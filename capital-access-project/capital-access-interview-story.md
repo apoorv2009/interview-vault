@@ -49,7 +49,99 @@ You joined as **Lead Software Development Engineer** in December 2024. Your owne
 
 ## Architecture Overview
 
-*[Diagram — see the HTML version (`capital-access-interview-story.html`) for the visual]*
+```mermaid
+flowchart TD
+    Okta["Okta<br/>OIDC Identity Provider · JWT · Custom claims (tenant, roles)"]
+    FD["Azure Front Door + CDN<br/>Load balancing · WAF · DDoS · SSL termination"]
+    SPA["Angular 18 SPA (Azure Static Web Apps)<br/>Standalone Components · NgRx · Okta Auth SDK · Role Guards"]
+
+    subgraph MS["MICROSERVICES — each validates JWT independently via Okta JWKS"]
+        Own["Ownership Service<br/>Institutional ownership %, history<br/>publishes → Service Bus"]
+        Prof["Profiles Service<br/>Company profiles, financials<br/>publishes → Service Bus"]
+        Targ["Targeting Service<br/>Investor scores, recommendations<br/>Redis cached, &lt;5ms reads<br/>subscribes ← Service Bus"]
+        Cont["Contacts Service<br/>IR contacts, meetings<br/>REST only (sync)"]
+        Notif["Notifications Service<br/>Alerts, in-app/email<br/>subscribes ← Service Bus"]
+        Rep["Report Service<br/>Job management, status<br/>publishes → Queue"]
+    end
+
+    subgraph SB["AZURE SERVICE BUS"]
+        Topics["Topics — Pub/Sub fan-out<br/>ownership-changed · profile-updated · report-ready<br/>Guaranteed delivery · Dead Letter Queue"]
+        Queue["Queue: report-generation-queue<br/>One worker per job"]
+    end
+
+    subgraph RPT["REPORT GENERATION"]
+        Func["Azure Function — Report Worker<br/>Queue trigger · serverless, auto-scales<br/>Aggregates data → generates PDF/Excel"]
+        Blob["Azure Blob Storage<br/>reports/{tenantId}/{jobId}/report.pdf<br/>SAS URL, 15 min, read-only"]
+    end
+
+    subgraph DS["DATA STORES — each service owns its own, no shared DB"]
+        CosmosDB["Cosmos DB<br/>Ownership time-series"]
+        SQL1["Azure SQL<br/>Company profiles"]
+        SQLRedis["Azure SQL + Redis<br/>Targeting scores, cache-aside"]
+        SQL2["Azure SQL<br/>Contacts · meetings"]
+        Table["Table Storage<br/>Alert events, delivery"]
+        SQL3["Azure SQL<br/>Report jobs table"]
+    end
+
+    subgraph SUP["SUPPORTING SERVICES"]
+        KV["Azure Key Vault<br/>Secrets · Managed Identity"]
+        AI["Azure App Insights<br/>Distributed tracing"]
+        CICD["Azure DevOps CI/CD<br/>Pipeline · bundle gate"]
+        Lifecycle["Blob Lifecycle Policy<br/>Hot 7d → Cool → Delete 90d"]
+        SWA["Azure Static Web Apps<br/>Angular hosting, global CDN"]
+    end
+
+    Okta -- JWT --> FD
+    FD --> SPA
+    SPA -- "REST Bearer JWT" --> Own
+    SPA -- "REST Bearer JWT" --> Prof
+    SPA -- "REST Bearer JWT" --> Targ
+    SPA -- "REST Bearer JWT" --> Cont
+    SPA -- "REST Bearer JWT" --> Notif
+    SPA -- "REST Bearer JWT" --> Rep
+
+    Own -- publish --> Topics
+    Prof -- publish --> Topics
+    Topics -- subscribe --> Targ
+    Topics -- subscribe --> Notif
+
+    Rep -- publish --> Queue
+    Queue --> Func
+    Func -. "calls all services to aggregate" .-> Targ
+    Func --> Blob
+    Func -- "report-ready event" --> Topics
+    Blob -. "SAS URL download" .-> SPA
+
+    Own --> CosmosDB
+    Prof --> SQL1
+    Targ --> SQLRedis
+    Cont --> SQL2
+    Notif --> Table
+    Rep --> SQL3
+
+    classDef identity fill:#007DC1,color:#fff,stroke:#005A9E
+    classDef edge fill:#0078D4,color:#fff,stroke:#005A9E
+    classDef frontend fill:#B91C1C,color:#fff,stroke:#7F1010
+    classDef svc fill:#003057,color:#fff,stroke:#001933
+    classDef report fill:#14532D,color:#fff,stroke:#0A3A1E
+    classDef bus fill:#92400E,color:#fff,stroke:#5C2800
+    classDef queue fill:#7C2D12,color:#fff,stroke:#4C1A0A
+    classDef func fill:#6B21A8,color:#fff,stroke:#4A1570
+    classDef blob fill:#1D4ED8,color:#fff,stroke:#1339A8
+    classDef store fill:#15803D,color:#fff,stroke:#0E5529
+    classDef support fill:#525252,color:#fff,stroke:#333
+
+    class Okta identity
+    class FD edge
+    class SPA frontend
+    class Own,Prof,Targ,Cont,Notif svc
+    class Rep report
+    class Topics,Queue bus
+    class Func func
+    class Blob blob
+    class CosmosDB,SQL1,SQLRedis,SQL2,Table,SQL3 store
+    class KV,AI,CICD,Lifecycle,SWA support
+```
 
 | Service | Owns | Database | Why this DB? |
 | --- | --- | --- | --- |
