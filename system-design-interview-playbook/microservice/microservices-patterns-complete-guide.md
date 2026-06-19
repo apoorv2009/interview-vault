@@ -18,9 +18,10 @@
 10. [Circuit Breaker Pattern](#10-circuit-breaker-pattern)
 11. [SAGA Pattern](#11-saga-pattern)
 12. [Choreography vs Orchestration](#12-choreography-vs-orchestration)
-13. [System Design — Facebook](#13-system-design--facebook)
-14. [System Design — Twitter](#14-system-design--twitter)
-15. [Interview Strategy](#15-interview-strategy)
+13. [CQRS Pattern](#13-cqrs-pattern)
+14. [System Design — Facebook](#14-system-design--facebook)
+15. [System Design — Twitter](#15-system-design--twitter)
+16. [Interview Strategy](#16-interview-strategy)
 
 ---
 
@@ -564,7 +565,124 @@ Central Saga Orchestrator directs every step and handles all failures.
 
 ---
 
-## 13. System Design — Facebook
+## 13. CQRS Pattern
+
+### The Problem
+
+One database handles both reads and writes. They fight each other.
+
+- **Writes** need strong consistency, complex validation, normalized data
+- **Reads** need speed, denormalized views, different indexes per use case
+- At scale, heavy reads slow down writes and vice versa — same DB, different needs
+
+### What CQRS Does
+
+**Command Query Responsibility Segregation** — split the write model (Commands) from the read model (Queries). Each side is optimized independently. Commands change state. Queries never change state.
+
+### The Mental Model — Bank Teller vs ATM Screen
+
+```
+Teller (Command side):
+  Processes transactions, enforces rules, updates the ledger.
+  Needs accuracy. Can be slower.
+
+ATM display (Query side):
+  Shows your balance instantly.
+  Doesn't process anything — just reads a pre-built view.
+  Can show data that's a few seconds old. That's fine.
+```
+
+### Architecture Flow
+
+```
+CLIENT
+  │
+  ├──▶ COMMAND (write intent: PlaceOrder, CancelOrder)
+  │       └──▶ Command Handler
+  │                 └──▶ validates business rules
+  │                 └──▶ writes to Write DB (normalized, ACID)
+  │                 └──▶ publishes Domain Event (OrderPlaced)
+  │                               └──▶ Event Handler
+  │                                         └──▶ updates Read DB (denormalized)
+  │
+  └──▶ QUERY (read request: GetOrderStatus, GetUserOrders)
+          └──▶ Query Handler
+                    └──▶ reads from Read DB (optimized for this exact query)
+                    └──▶ returns response instantly
+```
+
+### Commands vs Queries
+
+| | Command | Query |
+|---|---|---|
+| Intent | Change state | Read state |
+| Returns | Acknowledgement / void | Data |
+| Example | `PlaceOrder`, `CancelOrder` | `GetOrderStatus`, `GetUserOrders` |
+| Database | Write DB (normalized) | Read DB (denormalized) |
+| Consistency | Strong | Eventual |
+
+### Consistency Trade-off
+
+```
+User places order (Command) → Write DB updated immediately ✅
+                            → Event published → Read DB updated ~100ms later
+
+User checks order status (Query) → might see old status for 100ms
+                                 → then sees correct status ✅
+
+This is EVENTUAL CONSISTENCY. Acceptable for most use cases.
+If you need "read your own writes" immediately → cache the command result client-side.
+```
+
+### CQRS + Event Sourcing (Common Pairing)
+
+CQRS often pairs with Event Sourcing. The write side stores events (not state). The read side replays events to build optimized views.
+
+```
+Without Event Sourcing:  store current state → overwrite on update → history lost
+With Event Sourcing:     store every event   → current state = replay all events
+
+Orders (Event Sourcing write side):
+  event: OrderPlaced  {orderId: 1, item: iPhone, qty: 2}  at 10:05
+  event: ItemAdded    {orderId: 1, item: Case,   qty: 1}  at 10:06
+  event: OrderPaid    {orderId: 1, amount: $1200}         at 10:07
+
+Read model (rebuilt from events):
+  orderId: 1, items: [iPhone x2, Case x1], status: Paid, total: $1200
+
+Benefits: full audit trail · time travel · replay events to rebuild any view
+```
+
+### When to Use / Not Use
+
+**Use CQRS when:**
+- Read and write performance needs are very different
+- Many different read views of the same data (dashboard, mobile, reporting)
+- High read:write ratio — reads dominate
+- Audit trail required — pair with Event Sourcing
+- Scale reads and writes independently
+
+**Don't use CQRS when:**
+- Simple CRUD — massively overengineered
+- Team not familiar with eventual consistency
+- Small domain with few read patterns
+
+### Comparison with Related Patterns
+
+| Pattern | What it solves | Key idea |
+|---------|----------------|----------|
+| **CQRS** | Read/write contention | Separate models for reads and writes |
+| **Saga** | Distributed transactions | Chain of compensating steps |
+| **Outbox** | Dual-write reliability | Atomic DB write + event publish |
+| **Event Sourcing** | Audit trail / time travel | Store events not state |
+
+### Interview Answer
+
+> "CQRS separates the write model from the read model. The command side handles all state changes with strong consistency. The query side handles reads from a denormalized, eventually-consistent view. The write side publishes domain events; the read side consumes them to update its read models. This lets you scale reads and writes independently and optimize each side for its access pattern. The main cost is eventual consistency and the overhead of maintaining two databases."
+
+---
+
+## 14. System Design — Facebook
 
 ### Core Features (8 Things)
 
@@ -613,7 +731,7 @@ Celebrity Problem (Cristiano Ronaldo, 500M followers):
 
 ---
 
-## 14. System Design — Twitter
+## 15. System Design — Twitter
 
 ### 3 Core Differences from Facebook
 
@@ -680,7 +798,7 @@ NEW/DIFFERENT:
 
 ---
 
-## 15. Interview Strategy
+## 16. Interview Strategy
 
 ### System Design — The 5 Gears
 
