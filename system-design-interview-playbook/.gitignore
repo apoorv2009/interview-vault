@@ -1,0 +1,8 @@
+# Generated polished exports — .md files are the source of truth in this repo.
+# Keep docx out of git history (binary, no diffs); regenerate from .md if needed,
+# or drop a single curated copy locally if you want one on disk.
+*.docx
+
+# OS junk
+.DS_Store
+Thumbs.db
