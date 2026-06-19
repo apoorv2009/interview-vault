@@ -19,9 +19,7 @@
 11. [SAGA Pattern](#11-saga-pattern)
 12. [Choreography vs Orchestration](#12-choreography-vs-orchestration)
 13. [CQRS Pattern](#13-cqrs-pattern)
-14. [System Design — Facebook](#14-system-design--facebook)
-15. [System Design — Twitter](#15-system-design--twitter)
-16. [Interview Strategy](#16-interview-strategy)
+14. [Interview Strategy](#14-interview-strategy)
 
 ---
 
@@ -682,123 +680,7 @@ Benefits: full audit trail · time travel · replay events to rebuild any view
 
 ---
 
-## 14. System Design — Facebook
-
-### Core Features (8 Things)
-
-Profile · Friends (mutual) · Posts/Photos/Videos · News Feed · Likes & Comments · Notifications · Messages · Search
-
-### The 6 Core Concepts
-
-| Concept           | What it does                           | Analogy                                    |
-|-------------------|----------------------------------------|--------------------------------------------|
-| **Load Balancer** | Spreads traffic across many servers    | Supermarket directing customers to shortest queue |
-| **Sharding**      | Splits data across multiple databases  | Library rooms A-H, I-P, Q-Z               |
-| **Cache**         | Hot data in memory, skip DB            | Brain remembering capital of France        |
-| **CDN**           | Files from nearest server worldwide    | Flipkart warehouse in every city           |
-| **Message Queue** | Async background jobs                  | Restaurant ticket rail                     |
-| **Pre-computation**| Do hard work in advance, serve instantly | Pre-building your inbox overnight        |
-
-### News Feed — The Hardest Problem
-
-```
-Naive Pull Model (doesn't scale):
-  User opens app → query 500 friends → 500 DB queries → sort → show
-  At 3B users = billions of queries/second → database dies ❌
-
-Facebook's Push Model (Fan-out on Write):
-  Friend posts → immediately pushed to YOUR feed queue in background
-  You open app → read pre-built feed → milliseconds ✅
-
-Celebrity Problem (Cristiano Ronaldo, 500M followers):
-  Cannot push to 500M feeds in real time
-  HYBRID SOLUTION:
-    Normal users (< 10K followers) → Push model
-    Celebrities (millions)          → Pull model (fetch at read time)
-    Your feed = pre-built (normal friends) + pulled celebrity posts
-```
-
-### Key Solutions Per Problem
-
-| Problem                           | Solution                                  |
-|-----------------------------------|-------------------------------------------|
-| One server overloaded             | Load Balancer + multiple servers          |
-| One DB can't handle 3B users      | Sharding + separate DBs per data type     |
-| Photos/videos too big for DB      | Blob Storage (S3) + CDN                   |
-| Same post read millions of times  | Cache (Redis)                             |
-| Real-time notifications           | WebSockets — persistent two-way connection|
-| Search 3B users                   | Elasticsearch — pre-built inverted index  |
-
----
-
-## 15. System Design — Twitter
-
-### 3 Core Differences from Facebook
-
-|                   | Facebook                    | Twitter                                     |
-|-------------------|-----------------------------|---------------------------------------------|
-| Connection        | Mutual (friend both ways)   | One-way (follow)                            |
-| Feed order        | Algorithm ranked            | Chronological (newest first)                |
-| Write volume      | Medium                      | 500M tweets/day — extreme                   |
-| Public by default | No                          | Yes                                         |
-| Trending topics   | No                          | Core feature                                |
-| Real-time search  | No                          | Critical (tweets searchable in seconds)     |
-
-### Hybrid Fan-out (Celebrity Problem Even Worse)
-
-```
-Normal users (< 10K followers) → fan-out on write → push to followers' cache
-Celebrities (millions)         → fan-out on read  → pull when timeline opened
-Your timeline = cache (normal friends) + pulled celebrity tweets (merged chronologically)
-```
-
-### Trending Topics — Unique to Twitter
-
-```
-Every tweet arrives → extract hashtags → increment counter in Redis (cache)
-
-Every 30 seconds: sort hashtags by count → top 10 = Trending
-
-Key: Trending = SPIKE detection, not just total count.
-  #Cricket always mentioned → not trending
-  #Cricket spikes 10K/hr → 500K/hr → something big happened → TRENDING
-
-Tools: Kafka + Apache Flink (stream processing)
-```
-
-### Why Cassandra (Not SQL) for Tweets
-
-| SQL Database                              | Cassandra (NoSQL)                    |
-|-------------------------------------------|--------------------------------------|
-| Hard to scale writes horizontally         | Built for massive write throughput   |
-| Struggles at 6,000 tweets/second          | Handles millions of writes/second    |
-| ACID transactions                         | Eventual consistency                 |
-
-### What's New vs Facebook
-
-```
-SAME: Load Balancer, CDN, Cache (Redis), Sharded DBs,
-      Blob Storage, WebSockets, Search Index, Message Queues
-
-NEW/DIFFERENT:
-  Cassandra for tweet storage (write-heavy)
-  Hybrid fan-out service (worse celebrity problem)
-  Timeline cache per user (chronological not ranked)
-  Stream Processing (Kafka + Flink) for trending
-  Real-time search indexing (seconds not hours)
-  Trending Topics Service (spike detection)
-```
-
-### The One Sentence Difference
-
-> **Facebook** = social network. Connections between people. Sharing life moments with friends.
-> **Twitter** = public broadcast platform. Sharing information with the world in real time.
->
-> Same building blocks. Assembled differently because the problems are different.
-
----
-
-## 16. Interview Strategy
+## 14. Interview Strategy
 
 ### System Design — The 5 Gears
 
