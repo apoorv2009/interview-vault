@@ -1,59 +1,67 @@
-# InterviewPreperation
+# interview-vault
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 19.2.27.
+My interview prep notes, organized by topic.
 
-## Development server
+## Structure
 
-To start a local development server, run:
+```
+interview-vault/
+├── angular/                            # Angular 19 & TypeScript interview Q&A (74 questions)
+├── SQL&Postgres/                       # SQL & PostgreSQL interview prep
+├── capital-access-project/             # Real-project deep dive: S&P Global, Capital Access
+└── system-design-interview-playbook/   # Standalone system design Q&A, Senior Staff/Principal depth
+```
+
+## angular
+
+74 structured interview Q&As covering Angular 19 and TypeScript at a Senior Developer depth. Organized across 15 topic sections: Compilation & Build, Change Detection, Components & Lifecycle Hooks, Angular 19 Features (Signals, `@defer`, built-in control flow, `linkedSignal`, `resource`), Directives & Pipes, Dependency Injection, Forms, Routing, HTTP & Interceptors, RxJS & Reactivity, State Management (NgRx, BehaviorSubject, Signals), Performance Optimization, Testing with Jasmine & TestBed, TypeScript Deep Dive, and SSR & Hydration.
+
+Questions are tagged with `[Topic: X]` metadata and `[EPAM]` / `[Infosys]` / `[Capgemini]` / `[TCS]` company labels where the question is a known past interview question from that company. All version-specific answers are written from an **Angular 19** perspective.
+
+## interview-preperation-angular-app
+
+An Angular 19 application scaffold for interview preparation. Generated with Angular CLI 19.2.27.
+
+### Development server
 
 ```bash
 ng serve
 ```
 
-Once the server is running, open your browser and navigate to `http://localhost:4200/`. The application will automatically reload whenever you modify any of the source files.
+Open your browser and navigate to `http://localhost:4200/`.
 
-## Code scaffolding
-
-Angular CLI includes powerful code scaffolding tools. To generate a new component, run:
-
-```bash
-ng generate component component-name
-```
-
-For a complete list of available schematics (such as `components`, `directives`, or `pipes`), run:
-
-```bash
-ng generate --help
-```
-
-## Building
-
-To build the project run:
+### Build
 
 ```bash
 ng build
 ```
 
-This will compile your project and store the build artifacts in the `dist/` directory. By default, the production build optimizes your application for performance and speed.
+Build artifacts are stored in the `dist/` directory.
 
-## Running unit tests
-
-To execute unit tests with the [Karma](https://karma-runner.github.io) test runner, use the following command:
+### Running unit tests
 
 ```bash
 ng test
 ```
 
-## Running end-to-end tests
+## capital-access-project
 
-For end-to-end (e2e) testing, run:
+Interview prep tied to my current role: S&P Global, Lead Software Development Engineer, Capital Access (Dec 2024 – Present). Covers the actual production architecture, my ownership areas, and a growing set of Azure-service deep dives.
 
-```bash
-ng e2e
-```
+- `capital-access-interview-story.html` — single-file, self-contained doc (open directly in a browser). Includes: role/architecture overview, OIDC auth, Angular 18 migration, multi-tenancy, CI/CD, STAR story, follow-up Q&A, and per-service "Deep Dive" sections.
+- `README.md` — checklist of deep dives done vs. planned for this project.
 
-Angular CLI does not come with an end-to-end testing framework by default. You can choose one that suits your needs.
+Deep dives covered so far: Okta/OIDC, Azure Service Bus, Azure Functions, Durable Functions, Azure Cosmos DB.
+Planned next: Azure SQL, Azure Database for PostgreSQL, Azure Redis Cache, Azure Blob Storage, Azure Key Vault, Azure App Insights, Azure Front Door, Azure Static Web Apps.
 
-## Additional Resources
+## system-design-interview-playbook
 
-For more information on using the Angular CLI, including detailed command references, visit the [Angular CLI Overview and Command Reference](https://angular.dev/tools/cli) page.
+A personal repository of advanced system design interview questions and answers, written at a Senior Staff / Principal Engineer depth — one markdown file per question (real-world scenario style, e.g. "Your CTO calls at 3 AM, your S3 bucket is encrypted, ransom note in metadata — first 15 minutes"). Each answer includes a plain-language explanation, an architecture deep dive with diagrams, and a theoretical-frameworks section (CAP, PACELC, etc.) for interview talking points.
+
+24 questions covered currently, spanning: distributed systems & scale (Instagram scroll, Netflix subtitles/DRM, video transcoding), reliability & incident response (SSL cert expiry, ransomware), security (JWT debugging, API protection, OTP verification), concurrency (race conditions, duplicate inserts), RAG/AI systems (chunking, versioning, cost optimization, multi-format ingestion), and engineering practice (git rebase vs merge, microservice architecture patterns).
+
+See its own `README.md` and `CLAUDE.md` for authoring conventions (file naming, dedup rules, depth target, required sections).
+
+## Source of truth
+
+Markdown/HTML files are the source of truth — they diff cleanly in git and don't need a build step. Polished `.docx` exports can be generated on demand for printing/sharing but aren't tracked in git (see each folder's `.gitignore`).

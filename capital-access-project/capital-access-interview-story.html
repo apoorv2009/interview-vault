@@ -1,0 +1,1903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capital Access — Interview Story | S&P Global</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 14px; line-height: 1.75; color: #1a1a2e; background: #f4f6f9; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 20px; }
+
+  .doc-header { background: linear-gradient(135deg, #003057, #0066a1); color: #fff; padding: 28px 32px; border-radius: 10px; margin-bottom: 24px; }
+  .doc-header h1 { font-size: 22px; margin-bottom: 4px; }
+  .doc-header .sub { color: #aad4f0; font-size: 13px; margin-top: 6px; }
+  .badge { display: inline-block; background: rgba(255,255,255,0.15); color: #fff; font-size: 11px; padding: 3px 10px; border-radius: 12px; margin: 2px; }
+
+  .toc { background: #fff; border-radius: 8px; padding: 18px 24px; margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .toc h2 { font-size: 14px; color: #003057; margin-bottom: 10px; border-bottom: 2px solid #e0e8f0; padding-bottom: 8px; }
+  .toc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 20px; }
+  .toc a { text-decoration: none; color: #0066a1; font-size: 13px; padding: 3px 0; display: block; }
+  .toc a:hover { color: #003057; }
+  .toc-num { color: #bbb; font-size: 11px; margin-right: 5px; }
+
+  .section { background: #fff; border-radius: 8px; padding: 24px 28px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 2px solid #e8ecf0; }
+  .snum { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; color: #fff; flex-shrink: 0; background: #003057; }
+  .snum.blue   { background: #0066a1; }
+  .snum.green  { background: #1e7e34; }
+  .snum.amber  { background: #b8860b; }
+  .snum.purple { background: #5b2c8d; }
+  .snum.red    { background: #c0392b; }
+  .snum.teal   { background: #0d7377; }
+  h2.stitle { font-size: 17px; color: #003057; }
+
+  h3 { font-size: 14px; font-weight: bold; color: #003057; margin: 16px 0 8px; border-left: 3px solid #0066a1; padding-left: 8px; }
+  h4 { font-size: 13px; font-weight: bold; color: #1a1a2e; margin: 12px 0 5px; }
+  p  { margin-bottom: 10px; }
+
+  /* Speak box — the actual words to say */
+  .speak { background: #eaf4fb; border: 1px solid #bee3f8; border-radius: 6px; padding: 14px 16px; margin: 10px 0; font-size: 13px; line-height: 1.8; }
+  .speak::before { content: '🗣️ Say: '; font-weight: bold; color: #0066a1; display: block; margin-bottom: 6px; font-size: 12px; }
+
+  /* Callouts */
+  .callout { padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 13px; }
+  .callout.blue   { background: #eaf4fb; border-left: 4px solid #0066a1; }
+  .callout.green  { background: #eafaf1; border-left: 4px solid #27ae60; }
+  .callout.amber  { background: #fef9e7; border-left: 4px solid #f39c12; }
+  .callout.red    { background: #fdedec; border-left: 4px solid #e74c3c; }
+  .callout strong { display: block; margin-bottom: 3px; }
+
+  /* Q&A cards */
+  .qa { border: 1px solid #dde6ef; border-radius: 8px; margin: 14px 0; overflow: hidden; }
+  .qa-q { background: #003057; color: #fff; padding: 10px 16px; font-size: 13px; font-weight: bold; }
+  .qa-a { padding: 14px 16px; font-size: 13px; line-height: 1.8; }
+  .qa-a .label { font-weight: bold; color: #0066a1; display: block; margin-bottom: 4px; }
+  .qa-tip { background: #fef9e7; border-top: 1px solid #f0e0a0; padding: 8px 16px; font-size: 12px; color: #856404; }
+  .qa-tip::before { content: '💡 Tip: '; font-weight: bold; }
+
+  /* Flow */
+  .flow { background: #f0f4f8; border-radius: 6px; padding: 14px 16px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.9; margin: 10px 0; white-space: pre; overflow-x: auto; color: #1a1a2e; }
+
+  /* Architecture diagram */
+  .arch { background: #001f3f; color: #e8f4fd; border-radius: 8px; padding: 18px 20px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.9; margin: 12px 0; white-space: pre; overflow-x: auto; }
+
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th { background: #003057; color: #fff; padding: 8px 12px; text-align: left; }
+  td { padding: 7px 12px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) td { background: #f7f9fc; }
+
+  .metric { display: inline-block; background: #003057; color: #fff; border-radius: 6px; padding: 4px 12px; font-size: 13px; font-weight: bold; margin: 4px; }
+  .metric span { color: #7dd3fc; }
+
+  .summary-box { background: #003057; color: #e8f4fd; padding: 16px 20px; border-radius: 8px; margin: 16px 0; }
+  .summary-box h4 { color: #7dd3fc; margin-bottom: 8px; }
+
+  ul, ol { padding-left: 20px; margin: 6px 0 10px; }
+  li { margin-bottom: 4px; }
+  .divider { height: 1px; background: #e8ecf0; margin: 16px 0; }
+
+  @media (max-width: 640px) { .toc-grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="doc-header">
+    <h1>Capital Access — Interview Story</h1>
+    <div class="sub">S&amp;P Global · Lead Software Development Engineer · Dec 2024 – Present</div>
+    <div style="margin-top:12px">
+      <span class="badge">Angular 18</span>
+      <span class="badge">Azure Microservices</span>
+      <span class="badge">Azure Service Bus</span>
+      <span class="badge">Azure SQL / Cosmos DB</span>
+      <span class="badge">Azure Redis Cache</span>
+      <span class="badge">OIDC / Okta</span>
+      <span class="badge">Multi-Tenant SaaS</span>
+      <span class="badge">Azure DevOps CI/CD</span>
+      <span class="badge">Capital Markets</span>
+    </div>
+  </div>
+
+  <div class="toc">
+    <h2>📋 Contents</h2>
+    <div class="toc-grid">
+      <a href="#s1"><span class="toc-num">01</span> What is Capital Access?</a>
+      <a href="#s2"><span class="toc-num">02</span> Your Role &amp; Ownership</a>
+      <a href="#s3"><span class="toc-num">03</span> Architecture — Microservices, Azure Stack</a>
+      <a href="#s3b"><span class="toc-num">3b</span> Report Generation Architecture</a>
+      <a href="#s4"><span class="toc-num">04</span> OIDC Auth — Deep Dive</a>
+      <a href="#s5"><span class="toc-num">05</span> Angular 18 Migration</a>
+      <a href="#s6"><span class="toc-num">06</span> Multi-Tenancy in Frontend</a>
+      <a href="#s7"><span class="toc-num">07</span> CI/CD &amp; DevOps</a>
+      <a href="#s8"><span class="toc-num">08</span> The STAR Story (to say in interview)</a>
+      <a href="#s9"><span class="toc-num">09</span> Follow-Up Questions &amp; Answers</a>
+      <a href="#s10"><span class="toc-num">10</span> Questions to Ask the Interviewer</a>
+      <a href="#dd-okta"><span class="toc-num">DD1</span> Deep Dive — Okta / OIDC</a>
+      <a href="#dd-servicebus"><span class="toc-num">DD2</span> Deep Dive — Azure Service Bus</a>
+      <a href="#dd-azurefunctions"><span class="toc-num">DD3</span> Deep Dive — Azure Functions (Triggers, Bindings, Hosting)</a>
+      <a href="#dd-durable"><span class="toc-num">DD4</span> Deep Dive — Durable Functions</a>
+      <a href="#dd-cosmosdb"><span class="toc-num">DD5</span> Deep Dive — Azure Cosmos DB</a>
+    </div>
+  </div>
+
+
+  <!-- ===================== SECTION 1 ===================== -->
+  <div class="section" id="s1">
+    <div class="section-header">
+      <div class="snum blue">1</div>
+      <h2 class="stitle">What is Capital Access?</h2>
+    </div>
+
+    <p><strong>Capital Access</strong> is S&amp;P Global Market Intelligence's enterprise SaaS workflow platform for Investor Relations (IR) teams at publicly listed companies. Corporate IR officers use it to identify and target the right institutional investors, manage investor engagement and communications, monitor shareholder ownership, and measure IR programme effectiveness — all on a single platform. It is positioned under S&amp;P's <em>Issuer Solutions</em> division.</p>
+
+    <div class="callout amber"><strong>Key distinction for interviews:</strong> Capital Access serves <strong>corporate issuers</strong> (public company IR teams), not institutional investors or buy-side firms. The IR team at, say, a FTSE 100 company logs in to find which hedge funds or mutual funds are likely buyers of their stock, then manages outreach and tracks results inside Capital Access.</div>
+
+    <h3>Core Product Modules</h3>
+    <table>
+      <tr><th>Module</th><th>What IR teams do</th></tr>
+      <tr><td><strong>Investor Targeting &amp; Engagement</strong></td><td>Identify compatible institutional investors (by mandate, style, geography); run targeted outreach campaigns; track engagement</td></tr>
+      <tr><td><strong>Stock Surveillance / Capital Insight</strong></td><td>Real-time, self-service surveillance of ownership trends — who is buying, selling, likely to change position</td></tr>
+      <tr><td><strong>Capital Access Mail</strong></td><td>Purpose-built IR communication platform with seamless Outlook &amp; Gmail sync, mass email to investor lists, and engagement analytics (opens, clicks)</td></tr>
+      <tr><td><strong>Shareholder Ownership Analytics</strong></td><td>Track institutional ownership %, historical trends by quarter, peer benchmarking, ownership change alerts</td></tr>
+      <tr><td><strong>IR CRM (BD Corporate)</strong></td><td>Investor contact management, meeting scheduling (roadshows, NDRs), relationship history, bulk profile management</td></tr>
+      <tr><td><strong>AI Textual Analytics</strong></td><td>Input earnings call scripts or investor communications; receive AI-generated sentiment scores and early feedback signals</td></tr>
+      <tr><td><strong>ESG &amp; Governance Analytics</strong></td><td>Sustainability Fit Metric, Fund ESG Weighted Average — helps IR teams align sustainability narrative with investor priorities</td></tr>
+      <tr><td><strong>Reporting</strong></td><td>Board-level IR reports, Historical Ownership Report with trend analysis, customisable data-point-level layouts</td></tr>
+    </table>
+
+    <h3>Integrations &amp; Data</h3>
+    <p>Capital Access integrates data from <strong>S&amp;P Capital IQ Pro</strong> and <strong>Visible Alpha</strong> for financial intelligence, and syncs communications with <strong>Outlook</strong> and <strong>Gmail</strong> via Capital Access Mail.</p>
+
+    <h3>Scale</h3>
+    <div style="margin: 12px 0;">
+      <span class="metric">2,500+ <span>Corporate Issuers</span></span>
+      <span class="metric">8+ <span>Feature Modules</span></span>
+      <span class="metric">Multi-tenant <span>SaaS</span></span>
+      <span class="metric">Azure <span>Hosted</span></span>
+    </div>
+
+    <div class="callout blue"><strong>Why this matters for interviews:</strong> Capital Access is not a simple CRUD app. It serves regulated public companies and their IR programmes with strict security (multi-tenant data isolation), high availability, performance requirements (real-time surveillance), and AI-driven analytics. That context makes your work on OIDC, microservices architecture, and multi-tenancy highly meaningful.</div>
+
+    <h3>What to Say in the Interview</h3>
+    <div class="speak">Capital Access is a web platform used by Investor Relations (IR) teams in public companies. It helps them find and connect with investors, track who owns their company's shares, and manage investor communication — all in one place. The platform is used by over 2,500 companies worldwide and uses S&amp;P Global data such as Capital IQ Pro and Visible Alpha.
+
+I work as a Lead Software Development Engineer on the frontend using Angular 18. I also work with Azure-based microservices, Okta authentication, and CI/CD pipelines.</div>
+  </div>
+
+
+  <!-- ===================== SECTION 2 ===================== -->
+  <div class="section" id="s2">
+    <div class="section-header">
+      <div class="snum blue">2</div>
+      <h2 class="stitle">Your Role &amp; Ownership</h2>
+    </div>
+
+    <p>You joined as <strong>Lead Software Development Engineer</strong> in December 2024. Your ownership spans three distinct areas:</p>
+
+    <table>
+      <tr><th>Area</th><th>What you own</th><th>Impact</th></tr>
+      <tr><td><strong>Feature Development</strong></td><td>Angular 18 front-end features across 8+ modules</td><td>2,500+ corporate IR teams consume what you build</td></tr>
+      <tr><td><strong>Authentication</strong></td><td>Full OIDC flow — token refresh, silent renewal, role-scoped access</td><td>Security foundation for the entire SaaS product</td></tr>
+      <tr><td><strong>Platform Modernisation</strong></td><td>Legacy webpack → Angular 18 standalone component migration</td><td>30% bundle reduction, faster build pipeline</td></tr>
+    </table>
+
+    <div class="callout green"><strong>How to frame your seniority:</strong> You are not just implementing tickets. You contribute to front-end technical decisions — performance strategy, accessibility standards (WCAG 2.1), multi-tenant architecture, and CI/CD deployment gates. This is lead-level ownership.</div>
+  </div>
+
+
+  <!-- ===================== SECTION 3 ===================== -->
+  <div class="section" id="s3">
+    <div class="section-header">
+      <div class="snum blue">3</div>
+      <h2 class="stitle">Architecture Overview</h2>
+    </div>
+
+    <h3>Full System Architecture — Visual Diagram</h3>
+    <div style="overflow-x:auto;margin:12px 0;">
+    <svg viewBox="0 0 960 830" xmlns="http://www.w3.org/2000/svg" style="width:100%;min-width:700px;font-family:Arial,sans-serif;display:block;">
+      <defs>
+        <marker id="ab" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#0066A1"/></marker>
+        <marker id="ao" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#B85200"/></marker>
+        <marker id="ag" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#1A6E35"/></marker>
+        <marker id="ap" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#6B21A8"/></marker>
+      </defs>
+
+      <!-- ── BAND BACKGROUNDS ── -->
+      <rect x="2" y="2"   width="956" height="62"  rx="8" fill="#E8F4FD" stroke="#C5D9EA" stroke-width="1"/>
+      <text x="12" y="13" fill="#888" font-size="9" font-weight="bold">IDENTITY</text>
+      <rect x="2" y="70"  width="956" height="62"  rx="8" fill="#E8F4FD" stroke="#C5D9EA" stroke-width="1"/>
+      <text x="12" y="81" fill="#888" font-size="9" font-weight="bold">EDGE</text>
+      <rect x="2" y="138" width="956" height="70"  rx="8" fill="#FEF0F2" stroke="#F5C6CB" stroke-width="1"/>
+      <text x="12" y="149" fill="#888" font-size="9" font-weight="bold">FRONTEND</text>
+      <rect x="2" y="214" width="956" height="130" rx="8" fill="#EEF2EE" stroke="#C3D9C3" stroke-width="1"/>
+      <text x="12" y="225" fill="#888" font-size="9" font-weight="bold">MICROSERVICES  ·  each service validates JWT independently via Okta JWKS endpoint</text>
+      <rect x="2" y="350" width="956" height="88"  rx="8" fill="#FFF3E0" stroke="#FFCC80" stroke-width="1"/>
+      <text x="12" y="361" fill="#888" font-size="9" font-weight="bold">ASYNC MESSAGING — Azure Service Bus</text>
+      <rect x="2" y="444" width="956" height="138" rx="8" fill="#F5EEF8" stroke="#D8BEF8" stroke-width="1"/>
+      <text x="12" y="455" fill="#888" font-size="9" font-weight="bold">REPORT GENERATION — Azure Function (serverless, auto-scales) + Blob Storage</text>
+      <rect x="2" y="588" width="956" height="85"  rx="8" fill="#EAF4F0" stroke="#A9DFC0" stroke-width="1"/>
+      <text x="12" y="599" fill="#888" font-size="9" font-weight="bold">DATA STORES  ·  each service owns its own — no shared DB</text>
+      <rect x="2" y="679" width="956" height="52"  rx="8" fill="#F5F5F5" stroke="#DCDCDC" stroke-width="1"/>
+      <text x="12" y="690" fill="#888" font-size="9" font-weight="bold">SUPPORTING SERVICES</text>
+      <rect x="2" y="737" width="956" height="88"  rx="8" fill="#FAFAFA" stroke="#E0E0E0" stroke-width="1"/>
+      <text x="12" y="748" fill="#555" font-size="9" font-weight="bold">LEGEND</text>
+
+      <!-- ── OKTA ── -->
+      <rect x="370" y="10" width="220" height="46" rx="7" fill="#007DC1" stroke="#005A9E" stroke-width="1.5"/>
+      <text x="480" y="31" fill="#fff" font-size="13" font-weight="bold" text-anchor="middle">Okta</text>
+      <text x="480" y="47" fill="#B3E0FF" font-size="10" text-anchor="middle">OIDC Identity Provider · JWT · Custom claims (tenant, roles)</text>
+
+      <!-- ── FRONT DOOR ── -->
+      <rect x="228" y="78" width="504" height="46" rx="7" fill="#0078D4" stroke="#005A9E" stroke-width="1.5"/>
+      <text x="480" y="99" fill="#fff" font-size="12" font-weight="bold" text-anchor="middle">Azure Front Door + CDN</text>
+      <text x="480" y="115" fill="#B3D7FF" font-size="10" text-anchor="middle">Global load balancing · WAF · DDoS · SSL termination · Static asset cache</text>
+
+      <!-- ── ANGULAR SPA ── -->
+      <rect x="178" y="146" width="604" height="58" rx="7" fill="#B91C1C" stroke="#7F1010" stroke-width="1.5"/>
+      <text x="480" y="168" fill="#fff" font-size="13" font-weight="bold" text-anchor="middle">Angular 18 SPA  (Azure Static Web Apps)</text>
+      <text x="480" y="185" fill="#FFCDD2" font-size="10" text-anchor="middle">Standalone Components · NgRx · Okta Auth SDK · HTTP Interceptor (Bearer JWT) · Role Guards · Lazy Modules</text>
+
+      <!-- ── 6 SERVICE BOXES  w=148 gap=8  xs: 8,164,320,476,632,788 ── -->
+      <!-- Ownership -->
+      <rect x="8"   y="232" width="148" height="104" rx="6" fill="#003057" stroke="#001933" stroke-width="1.5"/>
+      <text x="82"  y="252" fill="#7FBFFF" font-size="11" font-weight="bold" text-anchor="middle">Ownership</text>
+      <text x="82"  y="265" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
+      <line x1="8" y1="272" x2="156" y2="272" stroke="#1A4A6E" stroke-width="1"/>
+      <text x="82"  y="284" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Institutional ownership %</text>
+      <text x="82"  y="296" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Historical data by quarter</text>
+      <text x="82"  y="308" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Change tracking</text>
+      <text x="82"  y="328" fill="#4ADE80" font-size="8"   text-anchor="middle">publishes → Service Bus</text>
+
+      <!-- Profiles -->
+      <rect x="164" y="232" width="148" height="104" rx="6" fill="#003057" stroke="#001933" stroke-width="1.5"/>
+      <text x="238" y="252" fill="#7FBFFF" font-size="11" font-weight="bold" text-anchor="middle">Profiles</text>
+      <text x="238" y="265" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
+      <line x1="164" y1="272" x2="312" y2="272" stroke="#1A4A6E" stroke-width="1"/>
+      <text x="238" y="284" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Company profiles</text>
+      <text x="238" y="296" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Financials · Sector</text>
+      <text x="238" y="308" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Market cap · IR team</text>
+      <text x="238" y="328" fill="#4ADE80" font-size="8"   text-anchor="middle">publishes → Service Bus</text>
+
+      <!-- Targeting -->
+      <rect x="320" y="232" width="148" height="104" rx="6" fill="#003057" stroke="#001933" stroke-width="1.5"/>
+      <text x="394" y="252" fill="#7FBFFF" font-size="11" font-weight="bold" text-anchor="middle">Targeting</text>
+      <text x="394" y="265" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
+      <line x1="320" y1="272" x2="468" y2="272" stroke="#1A4A6E" stroke-width="1"/>
+      <text x="394" y="284" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Investor scores</text>
+      <text x="394" y="296" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Recommendations</text>
+      <text x="394" y="308" fill="#FCD34D" font-size="8"   text-anchor="middle">Redis cached &lt;5ms reads</text>
+      <text x="394" y="328" fill="#FCA5A5" font-size="8"   text-anchor="middle">subscribes ← Service Bus</text>
+
+      <!-- Contacts -->
+      <rect x="476" y="232" width="148" height="104" rx="6" fill="#003057" stroke="#001933" stroke-width="1.5"/>
+      <text x="550" y="252" fill="#7FBFFF" font-size="11" font-weight="bold" text-anchor="middle">Contacts</text>
+      <text x="550" y="265" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
+      <line x1="476" y1="272" x2="624" y2="272" stroke="#1A4A6E" stroke-width="1"/>
+      <text x="550" y="284" fill="#AAD4F0" font-size="8.5" text-anchor="middle">IR contacts</text>
+      <text x="550" y="296" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Investor relationships</text>
+      <text x="550" y="308" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Meeting history</text>
+      <text x="550" y="328" fill="#AAD4F0" font-size="8"   text-anchor="middle">REST only (sync)</text>
+
+      <!-- Notifications -->
+      <rect x="632" y="232" width="148" height="104" rx="6" fill="#003057" stroke="#001933" stroke-width="1.5"/>
+      <text x="706" y="252" fill="#7FBFFF" font-size="11" font-weight="bold" text-anchor="middle">Notifications</text>
+      <text x="706" y="265" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
+      <line x1="632" y1="272" x2="780" y2="272" stroke="#1A4A6E" stroke-width="1"/>
+      <text x="706" y="284" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Alerts · In-app · Email</text>
+      <text x="706" y="296" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Report ready alerts</text>
+      <text x="706" y="308" fill="#FCD34D" font-size="8"   text-anchor="middle">Ownership change alerts</text>
+      <text x="706" y="328" fill="#FCA5A5" font-size="8"   text-anchor="middle">subscribes ← Service Bus</text>
+
+      <!-- Report Service -->
+      <rect x="788" y="232" width="162" height="104" rx="6" fill="#14532D" stroke="#0A3A1E" stroke-width="1.5"/>
+      <text x="869" y="252" fill="#86EFAC" font-size="11" font-weight="bold" text-anchor="middle">Report</text>
+      <text x="869" y="265" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
+      <line x1="788" y1="272" x2="950" y2="272" stroke="#1A5C30" stroke-width="1"/>
+      <text x="869" y="284" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Job management</text>
+      <text x="869" y="296" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Status tracking</text>
+      <text x="869" y="308" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Generates SAS URL</text>
+      <text x="869" y="328" fill="#4ADE80" font-size="8"   text-anchor="middle">publishes → Queue</text>
+
+      <!-- ── SERVICE BUS TOPICS ── -->
+      <rect x="8"   y="360" width="570" height="72" rx="6" fill="#92400E" stroke="#5C2800" stroke-width="1.5"/>
+      <text x="293" y="380" fill="#fff"    font-size="12" font-weight="bold" text-anchor="middle">Azure Service Bus — Topics (Pub/Sub fan-out)</text>
+      <text x="293" y="396" fill="#FDE68A" font-size="9"  text-anchor="middle">ownership-changed  →  [Targeting Service]  [Notifications Service]</text>
+      <text x="293" y="410" fill="#FDE68A" font-size="9"  text-anchor="middle">profile-updated    →  [Targeting Service]          ·          report-ready  →  [Notifications Service]</text>
+      <text x="293" y="424" fill="#FCD34D" font-size="8.5" text-anchor="middle">Guaranteed delivery · Dead Letter Queue on failure · At-least-once</text>
+
+      <!-- ── SERVICE BUS QUEUE ── -->
+      <rect x="586" y="360" width="366" height="72" rx="6" fill="#7C2D12" stroke="#4C1A0A" stroke-width="1.5"/>
+      <text x="769" y="380" fill="#fff"    font-size="12" font-weight="bold" text-anchor="middle">Azure Service Bus — Queue</text>
+      <text x="769" y="397" fill="#FED7AA" font-size="10" text-anchor="middle">report-generation-queue</text>
+      <text x="769" y="413" fill="#FED7AA" font-size="9"  text-anchor="middle">ONE worker per job · task, not event fan-out</text>
+      <text x="769" y="427" fill="#FED7AA" font-size="8.5" text-anchor="middle">Message lock · auto-retry · Dead Letter Queue</text>
+
+      <!-- ── AZURE FUNCTION ── -->
+      <rect x="586" y="452" width="366" height="70" rx="6" fill="#6B21A8" stroke="#4A1570" stroke-width="1.5"/>
+      <text x="769" y="472" fill="#E9D5FF" font-size="11" font-weight="bold" text-anchor="middle">Azure Function  (Report Worker)</text>
+      <text x="769" y="487" fill="#fff"    font-size="9"  text-anchor="middle">Queue Trigger · Serverless · auto-scales to queue depth</text>
+      <text x="769" y="502" fill="#D8B4FE" font-size="9"  text-anchor="middle">Calls all 5 services → aggregates data → generates PDF / Excel</text>
+      <text x="769" y="517" fill="#D8B4FE" font-size="8.5" text-anchor="middle">Uploads to Blob → updates job status → publishes report-ready event</text>
+
+      <!-- ── BLOB STORAGE ── -->
+      <rect x="626" y="534" width="286" height="50" rx="6" fill="#1D4ED8" stroke="#1339A8" stroke-width="1.5"/>
+      <text x="769" y="555" fill="#fff"    font-size="11" font-weight="bold" text-anchor="middle">Azure Blob Storage</text>
+      <text x="769" y="570" fill="#BFDBFE" font-size="9"  text-anchor="middle">reports/{tenantId}/{jobId}/report.pdf   ·   private container</text>
+      <text x="769" y="580" fill="#93C5FD" font-size="8"  font-style="italic" text-anchor="middle">SAS URL (15 min · read-only) returned to Angular for download</text>
+
+      <!-- ── DATA STORES ── -->
+      <!-- Cosmos DB (Ownership) -->
+      <rect x="8"   y="596" width="148" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
+      <text x="82"  y="616" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Cosmos DB</text>
+      <text x="82"  y="630" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Ownership time-series</text>
+      <text x="82"  y="643" fill="#BBF7D0" font-size="8.5" text-anchor="middle">High-vol writes · NoSQL</text>
+      <text x="82"  y="658" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Ownership Service</text>
+
+      <!-- Azure SQL (Profiles) -->
+      <rect x="164" y="596" width="148" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
+      <text x="238" y="616" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Azure SQL</text>
+      <text x="238" y="630" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Company profiles</text>
+      <text x="238" y="643" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Structured · relational</text>
+      <text x="238" y="658" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Profiles Service</text>
+
+      <!-- Azure SQL + Redis (Targeting) -->
+      <rect x="320" y="596" width="148" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
+      <text x="394" y="613" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Azure SQL</text>
+      <text x="394" y="626" fill="#BBF7D0" font-size="8.5" text-anchor="middle">+ Redis Cache</text>
+      <text x="394" y="639" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Scores · cache-aside</text>
+      <text x="394" y="652" fill="#FCD34D" font-size="8"   text-anchor="middle">&lt;5ms cached reads</text>
+      <text x="394" y="662" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Targeting Service</text>
+
+      <!-- Azure SQL (Contacts) -->
+      <rect x="476" y="596" width="148" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
+      <text x="550" y="616" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Azure SQL</text>
+      <text x="550" y="630" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Contacts · meetings</text>
+      <text x="550" y="643" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Relational structure</text>
+      <text x="550" y="658" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Contacts Service</text>
+
+      <!-- Table Storage (Notifications) -->
+      <rect x="632" y="596" width="148" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
+      <text x="706" y="616" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Table Storage</text>
+      <text x="706" y="630" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Alert events · delivery</text>
+      <text x="706" y="643" fill="#BBF7D0" font-size="8.5" text-anchor="middle">High-vol · low cost</text>
+      <text x="706" y="658" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Notifications Service</text>
+
+      <!-- Azure SQL (Report jobs) -->
+      <rect x="788" y="596" width="162" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
+      <text x="869" y="616" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Azure SQL</text>
+      <text x="869" y="630" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Report jobs table</text>
+      <text x="869" y="643" fill="#BBF7D0" font-size="8.5" text-anchor="middle">jobId · status · blobPath</text>
+      <text x="869" y="658" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Report Service</text>
+
+      <!-- ── SUPPORTING SERVICES ── -->
+      <rect x="8"   y="687" width="170" height="38" rx="5" fill="#525252" stroke="#333"/>
+      <text x="93"  y="703" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Azure Key Vault</text>
+      <text x="93"  y="717" fill="#CCC" font-size="8.5" text-anchor="middle">Secrets · Managed Identity</text>
+
+      <rect x="188" y="687" width="195" height="38" rx="5" fill="#525252" stroke="#333"/>
+      <text x="285" y="703" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Azure App Insights</text>
+      <text x="285" y="717" fill="#CCC" font-size="8.5" text-anchor="middle">Distributed tracing · Correlation ID</text>
+
+      <rect x="393" y="687" width="172" height="38" rx="5" fill="#525252" stroke="#333"/>
+      <text x="479" y="703" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Azure DevOps CI/CD</text>
+      <text x="479" y="717" fill="#CCC" font-size="8.5" text-anchor="middle">Pipeline · Bundle size gate</text>
+
+      <rect x="575" y="687" width="178" height="38" rx="5" fill="#525252" stroke="#333"/>
+      <text x="664" y="703" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Blob Lifecycle Policy</text>
+      <text x="664" y="717" fill="#CCC" font-size="8.5" text-anchor="middle">Hot 7d → Cool → Delete 90d</text>
+
+      <rect x="763" y="687" width="189" height="38" rx="5" fill="#525252" stroke="#333"/>
+      <text x="857" y="703" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Azure Static Web Apps</text>
+      <text x="857" y="717" fill="#CCC" font-size="8.5" text-anchor="middle">Angular hosting · global CDN</text>
+
+      <!-- ── ARROWS ── -->
+      <!-- Okta → Front Door -->
+      <line x1="480" y1="56" x2="480" y2="76" stroke="#0066A1" stroke-width="1.8" marker-end="url(#ab)"/>
+      <text x="488" y="70" fill="#0066A1" font-size="8">JWT</text>
+
+      <!-- Front Door → Angular -->
+      <line x1="480" y1="124" x2="480" y2="144" stroke="#0066A1" stroke-width="1.8" marker-end="url(#ab)"/>
+
+      <!-- Angular → Services (6 short dashed arrows) -->
+      <line x1="82"  y1="204" x2="82"  y2="230" stroke="#0066A1" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ab)"/>
+      <line x1="238" y1="204" x2="238" y2="230" stroke="#0066A1" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ab)"/>
+      <line x1="394" y1="204" x2="394" y2="230" stroke="#0066A1" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ab)"/>
+      <line x1="550" y1="204" x2="550" y2="230" stroke="#0066A1" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ab)"/>
+      <line x1="706" y1="204" x2="706" y2="230" stroke="#0066A1" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ab)"/>
+      <line x1="869" y1="204" x2="869" y2="230" stroke="#15803D" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ag)"/>
+      <!-- REST label -->
+      <text x="480" y="222" fill="#0066A1" font-size="8" text-anchor="middle">REST  (Bearer JWT)</text>
+
+      <!-- Ownership + Profiles → SB Topics (publish) -->
+      <path d="M 82 336 L 82 358" stroke="#B85200" stroke-width="1.5" marker-end="url(#ao)"/>
+      <path d="M 238 336 L 238 358" stroke="#B85200" stroke-width="1.5" marker-end="url(#ao)"/>
+
+      <!-- SB Topics → Targeting (subscription, up) -->
+      <path d="M 320 360 L 320 344 L 394 344 L 394 336" stroke="#B85200" stroke-width="1.4" stroke-dasharray="5,2" fill="none" marker-end="url(#ao)"/>
+      <!-- SB Topics → Notifications (subscription, up) -->
+      <path d="M 450 360 L 450 344 L 706 344 L 706 336" stroke="#B85200" stroke-width="1.4" stroke-dasharray="5,2" fill="none" marker-end="url(#ao)"/>
+
+      <!-- Report Service → SB Queue -->
+      <path d="M 869 336 L 869 358" stroke="#7C2D12" stroke-width="1.5" marker-end="url(#ao)"/>
+
+      <!-- SB Queue → Azure Function -->
+      <line x1="769" y1="432" x2="769" y2="450" stroke="#6B21A8" stroke-width="1.8" marker-end="url(#ap)"/>
+
+      <!-- Azure Function data aggregation (calls services — curved arrow left) -->
+      <path d="M 586 487 C 480 487 380 487 380 440 C 380 395 380 360 394 344 L 394 336" stroke="#6B21A8" stroke-width="1" stroke-dasharray="3,2" fill="none" marker-end="url(#ap)"/>
+      <text x="460" y="484" fill="#6B21A8" font-size="8" text-anchor="middle">calls all services to aggregate data</text>
+
+      <!-- Azure Function → Blob Storage -->
+      <line x1="769" y1="522" x2="769" y2="532" stroke="#1D4ED8" stroke-width="1.8" marker-end="url(#ab)"/>
+
+      <!-- Azure Function → SB Topics (report-ready event) -->
+      <path d="M 586 478 L 380 478 L 380 432" stroke="#B85200" stroke-width="1.2" stroke-dasharray="4,2" fill="none" marker-end="url(#ao)"/>
+      <text x="486" y="474" fill="#B85200" font-size="8" text-anchor="middle">report-ready event</text>
+
+      <!-- SAS URL return arrow (right edge, going up) -->
+      <path d="M 912 534 C 945 534 945 174 912 174" stroke="#15803D" stroke-width="1.3" stroke-dasharray="5,2" fill="none" marker-end="url(#ag)"/>
+      <text x="950" y="360" fill="#15803D" font-size="8" text-anchor="middle" transform="rotate(90,950,360)">SAS URL → Angular (download)</text>
+
+      <!-- ── LEGEND ── -->
+      <line x1="70" y1="762" x2="98" y2="762" stroke="#0066A1" stroke-width="1.8" marker-end="url(#ab)"/>
+      <text x="103" y="766" fill="#0066A1" font-size="9">Sync REST (Bearer JWT)</text>
+
+      <line x1="70" y1="778" x2="98" y2="778" stroke="#0066A1" stroke-width="1.8" stroke-dasharray="4,2" marker-end="url(#ab)"/>
+      <text x="103" y="782" fill="#0066A1" font-size="9">Sync REST (Angular → Service)</text>
+
+      <line x1="280" y1="762" x2="308" y2="762" stroke="#B85200" stroke-width="1.8" marker-end="url(#ao)"/>
+      <text x="313" y="766" fill="#B85200" font-size="9">Async publish → Service Bus</text>
+
+      <line x1="280" y1="778" x2="308" y2="778" stroke="#B85200" stroke-width="1.8" stroke-dasharray="4,2" marker-end="url(#ao)"/>
+      <text x="313" y="782" fill="#B85200" font-size="9">Topic subscription (fan-out)</text>
+
+      <line x1="510" y1="762" x2="538" y2="762" stroke="#6B21A8" stroke-width="1.8" stroke-dasharray="3,2" marker-end="url(#ap)"/>
+      <text x="543" y="766" fill="#6B21A8" font-size="9">Report pipeline (Queue → Function)</text>
+
+      <line x1="510" y1="778" x2="538" y2="778" stroke="#15803D" stroke-width="1.8" marker-end="url(#ag)"/>
+      <text x="543" y="782" fill="#15803D" font-size="9">Data store / SAS URL download</text>
+
+      <text x="755" y="762" fill="#555" font-size="8.5">✓ No shared DB · JWT per-service via Okta JWKS</text>
+      <text x="755" y="776" fill="#555" font-size="8.5">✓ Secrets from Key Vault (Managed Identity)</text>
+      <text x="755" y="790" fill="#555" font-size="8.5">✓ Traced via App Insights Correlation ID</text>
+      <text x="755" y="804" fill="#555" font-size="8.5">✓ Blob Lifecycle: Hot → Cool → Delete auto</text>
+    </svg>
+    </div>
+
+    <h3>The 5 Core Microservices</h3>
+    <table>
+      <tr><th>Service</th><th>Owns</th><th>Database</th><th>Why this DB?</th></tr>
+      <tr><td><strong>Ownership Service</strong></td><td>Institutional ownership % by company, quarterly history, change events</td><td>Azure Cosmos DB</td><td>High-volume time-series data — ownership changes constantly, needs fast writes and flexible schema per quarter</td></tr>
+      <tr><td><strong>Profiles Service</strong></td><td>Company profiles — financials, sector, market cap, IR team contacts</td><td>Azure SQL</td><td>Structured relational data, strong consistency, complex queries across company attributes</td></tr>
+      <tr><td><strong>Targeting Service</strong></td><td>Investor targeting scores, peer benchmarking, recommendations</td><td>Azure SQL + Redis Cache</td><td>Scores are read heavily by the UI — Redis caches top-N targeting results per company for sub-millisecond reads</td></tr>
+      <tr><td><strong>Contacts Service</strong></td><td>IR contacts, investor contacts, meeting history, relationships</td><td>Azure SQL</td><td>Relational by nature — contacts belong to companies, meetings belong to contacts</td></tr>
+      <tr><td><strong>Notifications Service</strong></td><td>Ownership change alerts, price movement alerts, delivery status</td><td>Azure Table Storage</td><td>High-volume write of alert events (cheap, scalable), reads are by user/timerange (partition key fits)</td></tr>
+    </table>
+
+    <h3>Why No API Gateway?</h3>
+    <div class="callout amber"><strong>The Angular SPA calls microservices directly.</strong> Each service exposes its own REST endpoint. Auth is validated at the service level — every service validates the incoming JWT independently against Okta's JWKS (JSON Web Key Set) endpoint. This means: no single point of failure, no gateway bottleneck, and each service scales completely independently. The trade-off is that cross-cutting concerns like rate limiting are handled per-service rather than centrally — we accept that for the scale we operate at.</div>
+
+    <h3>Async Communication — Azure Service Bus</h3>
+    <p>Not all communication is synchronous. When ownership data changes, multiple downstream services need to react. We use <strong>Azure Service Bus Topics</strong> (pub/sub model) for this.</p>
+    <div class="flow">Example: S&P data feed updates ownership percentages for APPLE INC
+
+Ownership Service:
+  → updates Cosmos DB ✅
+  → publishes "OwnershipChanged" event to Service Bus Topic
+
+Subscribers receive their own copy (pub/sub, not queue):
+  Targeting Service     → recalculates investor targeting scores for AAPL
+  Notifications Service → checks user alert preferences → sends email/in-app alert
+
+The Ownership Service does not know or care that Targeting and Notifications exist.
+If a new "Analytics Service" is added tomorrow, it just subscribes to the topic.
+Zero changes to Ownership Service.
+
+This is the Pub/Sub pattern: one event → many independent reactions.</div>
+
+    <div class="callout blue"><strong>Dead Letter Queue:</strong> If Targeting Service is down when the event arrives, Azure Service Bus holds it in a Dead Letter Queue. When the service recovers, it processes the backlog. No ownership change is ever lost — guaranteed delivery.</div>
+
+    <h3>Azure Redis Cache — Targeting Service</h3>
+    <div class="flow">Problem:
+  Targeting scores are expensive to compute (ML scoring model runs on S&P's data)
+  But the UI requests them constantly — every time a user opens an investor targeting page
+
+Solution: Cache-Aside Pattern with Redis
+  Request arrives → check Redis for cached score
+  Cache HIT  → return in < 5ms ✅
+  Cache MISS → fetch from Azure SQL → compute/enrich → store in Redis (TTL: 1 hour) → return
+
+Invalidation:
+  When OwnershipChanged event arrives (Service Bus) → Targeting Service
+  → recomputes score → writes new score to Azure SQL → INVALIDATES Redis key
+  → next request gets fresh score from SQL, re-caches it</div>
+
+    <h3>Frontend Architecture</h3>
+    <div class="flow">Angular 18 SPA (Azure Static Web Apps)
+├── Standalone Components (no NgModules — enables per-component tree-shaking)
+├── Lazy-loaded Feature Modules
+│   ├── Ownership Module        → calls Ownership Service
+│   ├── Profiles Module         → calls Profiles Service
+│   ├── Targeting Module        → calls Targeting Service (Redis-backed, fast)
+│   ├── Contacts Module         → calls Contacts Service
+│   ├── Notifications Module    → calls Notifications Service
+│   └── 5+ more feature modules
+├── Shared Core
+│   ├── OktaAuthService         → wraps okta-auth-js, manages token lifecycle
+│   ├── HTTP Interceptor        → attaches Bearer JWT to all outbound calls
+│   ├── Role Guard              → decodes JWT roles claim, protects routes
+│   ├── Tenant Config Service   → loads tenant feature flags after login
+│   └── WCAG 2.1 component lib  → accessible data grids, modals, charts
+├── NgRx Store
+│   ├── Auth slice              → user identity, roles, tenant
+│   ├── Feature slices          → one per lazy module, loaded on demand
+│   └── UI slice                → loading states, notifications
+└── Azure DevOps CI/CD</div>
+
+    <h3>Key Technology Decisions at a Glance</h3>
+    <table>
+      <tr><th>Technology</th><th>Used for</th><th>Why chosen</th></tr>
+      <tr><td>Okta</td><td>Identity / OIDC</td><td>Enterprise IdP, MFA, custom JWT claims, okta-auth-js SDK for Angular</td></tr>
+      <tr><td>Azure Service Bus</td><td>Async inter-service events</td><td>Pub/Sub Topics, guaranteed delivery, Dead Letter Queue, native Azure</td></tr>
+      <tr><td>Azure Cosmos DB</td><td>Ownership time-series</td><td>Horizontally scalable, flexible schema, fast writes for high-volume financial data</td></tr>
+      <tr><td>Azure SQL</td><td>Profiles, Contacts, Targeting</td><td>Relational structure, ACID transactions, rich querying</td></tr>
+      <tr><td>Azure Redis Cache</td><td>Targeting score caching</td><td>Sub-millisecond reads, cache-aside pattern, TTL-based auto-expiry</td></tr>
+      <tr><td>Azure Blob Storage</td><td>Reports, exports, documents</td><td>Cheap, scalable object storage for non-queryable binary files</td></tr>
+      <tr><td>Azure Key Vault</td><td>Secrets management</td><td>No connection strings in code or config files — services fetch secrets at runtime</td></tr>
+      <tr><td>Azure App Insights</td><td>Distributed tracing</td><td>Correlation IDs trace a single user request across 3+ microservices</td></tr>
+      <tr><td>Azure Front Door</td><td>CDN + WAF + load balancing</td><td>Global edge, DDoS protection, SSL termination at the edge</td></tr>
+      <tr><td>Azure Static Web Apps</td><td>Hosting Angular SPA</td><td>Built-in CDN, CI/CD integration, free SSL, global distribution</td></tr>
+      <tr><td>Azure Functions</td><td>Report Worker (serverless)</td><td>Queue-triggered, auto-scales to queue depth, no idle server cost, aggregates data from all services and generates PDF/Excel reports</td></tr>
+      <tr><td>Azure Durable Functions</td><td>Multi-step report pipeline orchestration</td><td>Checkpointed, crash-safe workflow (generate → blob upload → SAS URL) without hand-rolled progress tracking</td></tr>
+    </table>
+  </div>
+
+
+  <!-- ===================== SECTION 3b ===================== -->
+  <div class="section" id="s3b">
+    <div class="section-header">
+      <div class="snum blue">3b</div>
+      <h2 class="stitle">Report Generation Architecture</h2>
+    </div>
+
+    <p>Capital Access clients — IR teams, investment banks — need to generate ownership reports, shareholder analytics reports, investor targeting summaries, and board-pack exports. These are not instant: they require pulling data from multiple services, generating a formatted PDF or Excel, and making it available for download. The key design decision is <strong>async generation</strong> — never block the user while a report builds.</p>
+
+    <h3>Full Report Generation Flow</h3>
+    <div class="arch">STEP 1 — USER TRIGGERS REPORT
+  Angular UI → POST /api/reports
+              { reportType: "ownership-analysis", companyId: "AAPL", quarter: "Q2-2025" }
+              Report Service saves job → DB: { jobId: "rpt-001", status: "PENDING" }
+              Returns immediately → { jobId: "rpt-001" }   ← no waiting ✅
+
+STEP 2 — JOB QUEUED (Azure Service Bus Queue — NOT a Topic)
+  Report Service → publishes message to [report-generation-queue]
+  Message: { jobId: "rpt-001", reportType, companyId, tenantId, requestedBy }
+
+  WHY A QUEUE, NOT A TOPIC?
+  Report generation is a TASK — exactly ONE worker should process each job.
+  A Topic would fan-out to all subscribers → every worker generates the same report → wasteful.
+  Queue = one message, one consumer. ✅
+
+STEP 3 — WORKER PICKS UP JOB (Azure Function — Queue Trigger)
+  Azure Function triggered automatically when message arrives in queue
+  Serverless: scales out to N parallel instances if 50 reports queued simultaneously
+  Updates job status → "IN_PROGRESS"
+
+STEP 4 — DATA AGGREGATION (calls multiple microservices)
+  Azure Function calls:
+    Ownership Service  → ownership % history for AAPL, Q1–Q4 2025
+    Profiles Service   → company profile, financials, sector, IR team
+    Targeting Service  → current investor targeting scores and recommendations
+    Contacts Service   → IR contacts for the report footer / distribution list
+  Aggregates all data in memory → report data model ready
+
+STEP 5 — REPORT GENERATION
+  PDF:   uses document generation library (e.g. iTextSharp / QuestPDF / SSRS template)
+  Excel: uses EPPlus / ClosedXML to build formatted workbook
+  Output: byte[] of the generated file
+
+STEP 6 — UPLOAD TO AZURE BLOB STORAGE
+  Path: reports/{tenantId}/{jobId}/ownership-analysis-AAPL-Q2-2025.pdf
+  Azure Blob Storage → object stored ✅
+  Job record updated → { status: "COMPLETED", blobPath: "reports/..." }
+
+STEP 7 — NOTIFY USER
+  Azure Function publishes "ReportReady" event → Azure Service Bus Topic
+  Notifications Service subscribes → sends in-app notification + email
+  "Your Ownership Analysis report for AAPL is ready. Click to download."
+
+STEP 8 — SECURE DOWNLOAD
+  User clicks download → Angular calls GET /api/reports/rpt-001/download
+  Report Service generates a SAS URL (Shared Access Signature):
+    - Time-limited: expires in 15 minutes
+    - Read-only: cannot write or delete
+    - Scoped to exactly that blob: reports/{tenantId}/{jobId}/...
+  Returns SAS URL to Angular → browser downloads directly from Blob Storage
+  Blob Storage never publicly accessible — only via SAS URL</div>
+
+    <h3>Why Azure Function (Serverless) for the Worker?</h3>
+    <div class="callout blue"><strong>Report generation is bursty.</strong> At 9am when markets open, many IR teams trigger reports simultaneously. At 3pm it's quiet. A dedicated always-on VM or container wastes money 80% of the time. Azure Functions scale to zero when idle and spin up parallel instances automatically when the queue has 50 messages. Cost-efficient + elastic — no manual scaling configuration needed.</div>
+
+    <h3>Status Polling vs Real-time Notification</h3>
+    <div class="flow">Option A — Polling (what we use for simplicity):
+  Angular UI polls GET /api/reports/{jobId}/status every 3 seconds
+  { status: "PENDING" } → { status: "IN_PROGRESS" } → { status: "COMPLETED" }
+  On COMPLETED → show download button
+  Simple to implement. Fine for reports that take 10–30 seconds.
+
+Option B — SignalR (real-time push, more complex):
+  Azure SignalR Service pushes status update directly to the Angular client
+  No polling — notification arrives the instant the report is ready
+  Better UX for longer reports (minutes), more infrastructure to manage
+  Trade-off: added Azure SignalR dependency vs. polling simplicity</div>
+
+    <h3>What is a SAS URL and Why?</h3>
+    <div class="callout amber"><strong>Blob Storage is private — no public URLs.</strong> A SAS (Shared Access Signature) URL is a cryptographically signed URL that grants time-limited, permission-scoped access to a specific blob. We generate it server-side (Report Service has the storage account key in Key Vault). The client gets a URL that works for 15 minutes then expires. Even if the URL leaks, it becomes useless after expiry. This means: no proxy cost (file streams direct from Blob Storage to browser), no auth header needed on the download request, and the blob remains private at all times.</div>
+
+    <h3>Report Generation — Architecture Diagram</h3>
+    <div class="flow">Angular SPA
+    │  POST /reports (async, returns jobId immediately)
+    ▼
+Report Service ──────────────────────► Azure SQL (jobs table: jobId, status, blobPath)
+    │
+    │ publish to queue
+    ▼
+[Azure Service Bus Queue: report-generation-queue]
+    │
+    │ Queue Trigger (auto-scales)
+    ▼
+Azure Function (Report Worker)
+    ├── calls Ownership Service  ──► Cosmos DB
+    ├── calls Profiles Service   ──► Azure SQL
+    ├── calls Targeting Service  ──► Azure SQL + Redis
+    └── calls Contacts Service   ──► Azure SQL
+    │
+    │ generates PDF / Excel bytes
+    ▼
+Azure Blob Storage  ←── uploads file (private container)
+    │
+    │ updates job status + blob path
+    ▼
+Azure SQL (jobs table: status=COMPLETED)
+    │
+    │ publishes "ReportReady" event
+    ▼
+Azure Service Bus Topic ──► Notifications Service ──► email + in-app alert
+    │
+    │ user clicks download
+    ▼
+Report Service generates SAS URL (15 min, read-only, single blob)
+    │
+    ▼
+Browser downloads directly from Blob Storage via SAS URL ✅</div>
+
+    <h3>Follow-up Q&As for Report Generation</h3>
+
+    <div class="qa">
+      <div class="qa-q">Q: Why a Queue for report generation but a Topic for ownership change events?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        The fundamental difference is whether the message is a <em>task</em> or an <em>event</em>. Report generation is a task — "generate this specific report once, exactly one worker should do it." A Queue ensures exactly one consumer picks up each message. If I used a Topic, every subscribed worker instance would generate the same report — wasteful and wrong. An ownership change is an event — "something happened, tell everyone who cares." Multiple services (Targeting, Notifications) each need their own independent copy to react to. Topic fan-out is exactly right for that. Same Azure Service Bus, different pattern — Queue for tasks, Topic for events.
+      </div>
+      <div class="qa-tip">This directly maps to the Queue vs Pub/Sub distinction — a perfect chance to show depth.</div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: What happens if the Azure Function crashes mid-report generation?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Azure Service Bus handles this with message lock and retry. When the Function picks up a message, Service Bus locks it — no other consumer can claim it. If the Function crashes before completing, the lock expires after a configurable timeout (e.g. 5 minutes). Service Bus automatically re-delivers the message to another Function instance. We handle this safely because Step 4 (data aggregation) and Step 5 (PDF generation) are pure computation — no side effects. The only side-effecting steps are the Blob upload and the DB status update at the end. If those didn't happen, the retry will redo them cleanly. After a configured max retry count, the message moves to the Dead Letter Queue for manual inspection.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How do you prevent one tenant's report job from seeing another tenant's data?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        The tenant ID is embedded in the Service Bus message from the original request, and it came from the validated JWT — so it's trustworthy. The Azure Function includes the tenant ID in every downstream API call. Each microservice filters all data by tenant ID at the query level. The Blob Storage path is scoped under the tenant ID: reports/{tenantId}/{jobId}/.... The SAS URL is generated for that exact blob path only. So even if someone guessed another tenant's jobId, the SAS URL would be for their tenant's path, which wouldn't match.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How long are generated reports stored? What's your retention strategy?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Azure Blob Storage Lifecycle Management policies handle this automatically. Reports are stored in Hot tier for 7 days — within that window, SAS URLs can be regenerated on demand if the user wants to re-download. After 7 days, the policy automatically moves blobs to Cool tier (cheaper storage, same access). After 90 days, blobs are deleted — clients are expected to save reports locally if they need them longer. This is a business decision, not a technical constraint, but the Lifecycle Management policy enforces it with zero application code.
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== SECTION 4 ===================== -->
+  <div class="section" id="s4">
+    <div class="section-header">
+      <div class="snum green">4</div>
+      <h2 class="stitle">OIDC Authentication with Okta — Deep Dive</h2>
+    </div>
+
+    <p>This is the most technically rich part of your S&amp;P work. Expect detailed follow-up here. Be confident — you implemented the full auth flow.</p>
+
+    <h3>Why OIDC, not basic OAuth2?</h3>
+    <div class="callout blue">OAuth2 = authorisation framework (who can access what). OIDC = adds identity layer on top (who are you). For Capital Access, you need both — authenticate the user AND control what data/features they see based on their role and client subscription. OIDC gives you both in one flow. Okta is the Identity Provider — it handles the OIDC protocol, MFA, session management, and token issuance.</div>
+
+    <h3>The Full Auth Flow</h3>
+    <div class="flow">1. USER OPENS APP
+   Angular SPA loads → checks for valid access token in memory
+   No token / token expired → initiate OIDC login
+
+2. LOGIN REDIRECT
+   App redirects → Okta-hosted login page
+   User authenticates (password + MFA if enforced by Okta policy)
+   Okta issues: ID Token + Access Token + Refresh Token
+
+3. TOKEN RECEIVED
+   App receives tokens via redirect callback
+   ID Token  → decode claims: user identity, name, email, tenant/org ID
+   Access Token → short-lived (60 min), sent in Bearer header on every API call
+   Refresh Token → long-lived, used to get new access token silently
+
+4. SILENT RENEWAL (the tricky part)
+   Access token expires → BEFORE expiry, app silently requests new token
+   Uses Okta's refresh token flow (or silent SSO via hidden iframe)
+   User sees nothing — seamless experience
+   Angular Timer service triggers renewal at (expiry - 5 minutes)
+
+5. ROLE-SCOPED ACCESS CONTROL
+   Access token contains "groups" or custom "roles" claim (configured in Okta)
+   e.g. roles: ["capital_access.investor_targeting", "capital_access.reporting"]
+   Angular Route Guard reads roles claim
+   Routes not in the user's role list → redirect to Unauthorised page
+   10+ feature modules each have their own role guard
+
+6. HTTP INTERCEPTOR
+   Every outbound HTTP call → interceptor attaches "Authorization: Bearer {token}"
+   On 401 → interceptor attempts token refresh via Okta → retry original request once
+   On second 401 → force logout</div>
+
+    <h3>Token Storage — Important Design Decision</h3>
+    <div class="callout amber"><strong>Never store tokens in localStorage.</strong> localStorage is readable by any JS on the page — XSS attack steals your token. We store access tokens in memory (JavaScript variable) and use Okta's refresh token flow to get new ones. Session survives page refresh because Okta also issues an SSO session cookie that the silent renewal flow uses.</div>
+
+    <h3>Role-Scoped Access — Architecture</h3>
+    <div class="flow">Access Token JWT Payload (decoded, issued by Okta):
+{
+  "uid":   "okta-user-id",
+  "cid":   "okta-client-id",
+  "tid":   "tenant-id",           ← identifies which client company (custom claim in Okta)
+  "roles": ["investor_targeting", "shareholder_analytics"],  ← custom claim configured in Okta
+  "sub":   "user@clientcompany.com",
+  "iss":   "https://s&pglobal.okta.com/oauth2/default",     ← Okta issuer
+  "exp":   1718000000             ← expiry timestamp
+}
+
+Angular Route Config:
+{
+  path: 'investor-targeting',
+  component: InvestorTargetingComponent,
+  canActivate: [RoleGuard],
+  data: { requiredRole: 'investor_targeting' }  ← checked against JWT roles claim
+}</div>
+
+    <h3>Trickiest Challenge — SAML to Okta Migration</h3>
+    <div class="callout red"><strong>Why this is hard:</strong> Migrating auth on a live multi-tenant SaaS is like changing the locks on a building while people are inside. If anything breaks, 2,500+ companies lose access instantly.</div>
+
+    <h4>What changed technically</h4>
+    <table>
+      <tr><th>Before (SAML)</th><th>After (Okta OIDC)</th></tr>
+      <tr><td>XML-based token (SAML Assertion)</td><td>JSON-based JWT (compact, stateless)</td></tr>
+      <tr><td>SP-initiated redirect to IdP login page</td><td>OIDC Authorization Code flow with PKCE</td></tr>
+      <tr><td>Session managed server-side</td><td>Token in memory, silent renewal via Okta refresh token</td></tr>
+      <tr><td>No fine-grained role claims</td><td>Custom claims (tenant ID, roles) configured in Okta authorization server</td></tr>
+      <tr><td>Single backend validation approach</td><td>Each microservice validates JWT independently via Okta JWKS endpoint</td></tr>
+    </table>
+
+    <h4>What I did on the frontend</h4>
+    <ul>
+      <li>Replaced the SAML redirect flow with Okta OIDC using the <strong>okta-auth-js</strong> SDK</li>
+      <li>Built the HTTP Interceptor to attach <code>Bearer JWT</code> to every outbound request and handle 401 retry</li>
+      <li>Implemented silent token renewal — Angular Timer triggers refresh 5 minutes before expiry</li>
+      <li>Built Role Guards reading custom claims from the JWT to gate each feature module</li>
+      <li>Used <strong>per-tenant feature flags</strong> to roll the migration tenant-by-tenant — if one tenant had issues, we could roll back without touching others</li>
+    </ul>
+
+    <div class="callout amber"><strong>Important boundary to set clearly in the interview:</strong> User migration from SAML to Okta (provisioning accounts, syncing directories) was handled by a separate platform/infrastructure team. My ownership was end-to-end on the frontend auth flow and the per-tenant rollout strategy.</div>
+
+    <h3>What to Say in the Interview</h3>
+    <div class="speak">The trickiest thing I've worked on was the SAML to Okta OIDC migration. We were moving auth on a live platform serving 2,500+ companies — if anything broke, nobody could log in. My ownership was the frontend side: I replaced the SAML redirect flow with Okta's OIDC flow using okta-auth-js, built the HTTP interceptor to attach Bearer JWTs and handle token refresh on 401, and implemented silent token renewal so users never see an unexpected logout. The riskiest part was the cutover. We handled it using per-tenant feature flags — we migrated one tenant at a time, so we could roll forward or roll back per client without a full outage. The user provisioning side was handled by a separate infra team, so I can speak to the frontend auth flow in detail.</div>
+  </div>
+
+
+  <!-- ===================== SECTION 5 ===================== -->
+  <div class="section" id="s5">
+    <div class="section-header">
+      <div class="snum green">5</div>
+      <h2 class="stitle">Angular 18 Standalone Components Migration</h2>
+    </div>
+
+    <h3>What was the problem with legacy webpack config?</h3>
+    <div class="callout red"><strong>Before migration:</strong> NgModule-based architecture → all components declared in modules → large shared NgModules pulled everything into initial bundle → slow first load. Webpack config was hand-written and not taking advantage of Angular 18 build optimisations.</div>
+
+    <h3>What you did</h3>
+    <div class="flow">BEFORE (NgModule architecture):
+  AppModule
+    ├── SharedModule (pulled in ALL shared components, even unused ones)
+    ├── InvestorTargetingModule
+    └── ShareholderModule
+  Build: webpack manual config, no module federation
+  Bundle size: 100% (baseline)
+
+AFTER (Angular 18 Standalone):
+  Each component declares its own imports
+  ├── InvestorTargetingComponent (imports: [CommonModule, RouterModule, ChartComponent])
+  ├── ShareholderComponent (imports: [CommonModule, TableComponent])
+  └── ChartComponent (standalone, used only where needed)
+  Build: Angular 18 esbuild (Vite-based) — dramatically faster
+  Bundle size: -30% (only what each component actually needs is bundled)</div>
+
+    <h3>Why 30% reduction?</h3>
+    <ul>
+      <li>Tree-shaking works at component level — unused code eliminated per component, not per module</li>
+      <li>Lazy routes now split at component boundary, not module boundary — finer-grained chunks</li>
+      <li>esbuild (Angular 18 default) is 10–100x faster than webpack and produces smaller output</li>
+      <li>Removed barrel files (index.ts re-exports) that prevented tree-shaking</li>
+    </ul>
+
+    <h3>Migration Strategy (how you actually did it)</h3>
+    <ol>
+      <li>Ran Angular's <code>ng generate @angular/core:standalone</code> schematics to auto-migrate leaf components first</li>
+      <li>Converted shared/library components next (most reused → highest impact)</li>
+      <li>Converted feature modules last (they depend on shared components being ready)</li>
+      <li>Updated routing to use <code>loadComponent</code> instead of <code>loadChildren</code> where possible</li>
+      <li>Removed empty NgModules and updated webpack/esbuild config to use native Angular 18 builder</li>
+    </ol>
+
+    <div class="callout green"><strong>Result:</strong> 30% bundle reduction + faster CI build pipeline (esbuild vs webpack) + simpler codebase with no NgModule ceremony.</div>
+  </div>
+
+
+  <!-- ===================== SECTION 6 ===================== -->
+  <div class="section" id="s6">
+    <div class="section-header">
+      <div class="snum amber">6</div>
+      <h2 class="stitle">Multi-Tenancy in the Frontend</h2>
+    </div>
+
+    <p>Capital Access serves 2,500+ corporate issuers from one codebase. Each client is a separate tenant with potentially different feature sets, branding, and data.</p>
+
+    <h3>How multi-tenancy works in the Angular SPA</h3>
+    <div class="flow">At login, the JWT access token contains:
+  "tid" (tenant ID)  → identifies which client company the user belongs to
+  "roles"            → which Capital Access features this tenant has subscribed to
+
+Angular App Bootstrap:
+  1. Decode JWT → extract tid + roles
+  2. Load tenant config from API: { theme: 'default', features: ['investor_targeting'], locale: 'en-US' }
+  3. Set feature flags in NgRx store
+  4. Route guards use feature flags → users see only features their company pays for
+  5. Theme variables applied globally (Azure client has different branding than bank client)</div>
+
+    <h3>Data Isolation</h3>
+    <div class="callout blue">Every API call includes the tenant ID (from JWT). The backend microservices filter all data by tenant. A user from Client A can never see Client B's shareholder data. This is enforced at the API layer — the frontend is just the display. But the frontend must never expose tenant IDs or mix tenant contexts in the NgRx state.</div>
+
+    <h3>WCAG 2.1 Accessibility</h3>
+    <p>Capital Access is an enterprise product used at institutional clients — legal requirement in many markets. Your contribution:</p>
+    <ul>
+      <li>ARIA labels on all interactive components, data tables, and charts</li>
+      <li>Keyboard navigation on all modals, dropdowns, and data grids</li>
+      <li>Colour contrast ratios meeting WCAG 2.1 AA (4.5:1 text, 3:1 UI components)</li>
+      <li>Focus management — modal open/close, route changes restore focus correctly</li>
+      <li>Screen reader testing with NVDA/VoiceOver as part of PR review gate</li>
+    </ul>
+  </div>
+
+
+  <!-- ===================== SECTION 7 ===================== -->
+  <div class="section" id="s7">
+    <div class="section-header">
+      <div class="snum amber">7</div>
+      <h2 class="stitle">CI/CD &amp; DevOps</h2>
+    </div>
+
+    <h3>Pipeline Structure</h3>
+    <div class="flow">Developer pushes to feature branch
+         │
+         ▼
+[PR Branch Pipeline]
+  ├── Lint (ESLint + Stylelint)
+  ├── Unit Tests (Jest, coverage gate ≥ 80%)
+  ├── Build (Angular 18 esbuild)
+  └── Accessibility scan (axe-core automated)
+         │ PR approved + all gates pass
+         ▼
+[Merge to develop]
+  ├── Integration tests
+  ├── SAST security scan
+  └── Deploy to DEV environment
+         │ QA sign-off
+         ▼
+[Deploy to Staging]
+  ├── E2E tests (Cypress/Playwright)
+  ├── Performance budget check (bundle size gate)
+  └── Manual deployment gate (Lead approval)
+         │ Release approved
+         ▼
+[Deploy to Production]
+  └── Blue/Green deployment (zero downtime)</div>
+
+    <h3>Your Contribution</h3>
+    <p>You worked with DevOps to define <strong>deployment gates</strong> — automated checks that must pass before a stage can proceed. The bundle size gate ensures no PR accidentally re-inflates the bundle after your 30% reduction. The accessibility scan runs axe-core automatically — accessibility regressions are caught in CI, not after release.</p>
+  </div>
+
+
+  <!-- ===================== SECTION 8 ===================== -->
+  <div class="section" id="s8">
+    <div class="section-header">
+      <div class="snum purple">8</div>
+      <h2 class="stitle">The STAR Story — Say This in the Interview</h2>
+    </div>
+
+    <div class="callout amber"><strong>The most important section.</strong> Practise this out loud until it flows naturally. Under 3 minutes. Don't read it — tell it.</div>
+
+    <h3>Opening — "Tell me about your current project"</h3>
+    <div class="speak">
+I currently work at S&P Global as a Lead Software Development Engineer on Capital Access — it's S&P's web platform for Investor Relations teams at publicly listed companies. The platform serves over 2,500 corporate issuers worldwide, helping them find and connect with investors, track ownership, and manage investor communications.
+
+The backend is a microservices architecture on Azure — five core services each with their own data store: an Ownership Service that holds institutional ownership percentages and historical data in Cosmos DB, a Profiles Service for company financials and metadata in Azure SQL, a Targeting Service for investor targeting scores backed by Azure SQL with Redis caching for fast reads, a Contacts Service for IR relationship management, and a Notifications Service for ownership change alerts. Services communicate asynchronously through Azure Service Bus Topics — when ownership data changes, the Service Bus event fans out to both the Targeting and Notifications services independently without any tight coupling between them.
+
+The frontend is Angular 18 — my primary area of ownership. I've worked on feature development across 10+ modules, owned the full OIDC authentication flow using Okta, and led the migration from our legacy NgModule architecture to Angular 18 standalone components.
+
+The standalone migration was the most impactful thing I've done. The old setup was pulling everything into the initial bundle regardless of what the user actually accessed. By moving to standalone components and switching to Angular 18's esbuild builder, we achieved a 30% reduction in bundle size. We then put a bundle size gate in our Azure DevOps pipeline so no future PR can silently re-inflate it.
+
+On auth — security is non-negotiable in regulated financial software. I implemented OIDC with Okta: the Angular app handles silent token renewal before expiry, role claims in the JWT control which features and data each tenant can access, and an HTTP interceptor retries on 401 after token refresh before forcing logout. Tokens live in memory, never localStorage.
+    </div>
+
+    <h3>If asked specifically about a challenge</h3>
+    <div class="speak">
+The trickiest part of the auth implementation was silent token renewal. When an access token is about to expire, the app needs to get a new one without interrupting the user. I set up a timer that fires 5 minutes before expiry and uses Okta's refresh token flow — completely invisible to the user. The edge case was handling what happens when the refresh call fails — for example if the user's network drops momentarily or if their Okta session itself has expired. I implemented a fallback: one retry, then a graceful redirect to the login page with the user's current route preserved so they land back where they were after re-authenticating. That kind of detail matters in an enterprise financial product where a user is mid-way through building an investor targeting list.
+    </div>
+
+    <h3>If asked about a result / impact</h3>
+    <div class="speak">
+The 30% bundle reduction meant the initial page load dropped noticeably for clients on slower enterprise networks. Beyond the number, the architectural shift to standalone components simplified onboarding of new features — engineers no longer had to think about which NgModule to add a component to. The CI pipeline now catches bundle regressions and accessibility failures automatically before they reach production. For an enterprise SaaS with 500+ clients, catching a regression in CI is infinitely better than discovering it in production.
+    </div>
+  </div>
+
+
+  <!-- ===================== SECTION 9 ===================== -->
+  <div class="section" id="s9">
+    <div class="section-header">
+      <div class="snum red">9</div>
+      <h2 class="stitle">Follow-Up Questions &amp; Answers</h2>
+    </div>
+
+    <!-- AUTH -->
+    <h3>🔐 Authentication</h3>
+
+    <div class="qa">
+      <div class="qa-q">Q: You mentioned migrating from SAML to Okta — how did you handle the user migration?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        The user provisioning side — syncing existing accounts from SAML into Okta — was handled by a separate platform and infrastructure team. My ownership was purely on the frontend auth flow: replacing the SAML redirect with Okta OIDC, building the HTTP interceptor, silent token renewal, and the role guards. I also designed the per-tenant feature flag rollout so we could migrate one client at a time and roll back any individual tenant if something went wrong, without taking the whole platform down.
+      </div>
+      <div class="qa-tip">This is the right answer — it's honest, shows you know the full picture, and keeps you on safe ground where you can answer every follow-up confidently.</div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: Why did you migrate from SAML to Okta OIDC? What was wrong with SAML?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        SAML wasn't wrong — it worked — but it had limitations for our use case. SAML tokens are XML-based and verbose, which added overhead on every request. More importantly, SAML sessions are server-managed, which doesn't fit a stateless microservices architecture — each service would need to call back to a session store to validate the user. With Okta OIDC, we get compact JWTs that each microservice validates locally using Okta's JWKS endpoint, with no shared session store needed. We also got fine-grained custom claims (tenant ID, roles) in the token itself, which SAML required more complex attribute mapping to achieve. And Okta gives us MFA, adaptive policies, and audit logging out of the box.
+      </div>
+      <div class="qa-tip">SAML vs OIDC is a common deep-dive. Key points: XML vs JWT, server session vs stateless, and the microservices fit.</div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: Why OIDC instead of SAML for enterprise clients?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        SAML is XML-based and built for browser redirects — it works but is heavy and hard to use in SPAs. OIDC is JSON/JWT-based, designed for modern apps, and works natively with SPAs and mobile clients. Okta supports both SAML and OIDC, but we chose OIDC because it gives us cleaner token handling in Angular — we can decode JWT claims directly in the browser, attach Bearer tokens to every API call, and handle silent renewal without page redirects. Okta also has a well-maintained JavaScript SDK (okta-auth-js) that integrates cleanly with Angular. For a modern SaaS targeting institutional clients, OIDC is the right choice.
+      </div>
+      <div class="qa-tip">Mention: JWT is stateless — backend microservices can validate it without a session store.</div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How do you prevent token theft? XSS? CSRF?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        XSS: Tokens are stored in memory (JavaScript variable), never localStorage or sessionStorage. Okta's SDK keeps the access token in memory by default — we don't override that. Content Security Policy (CSP) headers prevent injected scripts from reaching external endpoints even if they execute. We also sanitise all dynamic HTML via Angular's built-in DomSanitizer. CSRF: Not a concern for Bearer token auth — CSRF exploits cookies, and we're not relying on cookies for authentication. The Bearer token has to be explicitly attached to each request by our HTTP interceptor, which a forged third-party page cannot do.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: What happens when a user's session expires mid-workflow?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        The silent renewal timer fires before expiry and gets a new access token invisibly via Okta's refresh token flow. If silent renewal fails — network issue or Okta session expired — the HTTP interceptor on the next API call catches the 401, attempts one token refresh, and if that fails, redirects to login. We preserve the current URL in state so after login the user is returned exactly to where they were. For a financial workflow like building an investor targeting list, losing progress on session expiry would be unacceptable.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How does role-based access work across 2,500+ clients?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Each client company is a separate application or group in Okta. When users from ClientA log in, Okta issues a JWT containing their tenant ID and the specific roles their company has subscribed to — configured as custom claims in Okta's authorization server. For example, roles: ["investor_targeting", "shareholder_analytics"]. The Angular route guards decode these claims and only allow access to matching routes. If Client B hasn't subscribed to Roadshow Management, that route is simply unreachable — the guard redirects them. This is enforced both client-side in routing and server-side in the API — the client-side guard is UX, the server-side check is the actual security boundary.
+      </div>
+      <div class="qa-tip">Important: Always say "client-side is UX, server-side is security" — interviewers love this distinction.</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- PERFORMANCE -->
+    <h3>⚡ Performance</h3>
+
+    <div class="qa">
+      <div class="qa-q">Q: How did you achieve the 30% bundle reduction specifically?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Three things. First, standalone components enable tree-shaking at the component level — each component declares exactly what it imports, so unused code from shared modules is eliminated. In NgModule architecture, a SharedModule that exports 50 components pulls all 50 into any module that imports SharedModule, even if you only used 2. Second, we switched from webpack to Angular 18's esbuild-based builder — esbuild is fundamentally faster and produces smaller output. Third, we removed barrel files (index.ts re-export patterns) that were preventing tree-shaking — bundlers couldn't tell which exports were actually used when everything was re-exported through a single index file.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How do you ensure performance doesn't regress in future?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        We added a bundle size budget gate in the Azure DevOps CI pipeline. Every PR is built and the output bundle sizes are compared against a defined budget. If any chunk exceeds its budget, the pipeline fails and the PR cannot be merged. This means a developer can't accidentally import a heavy library without the team noticing. We also run Lighthouse in CI on key routes and track Core Web Vitals — First Contentful Paint and Total Blocking Time are tracked per release.
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ARCHITECTURE -->
+    <h3>🏗️ Architecture</h3>
+
+    <div class="qa">
+      <div class="qa-q">Q: How does the frontend communicate with microservices?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        The Angular SPA talks to an API Gateway — not directly to individual microservices. The gateway handles auth token validation, rate limiting, and routing to the correct downstream service. Every request from the SPA includes the Bearer JWT. The gateway validates the JWT signature and tenant claims, then forwards the request to the appropriate service. This means individual microservices don't need to re-implement auth — they trust the gateway. The Angular app doesn't know or care which microservice handles which endpoint — it just calls the API Gateway URL and the routing is transparent.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How is state managed in a 10+ module Angular SPA?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        We use NgRx. Each feature module has its own slice of state — investor targeting state, shareholder state, etc. Global state — auth info, current tenant config, user preferences — lives in a root store. Feature stores are lazily loaded with their routes, so only the state for modules the user has actually visited is in memory. This keeps the state tree clean and prevents different features from accidentally sharing mutable state.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: What's your deployment strategy — how do you release without downtime?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Blue/Green deployment on Azure. Two identical environments — Blue (current production) and Green (new version). We deploy to Green, run smoke tests, then switch the load balancer to Green. If anything goes wrong, we flip back to Blue in seconds — no rollback needed, Blue is still running. For an enterprise SaaS with financial clients who might be mid-workflow during a release, zero downtime is a hard requirement.
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- AZURE & MICROSERVICES -->
+    <h3>☁️ Azure Services & Microservices</h3>
+
+    <div class="qa">
+      <div class="qa-q">Q: Why Cosmos DB for the Ownership Service but Azure SQL for Profiles?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Ownership data is fundamentally time-series — every quarter, thousands of companies have ownership percentages updated for potentially thousands of institutional investors. That's high-volume writes with a flexible schema that changes over time (new fields, new markets). Cosmos DB handles that natively — it's horizontally partitioned, you write at massive scale, and you query by company ID or time range which maps well to its partition key model. Company profiles are the opposite — structured, relational, change rarely, and get queried with JOINs across sector, market cap, geography. That's exactly what Azure SQL is optimised for. Picking the right database per service is one of the advantages of microservices — you're not forced into one-size-fits-all.
+      </div>
+      <div class="qa-tip">This is a great answer that shows you understand data modelling trade-offs, not just that you used Azure services.</div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: Why Azure Service Bus and not Azure Event Grid or Azure Event Hubs?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Three options, three different use cases. Event Grid is for reactive infrastructure events — "a blob was uploaded", "a VM was deallocated". Not suited for business domain events between services. Event Hubs is a high-throughput streaming platform — Kafka-compatible, designed for millions of events per second, ideal for telemetry or log ingestion. But we don't need that scale, and Event Hubs is pull-based with complex consumer group management. Service Bus is the right fit for us: it's a proper messaging broker with Topics for pub/sub fan-out, guaranteed at-least-once delivery, Dead Letter Queue for failed messages, and message ordering within sessions if we need it. Our ownership change events need reliable delivery to multiple subscribers — Service Bus Topics give us exactly that without the operational overhead of Kafka or Event Hubs.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How do services validate the JWT without an API Gateway?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Every service fetches Okta's JWKS (JSON Web Key Set) endpoint at startup — that's the set of public keys Okta uses to sign JWTs. When a request arrives with a Bearer token, the service validates the JWT signature against those keys, checks the issuer (must be our Okta domain), checks expiry, and checks the audience claim (must be our API). This is all stateless — the service doesn't call Okta on every request, it just validates the signature locally using the cached JWKS. The JWKS is refreshed periodically in case Okta rotates keys. It means each service independently enforces security with no shared dependency on a gateway.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How does Redis caching work in the Targeting Service? What about stale data?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        We use the Cache-Aside pattern. When the UI requests targeting scores for a company, the Targeting Service checks Redis first. Cache hit — returns in under 5ms. Cache miss — fetches from Azure SQL, returns the result, and writes it to Redis with a TTL of one hour. Staleness is the key concern. We solve it through event-driven invalidation: when the Ownership Service publishes an "OwnershipChanged" event to Service Bus, the Targeting Service receives it, recomputes the scores, writes the updated scores to SQL, and explicitly deletes the stale Redis key. The next request re-populates the cache with fresh data. So in the worst case, a score is stale for the time between the ownership change event and the Targeting Service processing it — which is seconds. That's acceptable for an investor targeting use case where data is inherently based on quarterly filings.
+      </div>
+      <div class="qa-tip">Shows you understand cache invalidation — one of the hardest problems in distributed systems.</div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: What happens if the Notifications Service is down when a Service Bus event arrives?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Azure Service Bus handles this transparently. The event is held in the subscription's message queue until the Notifications Service comes back online and picks it up. Service Bus guarantees at-least-once delivery. If the service fails while processing — say it crashes after receiving the message but before updating the database — the message lock expires and Service Bus re-delivers it. We handle idempotency in the Notifications Service: each event has a unique ID, and we check whether we've already processed it before sending an alert. If yes, we skip it. This prevents duplicate notifications to clients even if a message is delivered more than once. After a configurable number of failed attempts, Service Bus moves the message to the Dead Letter Queue where we can inspect and replay it manually.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How do you trace a request across 3–4 microservices when debugging?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Azure Application Insights with distributed tracing. Every service is instrumented with the App Insights SDK. When a request arrives at any service, it reads or creates a correlation ID (W3C Trace Context header). This correlation ID is passed through every downstream call — both synchronous REST calls and the Service Bus messages. In App Insights, I can search by correlation ID and see the full end-to-end trace: Angular SPA → Targeting Service (50ms) → Redis cache miss → Azure SQL query (120ms) → response. If the Targeting Service also triggered a Service Bus event, that leg of the trace is linked too. Without this, debugging a slow request across microservices would be guesswork. With App Insights, the entire call chain is one query away.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How are secrets managed — connection strings, API keys?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Azure Key Vault. No connection strings or secrets in code, config files, or environment variables in the deployment pipeline. Each microservice has a Managed Identity assigned to it on Azure. At startup, the service authenticates to Key Vault using its Managed Identity — no credentials needed — and fetches the secrets it needs: database connection string, Service Bus connection string, Okta client secret. Key Vault also handles certificate rotation. If we rotate the database password, we update it in Key Vault once and all services pick it up on their next restart or secret refresh cycle — no redeployment required.
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- BEHAVIOURAL -->
+    <h3>🧠 Behavioural</h3>
+
+    <div class="qa">
+      <div class="qa-q">Q: Tell me about a technical decision you pushed back on.</div>
+      <div class="qa-a">
+        <span class="label">Answer (adapt to your experience):</span>
+        When we were planning the standalone migration, there was a suggestion to do it all at once in one sprint. I pushed back — a "big bang" migration on a production SaaS with 500 clients was too risky. I proposed an incremental approach: migrate leaf components first (lowest dependency), then shared components, then feature modules. Each phase had its own PR, code review, and test cycle. It took longer but at no point was the application in a broken state. That mattered because our clients are financial institutions — a broken release isn't just a bad user experience, it can affect their business-critical workflows.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How do you manage quality across 10+ feature modules?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Automated gates in the CI pipeline first — lint, unit test coverage, build, and accessibility scan must all pass before a PR can merge. Beyond automation, I contribute to front-end architecture decisions that apply across all modules — things like the HTTP interceptor pattern, how route guards work, how components should handle loading and error states. Consistency in these patterns means every module works the same way, which makes debugging and code reviews much faster regardless of which module you're looking at.
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ===================== DEEP DIVE: OKTA ===================== -->
+  <div class="section" id="dd-okta">
+    <div class="section-header">
+      <div class="snum purple">🔐</div>
+      <h2 class="stitle">Deep Dive — Okta (Identity / OIDC)</h2>
+    </div>
+
+    <div class="callout blue"><strong>Your ownership boundary:</strong> The Okta authorization server was configured by the platform/security team. Your ownership is the full frontend integration — okta-auth-js SDK, OIDC flow, token lifecycle, HTTP interceptor, role guards, and the SAML→Okta migration on the Angular side.</div>
+
+    <h3>What is Okta and why is it used?</h3>
+    <p>Okta is an enterprise Identity Provider (IdP). Instead of Capital Access managing usernames and passwords itself, all authentication is delegated to Okta. Okta handles login pages, MFA enforcement, session management, and token issuance. Capital Access trusts whatever Okta says about the user.</p>
+    <table>
+      <tr><th>Concern</th><th>Who handles it</th></tr>
+      <tr><td>Username / password storage</td><td>Okta</td></tr>
+      <tr><td>MFA (enforced for every user)</td><td>Okta policy</td></tr>
+      <tr><td>Login page UI</td><td>Okta-hosted page</td></tr>
+      <tr><td>Token issuance (JWT)</td><td>Okta authorization server</td></tr>
+      <tr><td>Custom claims (tenant ID, roles)</td><td>Okta authorization server (configured by platform team)</td></tr>
+      <tr><td>Frontend token consumption, role guards, interceptor</td><td>You (Angular)</td></tr>
+    </table>
+
+    <h3>The Two Token Renewal Scenarios</h3>
+    <div class="callout amber"><strong>Both scenarios exist in production — knowing both is what separates senior candidates.</strong></div>
+    <div class="flow">SCENARIO 1 — Silent Renewal (user is active, token nearing expiry)
+  Access token has 60-minute lifetime
+  Angular Timer triggers 5 minutes before expiry
+  okta-auth-js calls Okta token endpoint in the background using the refresh token
+  New access token returned silently → stored in memory
+  User sees nothing — completely seamless
+
+SCENARIO 2 — Full Redirect to Okta (session fully expired)
+  User closes app and reopens after a long gap
+  OR refresh token itself has expired (longer-lived, e.g. 24h, but not infinite)
+  No valid token in memory, no valid refresh token
+  Angular detects this on app init → redirects user to Okta login page
+  User authenticates (password + MFA) → Okta redirects back with new tokens
+  App resumes where the user left off (redirect_uri with state param)</div>
+
+    <h3>Token Storage — Why Memory, Not localStorage</h3>
+    <div class="flow">localStorage  ❌
+  Readable by ANY JavaScript on the page
+  XSS attack injects malicious script → reads token → sends to attacker's server
+  Token stolen = attacker impersonates user until token expires
+
+Memory (JavaScript variable)  ✅
+  Only accessible by our application code
+  XSS attack cannot reach it (no DOM/storage API to read JS variables)
+  Survives page navigation within the SPA
+  Lost on full page refresh → Scenario 2 (redirect to Okta) kicks in
+
+sessionStorage  ⚠️ (not used)
+  Survives refresh but cleared on tab close
+  Still vulnerable to XSS in same ways as localStorage</div>
+
+    <h3>HTTP Interceptor — How Every Request Gets Auth</h3>
+    <div class="flow">Angular HTTP Interceptor (runs on EVERY outbound request):
+
+  1. Request arrives at interceptor
+  2. Call OktaAuthService.getAccessToken()
+     → returns token from memory
+  3. Clone request, add header: Authorization: Bearer {token}
+  4. Forward to service
+
+  On 401 response back:
+  5. Attempt silent token refresh (okta-auth-js refresh token call)
+  6. If refresh succeeds → retry original request once with new token
+  7. If refresh fails (refresh token expired) → force logout → redirect to Okta</div>
+
+    <h3>Role Guards — Controlling Feature Access</h3>
+    <div class="flow">JWT Access Token contains custom claims (set by Okta authorization server):
+{
+  "tid":   "tenant-abc-123",           ← which company (tenant)
+  "roles": ["investor_targeting",      ← which modules they can access
+            "shareholder_analytics",
+            "reporting"]
+  "sub":   "user@clientcompany.com",
+  "exp":   1718000000
+}
+
+Angular Route Guard:
+  User navigates to /investor-targeting
+  RoleGuard.canActivate() fires
+  Reads "roles" claim from JWT
+  "investor_targeting" present? → allow
+  Not present? → redirect to /unauthorised
+
+  This is UI-level convenience, NOT security.
+  Real security: backend microservice validates the same JWT independently.</div>
+
+    <h3>SAML → Okta Migration (your trickiest challenge)</h3>
+    <div class="flow">Before (SAML):                        After (Okta OIDC):
+  XML-based assertions               JWT (compact JSON)
+  Server-side session management     Stateless — each service validates JWT locally
+  SP-initiated redirect flow         OIDC Authorization Code + PKCE flow
+  No fine-grained role claims        Custom claims (tenant, roles) in every JWT
+
+What I did on the Angular side:
+  → Replaced SAML redirect handling with okta-auth-js OIDC flow
+  → Built HTTP Interceptor (Bearer JWT on all requests, 401 retry)
+  → Implemented silent token renewal via refresh token
+  → Built Role Guards reading JWT claims
+  → Per-tenant feature flags for gradual rollout (one tenant at a time)
+     → could roll back any single tenant without platform-wide outage
+
+User provisioning (moving accounts from SAML to Okta) → handled by infra team.
+My ownership: frontend auth flow end-to-end.</div>
+
+    <h3>Interview Questions — Okta / OIDC</h3>
+
+    <div class="qa">
+      <div class="qa-q">Q: What is the difference between OAuth2 and OIDC?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        OAuth2 is an authorisation framework — it answers "what can this app access on behalf of the user?" It issues access tokens. OIDC (OpenID Connect) is a layer on top of OAuth2 that adds identity — it answers "who is this user?" It adds an ID Token (a JWT containing user identity claims like name, email, and in our case tenant ID and roles). We need both for Capital Access: we need to know who the user is (OIDC) and control what they can do (OAuth2 scopes + custom role claims). Okta implements both in a single flow.
+      </div>
+      <div class="qa-tip">Simple version: OAuth2 = authorisation (what). OIDC = authentication + authorisation (who + what).</div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: Why store tokens in memory and not localStorage?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        localStorage is accessible by any JavaScript on the page. If there's an XSS vulnerability anywhere in the application — a third-party library, an injected script — the attacker can read the token and impersonate the user. Memory (a JavaScript variable) is not accessible via any browser storage API, so an XSS attack cannot reach it. The downside is that tokens are lost on a hard page refresh, but we handle that gracefully: on app init, if no token exists in memory, we check for a valid Okta SSO session and silently renew, or redirect to Okta login. For a regulated financial platform, the security trade-off is clearly worth it.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How does silent token renewal work? What if it fails?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        We run a timer that triggers 5 minutes before the access token expires. At that point, okta-auth-js makes a background call to Okta's token endpoint using the refresh token. Okta validates the refresh token and returns a new access token — the user sees nothing. If the silent renewal fails — because the refresh token has also expired, or Okta is unreachable — the interceptor catches the 401 on the next API call, attempts the refresh one more time, and if that also fails, forces a logout and redirects the user to the Okta login page. We also handle the case where a user reopens the app after a long gap: on app init we always check token validity first, and redirect to Okta immediately if there's nothing valid in memory.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How does MFA work — is it handled in Angular?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        No — MFA is entirely handled by Okta. When the user is redirected to the Okta-hosted login page, Okta's own policy evaluates whether MFA is required (it is, for every user in our case). Okta presents the MFA challenge — TOTP, push notification, SMS — and only issues tokens after the user passes. Our Angular app never sees the MFA step at all. This is one of the key benefits of a hosted IdP like Okta: we get enterprise MFA, adaptive policies, and compliance out of the box without building any of it ourselves.
+      </div>
+      <div class="qa-tip">If asked "did you implement MFA?" — the honest answer is no, Okta handles it. That's correct and shows you understand the architecture.</div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: What is PKCE and why does it matter?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        PKCE stands for Proof Key for Code Exchange. In the OIDC Authorization Code flow, the app generates a random secret (code verifier), hashes it (code challenge), and sends the hash to Okta with the initial auth request. When Okta returns the authorization code and the app exchanges it for tokens, it also sends the original code verifier. Okta verifies they match. This prevents an attacker who intercepts the authorization code from being able to exchange it for tokens — because they don't have the original code verifier. For a browser-based SPA, PKCE is mandatory because there is no server-side secret to protect the token exchange. okta-auth-js handles PKCE automatically.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How did you handle the SAML to Okta migration without downtime?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        We used per-tenant feature flags. Rather than switching all 2,500+ clients at once, we migrated one tenant at a time. Each tenant had a flag that controlled whether their auth flow used the old SAML redirect or the new Okta OIDC flow. We started with internal test tenants, validated everything, then gradually rolled out to production clients. If a specific tenant had issues, we flipped their flag back to SAML without affecting anyone else. The user provisioning side was handled by the infra team. My side — the Angular auth flow — was ready ahead of the tenant rollout so each migration was just a flag change.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===================== DEEP DIVE: AZURE SERVICE BUS ===================== -->
+  <div class="section" id="dd-servicebus">
+    <div class="section-header">
+      <div class="snum purple">📨</div>
+      <h2 class="stitle">Deep Dive — Azure Service Bus</h2>
+    </div>
+
+    <div class="callout blue"><strong>Your ownership:</strong> You don't manage the Service Bus infrastructure itself (provisioning, scaling tier, network rules) — that's set up once by the platform team. Your ownership is using it correctly from each microservice: publishing events, subscribing, handling retries/idempotency, and reasoning about why a Queue vs a Topic was used in a given case.</div>
+
+    <h3>Core Concepts — High Level Definitions</h3>
+    <table>
+      <tr><th>Concept</th><th>What it is, in one line</th></tr>
+      <tr><td><strong>Namespace</strong></td><td>The top-level container in Azure for your whole messaging setup — like a folder that holds all your Queues and Topics. One namespace (e.g. <code>apoorv-capitalaccess-sb1</code>) can hold many Queues and Topics. You connect to a namespace, then talk to a specific Queue/Topic inside it.</td></tr>
+      <tr><td><strong>Queue</strong></td><td>A point-to-point channel. One message → exactly ONE consumer processes it. Used for tasks/jobs where work should happen exactly once (e.g. <code>report-generation-queue</code>).</td></tr>
+      <tr><td><strong>Topic</strong></td><td>A publish/subscribe (pub/sub) channel. One message published → every Subscription attached to that Topic gets its OWN independent copy. Used for events where multiple services each need to react independently (e.g. <code>ownership-changed</code>).</td></tr>
+      <tr><td><strong>Subscription</strong></td><td>A "mailbox" attached to a Topic. Each subscriber service (Targeting, Notifications) has its own Subscription on the same Topic — that's what makes the fan-out work. Without a Subscription, a Topic has nowhere to deliver messages to.</td></tr>
+      <tr><td><strong>Dead Letter Queue (DLQ)</strong></td><td>An automatic "failed messages" holding area, built into every Queue and every Subscription. If a message fails to be processed successfully too many times (exceeds Max Delivery Count), Service Bus moves it here automatically instead of retrying forever. Lets you inspect what went wrong without blocking the rest of the queue.</td></tr>
+    </table>
+
+    <div class="callout amber"><strong>How they relate:</strong> Namespace contains Queues and Topics. A Topic contains one or more Subscriptions. Every Queue and every Subscription has its own DLQ attached automatically — DLQ is not a separate thing you create, it always exists alongside.</div>
+
+    <h3>Peek vs Receive — What You Actually Learned Hands-On</h3>
+    <div class="flow">PEEK — look only, zero side effects
+  Message stays in the queue untouched. Delivery count unchanged.
+  Can peek the same message any number of times.
+
+RECEIVE (Peek-Lock — what real app code uses)
+  Message gets LOCKED (hidden from other consumers) but NOT deleted yet.
+  You now have a time window (Lock Duration) to decide:
+    → Complete    : message deleted for good (you finished processing successfully)
+    → Abandon     : lock released, message goes back to queue, Delivery Count +1
+    → do nothing  : lock silently expires — SAME effect as Abandon, Delivery Count +1
+    → Dead-letter : send straight to DLQ (e.g. you know this message is malformed)
+
+RECEIVE-AND-DELETE (simpler, riskier — not used in production code here)
+  Message deleted the INSTANT it's received. No second chance if processing then fails.
+  Fire-and-forget. We don't use this for report jobs — Peek-Lock is safer.</div>
+
+    <div class="callout green"><strong>Why this matters for Capital Access:</strong> The Report Worker (Azure Function) uses Peek-Lock semantics under the hood. If it crashes mid-PDF-generation after receiving a message but before completing it, the lock expires and the job automatically comes back for another attempt — no job is silently lost just because one worker instance died.</div>
+
+    <h3>Max Delivery Count → Dead Letter Queue</h3>
+    <div class="flow">Message enters queue → Delivery Count = 0
+  Worker receives it, fails (crash / exception / lock timeout) → back to queue, Delivery Count = 1
+  Worker receives it again, fails again → Delivery Count = 2
+  ... repeats ...
+  Delivery Count exceeds Max Delivery Count (default 10)
+  → Service Bus AUTOMATICALLY moves the message to the Dead Letter Queue
+  → It stops being retried — sits aside for manual inspection
+  → Rest of the queue keeps moving — one "poison message" can't block everything behind it</div>
+
+    <h3>Why Azure Service Bus over Kafka, RabbitMQ, or a plain Queue?</h3>
+    <table>
+      <tr><th>Alternative</th><th>Why it wasn't the right fit</th></tr>
+      <tr><td><strong>Kafka</strong></td><td>Built for massive-scale event streaming (millions of events/sec, replay, long retention). Capital Access has moderate event volume — Kafka would be operational overkill, plus it needs separate cluster management we don't need.</td></tr>
+      <tr><td><strong>RabbitMQ</strong></td><td>Third-party, self-hosted — we'd own patching, scaling, and uptime ourselves. Service Bus is native Azure: integrates with Managed Identity, Key Vault, and App Insights out of the box, with no separate infrastructure to run.</td></tr>
+      <tr><td><strong>A "plain" custom queue (e.g. DB table as queue)</strong></td><td>No built-in message locking, retry, or Dead Letter handling — we'd have to build all of that ourselves and it's easy to get subtly wrong (duplicate processing, lost messages under crashes).</td></tr>
+      <tr><td><strong>Azure Service Bus (chosen)</strong></td><td>Fully managed (no servers to provision or patch), supports both Queue (task) and Topic/Subscription (event fan-out) patterns natively, built-in message locking + retry + DLQ, and scales automatically — we just create the namespace and use it.</td></tr>
+    </table>
+
+    <h3>Guaranteed Delivery and Idempotency</h3>
+    <div class="callout amber"><strong>"At-least-once" delivery, not "exactly-once":</strong> Service Bus guarantees a message will be delivered at least once — but under certain failure timing (e.g. worker completes the work but crashes before calling Complete), the same message can be redelivered. Consumers must be idempotent — check an event/message ID before reprocessing, so retried messages don't cause duplicate side effects (e.g. don't regenerate and re-upload the same report twice).</div>
+
+    <h3>Interview Questions — Azure Service Bus</h3>
+
+    <div class="qa">
+      <div class="qa-q">Q: What's the difference between a Queue and a Topic in Service Bus?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        A Queue is point-to-point — one message, exactly one consumer processes it. We use this for tasks where doing the work twice would be wrong or wasteful, like <code>report-generation-queue</code>. A Topic is publish/subscribe — one message gets fanned out to every Subscription attached to that Topic, each getting its own independent copy. We use this for events, like <code>ownership-changed</code>, where multiple services (Targeting, Notifications) each need to react independently without knowing about each other.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: What happens if a consumer crashes while processing a message?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        When a consumer receives a message under Peek-Lock (the default for real application code), Service Bus locks it so no one else can take it, but doesn't delete it yet. If the consumer crashes before calling Complete, that lock simply expires after the configured Lock Duration, and Service Bus automatically makes the message visible again for another consumer to pick up. Its delivery count increments each time this happens. If it keeps failing past Max Delivery Count, it's automatically moved to the Dead Letter Queue rather than retried forever.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How do you prevent the same message from being processed twice?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Service Bus guarantees at-least-once delivery, not exactly-once — so duplicates are possible in edge cases (e.g. the consumer finishes work but crashes right before calling Complete). We make our consumers idempotent: each message carries a unique ID (or we use the jobId/eventId already in the payload), and before processing we check whether that ID has already been handled. If it has, we skip reprocessing and just acknowledge the message. This way a redelivered message is safe even if the original processing already succeeded.
+      </div>
+      <div class="qa-tip">This is a very common follow-up — always pair "guaranteed delivery" with "and that's why idempotency matters" to show depth.</div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: Why Service Bus instead of Kafka or RabbitMQ?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Kafka is built for very high-throughput event streaming with replay and long retention — that's more capability than we need for Capital Access's moderate event volume, and it adds real operational overhead (managing a cluster). RabbitMQ is a strong option too, but it's third-party and self-hosted, meaning we'd own its uptime, scaling, and patching ourselves. Azure Service Bus is fully managed — we provision a namespace and Microsoft handles the infrastructure — and it integrates natively with the rest of our Azure stack: Managed Identity for auth instead of connection strings, Key Vault for secrets, and App Insights for tracing messages end-to-end. For our scale, that native integration and zero infrastructure management mattered more than Kafka's raw throughput ceiling.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Scenario: A report job message keeps failing every time a specific worker picks it up. What happens, and how would you investigate?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Each failed attempt increments that message's delivery count and it bounces back to the queue. After it exceeds Max Delivery Count, Service Bus automatically moves it to the Dead Letter Queue — it stops blocking other jobs behind it. To investigate, I'd go to the Dead Letter sub-queue, inspect the message body and properties (including any exception details we logged via App Insights using the message's Correlation ID), and figure out why it consistently fails — e.g. malformed jobId, a tenant whose data is in an unexpected state, or a bug in the worker for a specific report type. Once fixed, I could resubmit that specific message from the DLQ back into the main queue for reprocessing.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Scenario: You need to add a brand-new "Audit Service" that should also react every time ownership data changes, without touching any existing service. How?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Because we use a Topic (<code>ownership-changed</code>) rather than direct service-to-service calls, this is simple: I'd just create a new Subscription on the existing Topic for the Audit Service. It immediately starts receiving its own independent copy of every ownership-changed event going forward. The Ownership Service that publishes the event needs zero changes — it doesn't know or care how many subscribers exist. This is exactly the decoupling benefit of pub/sub over direct calls.
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ===================== DEEP DIVE: AZURE FUNCTIONS (PLAIN) ===================== -->
+  <div class="section" id="dd-azurefunctions">
+    <div class="section-header">
+      <div class="snum purple">⚡</div>
+      <h2 class="stitle">Deep Dive — Azure Functions (Triggers, Bindings, Hosting)</h2>
+    </div>
+
+    <div class="callout blue"><strong>Where this fits:</strong> This covers "plain" (non-Durable) Azure Functions — the fundamentals behind the Report Worker before it became an orchestration, and the building blocks Durable Functions itself sits on top of. Know this section first; Durable Functions (DD4) is the specialised extension built on top of these same primitives.</div>
+
+    <h3>What Is an Azure Function, Simply?</h3>
+    <div class="callout amber"><strong>It's a piece of code that runs when something happens, and you don't manage a server for it.</strong> You write one method, decorate it with a trigger (what causes it to run — a queue message, an HTTP call, a timer), and Azure handles provisioning, scaling, and patching the infrastructure underneath it. You pay (in Consumption plans) only for the time your code actually executes.</div>
+
+    <h3>Triggers vs Bindings — the Core Concept</h3>
+    <table>
+      <tr><th>Concept</th><th>What it means</th></tr>
+      <tr><td><strong>Trigger</strong></td><td>What causes the function to run. Exactly one per function — e.g. <code>[ServiceBusTrigger]</code>, <code>[HttpTrigger]</code>, <code>[TimerTrigger]</code>, <code>[BlobTrigger]</code>. The trigger also usually delivers the input data (e.g. the queue message body).</td></tr>
+      <tr><td><strong>Input binding</strong></td><td>Declarative way to pull in extra data the function needs, without writing SDK boilerplate — e.g. read a row from Table Storage matching an ID from the trigger payload.</td></tr>
+      <tr><td><strong>Output binding</strong></td><td>Declarative way to send data out — e.g. return a value and have it automatically written to a Queue or Blob, instead of manually instantiating a client SDK and calling Send.</td></tr>
+    </table>
+    <div class="callout green">In our codebase we mostly use the trigger plus our own service calls (e.g. Blob SDK inside an Activity) rather than declarative output bindings for everything — that's a valid choice too. Bindings are a convenience layer, not a requirement; you can always drop down to the SDK directly when you need more control (e.g. generating a SAS URL with specific options).</div>
+
+    <h3>Hosting Plans — Where the Function Actually Runs</h3>
+    <table>
+      <tr><th>Plan</th><th>Scaling behaviour</th><th>When to use</th></tr>
+      <tr><td><strong>Consumption</strong></td><td>Scales to zero when idle, automatically adds instances as load increases, pay-per-execution</td><td>Bursty, unpredictable workloads — exactly our Report Worker, which is busy at market open and idle afterward</td></tr>
+      <tr><td><strong>Premium</strong></td><td>Pre-warmed instances (no cold start), still elastic, supports VNET integration</td><td>Latency-sensitive functions where even a 1–2s cold start is unacceptable, or you need private networking to a VNET-restricted resource</td></tr>
+      <tr><td><strong>Dedicated (App Service Plan)</strong></td><td>Runs on VMs you already pay for continuously, no cold start, no extra scale-out cost model</td><td>You already have spare capacity on an App Service Plan and want predictable, always-on cost instead of consumption billing</td></tr>
+    </table>
+    <div class="callout amber"><strong>Cold start:</strong> On Consumption, if no instance has handled a request recently, the platform has to spin one up before your code runs — adds latency (could be seconds, more for .NET if JIT-heavy). For our async report jobs, a cold start adds a little delay before the worker picks up the queue message, but since the whole flow is already async and polled, it's invisible to the user.</div>
+
+    <h3>In-Process vs Isolated Worker Model (.NET specifically)</h3>
+    <div class="flow">In-Process Model (older):
+  Your function code runs INSIDE the same process as the Functions host.
+  Tightly coupled to whatever .NET version the host itself runs.
+  Simpler binding object model, but you're stuck on host-supported .NET versions.
+
+Isolated Worker Model (current, what our project uses):
+  Your function code runs in its OWN separate worker process.
+  Communicates with the host process over gRPC.
+  Lets you run a newer/different .NET version than the host requires.
+  Full control over the dependency injection container (Program.cs sets it up
+  explicitly, like a normal ASP.NET Core app) — you're not limited to the
+  host's built-in DI.
+  This is the model Microsoft is investing in going forward.</div>
+
+    <h3>Triggers We Actually Use, and Why</h3>
+    <table>
+      <tr><th>Trigger</th><th>Used for</th><th>Why this one</th></tr>
+      <tr><td><code>ServiceBusTrigger</code></td><td>Function1 — picks up report-generation-queue messages</td><td>Queue semantics fit a task that should be processed exactly once per message; auto-scales with queue depth</td></tr>
+      <tr><td><code>OrchestrationTrigger</code></td><td>ReportOrchestrator</td><td>Durable Functions-specific trigger — marks a function as the workflow definition the Durable Task framework drives via replay</td></tr>
+      <tr><td><code>ActivityTrigger</code></td><td>GenerateReport, WriteToBlob, GenerateSasUrl</td><td>Marks a function as a unit of real work the orchestrator can schedule and await</td></tr>
+    </table>
+
+    <h3>How Scaling Actually Works on Consumption</h3>
+    <div class="flow">Scale controller monitors the trigger source (e.g. Service Bus queue length):
+  Queue has 1 message    → 1 function instance handles it
+  Queue has 50 messages   → scale controller spins up multiple instances
+                            in parallel, each pulling and processing
+                            different messages concurrently
+  Queue drains to 0       → instances scale back down to zero over time
+
+This is why a Consumption-plan Function is a good fit for bursty, unpredictable
+load — Report Worker demand at 9am market open vs. 3pm is wildly different,
+and we don't pay for idle capacity or manually configure autoscale rules.</div>
+
+    <h3>Interview Questions — Azure Functions Fundamentals</h3>
+
+    <div class="qa">
+      <div class="qa-q">Q: What's the difference between a trigger and a binding?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        A trigger is what causes the function to execute — every function has exactly one (a queue message arriving, an HTTP request, a timer firing). A binding is a declarative way to read additional input or write output without hand-writing SDK calls — for example, an input binding could fetch a row from Table Storage matching an ID from the trigger payload, and an output binding could write your return value straight to a Blob or Queue. The trigger always implies an input as well; bindings are the optional extra wiring around it.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: Why did the project use the isolated worker model instead of in-process?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        The isolated worker model runs our function code in its own process, separate from the Functions host, communicating over gRPC. That decouples our .NET version from whatever version the host itself requires, gives us a normal ASP.NET Core-style Program.cs where we configure dependency injection explicitly, and it's the model Microsoft is actively investing in going forward — in-process is effectively the legacy path now. For a project that wants to stay current on .NET versions without waiting on host support, isolated is the right default.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: What's a cold start, and does it matter for this workload?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        On a Consumption plan, instances scale to zero when idle. The first request after idle time has to wait for a new instance to spin up before the function runs — that's the cold start, and it can add a noticeable delay, especially for .NET workloads with JIT compilation. For our Report Worker, it doesn't really matter: the entire pipeline is already asynchronous — the client gets a jobId immediately and polls for status — so an extra second or two before the worker actually starts processing is invisible to the end user. If this were a latency-sensitive synchronous API, I'd consider a Premium plan instead, which keeps pre-warmed instances around specifically to avoid this.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How does a Consumption-plan Function scale automatically?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        The platform's scale controller watches the trigger source — for a queue trigger, that's queue length and the rate messages are arriving. If the queue backs up, it spins up additional function instances in parallel, each pulling and processing different messages, up to a configured maximum. As the queue drains, instances scale back down, eventually to zero. We don't write any autoscale rules ourselves — it's driven by the trigger type automatically, which is exactly why a bursty workload like report generation (heavy at market open, quiet later) fits Consumption well.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: When would you choose a Premium or Dedicated plan instead of Consumption?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Premium, if cold start latency is unacceptable for the use case — it keeps pre-warmed instances ready — or if the function needs VNET integration to reach a network-restricted resource, which Consumption doesn't support. Dedicated (running on an existing App Service Plan) makes sense if we already have spare, paid-for compute sitting there and want predictable always-on costs rather than the variable per-execution billing of Consumption. For our Report Worker specifically, the bursty nature and tolerance for a small startup delay made Consumption the right default — we'd only revisit that if cold starts became a measured problem.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Scenario: A teammate suggests writing all the report-pipeline glue logic directly inside one big function instead of using bindings/triggers at all. What would you push back on?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        You can absolutely write everything procedurally inside one function body, and for a tiny one-off task that's fine — but for a job that needs to react to a queue, scale with load, and potentially survive crashes mid-pipeline, you lose a lot for free. The trigger gives you automatic scale-out tied to queue depth without writing polling code yourself. Splitting the work into discrete steps (even before going Durable) makes each piece testable and reusable. And it sets you up cleanly to move to a Durable orchestration later — which we did — without redesigning the worker model. I'd push back gently: a single monolithic function works today, but it's a dead end if the pipeline grows another step or needs crash recovery.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Scenario: The Report Worker function is timing out on very large reports before it can finish all the work. What are your options?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        A few angles. First, check the plan's max execution timeout — Consumption has a default (commonly 5 minutes, configurable up to 10) where Premium/Dedicated can run unbounded; if the report generation is legitimately long-running, moving off Consumption removes the hard ceiling. Second, and more architecturally — this is exactly the case for Durable Functions: instead of one function doing all the work in one execution, break it into Activity steps (generate → upload → finalize) so each step is its own bounded unit of work and the overall job isn't limited by a single function's timeout, since the orchestrator coordinates across multiple executions rather than one long one. That's part of why we evolved this worker into a Durable orchestration.
+      </div>
+      <div class="qa-tip">This question is a natural bridge into the Durable Functions section (DD4) — use it to pivot there if asked as a follow-up.</div>
+    </div>
+
+  </div>
+
+
+  <!-- ===================== DEEP DIVE: DURABLE FUNCTIONS ===================== -->
+  <div class="section" id="dd-durable">
+    <div class="section-header">
+      <div class="snum purple">⏱️</div>
+      <h2 class="stitle">Deep Dive — Durable Functions</h2>
+    </div>
+
+    <div class="callout blue"><strong>Where this fits:</strong> The report generation worker (Section 3b) started as a single Azure Function reacting to one queue message. As the pipeline grew more steps — generate → upload to blob → produce a SAS URL — we evolved the worker into a <strong>Durable Function orchestration</strong> so each step is independently checkpointed and the whole job survives a crash or restart without redoing finished work.</div>
+
+    <h3>The Simple Mental Model</h3>
+    <div class="callout amber"><strong>Think of it as a recipe with a notebook.</strong> Normally, if the app crashes halfway through a report job, you lose everything and start over. Durable Functions writes down every finished step in a notebook (stored in Azure Storage) as it goes — "Step 1 done, here's the result." If the process crashes or restarts, it doesn't redo the work, it reads the notebook and resumes from the next step.</div>
+
+    <h3>How State Is Actually Persisted</h3>
+    <div class="flow">Durable Functions is built on the Durable Task Framework — it uses EVENT SOURCING, not snapshots.
+
+Every time the orchestrator awaits something (an activity call, a timer, an
+external event), the framework:
+  1. Appends an event to a History log for that orchestration instance
+  2. Persists that history to the configured storage account (AzureWebJobsStorage)
+  3. Pauses the orchestrator until the awaited work completes
+
+When the awaited work finishes, the framework wakes the orchestrator back up
+and REPLAYS the function from the top:
+  - Every previously-completed step returns its cached result instantly from
+    history (no real work re-executes)
+  - Only the first NOT-YET-completed step actually runs for real
+
+This is why orchestrator code must be deterministic — no DateTime.Now,
+Guid.NewGuid(), or direct I/O inside the orchestrator itself. Anything like
+that has to go through context.CurrentUtcDateTime, or live inside an Activity,
+otherwise replay produces different results each time and history desyncs.</div>
+
+    <h3>What Gets Created in Storage</h3>
+    <table>
+      <tr><th>Storage artifact</th><th>Purpose</th></tr>
+      <tr><td><strong>Instances / History table</strong></td><td>One row per orchestration instance; the full event history (what ran, what it returned) that replay reads from</td></tr>
+      <tr><td><strong>Control queue</strong></td><td>The orchestrator's own queue — wakes it up when an activity result or timer fires</td></tr>
+      <tr><td><strong>Work-item queue</strong></td><td>Where Activity functions pick up the actual jobs the orchestrator schedules</td></tr>
+      <tr><td><strong>Large-message blob container</strong></td><td>Used automatically when an activity's input/output is too large to fit in a queue message</td></tr>
+    </table>
+
+    <h3>Report Pipeline as a Durable Orchestration</h3>
+    <div class="arch">CLIENT FUNCTION (Service Bus Trigger — Function1)
+  Receives message from report-generation-queue
+  Calls: client.ScheduleNewOrchestrationInstanceAsync("ReportOrchestrator", payload)
+  Returns immediately — does NOT wait for the report to finish ✅
+
+ORCHESTRATOR FUNCTION (ReportOrchestrator)
+  [OrchestrationTrigger] TaskOrchestrationContext context
+  string content  = await context.CallActivityAsync<string>("GenerateReport", input);
+  string blobPath = await context.CallActivityAsync<string>("WriteToBlob", content);
+  string sasUrl   = await context.CallActivityAsync<string>("GenerateSasUrl", blobPath);
+  return sasUrl;
+
+  Each "await" is a checkpoint:
+    - GenerateReport completes → history records the result → checkpoint written
+    - If the process crashes here, on restart the orchestrator REPLAYS,
+      sees GenerateReport already has a result in history, skips re-running it,
+      and resumes at WriteToBlob — not from the very beginning.
+
+ACTIVITY FUNCTIONS ([ActivityTrigger])
+  GenerateReport   → builds report content
+  WriteToBlob      → uploads to Azure Blob Storage, returns blob path
+  GenerateSasUrl   → returns a time-limited SAS URL for download</div>
+
+    <h3>Why Not Just Chain Plain Functions or Use a Saga in Code?</h3>
+    <div class="callout green">You could call three plain functions in sequence from the trigger function itself, but then YOU own the crash-recovery logic — tracking which step completed, persisting that somewhere, and writing the resume logic by hand. Durable Functions gives you that checkpointing for free: the framework persists progress after every awaited step, and replay-based resume is built into the runtime. It is the managed version of the "saga / workflow with a tracking table" pattern people otherwise hand-roll.</div>
+
+    <h3>When Durable Functions Is the Right Tool</h3>
+    <table>
+      <tr><th>Pattern</th><th>Fits Durable Functions because…</th></tr>
+      <tr><td>Function chaining</td><td>Sequential steps where each step's output feeds the next, and you want each step durable/retryable independently — exactly the report pipeline</td></tr>
+      <tr><td>Fan-out / fan-in</td><td>Kick off N parallel activities (e.g. generate sections of a report concurrently), then aggregate once all complete</td></tr>
+      <tr><td>Async HTTP APIs</td><td>Client kicks off a long job and polls a status endpoint instead of holding a connection open — Durable Functions has a built-in HTTP status-polling pattern</td></tr>
+      <tr><td>Human interaction / approval</td><td>Orchestration can pause for minutes, hours, or days waiting for <code>WaitForExternalEvent</code> (e.g. a manager approving a report before it's sent)</td></tr>
+      <tr><td>Stateful entities</td><td>Durable Entities act like small stateful actors holding state across calls — less relevant here, more common in IoT/counter scenarios</td></tr>
+    </table>
+    <div class="callout red"><strong>When it's overkill:</strong> A single quick operation that finishes in well under a second and doesn't need to survive a crash gains nothing from Durable Functions — it just adds storage and orchestration overhead for no benefit. Use a plain function there.</div>
+
+    <h3>What to Say in the Interview</h3>
+    <div class="speak">We evolved the report worker from a single queue-triggered function into a Durable Function orchestration once the pipeline grew multiple sequential steps — generate the report, upload it to blob storage, then produce a SAS URL. The trigger function now just schedules an orchestration instance and returns immediately. The orchestrator calls each step as an Activity function and awaits the result. Durable Functions checkpoints progress after every step into Azure Storage using an event-sourcing model, so if the process crashes mid-pipeline, it doesn't restart from scratch — on recovery it replays the orchestration history, instantly skips the steps that already completed, and resumes exactly where it left off. That gave us crash-safe, resumable report generation without hand-rolling our own progress-tracking table.</div>
+
+    <h3>Interview Questions — Durable Functions</h3>
+
+    <div class="qa">
+      <div class="qa-q">Q: What problem do Durable Functions solve that a plain Azure Function doesn't?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        A plain function is stateless and atomic — if it crashes partway through a multi-step job, that progress is gone and you start the whole thing over. Durable Functions adds a persistent, checkpointed workflow on top of functions: after every awaited step (an Activity call, a timer, an external event), the framework writes that step's result to storage. If the process restarts, the orchestrator replays from history, instantly resumes anything already completed, and only does real work from the first incomplete step onward. It turns a multi-step pipeline into something that survives crashes and redeploys without you writing your own progress-tracking logic.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How does the orchestrator "remember" what it already did? Where is that state stored?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        It's event sourcing, not a snapshot. Every orchestration instance has a history log of events — "activity X started," "activity X completed with result Y" — persisted in the storage account configured by <code>AzureWebJobsStorage</code> (an Instances/History table, plus control and work-item queues the framework manages). When the orchestrator wakes up, it doesn't resume execution mid-function the way a thread would — it replays the orchestrator code from the top. Every step already present in history returns its cached result immediately instead of re-running; the first step without a recorded result is the one that actually executes.
+      </div>
+      <div class="qa-tip">Mention "event sourcing" and "replay" explicitly — these are the two terms interviewers are listening for.</div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: Why can't I just call DateTime.Now or Guid.NewGuid() inside the orchestrator function?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Because the orchestrator function body gets re-executed (replayed) every time it wakes up, it has to be deterministic — given the same history, it must produce the same sequence of calls every time. If the orchestrator called <code>DateTime.Now</code> directly, replay would get a different value each time and could schedule a different activity than it did originally, desynchronising it from its own history. The framework provides deterministic equivalents instead — <code>context.CurrentUtcDateTime</code> for time, or you push any genuinely non-deterministic work (random numbers, real I/O, current time) into an Activity function, where it's only executed once and the result is the thing that gets recorded in history.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: What's the difference between an Orchestrator function and an Activity function?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        The Orchestrator (<code>[OrchestrationTrigger]</code>) defines the workflow — what steps run, in what order, with what logic between them — but it must stay deterministic and side-effect free, because it gets replayed. Activities (<code>[ActivityTrigger]</code>) are where the real work and side effects happen — calling an external API, writing to Blob Storage, hitting a database. Each Activity call from the orchestrator runs exactly once for real; only its already-known result gets replayed afterward, never the Activity code itself.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: What's the trigger function's job if the orchestrator does all the real work?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        The trigger function (our Service Bus-triggered Function1) is just the entry point — it calls <code>DurableTaskClient.ScheduleNewOrchestrationInstanceAsync</code> with the incoming payload and returns immediately. It doesn't wait for the report to finish; it just hands off a durable "ticket" represented by an instance ID. That keeps the Service Bus message processed quickly — Service Bus doesn't hold a lock open for however long the whole report pipeline takes, it's released as soon as scheduling succeeds.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Scenario: The Function host crashes right after "WriteToBlob" completes but before "GenerateSasUrl" runs. What happens when it restarts?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Because <code>WriteToBlob</code> already completed and its result was checkpointed to history before the crash, nothing is lost. On restart, the Durable Task framework picks the orchestration instance back up from the control queue, replays the orchestrator function from the top, and for both <code>GenerateReport</code> and <code>WriteToBlob</code> it sees a completed result in history and returns those instantly without re-executing them — so the report isn't regenerated and the blob isn't re-uploaded. It reaches <code>GenerateSasUrl</code>, finds no result for that step yet, and actually executes it for the first time. The job resumes from exactly the next undone step, not from scratch.
+      </div>
+      <div class="qa-tip">This is the single most likely scenario question — answer it by walking through replay step-by-step like this, naming which steps replay from cache vs which step actually runs.</div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Scenario: Product asks you to add a 4th step that generates three report sections in parallel before assembling the final PDF. How would Durable Functions handle that?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        That's the fan-out/fan-in pattern. Inside the orchestrator, instead of one <code>await</code> per Activity, I'd start all three section-generation Activity calls without awaiting each individually — <code>context.CallActivityAsync</code> three times into a list of tasks — then <code>await Task.WhenAll(tasks)</code> to wait for all three to complete before moving on to the assembly step. The framework checkpoints each of the three results independently in history, so even here, if the process crashes after two of three sections finish, replay resumes only the section that hadn't completed, not all three.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Scenario: A client wants the report job to pause and wait for a manager's approval before the SAS URL is emailed out, possibly hours or days later. How would you implement that with Durable Functions?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        I'd add an <code>await context.WaitForExternalEvent("ApprovalReceived")</code> step in the orchestrator after report generation and before the final notification step. The orchestration instance effectively suspends — it costs nothing while waiting, there's no thread or function execution sitting idle — until something raises that event for that specific instance ID, typically via a separate HTTP-triggered function that the manager's "Approve" link calls, which in turn calls <code>client.RaiseEventAsync(instanceId, "ApprovalReceived", ...)</code>. The orchestrator then wakes up, replays up to that point, sees the event was received, and proceeds to the notification step. This is exactly the human-interaction pattern Durable Functions is designed for — long waits without keeping infrastructure busy.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: Doesn't replaying the orchestrator function every time waste compute, especially for a long pipeline with many steps?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        It looks wasteful but isn't, in practice. Replaying already-completed steps doesn't re-run their actual work — it's just reading cached results out of history and returning them, which is cheap in-memory bookkeeping, not real I/O. The cost only shows up as the orchestrator function getting "re-entered" more times as the history grows, which the framework mitigates internally (it doesn't literally redo the whole walk every single time in the simplest cases). For genuinely very long-running orchestrations with thousands of steps, Microsoft's guidance is to use sub-orchestrations to keep individual histories smaller — but for a 3–4 step pipeline like ours, this is a non-issue.
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- ===================== DEEP DIVE: AZURE COSMOS DB ===================== -->
+  <div class="section" id="dd-cosmosdb">
+    <div class="section-header">
+      <div class="snum purple">DD5</div>
+      <h2 class="stitle">Deep Dive — Azure Cosmos DB</h2>
+    </div>
+
+    <div class="callout blue"><strong>Where it sits in the architecture:</strong> Cosmos DB holds the Ownership time-series data — high write volume, schema that can vary slightly between data providers, and a query pattern that's almost always "history for one company." That profile is what makes a flexible-schema, horizontally-scalable document store the right fit, versus Azure SQL which we use for the genuinely relational Profiles/Contacts/Targeting data.</div>
+
+    <h3>What Cosmos DB Actually Is</h3>
+    <p>A globally distributed, multi-model PaaS database. You don't provision servers — you provision throughput (Request Units, or RU/s), and Cosmos handles partitioning, replication, and scaling underneath. One account can expose data through different APIs: <strong>Core (SQL) API</strong> (native document model, the default), API for MongoDB, API for Cassandra, Gremlin (graph), Table API, and a separate distributed-Postgres offering (vCore, built on Citus). We use Core (SQL) API — it's the standard fit for a greenfield .NET stack with no migration constraint pulling toward another API.</p>
+
+    <h3>How We Modeled It</h3>
+    <table>
+      <tr><th>Setting</th><th>Value</th><th>Why</th></tr>
+      <tr><td>Database</td><td><code>OwnershipDb</code></td><td>—</td></tr>
+      <tr><td>Container</td><td><code>OwnershipHistory</code></td><td>—</td></tr>
+      <tr><td>Partition key</td><td><code>/companyId</code></td><td>Almost every real query is "history for company X" — keeps those reads in a single partition (cheap), avoids a hot partition (e.g. partitioning by <code>quarter</code> would pile every company's quarter-end writes onto one partition)</td></tr>
+      <tr><td>Id design</td><td><code>{companyId}-{quarter}</code> e.g. <code>AAPL-2025-Q2</code></td><td>Self-describing id; uniqueness in Cosmos is actually the combination of <strong>id + partition key</strong>, not id alone, so embedding the partition value avoids accidental collisions</td></tr>
+      <tr><td>Consistency</td><td>Session (default)</td><td>Read-your-own-writes within a session without paying cross-region Strong-consistency latency — a few seconds of staleness across regions is fine for ownership reporting</td></tr>
+      <tr><td>Throughput</td><td>Dedicated container-level, autoscale</td><td>Report-generation and quarterly refresh cycles are bursty, not constant — autoscale avoids both throttling and paying for idle peak capacity</td></tr>
+    </table>
+
+    <h3>How the Code Calls It</h3>
+    <div class="flow">CosmosClient client = new CosmosClient(connectionString);
+Container container = client.GetDatabase("OwnershipDb").GetContainer("OwnershipHistory");
+
+// Point read — cheapest possible op, ~1 RU, needs id + partition key
+var item = await container.ReadItemAsync&lt;OwnershipRecord&gt;(
+    id: "AAPL-2025-Q2", partitionKey: new PartitionKey("AAPL"));
+
+// Query — SQL-like syntax over JSON documents
+var query = new QueryDefinition(
+    "SELECT * FROM c WHERE c.companyId = @companyId")
+    .WithParameter("@companyId", "AAPL");
+var iterator = container.GetItemQueryIterator&lt;OwnershipRecord&gt;(query);
+
+// Upsert — insert-or-replace, idempotent (important for at-least-once delivery from Service Bus)
+await container.UpsertItemAsync(record, new PartitionKey(record.CompanyId));</div>
+
+    <h3>Query Cost Hierarchy (cheapest → most expensive)</h3>
+    <table>
+      <tr><th>Operation</th><th>Cost</th><th>Why</th></tr>
+      <tr><td>Point read (<code>ReadItemAsync</code> with id + partition key)</td><td>Lowest</td><td>Goes straight to the exact document, no query engine involved</td></tr>
+      <tr><td>Query filtered on partition key</td><td>Low</td><td>Stays within a single physical partition</td></tr>
+      <tr><td>Query NOT filtered on partition key</td><td>High</td><td>Cross-partition scatter-gather — fans out to every partition and merges results</td></tr>
+      <tr><td><code>GROUP BY</code> / aggregates without partition key filter</td><td>High</td><td>Same scatter-gather problem, plus aggregation overhead</td></tr>
+    </table>
+    <div class="callout amber"><strong>RU/s in one line:</strong> Request Units are Cosmos's normalized cost unit (CPU+memory+IO) for any operation. You provision RU/s (or use autoscale/serverless); exceed the budget and requests get throttled (HTTP 429) rather than just slowing down — so RU awareness is a reliability concern, not just a cost one.</div>
+
+    <h3>Change Feed — For Cross-Partition Access Patterns</h3>
+    <div class="callout green">A feature like "show ownership changes across ALL companies in the last 24 hours" is inherently cross-partition and expensive to query live. The better pattern is the <strong>Change Feed</strong> — a continuous, ordered stream of inserts/updates per partition that a separate Azure Function or reader consumes continuously, pushing results into a pre-computed summary container or downstream queue. Turns an expensive ad-hoc scan into a cheap, pre-built read path.</div>
+
+    <h3>What to Say in the Interview</h3>
+    <div class="speak">We use Cosmos DB's Core API for ownership time-series data because it's high write volume, the schema can vary slightly between data providers, and almost every query is "give me history for one company" — a profile that fits a flexible-schema, horizontally-scalable document store better than a fixed relational table. We partitioned by companyId specifically to avoid a hot-partition problem and keep our most common query pattern single-partition. We use Session consistency since we don't need cross-region strong consistency for ownership reporting, and we lean on point reads over queries wherever we already know the id, since that's the cheapest possible RU cost.</div>
+
+    <h3>Interview Questions — Azure Cosmos DB</h3>
+
+    <div class="qa">
+      <div class="qa-q">Q: What problem does Cosmos DB solve that Azure SQL doesn't, in your architecture?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Ownership data is high-volume, time-series, and the schema occasionally varies between data providers — exactly the profile where a flexible-schema, horizontally-scalable document store outperforms a fixed relational schema. Azure SQL is the right tool for Profiles/Contacts/Targeting because that data is genuinely relational with strict structure and needs joins and ACID guarantees across related tables. Different data shapes, different tools.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: How did you choose the partition key for the OwnershipHistory container, and why does it matter?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        We partitioned by companyId. Almost every real query pattern is "give me ownership history for company X," so keeping all of a company's documents in one logical partition makes those reads single-partition and cheap. The partition key is the single most consequential design decision in Cosmos DB — it determines both query efficiency and write distribution, and it can't be changed after creation without migrating to a new container.
+      </div>
+      <div class="qa-tip">Partition key choice is the #1 thing interviewers probe on Cosmos DB — always have a concrete reason tied to your real query pattern, not just "it seemed reasonable."</div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: What's a Request Unit (RU), and why should an engineer care about it day to day?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        An RU is Cosmos's normalized cost unit covering CPU, memory, and IO for an operation — every read, write, and query consumes a measurable number of RUs based on document size and operation complexity. You provision RU/s (or use autoscale/serverless), and if your application exceeds that budget, requests get throttled (HTTP 429) rather than just slowing down. RU awareness directly drives both cost and reliability — a badly-designed query that scans across partitions can burn far more RUs than an equivalent well-targeted one.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: What's the difference between a point read and a query, cost-wise?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        A point read (ReadItemAsync with both id and partition key) goes straight to the exact document — the cheapest possible operation. A query, even one scoped to a single partition, goes through the query engine and costs more. A cross-partition query (no partition key in the filter) is the most expensive, since Cosmos fans out to every physical partition and merges results. Always prefer a point read over a query when you already know the id and partition key.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: What consistency levels does Cosmos DB offer, and which would you pick for ownership data?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        Five levels: Strong, Bounded Staleness, Session (the default), Consistent Prefix, and Eventual — a tradeoff between consistency, latency, availability, and throughput. For ownership data, Session consistency is right: within a single client session you always read your own latest writes, but you're not paying the cross-region latency cost of Strong consistency, which ownership reporting doesn't need.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: Cosmos DB supports multiple APIs — Core/SQL, MongoDB, Cassandra, Gremlin, Table. Why Core/SQL here?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        It's the native, default model — document-based, queried with SQL-like syntax, with full first-class SDK support in .NET. The other APIs mainly exist for migration scenarios — you already have a Mongo or Cassandra app and want to move to Cosmos without rewriting the data access layer. We're greenfield on Azure with a .NET stack, so there's no migration constraint pulling toward another API.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Scenario: A teammate suggests partitioning the container by "quarter" instead of "companyId," since quarter is simpler. What's your concern?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        That creates a hot partition. Every company's data for the current quarter would land on the same partition, so during the heaviest ingestion period — quarter-end, when every data provider sends updates — all writes pile onto one partition's throughput budget while other partitions sit idle. Cosmos can't fix this after the fact; partition key choice is fixed at container creation. I'd confirm the real query pattern is "by company," which it is, and keep companyId as the partition key.
+      </div>
+      <div class="qa-tip">This is the most common Cosmos scenario question — always frame your answer around the actual read/write pattern, not a "simpler-sounding" key.</div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Scenario: Your report generation job calls the same Cosmos write twice due to a Service Bus message redelivery (at-least-once delivery). What breaks, and how do you prevent it?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        If the code uses CreateItemAsync, the second call throws a 409 Conflict, since the same id already exists in that partition — a safety net, but it needs explicit handling or the retry looks like a failure. The cleaner fix is UpsertItemAsync instead of CreateItemAsync for this kind of pipeline — insert-or-replace is naturally idempotent, so redelivery just overwrites the same document with the same data, no error, no special-casing needed.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Scenario: A new feature needs "show every ownership change across all companies in the last 24 hours" — inherently cross-company. How do you support that without a slow cross-partition scan every time?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        I'd reach for the Change Feed instead of querying the container directly. It gives a continuous, ordered stream of inserts/updates per partition, which a separate Azure Function or dedicated reader can consume continuously and push into a separate summary container or downstream queue purpose-built for that "last 24 hours, all companies" shape. That turns an expensive ad-hoc cross-partition query into a cheap, pre-computed read path.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Scenario: RU consumption is suddenly spiking and reports are timing out. How would you diagnose it?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        First, the portal's Metrics blade — check normalized RU consumption and 429 throttling rate over time to confirm it's a throughput ceiling issue, not something else like network. Then Data Explorer's Query Stats on the suspect queries to see actual RU charge per call — that usually reveals a query that lost its partition-key filter, or a new access pattern doing cross-partition scans. Fix is either tightening the query to include the partition key, adding a more targeted index, or increasing provisioned RU/s (or moving to autoscale) if the load genuinely grew.
+      </div>
+    </div>
+
+  </div>
+
+
+  <!-- ===================== SECTION 10 ===================== -->
+  <div class="section" id="s10">
+    <div class="section-header">
+      <div class="snum teal">10</div>
+      <h2 class="stitle">Questions to Ask the Interviewer</h2>
+    </div>
+
+    <div class="callout blue"><strong>Always ask 2–3 good questions.</strong> It shows genuine interest. Pick ones relevant to what they've discussed.</div>
+
+    <table>
+      <tr><th>Question</th><th>Why it's good</th></tr>
+      <tr><td>"How is the front-end team structured — are engineers aligned to features or to platform layers?"</td><td>Shows you care about team dynamics and working model</td></tr>
+      <tr><td>"What's the biggest technical debt the front-end team is dealing with right now?"</td><td>Gets real info about the actual codebase state</td></tr>
+      <tr><td>"How does the team balance new feature delivery with performance and security hardening?"</td><td>Shows maturity — you know both sides of the coin matter</td></tr>
+      <tr><td>"Is there a path toward micro-frontends or module federation, or is a monorepo SPA the long-term direction?"</td><td>Senior-level question about architectural roadmap</td></tr>
+      <tr><td>"How does accessibility compliance get validated — automated only or manual audits too?"</td><td>Relevant to regulated financial enterprise software</td></tr>
+    </table>
+  </div>
+
+  <div class="summary-box">
+    <h4>📌 The Four Things to Remember</h4>
+    1. <strong>You know the full stack</strong> — Angular 18 frontend + 5 named microservices + Azure Service Bus + Cosmos DB + Redis + Key Vault. Don't speak in vague terms — name the services.<br><br>
+    2. <strong>Every Azure service choice has a reason</strong> — Cosmos DB for time-series, SQL for relational, Redis for read performance, Service Bus Topics for fan-out events, Key Vault for secrets. Know the why for each.<br><br>
+    3. <strong>Client-side is UX, server-side is security</strong> — when asked about auth guards, JWT validation, or role access: always say both layers exist and explain which one is the real security boundary.<br><br>
+    4. <strong>You own, you don't just contribute</strong> — auth flow, bundle optimisation, CI/CD gates, and architecture decisions. Frame everything as ownership with measurable impact.
+  </div>
+
+  <div style="text-align:center; color:#888; font-size:12px; padding: 20px 0;">
+    📍 D:\Learning\Study Material · Capital Access Interview Story · Updated June 2026
+  </div>
+
+</div>
+</body>
+</html>
