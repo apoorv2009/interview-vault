@@ -18,32 +18,6 @@ interview-vault/
 
 Questions are tagged with `[Topic: X]` metadata and `[EPAM]` / `[Infosys]` / `[Capgemini]` / `[TCS]` company labels where the question is a known past interview question from that company. All version-specific answers are written from an **Angular 19** perspective.
 
-## interview-preperation-angular-app
-
-An Angular 19 application scaffold for interview preparation. Generated with Angular CLI 19.2.27.
-
-### Development server
-
-```bash
-ng serve
-```
-
-Open your browser and navigate to `http://localhost:4200/`.
-
-### Build
-
-```bash
-ng build
-```
-
-Build artifacts are stored in the `dist/` directory.
-
-### Running unit tests
-
-```bash
-ng test
-```
-
 ## capital-access-project
 
 Interview prep tied to my current role: S&P Global, Lead Software Development Engineer, Capital Access (Dec 2024 – Present). Covers the actual production architecture, my ownership areas, and a growing set of Azure-service deep dives.
