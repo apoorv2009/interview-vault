@@ -842,21 +842,356 @@ In Angular 19 with Signals, this error is much rarer because Signal reads are sy
 
 ### Q12. [Topic: Change Detection] [Infosys] What is the Angular component lifecycle? List all hooks in execution order.
 
+Every Angular component goes through a predictable journey — created, initialised, updated, and eventually destroyed. Angular provides **hook methods** to tap into specific moments of that journey.
+
+#### The house-building analogy
+
 ```
-constructor()             DI injection. No DOM, no inputs yet.
-ngOnChanges()             Fires when @Input() values change. Runs before ngOnInit and on each subsequent change.
-ngOnInit()                Runs once after first ngOnChanges. Use for initialization and HTTP calls.
-ngDoCheck()               Every CD cycle — use sparingly as it is very frequent.
-ngAfterContentInit()      Once after ng-content projection is initialized.
-ngAfterContentChecked()   After every CD check of projected content.
-ngAfterViewInit()         Once after component + child views are initialized. DOM is accessible here.
-ngAfterViewChecked()      After every CD check of the component's view.
-ngOnDestroy()             Before component is removed from DOM. Cancel subscriptions and timers here.
+constructor()            → Land purchased — component object created, DI wired
+ngOnChanges()            → Architect delivers blueprints — inputs received from parent
+ngOnInit()               → Construction complete, move in — ready to work
+ngDoCheck()              → Property inspector visits — every CD cycle
+ngAfterContentInit()     → Furniture delivered — projected content ready
+ngAfterContentChecked()  → Furniture re-inspected — after every CD on content
+ngAfterViewInit()        → Final walkthrough, electricity & plumbing — DOM fully ready
+ngAfterViewChecked()     → Final re-inspection — after every CD on view
+ngOnDestroy()            → Moving out — cleanup before removal
 ```
 
-**ngOnInit vs constructor:**
-- `constructor`: for DI only. Inputs are not yet bound. DOM does not exist.
-- `ngOnInit`: safe to read inputs and make HTTP calls. Called after the first `ngOnChanges`.
+#### Full execution order
+
+```
+Component created
+      ↓
+constructor()
+      ↓
+ngOnChanges()           ← fires BEFORE ngOnInit if there are @Input() values
+      ↓
+ngOnInit()              ← fires ONCE
+      ↓
+ngDoCheck()             ← fires every CD cycle
+      ↓
+ngAfterContentInit()    ← fires ONCE
+      ↓
+ngAfterContentChecked() ← fires every CD cycle
+      ↓
+ngAfterViewInit()       ← fires ONCE
+      ↓
+ngAfterViewChecked()    ← fires every CD cycle
+      ↓
+[component lives — ngOnChanges → ngDoCheck → Checked hooks repeat on each CD cycle]
+      ↓
+ngOnDestroy()           ← fires ONCE before removal
+```
+
+---
+
+#### `constructor()`
+
+Not an Angular hook — a standard TypeScript constructor. The only safe thing here is receiving injected services.
+
+```typescript
+export class UserComponent {
+  constructor(private userService: UserService) {
+    // ✅ DI only
+    // ❌ Don't call services — inputs not set yet
+    // ❌ Don't touch DOM — doesn't exist yet
+  }
+}
+```
+
+---
+
+#### `ngOnChanges(changes: SimpleChanges)`
+
+Fires every time an `@Input()` value changes — including the very first time, before `ngOnInit`.
+
+```typescript
+export class UserCardComponent implements OnChanges {
+  @Input() userId!: number;
+
+  ngOnChanges(changes: SimpleChanges) {
+    // changes tells you what changed, old value, new value
+    if (changes['userId']) {
+      this.loadUser(changes['userId'].currentValue);
+    }
+  }
+}
+```
+
+**Real use cases:**
+```typescript
+// 1. Reload data when parent passes a new ID
+ngOnChanges(changes: SimpleChanges) {
+  if (changes['userId'] && !changes['userId'].firstChange) {
+    this.fetchUserData(this.userId);
+  }
+}
+
+// 2. Validate input before using it
+ngOnChanges(changes: SimpleChanges) {
+  if (changes['price'] && this.price < 0) {
+    this.price = 0;
+  }
+}
+
+// 3. Detect first change vs subsequent changes
+ngOnChanges(changes: SimpleChanges) {
+  if (changes['config']?.firstChange) {
+    this.initWithConfig(this.config);
+  } else {
+    this.updateConfig(this.config);
+  }
+}
+```
+
+> Only fires for `@Input()` properties — not for properties changed internally.
+
+---
+
+#### `ngOnInit()`
+
+Fires **once**, after the first `ngOnChanges`. All `@Input()` values are available. This is the main "get started" hook.
+
+```typescript
+export class DashboardComponent implements OnInit {
+  @Input() userId!: number;
+
+  ngOnInit() {
+    // ✅ @Input() values ready
+    // ✅ Safe to call services and HTTP
+    this.userService.getUser(this.userId).subscribe(u => this.user = u);
+  }
+}
+```
+
+**Real use cases:**
+```typescript
+// Fetch API data
+ngOnInit() {
+  this.productService.getProducts().subscribe(p => this.products = p);
+}
+
+// Subscribe to route params
+ngOnInit() {
+  this.route.paramMap.subscribe(params => {
+    this.loadPost(+params.get('id')!);
+  });
+}
+
+// Start a polling interval
+ngOnInit() {
+  interval(30000).pipe(
+    startWith(0),
+    switchMap(() => this.statusService.getStatus()),
+    takeUntilDestroyed(this.destroyRef)
+  ).subscribe(status => this.status = status);
+}
+```
+
+**constructor vs ngOnInit — most common interview question:**
+```
+constructor()  → component object BEING CREATED
+                 @Input() NOT set, DOM does NOT exist
+                 → only for DI
+
+ngOnInit()     → component FULLY INITIALISED
+                 @Input() IS set, DOM still does NOT exist
+                 → HTTP calls, subscriptions, data setup
+```
+
+---
+
+#### `ngDoCheck()`
+
+Fires on **every single CD cycle**. Lets you write custom detection logic for changes Angular can't detect — like a mutation deep inside an object.
+
+```typescript
+export class CartComponent implements DoCheck {
+  @Input() items: CartItem[] = [];
+  private previousCount = 0;
+
+  ngDoCheck() {
+    // Array reference didn't change but contents did — Angular won't catch this
+    if (this.items.length !== this.previousCount) {
+      this.previousCount = this.items.length;
+      this.recalculateTotal();
+    }
+  }
+}
+```
+
+> Fires extremely frequently — keep logic here minimal. In most cases, use immutable data + OnPush instead.
+
+---
+
+#### `ngAfterContentInit()`
+
+Fires **once** after Angular projects external content into your component via `<ng-content>`. Safe to read `@ContentChild` references here.
+
+```typescript
+export class TabsComponent implements AfterContentInit {
+  @ContentChildren(TabComponent) tabs!: QueryList<TabComponent>;
+
+  ngAfterContentInit() {
+    // All projected <app-tab> children are now accessible
+    this.tabs.first.isActive = true;
+  }
+}
+
+// Usage:
+// <app-tabs>
+//   <app-tab title="Home">...</app-tab>
+//   <app-tab title="Profile">...</app-tab>
+// </app-tabs>
+```
+
+---
+
+#### `ngAfterContentChecked()`
+
+Fires after Angular checks projected content on every CD cycle. Use when you need to react to dynamically changing projected content.
+
+```typescript
+ngAfterContentChecked() {
+  this.updateTabTitles(); // tabs may have been added/removed
+}
+```
+
+> Fires very frequently. Keep logic lightweight.
+
+---
+
+#### `ngAfterViewInit()`
+
+Fires **once** after the component's own template and all child components are fully rendered. **The DOM finally exists here.**
+
+```typescript
+export class DashboardComponent implements AfterViewInit {
+  @ViewChild('chartCanvas') canvasRef!: ElementRef;
+  @ViewChild('searchInput') searchInput!: ElementRef;
+
+  ngAfterViewInit() {
+    // ✅ DOM exists — safe to interact with it
+
+    // Initialise a third-party chart library
+    this.chart = new Chart(this.canvasRef.nativeElement, {
+      type: 'bar', data: this.chartData
+    });
+
+    // Auto-focus an input
+    this.searchInput.nativeElement.focus();
+  }
+}
+```
+
+**Real use cases:**
+```typescript
+// Google Maps initialisation
+ngAfterViewInit() {
+  this.map = new google.maps.Map(this.mapContainer.nativeElement, {
+    center: { lat: 40.71, lng: -74.00 }, zoom: 12
+  });
+}
+
+// Set up ResizeObserver
+ngAfterViewInit() {
+  new ResizeObserver(entries => {
+    this.width = entries[0].contentRect.width;
+    this.cdr.markForCheck();
+  }).observe(this.containerRef.nativeElement);
+}
+
+// Measure element dimensions
+ngAfterViewInit() {
+  const { width, height } = this.cardRef.nativeElement.getBoundingClientRect();
+  this.cardDimensions = { width, height };
+}
+```
+
+**ngOnInit vs ngAfterViewInit:**
+```
+ngOnInit()        → data ready, DOM does NOT exist
+                    → HTTP calls, subscriptions
+
+ngAfterViewInit() → DOM FULLY EXISTS
+                    → third-party library init, @ViewChild, focus, measure
+```
+
+---
+
+#### `ngAfterViewChecked()`
+
+Fires after Angular checks the component's view on every CD cycle. Use for post-render adjustments like auto-scrolling.
+
+```typescript
+ngAfterViewChecked() {
+  if (this.shouldScrollToBottom) {
+    this.messageList.nativeElement.scrollTop =
+      this.messageList.nativeElement.scrollHeight;
+    this.shouldScrollToBottom = false;
+  }
+}
+```
+
+> Set a flag in your logic and check it here — never do heavy computation directly.
+
+---
+
+#### `ngOnDestroy()`
+
+Fires **once** just before the component is removed. Clean up everything to prevent memory leaks.
+
+```typescript
+export class LiveFeedComponent implements OnInit, OnDestroy {
+  private subscription!: Subscription;
+  private intervalId!: ReturnType<typeof setInterval>;
+  private socket!: WebSocket;
+
+  ngOnInit() {
+    this.subscription = this.feedService.updates$.subscribe(/* ... */);
+    this.intervalId   = setInterval(() => this.refresh(), 5000);
+    this.socket       = new WebSocket('ws://live.example.com');
+  }
+
+  ngOnDestroy() {
+    this.subscription.unsubscribe();     // cancel subscriptions
+    clearInterval(this.intervalId);      // clear timers
+    this.socket.close();                 // close WebSocket
+    document.removeEventListener('keydown', this.keyHandler); // remove listeners
+  }
+}
+```
+
+**Angular 19 — `takeUntilDestroyed()` replaces manual ngOnDestroy for subscriptions:**
+```typescript
+export class LiveFeedComponent implements OnInit {
+  private destroyRef = inject(DestroyRef);
+
+  ngOnInit() {
+    this.feedService.updates$.pipe(
+      takeUntilDestroyed(this.destroyRef) // auto-unsubscribes on destroy
+    ).subscribe(/* ... */);
+    // No ngOnDestroy needed for subscriptions
+  }
+}
+```
+
+---
+
+#### Complete cheat sheet
+
+| Hook | Fires | DOM exists? | @Input ready? | Use for |
+|---|---|---|---|---|
+| `constructor` | Once — on creation | ❌ | ❌ | Dependency injection only |
+| `ngOnChanges` | Before init + on every input change | ❌ | ✅ | React to input changes, validate |
+| `ngOnInit` | Once — after first ngOnChanges | ❌ | ✅ | HTTP calls, subscriptions, data init |
+| `ngDoCheck` | Every CD cycle | ❌ | ✅ | Custom dirty checking — use sparingly |
+| `ngAfterContentInit` | Once — after ng-content projected | ❌ | ✅ | Access @ContentChild references |
+| `ngAfterContentChecked` | Every CD cycle | ❌ | ✅ | React to projected content changes |
+| `ngAfterViewInit` | Once — after view fully rendered | ✅ | ✅ | 3rd-party libs, @ViewChild, focus, measure |
+| `ngAfterViewChecked` | Every CD cycle | ✅ | ✅ | Post-render adjustments (scroll, measure) |
+| `ngOnDestroy` | Once — before removal | ✅ | ✅ | Unsubscribe, clear timers, close sockets |
 
 ---
 
@@ -866,23 +1201,172 @@ ngOnDestroy()             Before component is removed from DOM. Cancel subscript
 
 ### Q13. [Topic: Components] [Capgemini] What is ViewEncapsulation in Angular and what are its modes?
 
-ViewEncapsulation controls how component styles are scoped to prevent leaking to other components.
+#### The problem it solves
 
-| Mode | Behavior |
-|---|---|
-| `Emulated` (default) | Angular adds unique attribute selectors (`_ngcontent-xxx`) to scope styles. No native shadow DOM. |
-| `ShadowDom` | Uses the browser's native Shadow DOM API for true encapsulation. Styles and DOM are fully isolated. |
-| `None` | No encapsulation. Styles leak globally — use only for intentional global overrides or theming. |
+In plain HTML, CSS is global — a style defined anywhere affects everything on the page. Without protection, your `UserCard` component's `h2 { color: blue }` would make every `h2` on the entire page blue. ViewEncapsulation keeps each component's styles locked to that component only.
+
+#### Simple analogy — offices in a building
+
+**Without encapsulation** → One open floor. One team paints the walls blue — the entire floor turns blue.
+
+**With encapsulation** → Separate walled offices. Blue walls in HR don't affect Finance next door.
+
+ViewEncapsulation controls how "walled off" each component's styles are.
+
+---
+
+#### Mode 1 — `Emulated` (default)
+
+Angular adds a **unique ID attribute** to every element in the component's template, then rewrites CSS rules to only target elements with that ID.
 
 ```typescript
 @Component({
-  selector: 'app-card',
-  encapsulation: ViewEncapsulation.ShadowDom,
-  styles: [`:host { display: block; } h2 { color: blue; }`]
+  selector: 'app-user-card',
+  template: `<h2>Alice</h2>`,
+  styles: [`h2 { color: blue; }`]
+  // ViewEncapsulation.Emulated is the default — no need to declare it
 })
 ```
 
-`Emulated` is the correct default for most components. Use `None` sparingly — typically only for theme or design-system components that intentionally style projected or external content.
+What Angular actually renders in the browser:
+```html
+<!-- Angular adds a unique scoping attribute -->
+<h2 _ngcontent-abc-c123>Alice</h2>
+```
+
+Your CSS gets rewritten to:
+```css
+/* You write:          h2 { color: blue; }                          */
+/* Angular outputs:    h2[_ngcontent-abc-c123] { color: blue; }     */
+```
+
+Now `color: blue` only applies to `h2` inside **this component** — every other `h2` on the page is untouched. You write normal CSS and Angular handles all the scoping invisibly.
+
+```typescript
+// Component A
+styles: [`h2 { color: blue; }`]  // only affects h2 inside Component A
+
+// Component B
+styles: [`h2 { color: red; }`]   // only affects h2 inside Component B
+// They never interfere ✅
+```
+
+---
+
+#### Mode 2 — `ShadowDom`
+
+Uses the browser's **native Shadow DOM API** — a completely isolated DOM subtree built into the browser itself.
+
+```typescript
+@Component({
+  selector: 'app-user-card',
+  encapsulation: ViewEncapsulation.ShadowDom,
+  styles: [`h2 { color: blue; }`]
+})
+```
+
+What it looks like in DevTools:
+```html
+<app-user-card>
+  #shadow-root (open)      ← browser creates this — styles live inside here
+    <style>h2 { color: blue; }</style>
+    <h2>Alice</h2>
+</app-user-card>
+```
+
+**Emulated vs ShadowDom analogy:**
+- Emulated = walled offices with glass windows — mostly separate but global CSS can still reach in
+- ShadowDom = rooms with soundproof one-way mirrors — **complete isolation**, nothing gets in or out
+
+| | Emulated | ShadowDom |
+|---|---|---|
+| Global CSS can style inside? | ✅ Yes | ❌ No |
+| Component CSS leaks outside? | ❌ No | ❌ No |
+| Browser support | All browsers | Modern browsers only |
+
+**When to use**: Design systems, shared web components used across multiple frameworks, Angular Material internals.
+
+**Downside**: You cannot style it from outside — parent component styles and global themes won't penetrate the shadow boundary. Theming becomes harder.
+
+---
+
+#### Mode 3 — `None`
+
+No encapsulation. Styles become **global** and affect the entire page.
+
+```typescript
+@Component({
+  selector: 'app-theme',
+  encapsulation: ViewEncapsulation.None,
+  styles: [`h2 { color: blue; }`]  // affects EVERY h2 on the page
+})
+```
+
+**Valid use cases:**
+```typescript
+// 1. Intentional global theming — setting CSS variables for the whole app
+@Component({
+  selector: 'app-theme-provider',
+  encapsulation: ViewEncapsulation.None,
+  styles: [`
+    :root {
+      --primary-color: #3f51b5;
+      --font-size-base: 16px;
+    }
+  `]
+})
+
+// 2. Overriding styles inside a third-party library's rendered DOM
+@Component({
+  selector: 'app-dialog-wrapper',
+  encapsulation: ViewEncapsulation.None,
+  styles: [`
+    .mat-dialog-container { border-radius: 12px; }
+  `]
+})
+```
+
+---
+
+#### The `:host` selector — styling your component's own element
+
+All three modes support `:host`, which targets the **component's own tag** (`<app-user-card>` itself, not its inner content):
+
+```typescript
+@Component({
+  selector: 'app-user-card',
+  styles: [`
+    :host {
+      display: block;           /* make it block-level */
+      border: 1px solid #ccc;
+      padding: 16px;
+    }
+
+    :host(.featured) {          /* when parent adds class="featured" to the tag */
+      border-color: gold;
+    }
+
+    :host-context(.dark-theme) { /* when ANY ancestor has class dark-theme */
+      background: #333;
+      color: white;
+    }
+  `]
+})
+```
+
+---
+
+#### Full comparison
+
+| | `Emulated` (default) | `ShadowDom` | `None` |
+|---|---|---|---|
+| How | Angular adds unique attribute IDs | Browser native Shadow DOM | No scoping |
+| Styles leak out? | ❌ No | ❌ No | ✅ Yes — global |
+| Global CSS leaks in? | ✅ Yes | ❌ No | ✅ Yes |
+| Browser support | All browsers | Modern browsers | All browsers |
+| Use for | Everything — correct default | Design systems, web components | Global theming, 3rd-party overrides |
+
+**One-line interview answer**: ViewEncapsulation controls how component styles are scoped. `Emulated` (default) adds unique attribute selectors so styles only apply inside that component. `ShadowDom` uses the browser's native shadow DOM for complete isolation. `None` removes all scoping making styles global. Use `Emulated` always, `None` only for intentional global overrides, `ShadowDom` for design systems needing true browser-level isolation.
 
 ---
 
