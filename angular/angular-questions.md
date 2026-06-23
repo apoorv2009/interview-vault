@@ -391,13 +391,83 @@ The Angular Language Service is a TypeScript plugin (used in VS Code, JetBrains 
 
 ### Q6. [Topic: Change Detection] [EPAM] Explain Angular's change detection mechanism.
 
-Angular's change detection (CD) determines when to update the DOM to reflect state changes in components. The flow:
+#### The problem it solves
 
-1. **Zone.js** monkey-patches all browser async APIs (`setTimeout`, `Promise.then`, `fetch`, DOM events, etc.)
-2. When any async operation completes, Zone.js notifies Angular's `ApplicationRef`
-3. Angular triggers a CD cycle starting from the **root component** and walking the entire component tree top-down
-4. Each component compares its current template bindings against previous values
-5. If a value changed, Angular updates the corresponding DOM node
+In plain JavaScript, changing a variable does nothing to the screen — you have to manually find and update the DOM yourself. Angular's promise is: **you manage the data, Angular manages the DOM**. Change Detection (CD) is the system that keeps them in sync.
+
+#### Simple mental model — the spreadsheet analogy
+
+Think of your Angular app as a spreadsheet:
+- Your **component class** = data cells (the values)
+- Your **template** = formula cells (what the user sees)
+- **Change Detection** = the recalculation engine — when a value cell changes, it recalculates all formula cells that depend on it
+
+```
+Component class         Template (DOM)
+──────────────          ──────────────
+username = 'Alice'  →→→ <p>Alice</p>
+
+       ↓ data changes
+
+username = 'Bob'
+       ↓ Angular runs Change Detection
+                   →→→ <p>Bob</p>   ← DOM updated
+```
+
+#### What triggers data to change — only three sources
+
+```
+1. User interaction   → button click, form input, keyboard event
+2. HTTP response      → data returned from the server
+3. Timer firing       → setTimeout / setInterval completed
+```
+
+All three are **async events**. Angular needs to know when they happen — this is Zone.js's job.
+
+#### Zone.js — Angular's spy
+
+Zone.js wraps every async operation silently. When any of the three sources above completes, Zone.js tells Angular: *"something just happened, you should check your data."*
+
+```
+User clicks a button
+      ↓
+Zone.js intercepts the click event
+      ↓
+Your click handler runs (data may have changed)
+      ↓
+Zone.js notifies Angular
+      ↓
+Angular runs Change Detection
+      ↓
+DOM updated
+```
+
+#### What happens during a CD cycle
+
+Angular walks the **entire component tree top to bottom**, visiting every component:
+
+```
+AppComponent          ← checked
+├── HeaderComponent   ← checked
+├── SidebarComponent  ← checked
+└── MainComponent     ← checked
+    ├── UserCard      ← checked
+    └── PostList      ← checked
+```
+
+For each component, Angular compares current binding values against the previous values it stored:
+
+```
+Previous value of username: 'Alice'
+Current value of username:  'Bob'
+Different? YES → update the <p> DOM node
+
+Previous value of count: 42
+Current value of count:  42
+Different? NO  → skip, leave DOM alone
+```
+
+Only changed bindings get a DOM update. Everything unchanged is left untouched.
 
 This is the **Default** (`CheckAlways`) strategy — every component in the tree is checked on every CD cycle regardless of whether its inputs changed.
 
@@ -442,28 +512,155 @@ this.user = { ...this.user, name: 'Alice' };
 
 ### Q8. [Topic: Change Detection] [EPAM] What is the difference between `markForCheck()` and `detectChanges()`?
 
-Both live on `ChangeDetectorRef` and are used to manually control CD in `OnPush` components.
+#### One-line version
+
+- `markForCheck()` → **"Add me to the next inspection round"**
+- `detectChanges()` → **"Inspect me right now, immediately"**
+
+#### Real-world analogy
+
+Imagine an office building where a **safety inspector** walks every floor on a schedule (Angular's CD cycle).
+
+**`markForCheck()`** = You stick a **"needs inspection"** flag on your room door. You are not calling the inspector right now — just ensuring he does not skip your room on his next scheduled round.
+
+**`detectChanges()`** = You **call the inspector directly** and say *"drop everything, come check my room now."* He comes immediately, checks your room and every room below yours, then goes back to his schedule.
+
+#### Direction matters
+
+```
+markForCheck()  — walks UP the tree, flags component + ancestors
+detectChanges() — walks DOWN the tree, checks component + all children
+
+AppComponent         ← markForCheck() flags this
+└── MainComponent    ← markForCheck() flags this
+    └── UserCard     ← YOU ARE HERE
+        └── Avatar   ← detectChanges() checks this
+```
+
+#### Side by side
 
 | | `markForCheck()` | `detectChanges()` |
 |---|---|---|
-| Execution | Asynchronous — schedules check on next CD cycle | Synchronous — runs CD immediately |
-| Scope | Marks this component and **all ancestors** as dirty | Runs CD on this component and **all children** |
-| DOM update timing | On next tick | Immediately |
-| Risk | Low — safe to call from anywhere | Can cause `ExpressionChangedAfterItHasBeenCheckedError` if called in lifecycle hooks at the wrong time |
-| Typical use case | After pushing data to a stream outside Zone.js | After programmatic DOM manipulation that must be reflected immediately |
+| When does CD run? | Next scheduled cycle | Immediately, right now |
+| Direction | Walks UP — flags component + ancestors | Walks DOWN — checks component + children |
+| Synchronous? | No — schedules only | Yes — runs synchronously |
+| Safe in lifecycle hooks? | Yes | Careful — can cause `ExpressionChangedAfterItHasBeenCheckedError` |
+| Typical use | Data changed outside Zone.js | Need DOM updated before the next line of code |
 
 ```typescript
 constructor(private cdr: ChangeDetectorRef) {}
 
-// Schedule: safe and idiomatic
-this.cdr.markForCheck();
+this.cdr.markForCheck();   // schedule — safe, idiomatic
+this.cdr.detectChanges();  // immediate — synchronous
 
-// Synchronous: use when DOM must be updated right now
-this.cdr.detectChanges();
-
-// Detach from CD tree entirely (useful for charts, canvas, 3rd-party widgets)
+// Detach from CD tree entirely (charts, canvas, 3rd-party widgets)
 this.cdr.detach();
-this.cdr.reattach(); // re-attach when needed
+this.cdr.reattach();
+```
+
+#### Real-world scenarios — `markForCheck()`
+
+**WebSocket / third-party library callback outside Zone.js:**
+```typescript
+this.socket.on('message', (data) => {
+  // Socket.io runs outside Zone.js — Angular has no idea this happened
+  this.message = data;
+  this.cdr.markForCheck();
+});
+```
+
+**Manual subscribe in OnPush component:**
+```typescript
+ngOnInit() {
+  this.notifService.unreadCount$.subscribe(count => {
+    this.count = count;
+    this.cdr.markForCheck(); // async pipe does this for you automatically
+  });
+}
+```
+
+**Running heavy work outside Angular zone, then updating UI:**
+```typescript
+this.ngZone.runOutsideAngular(() => {
+  const result = this.doExpensiveCalculation();
+  this.ngZone.run(() => {
+    this.result = result;
+    this.cdr.markForCheck();
+  });
+});
+```
+
+**Web Worker sending result back to main thread:**
+```typescript
+this.worker.onmessage = ({ data }) => {
+  // Worker messages arrive outside Zone.js
+  this.processedData = data;
+  this.cdr.markForCheck();
+};
+```
+
+**Third-party library events (Google Maps, Chart.js):**
+```typescript
+this.map.addListener('click', (event) => {
+  // Google Maps events — completely outside Angular
+  this.selectedLocation = event.latLng;
+  this.cdr.markForCheck();
+});
+```
+
+#### Real-world scenarios — `detectChanges()`
+
+**Focusing an element that was just shown:**
+```typescript
+openSearchBox() {
+  this.showSearch = true;
+  this.cdr.detectChanges();          // DOM now has the input element
+  this.searchInput.nativeElement.focus(); // safe to focus
+}
+```
+
+**Initialising Chart.js / D3 on a conditionally rendered container:**
+```typescript
+showChart() {
+  this.isChartVisible = true;
+  this.cdr.detectChanges();          // canvas element now exists in DOM
+  this.chart = new Chart(this.canvasRef.nativeElement, config);
+}
+```
+
+**Measuring DOM dimensions to position a tooltip:**
+```typescript
+showTooltip(content: string) {
+  this.tooltipContent = content;
+  this.tooltipVisible = true;
+  this.cdr.detectChanges();
+  const { width, height } = this.tooltipRef.nativeElement.getBoundingClientRect();
+  this.tooltipPosition = this.calculatePosition(width, height);
+  this.cdr.detectChanges();          // apply calculated position
+}
+```
+
+**Driving Angular from legacy non-Angular code:**
+```typescript
+updateFromLegacySystem(data: any) {
+  this.componentData = data;
+  this.cdr.detectChanges();          // legacy system expects DOM current immediately
+  this.legacyLib.onAngularUpdated();
+}
+```
+
+#### Decision rule
+
+```
+Does the DOM need to update RIGHT NOW before my next line of code?
+  YES → detectChanges()
+  NO  → markForCheck()
+
+Did data change outside Zone.js (WebSocket, worker, 3rd-party callback)?
+  YES → markForCheck()
+  NO  → you probably don't need either
+        (Zone.js handles Default strategy automatically)
+        (async pipe handles OnPush automatically)
 ```
 
 ---
@@ -514,6 +711,103 @@ ngOnInit() {
 ```
 
 In Angular 19, converting the stream to a Signal via `toSignal()` is the cleanest approach — Signals drive fine-grained updates without Zone.js overhead.
+
+---
+
+### Q10a. [Topic: Change Detection] HTTP responses automatically update the DOM — why doesn't WebSocket do the same?
+
+This is a nuanced distinction. The short answer: **it depends on which WebSocket you use and which CD strategy your component has.**
+
+#### Why HTTP works automatically
+
+When you use Angular's `HttpClient`, two layers of safety work together:
+
+```
+HttpClient.get('/api/users')
+    │
+    ├── Internally uses XHR or Fetch
+    │   ← Zone.js patches BOTH
+    │   ← Response arrival notifies Angular automatically
+    │
+    └── Returns an Observable
+        └── You subscribe via async pipe
+            └── async pipe internally calls markForCheck()
+                every time a new value arrives
+```
+
+HTTP works automatically because of **two layers** — Zone.js handles the network event AND the `async` pipe calls `markForCheck()` on your behalf.
+
+#### The truth about native WebSocket
+
+Zone.js **does** patch the native `WebSocket` API. So if you use it directly, CD triggers automatically for Default strategy components — just like HTTP:
+
+```typescript
+// Native WebSocket — Zone.js patches this
+const ws = new WebSocket('ws://localhost:8080');
+ws.onmessage = (event) => {
+  this.message = event.data;
+  // Default strategy → DOM updates automatically ✅
+  // No markForCheck() needed
+};
+```
+
+#### Why WebSocket still needs `markForCheck()` in practice
+
+Two real-world situations break the automatic behaviour:
+
+**Situation 1 — Third-party WebSocket libraries (most common)**
+
+In real projects you use Socket.io, SignalR, SockJS — not raw WebSocket. These libraries have their own internal event systems that Zone.js does NOT patch:
+
+```typescript
+// Socket.io — own event emitter, NOT patched by Zone.js
+this.socket.on('message', (data) => {
+  // Runs outside Angular's zone
+  this.message = data;
+  // DOM will NOT update automatically ❌
+  this.cdr.markForCheck(); // ← required
+});
+```
+
+**Situation 2 — OnPush component**
+
+Even when Zone.js does trigger a CD cycle from a native WebSocket message, OnPush components are **skipped** unless explicitly marked dirty:
+
+```
+Native WebSocket message arrives
+→ Zone.js triggers CD cycle (app-wide)
+→ Angular walks the tree
+→ Reaches your OnPush component
+→ "Is this component dirty?" → NO
+→ SKIPPED → DOM not updated ❌
+```
+
+Compare with HTTP + `async` pipe:
+```
+HTTP response arrives
+→ Zone.js triggers CD cycle
+→ async pipe receives the value
+→ async pipe calls markForCheck() internally ← this is the key step
+→ OnPush component is now dirty
+→ Angular checks it → DOM updated ✅
+```
+
+#### Full picture
+
+| Scenario | DOM auto-updates? |
+|---|---|
+| HTTP + `async` pipe + Default strategy | ✅ Zone.js + async pipe handles it |
+| HTTP + `async` pipe + OnPush | ✅ async pipe calls `markForCheck()` internally |
+| HTTP + manual subscribe + Default strategy | ✅ Zone.js handles it |
+| HTTP + manual subscribe + OnPush | ❌ Need `markForCheck()` manually |
+| Native WebSocket + Default strategy | ✅ Zone.js patches native WebSocket |
+| Native WebSocket + OnPush | ❌ Zone.js triggers cycle but OnPush is skipped |
+| Socket.io / SignalR + Default strategy | ❌ Library bypasses Zone.js entirely |
+| Socket.io / SignalR + OnPush | ❌ Double problem — no Zone.js + OnPush skips |
+
+#### Takeaway
+
+The `async` pipe is the real hero in the HTTP story — it silently calls `markForCheck()` every time a value arrives. With WebSocket you have to do it yourself, because either your library bypasses Zone.js or your component is OnPush and nothing calls `markForCheck()` on your behalf.
 
 ---
 
