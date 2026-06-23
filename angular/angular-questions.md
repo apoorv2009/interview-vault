@@ -100,41 +100,282 @@ bootstrapApplication(AppComponent, appConfig);
 
 ### Q2. [Topic: Compilation] What is the Ivy compiler and how does it relate to AOT?
 
-Ivy is Angular's rendering engine and compiler, introduced as the default in Angular 9. It replaced the older View Engine.
+Ivy is Angular's **compiler and runtime renderer**, introduced as the default in Angular 9. It replaced the older View Engine. Understanding why it was rewritten makes its design decisions clear.
 
-Key Ivy characteristics:
-- Makes AOT the default for **both dev and prod** builds
-- Produces smaller bundles via the locality principle — each component is compiled independently without needing knowledge of the whole app
-- Enables better tree-shaking: unused framework features are eliminated at the module level
-- Foundation for Standalone components, Signals, and `@defer`
+#### The problem with View Engine
 
-In Angular 19, Ivy is the only engine. View Engine was removed in Angular 13.
+View Engine compiled components with **global knowledge** — to compile component A, it needed to know about component B, module C, and every transitive dependency. This caused two problems:
+1. **Slow incremental builds** — changing one component could force recompilation of unrelated components
+2. **Poor tree-shaking** — NgModules bundled everything declared in them, used or not
+
+#### How Ivy works differently — the Locality Principle
+
+Ivy compiles each component **in isolation**. A component's compiled output contains everything it needs to render — no global registry, no cross-component lookup.
+
+```typescript
+// What you write
+@Component({
+  selector: 'app-hello',
+  template: `<h1>Hello {{ name }}</h1>`
+})
+export class HelloComponent {
+  name = 'World';
+}
+```
+
+```javascript
+// What Ivy generates at build time (simplified)
+HelloComponent.ɵcmp = defineComponent({
+  type: HelloComponent,
+  selectors: [['app-hello']],
+  decls: 2,     // 2 DOM nodes: <h1> and text node
+  vars: 1,      // 1 binding: {{ name }}
+  template: function(rf, ctx) {
+    if (rf & 1) {                    // creation phase — runs ONCE, builds DOM
+      elementStart(0, 'h1');
+      text(1);
+      elementEnd();
+    }
+    if (rf & 2) {                    // update phase — runs on CD, updates bindings only
+      textInterpolate(ctx.name);
+    }
+  }
+});
+```
+
+The template compiles into **two separate phases**:
+- **Creation phase** (`rf & 1`) — runs once, builds the DOM structure
+- **Update phase** (`rf & 2`) — runs on every change detection cycle, updates only the bindings that changed
+
+This is fundamentally more efficient than View Engine, which re-evaluated the whole template on every check.
+
+#### What Ivy enables
+
+| Capability | How Ivy makes it possible |
+|---|---|
+| Better tree-shaking | Bundler sees exactly which runtime instructions (`elementStart`, `text`, `listener`) each component uses and drops the rest |
+| Faster incremental builds | Locality means only the changed file is recompiled — no module-graph ripple |
+| Standalone components | View Engine needed NgModules to resolve directive/pipe availability; Ivy resolves from the component's own `imports` array |
+| Signals & fine-grained CD | The update phase already operates at binding level; Signals plug directly into it — only the specific `textInterpolate` calls that read a changed Signal re-execute |
+| Better debugging | Ivy exposes component internals via `ng` globals in dev mode |
+
+#### Ivy debugging utilities (dev mode only)
+
+```javascript
+// In browser DevTools console — click a DOM element first ($0 = selected element)
+ng.getComponent($0)        // get component instance from a DOM element
+ng.getOwningComponent($0)  // get the parent component
+ng.applyChanges(comp)      // manually trigger CD on a specific component instance
+ng.getContext($0)          // get template context (useful for *ngFor rows)
+```
+
+#### The `ɵ` prefix — internal Ivy symbols
+
+Compiled Angular classes gain properties prefixed with `ɵ` (theta). These are **internal APIs** — never use them directly; the compiler generates them.
+
+| Symbol | What it holds |
+|---|---|
+| `ɵcmp` | Component definition — template, styles, inputs, outputs |
+| `ɵdir` | Directive definition |
+| `ɵpipe` | Pipe definition |
+| `ɵfac` | Factory function used by DI to instantiate the class |
+| `ɵprov` | Injectable provider metadata |
+
+#### Ivy vs View Engine
+
+| Dimension | View Engine | Ivy |
+|---|---|---|
+| Compilation model | Global — whole-app knowledge required | Local — per-component, self-contained |
+| NgModules required | Yes | No — standalone components possible |
+| Tree-shaking | Coarse — module level | Fine-grained — instruction level |
+| Build speed | Slower incremental | Faster incremental |
+| Removed in Angular version | — | View Engine removed in Angular 13 |
+| Default since | — | Angular 9 |
+
+In Angular 19, Ivy is the only engine. View Engine cannot be re-enabled.
 
 ---
 
 ### Q3. [Topic: Compilation] [EPAM] How does tree-shaking work in Angular and what makes it possible?
 
-Tree-shaking is performed by the bundler (esbuild in Angular 19). It statically analyzes the import graph and eliminates code that is never imported.
+#### The core idea
 
-AOT makes tree-shaking effective because:
-1. Templates are compiled to explicit TypeScript/JS references at build time
-2. The bundler can see exactly which Angular directives, pipes, and features the app uses
-3. Unused framework code (e.g., `NgSwitch` if you only use `@if`) is eliminated
+Tree shaking is the process of **removing dead code from your final bundle** — code that exists in source or dependencies but is never imported or used. The name comes from the mental model: shake the dependency tree and dead leaves (unused code) fall off.
 
-With JIT, the Angular compiler must be shipped whole because the bundler cannot know what templates will dynamically reference at runtime.
+It is performed by the **bundler** (esbuild in Angular 19) at build time.
 
-In Angular 19, standalone components improve tree-shaking further — only directly imported components and directives are included, not entire NgModules.
+#### Simple example
+
+```typescript
+// math-utils.ts
+export function add(a: number, b: number)      { return a + b; }
+export function subtract(a: number, b: number) { return a - b; }
+export function multiply(a: number, b: number) { return a * b; }
+
+// app.ts — only imports one function
+import { add } from './math-utils';
+console.log(add(2, 3));
+```
+
+**Without tree shaking** — all three functions in the bundle:
+```javascript
+function add(a, b)      { return a + b; }
+function subtract(a, b) { return a - b; } // ← dead code
+function multiply(a, b) { return a * b; } // ← dead code
+```
+
+**With tree shaking** — only `add` survives:
+```javascript
+function add(a, b) { return a + b; }
+```
+
+#### How the bundler knows what is safe to remove
+
+Tree shaking relies on **ES Module static imports**. Because `import` declarations are top-level and cannot be dynamic, the bundler builds a complete dependency graph at build time without executing the code.
+
+```typescript
+// ✅ Static import — bundler can analyse at build time
+import { NgIf } from '@angular/common';
+
+// ❌ Dynamic — bundler cannot statically know what will be imported
+const module = await import(someRuntimeVariable);
+```
+
+**CommonJS `require()` breaks tree shaking** — it is a runtime function call, so the bundler cannot know what will be required until the code actually runs. This is why Angular dropped CommonJS output in library packages.
+
+#### What gets tree-shaken in an Angular 19 app
+
+```typescript
+@Component({
+  imports: [NgIf, RouterLink],  // explicit — bundler sees exactly this
+  template: `<a *ngIf="show" routerLink="/home">Go</a>`
+})
+```
+
+Everything you never imported is eliminated from the bundle:
+- `NgFor`, `NgSwitch`, `NgClass`, `NgStyle` — not in your imports
+- `FormsModule`, `ReactiveFormsModule` — not provided
+- `HttpClient` — if `provideHttpClient()` is never called
+- Dozens of internal Angular runtime instructions your templates never generate
+
+#### Why AOT is a prerequisite for effective tree shaking
+
+```
+JIT path:
+  Angular compiler shipped to browser
+  → Bundler cannot know which framework features templates will use at runtime
+  → Entire compiler + all directives must be included
+  → Tree shaking is largely defeated
+
+AOT path:
+  Templates compiled to explicit JS function calls before bundling
+  → Bundler sees exactly: "this app uses elementStart, text, listener, ngIf — nothing else"
+  → Everything else is dropped
+  → Tree shaking works at maximum efficiency
+```
+
+#### `sideEffects: false` — the other half of tree shaking
+
+For tree shaking to work safely, the bundler must be confident that removing an unused file won't break anything. Some code has side effects just from being imported (polyfills that modify `window`, auto-registering service workers, etc.).
+
+Library authors signal safety in `package.json`:
+```json
+{ "sideEffects": false }
+```
+
+This tells the bundler: *"none of my files have side effects — drop any file that isn't explicitly imported."* Angular's own packages declare this, which is why Angular framework code tree-shakes so aggressively.
+
+If a library does NOT declare `sideEffects: false`, the bundler takes the conservative path and keeps all imported modules even if their exports go unused.
 
 ---
 
 ### Q4. [Topic: Compilation] When would you use JIT compilation in a production Angular application?
 
-JIT is needed in two narrow scenarios:
+The honest answer is almost never in a standard application. There are four specific architectural scenarios where JIT is genuinely justified.
 
-1. **CMS-driven dynamic templates**: When template HTML is loaded from a server at runtime (e.g., a form builder where users define UI structure), you need `JitCompilerFactory` from `@angular/platform-browser-dynamic`.
-2. **Runtime micro-frontend plugins**: When plugin components are loaded at runtime whose structure isn't known at build time and dynamic compilation is required.
+#### Scenario 1 — CMS-driven dynamic templates
 
-These are edge cases. In nearly all Angular 19 applications, AOT is the correct choice.
+A Content Management System stores Angular template strings in a database. Those templates must be compiled in the browser at runtime because their content is not known at build time.
+
+```typescript
+import { Component, NgModule, Compiler } from '@angular/core';
+
+@Injectable({ providedIn: 'root' })
+export class DynamicTemplateService {
+  constructor(private compiler: Compiler) {}
+
+  async createComponent(template: string, context: Record<string, any>) {
+    @Component({ template, standalone: false })
+    class DynamicComponent {
+      title   = context['title'];
+      ctaText = context['ctaText'];
+    }
+
+    @NgModule({ declarations: [DynamicComponent] })
+    class DynamicModule {}
+
+    // JIT compiles here — this is what requires the compiler in the bundle
+    const { componentFactories } =
+      await this.compiler.compileModuleAndAllComponentsAsync(DynamicModule);
+    return componentFactories[0];
+  }
+}
+```
+
+Real-world examples: email template builders, drag-and-drop form builders where admins author templates in a UI, content personalisation platforms with per-tenant layouts.
+
+#### Scenario 2 — Plugin / extension architecture
+
+Third-party developers write Angular components as plugins, loaded and compiled at runtime. Their source was not available when the host application was built — think VS Code extensions for an Angular host shell.
+
+```typescript
+async loadPlugin(pluginUrl: string) {
+  // Plugin bundle loaded from CDN at runtime — unknown at build time
+  const pluginModule = await import(/* webpackIgnore: true */ pluginUrl);
+
+  const factory = await this.compiler.compileModuleAndAllComponentsAsync(
+    pluginModule.PluginModule
+  );
+  return factory;
+}
+```
+
+#### Scenario 3 — Developer tooling and live sandboxes
+
+Tools that let users write and preview Angular code in real time require JIT — there is no build step; user code arrives as a string.
+
+Examples that use JIT under the hood:
+- **StackBlitz** — runs Angular in the browser, compiling code as you type
+- **Angular Playground** — component isolation and previewing tool
+- **Online coding challenge platforms** — that execute Angular components in-browser
+
+#### Scenario 4 — Multi-tenant UI customisation
+
+A SaaS platform where each tenant has a different UI layout stored in their database row. The server cannot pre-compile thousands of tenant-specific templates at build time.
+
+#### Ask this before reaching for JIT
+
+For every scenario above, ask: **can I solve this without runtime template compilation?**
+
+| JIT scenario | AOT alternative to consider first |
+|---|---|
+| CMS stores template strings | Store data/config, not templates — drive rendering from a configuration object, not Angular syntax |
+| Plugin architecture | Ship plugins as pre-compiled standalone components loaded via dynamic `import()` — no JIT needed |
+| Tenant UI customisation | Use `ngComponentOutlet` with a finite set of pre-built layout components driven by tenant config |
+| Simple dynamic HTML | Use `[innerHTML]` with `DomSanitizer.bypassSecurityTrustHtml()` for purely presentational content |
+
+```
+Use JIT when:
+  ✅ Templates arrive as strings from external systems at runtime
+  ✅ Plugins are compiled in the browser with no prior build step
+  ✅ You are building developer tooling — sandbox, live preview, REPL
+
+Do NOT use JIT when:
+  ❌ You want conditional rendering          → use @if / ngComponentOutlet
+  ❌ You want to load features lazily        → use dynamic import() with AOT
+  ❌ You want to vary UI per user            → use config-driven pre-built components
+  ❌ You are on Angular 19 standalone        → JIT support is degraded, find an alternative
+```
 
 ---
 
