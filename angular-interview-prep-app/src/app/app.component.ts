@@ -10,6 +10,7 @@ import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 })
 export class AppComponent {
   concepts = [
-    { number: 1, name: 'JIT vs AOT Compilation', route: '/jit-aot' }
+    { number: 1, name: 'JIT vs AOT Compilation', route: '/jit-aot' },
+    { number: 2, name: 'Change Detection', route: '/change-detection' }
   ];
 }
