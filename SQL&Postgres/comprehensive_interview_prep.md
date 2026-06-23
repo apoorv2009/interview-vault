@@ -629,6 +629,62 @@ OUTER APPLY (
 
 ---
 
+### Q4 — ON vs WHERE filter in LEFT JOIN (classic trap)
+
+**Question:** What is wrong with this query? Fix it.
+```sql
+SELECT c.name, o.total, o.status
+FROM customers c
+LEFT JOIN orders o ON o.customer_id = c.id
+WHERE o.status = 'pending';
+```
+
+**Problem:** `WHERE` runs *after* the JOIN. The LEFT JOIN produces NULLs for customers with no pending orders. Then `NULL = 'pending'` evaluates to `UNKNOWN` (not TRUE) → those rows are removed. LEFT JOIN silently becomes INNER JOIN.
+
+**Fix — move filter to ON clause:**
+```sql
+SELECT c.name, o.total, o.status
+FROM customers c
+LEFT JOIN orders o
+    ON o.customer_id = c.id
+    AND o.status = 'pending';  -- applied during join, NULLs preserved
+```
+
+**Golden rule:**
+
+| Filter location | Effect | Use when |
+|----------------|--------|----------|
+| `ON` clause | Applied during join — non-matching rows kept with NULLs | Filter right table, keep all left rows |
+| `WHERE` clause | Applied after join — removes NULL rows → LEFT becomes INNER | Filter final result (both sides) |
+
+**Edge Cases:**
+- Any non-null check on right table in WHERE converts LEFT JOIN to INNER JOIN
+- `WHERE o.id IS NOT NULL` → always INNER JOIN regardless of keyword used
+- `COALESCE(o.status, '') = 'pending'` in WHERE also kills NULLs
+- This trap applies to RIGHT JOIN too (filtering left table in WHERE)
+
+**Optimization Tips:**
+- Pushing filters into ON reduces rows joined early — better performance on large tables
+- PostgreSQL's EXPLAIN will show the same plan for both in simple cases, but the result set differs
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | Standard SQL | PostgreSQL | MS SQL |
+|-----------|-------------|------------|--------|
+| `ON` filter behaviour | ✅ Standard | ✅ | ✅ |
+| `NULL = value` result | `UNKNOWN` → excluded | `UNKNOWN` → excluded | `UNKNOWN` → excluded |
+| `IS NOT DISTINCT FROM` | Not standard | ✅ PG only — NULL-safe equality | ❌ Use `ISNULL(col, val)` |
+| NULL-safe equal syntax | N/A | `a IS NOT DISTINCT FROM b` | `a IS NULL AND b IS NULL OR a = b` |
+
+```sql
+-- PostgreSQL NULL-safe equality (useful in ON clauses):
+LEFT JOIN orders o
+    ON o.customer_id IS NOT DISTINCT FROM c.id
+    AND o.status IS NOT DISTINCT FROM 'pending';
+```
+
+---
+
 *(Further questions and answers will be appended here as the session progresses.)*
 
 ---
