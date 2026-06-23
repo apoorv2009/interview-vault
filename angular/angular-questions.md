@@ -58,6 +58,46 @@ ng build --aot=false # JIT (explicit opt-out, rare)
 
 ---
 
+### Q1a. [Topic: Compilation] Can you still use JIT in Angular 19 instead of AOT?
+
+Yes, technically — but with significant caveats.
+
+**How to opt in:**
+```bash
+ng build --aot=false       # disable AOT for a build
+ng serve --aot=false       # disable for dev server
+```
+
+At the bootstrap level, JIT requires `platformBrowserDynamic` instead of the AOT default:
+```typescript
+// JIT bootstrap — templates compiled in the browser at runtime
+import { platformBrowserDynamic } from '@angular/platform-browser-dynamic';
+import { AppModule } from './app/app.module';
+
+platformBrowserDynamic().bootstrapModule(AppModule);
+```
+
+```typescript
+// AOT bootstrap — Angular 19 default
+import { bootstrapApplication } from '@angular/platform-browser';
+bootstrapApplication(AppComponent, appConfig);
+```
+
+**Walls you hit in Angular 19:**
+
+| Issue | Detail |
+|---|---|
+| Standalone components | JIT support for standalone is limited and partially broken — standalone architecture was designed around AOT |
+| esbuild builder | Angular 19's default builder (`@angular-devkit/build-angular:application`) is tightly coupled to AOT; JIT effectively forces the older webpack builder |
+| Bundle cost | JIT requires shipping `@angular/compiler` — adds ~200–300 KB gzipped to the bundle |
+| Deprecation trajectory | The Angular team has signalled JIT is not a long-term supported path. New features (Signals, `@defer`, partial hydration) are not tested against JIT |
+
+**The only legitimate reason to use JIT in Angular 19** is runtime template compilation — a CMS or plugin system where component templates arrive as strings from a server and must be compiled dynamically in the browser. Even then, most teams find alternatives (a DSL compiled server-side, a safe HTML renderer) to avoid the security and bundle-size cost of shipping the compiler.
+
+**Interview answer**: JIT is still technically available via `--aot=false` or `platformBrowserDynamic`, but in Angular 19 it is essentially a legacy escape hatch. AOT is the default for both dev and prod, and JIT is only justified for dynamic runtime template compilation — a rare architectural need.
+
+---
+
 ### Q2. [Topic: Compilation] What is the Ivy compiler and how does it relate to AOT?
 
 Ivy is Angular's rendering engine and compiler, introduced as the default in Angular 9. It replaced the older View Engine.
