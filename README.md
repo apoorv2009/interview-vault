@@ -4,14 +4,13 @@ My interview prep notes, organized by topic.
 
 ## Structure
 
-```
-interview-vault/
-├── angular/                            # Angular 19 & TypeScript interview Q&A (74 questions)
-├── angular-interview-prep-app/         # Hands-on Angular 19 app for practising concepts
-├── SQL&Postgres/                       # SQL & PostgreSQL interview prep
-├── capital-access-project/             # Real-project deep dive: S&P Global, Capital Access
-└── system-design-interview-playbook/   # Standalone system design Q&A, Senior Staff/Principal depth
-```
+| Folder | Description |
+|--------|-------------|
+| [angular](https://github.com/apoorv2009/interview-vault/tree/main/angular) | Angular 19 & TypeScript interview Q&A (74 questions) |
+| [angular-interview-prep-app](https://github.com/apoorv2009/interview-vault/tree/main/angular-interview-prep-app) | Hands-on Angular 19 app for practising concepts |
+| [SQL&Postgres](https://github.com/apoorv2009/interview-vault/tree/main/SQL%26Postgres) | SQL & PostgreSQL interview prep |
+| [capital-access-project](https://github.com/apoorv2009/interview-vault/tree/main/capital-access-project) | Real-project deep dive: S&P Global, Capital Access |
+| [system-design-interview-playbook](https://github.com/apoorv2009/interview-vault/tree/main/system-design-interview-playbook) | Standalone system design Q&A, Senior Staff/Principal depth |
 
 ## angular
 
