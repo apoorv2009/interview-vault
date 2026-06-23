@@ -6,9 +6,17 @@ My interview prep notes, organized by topic.
 
 ```
 interview-vault/
+├── angular/                            # Angular 19 & TypeScript interview Q&A (74 questions)
+├── SQL&Postgres/                       # SQL & PostgreSQL interview prep
 ├── capital-access-project/             # Real-project deep dive: S&P Global, Capital Access
 └── system-design-interview-playbook/   # Standalone system design Q&A, Senior Staff/Principal depth
 ```
+
+## angular
+
+74 structured interview Q&As covering Angular 19 and TypeScript at a Senior Developer depth. Organized across 15 topic sections: Compilation & Build, Change Detection, Components & Lifecycle Hooks, Angular 19 Features (Signals, `@defer`, built-in control flow, `linkedSignal`, `resource`), Directives & Pipes, Dependency Injection, Forms, Routing, HTTP & Interceptors, RxJS & Reactivity, State Management (NgRx, BehaviorSubject, Signals), Performance Optimization, Testing with Jasmine & TestBed, TypeScript Deep Dive, and SSR & Hydration.
+
+Questions are tagged with `[Topic: X]` metadata and `[EPAM]` / `[Infosys]` / `[Capgemini]` / `[TCS]` company labels where the question is a known past interview question from that company. All version-specific answers are written from an **Angular 19** perspective.
 
 ## capital-access-project
 
