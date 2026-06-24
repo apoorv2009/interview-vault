@@ -13,9 +13,10 @@
 1. [OOP Fundamentals](#1-oop-fundamentals)
 2. [C# Language Features](#2-c-language-features)
 3. [SOLID Principles](#3-solid-principles)
-4. [.NET Core & ASP.NET Core](#4-net-core--aspnet-core)
-5. [Entity Framework Core](#5-entity-framework-core)
-6. [LINQ](#6-linq)
+4. [Garbage Collection Deep Dive (Q127–Q150)](#4-garbage-collection-deep-dive)
+5. [.NET Core & ASP.NET Core](#5-net-core--aspnet-core)
+6. [Entity Framework Core](#6-entity-framework-core)
+7. [LINQ](#7-linq)
 
 ---
 
@@ -1954,7 +1955,880 @@ public interface IExportable
 
 ---
 
-## 4. .NET Core & ASP.NET Core
+## 4. Garbage Collection Deep Dive
+
+---
+
+### Q127. Explain Garbage Collector (GC)?
+
+The **Garbage Collector** is a part of the .NET CLR (Common Language Runtime) that automatically manages memory on the **managed heap**. It allocates memory when you create objects and reclaims memory when objects are no longer needed — freeing you from manual `malloc`/`free` calls (like C/C++).
+
+```csharp
+// You allocate — GC cleans up
+var activity = new EngagementActivity(id, "tenant-abc", ActivityType.Roadshow);
+// activity is on the managed heap
+// When activity has no more references pointing to it → GC reclaims the memory
+
+// Without GC (C++):
+EngagementActivity* a = new EngagementActivity(); // manual allocation
+delete a;                                          // manual cleanup — forget this → memory leak
+```
+
+**GC responsibilities:**
+- Allocate memory for new objects on the managed heap
+- Track which objects are still in use (reachable)
+- Reclaim memory of unreachable objects
+- Compact the heap to reduce fragmentation
+
+> **Capital Access**: We create thousands of `EngagementActivity`, `ReportJob`, and DTO objects per second across 7 microservices. None of them are manually freed — the GC handles all of it. This lets us focus on business logic instead of memory management.
+
+---
+
+### Q128. How Does the GC Know When to Clean Objects?
+
+The GC uses **reachability analysis** — not reference counting. It traces from **GC Roots** and marks every object it can reach. Anything NOT reachable = garbage = collected.
+
+**GC Roots (starting points for the trace):**
+```
+1. Local variables on the active call stack
+2. Static fields (live for the app's lifetime)
+3. CPU registers holding object references
+4. GC Handles (explicit pinned handles)
+```
+
+```csharp
+// Example — when does activity become collectible?
+public void ProcessEngagement()
+{
+    var activity = new EngagementActivity(id, tenantId); // GC root: local variable
+    activity.Complete("Great meeting");
+    // 'activity' local variable goes out of scope at end of method
+    // GC root disappears → object becomes UNREACHABLE → eligible for collection
+}
+
+// Static field — object lives FOREVER (app lifetime)
+public static class Cache
+{
+    private static EngagementActivity _lastActivity; // GC root — never collectible while app runs
+}
+
+// Circular references are handled correctly
+// object A → B → A   (A and B reference each other)
+// If nothing from GC Roots reaches A or B → BOTH are collected ✅
+// (Reference counting would fail here — counts are 1 each but both are garbage)
+```
+
+---
+
+### Q129. Is There a Way to See the Heap Memory?
+
+Yes — multiple tools at different levels:
+
+```bash
+# 1. dotnet-counters — real-time GC metrics from CLI
+dotnet-counters monitor --process-id <pid> System.Runtime
+# Shows: GC Heap Size, Gen0/1/2 collections per second, pause time
+
+# 2. dotnet-dump — capture heap snapshot for offline analysis
+dotnet-dump collect --process-id <pid> --output ./dump.dmp
+dotnet-dump analyze dump.dmp
+> dumpheap -stat          # show all object types and their total size on heap
+> dumpheap -type EngagementActivity  # find all EngagementActivity instances
+> gcroot <object-address> # show what is keeping this object alive (retention path)
+
+# 3. dotnet-trace — record GC events for PerfView analysis
+dotnet-trace collect --process-id <pid> --providers Microsoft-DotNETCore-SampleProfiler
+```
+
+```csharp
+// 4. From inside the app — GC APIs
+long totalMemory = GC.GetTotalMemory(forceFullCollection: false); // bytes on managed heap
+Console.WriteLine($"Heap: {totalMemory / 1024 / 1024} MB");
+
+// Generation sizes
+long gen0 = GC.GetGenerationSize(0);
+long gen2 = GC.GetGenerationSize(2);
+
+// How many collections happened?
+int gen0Collections = GC.CollectionCount(0);
+int gen2Collections = GC.CollectionCount(2); // if this is high → memory pressure ❌
+```
+
+```
+// 5. Visual Studio — Diagnostic Tools window (Debug > Windows > Diagnostic Tools)
+//    Memory Usage tab → Take Snapshot → Compare snapshots to find leaks
+
+// 6. Azure App Insights (Capital Access)
+//    Metrics: "Process physical bytes" and ".NET CLR Memory > # Bytes in all Heaps"
+//    Alert when Gen2 heap > 1.5GB → investigate
+```
+
+---
+
+### Q130. Does GC Clean Primitive Types?
+
+**It depends on where they live:**
+
+```csharp
+// STACK variables — primitive types as local variables live on the STACK
+// Stack frames are unwound automatically when a method returns
+// GC is NOT involved — the CPU stack pointer moves, memory is reclaimed instantly
+public void Calculate()
+{
+    int count = 100;        // stack — not touched by GC
+    decimal score = 92.5m;  // stack — not touched by GC
+    bool isValid = true;    // stack — not touched by GC
+} // stack frame popped → all gone instantly
+
+// HEAP — primitive types INSIDE objects live on the heap AS PART of the object
+public class EngagementActivity
+{
+    public int AttendeeCount { get; private set; }  // int lives inside the object on heap
+    public bool IsDeleted { get; private set; }     // bool lives inside the object on heap
+}
+// When GC collects EngagementActivity → AttendeeCount and IsDeleted are collected WITH it
+// GC doesn't collect the int separately — it collects the whole object
+
+// BOXED primitives — value type stored as object → lives on managed heap → GC collects
+object boxed = 42;  // int boxed → on heap → GC manages this
+```
+
+**Answer**: GC does NOT directly clean stack primitives (stack handles that). For primitives inside objects, they are collected as part of the parent object. For boxed primitives, GC collects them like any heap object.
+
+---
+
+### Q131. Managed vs Unmanaged Code/Objects/Resources?
+
+```
+MANAGED CODE / OBJECTS
+  - Written in C#, VB.NET, F# etc. — compiled to IL, runs under CLR
+  - Memory managed by GC automatically
+  - Examples: EngagementActivity, List<T>, Dictionary, string, any .NET class
+  - You allocate (new), GC deallocates
+
+UNMANAGED CODE / RESOURCES
+  - Outside CLR control — native OS resources
+  - GC has NO knowledge of these
+  - Must be cleaned up manually
+  - Examples:
+    SqlConnection    → database connection handle (limited pool!)
+    FileStream       → OS file handle
+    HttpClient       → network socket
+    SqlCommand       → DB command object
+    Timer            → OS timer handle
+    Mutex/Semaphore  → OS synchronisation primitive
+    COM objects      → legacy Windows objects
+    Marshal.AllocHGlobal → native heap memory
+```
+
+```csharp
+// MANAGED — GC handles it
+var activity = new EngagementActivity(id, tenantId); // GC cleans up ✅
+
+// UNMANAGED — you MUST clean it
+var connection = new SqlConnection(connectionString); // wraps OS connection handle
+// GC can collect the SqlConnection object, but the OS connection handle stays OPEN
+// until you call Dispose() or the finalizer eventually runs
+// Connection pool exhaustion if you don't dispose promptly ❌
+```
+
+---
+
+### Q132. Can GC Clean Unmanaged Code?
+
+**No — GC cannot clean unmanaged resources.** GC only manages the managed heap. It has no visibility into OS handles, file descriptors, or native memory.
+
+However, GC **triggers cleanup indirectly** through the **finalizer/destructor**:
+
+```csharp
+// GC collects the managed object → calls the finalizer → finalizer can release unmanaged resource
+public class SqlEngagementRepository
+{
+    private SqlConnection _connection = new SqlConnection(connectionString);
+
+    ~SqlEngagementRepository() // finalizer — GC eventually calls this
+    {
+        _connection.Dispose(); // INDIRECTLY cleans unmanaged resource through finalizer
+    }
+}
+```
+
+**BUT** — "eventually" is unpredictable. That's why `IDisposable` exists — for **deterministic, immediate** cleanup. Finalizer is only a safety net.
+
+---
+
+### Q133. Explain Generations?
+
+The managed heap is divided into **generations** based on the **Generational Hypothesis**: *most objects die young*.
+
+Research shows: in typical applications, 80–90% of objects are short-lived — created for one operation and immediately garbage. Only a small fraction live for the entire app lifetime.
+
+Generations let GC exploit this pattern: **collect young objects frequently and cheaply, collect old objects rarely**.
+
+```
+Generation 0 (Gen 0) → youngest, smallest, collected most often
+Generation 1 (Gen 1) → middle tier, buffer layer
+Generation 2 (Gen 2) → oldest, largest, collected least often
+Large Object Heap     → objects > 85KB, collected with Gen 2
+```
+
+---
+
+### Q134. What is GC0, GC1, and GC2?
+
+```
+GEN 0
+  Size:      Few MB (configurable)
+  Contains:  Newly allocated objects
+  Collected: Most frequently — every few seconds under load
+  Duration:  < 1ms — barely noticeable
+  Capital Access: request DTOs, LINQ intermediates, temporary strings, HttpContext
+
+GEN 1
+  Contains:  Objects that survived Gen 0 collection (promoted)
+  Collected: Less often than Gen 0
+  Purpose:   Buffer — second chance to die before reaching Gen 2
+  Capital Access: DbContext instances (slightly longer than one DB call)
+
+GEN 2
+  Contains:  Long-lived objects — survived Gen 0 + Gen 1
+  Collected: Rarely — only when heap is under pressure (full GC)
+  Duration:  Can be 10–100ms+ — noticeable in production
+  Capital Access: Singleton services, ConcurrentDictionary cache, static config
+
+LARGE OBJECT HEAP (LOH)
+  Contains:  Objects > 85,000 bytes — allocated directly here
+  Collected: Only with Gen 2
+  Capital Access: byte[] PDF buffers (2-5MB per report) — use ArrayPool<byte> to avoid ❌
+```
+
+```csharp
+// Capital Access: LOH problem with large report buffers
+// ❌ Each report allocates a new large byte[] → goes to LOH → Gen 2 pressure
+byte[] pdf = new byte[3 * 1024 * 1024]; // 3MB → straight to LOH
+
+// ✅ ArrayPool — rent from pool, return after use → no GC allocation
+var buffer = ArrayPool<byte>.Shared.Rent(3 * 1024 * 1024);
+try { BuildPdf(buffer); }
+finally { ArrayPool<byte>.Shared.Return(buffer); } // no GC cycle needed
+```
+
+---
+
+### Q135. Why Do We Need Generations?
+
+**Without generations — one big heap, one expensive GC:**
+```
+Every GC run → scan ALL live objects on the entire heap
+Production app → heap = 500MB → scan 500MB → pause = seconds
+Under load: GC every few seconds → multi-second pauses → terrible user experience
+```
+
+**With generations — targeted, cheap collections:**
+```
+Gen 0 is tiny (few MB). 90% of objects die there.
+Gen 0 GC: scan tiny Gen 0 only → < 1ms → user doesn't notice
+Full GC (Gen 2): only when Gen 2 is full → minutes apart → acceptable
+
+Result: thousands of cheap Gen 0 collections between each expensive Gen 2 collection
+```
+
+**Without Gen 1 (just Gen 0 and Gen 2):**
+Medium-lived objects (live a few hundred ms, then die) would skip straight to Gen 2. Gen 2 would fill up fast with objects that were about to die anyway → frequent expensive full GCs. Gen 1 acts as a **quarantine** — gives medium-lived objects one more chance to die before promotion to Gen 2.
+
+---
+
+### Q136. Which Is the Best Place to Clean Unmanaged Objects?
+
+**The `Dispose()` method via the IDisposable pattern — always.**
+
+```
+Best:    Dispose() — called immediately when you're done with the resource
+         using statement / using declaration ensures this always happens
+
+Backup:  Finalizer (~destructor) — GC calls this eventually if Dispose() was forgotten
+         Non-deterministic timing — could be minutes later
+
+NEVER:   Rely only on the finalizer — connection pool can be exhausted by then
+```
+
+```csharp
+// BEST — deterministic, immediate
+using var connection = new SqlConnection(connectionString); // Dispose called here
+using var context = new EngagementDbContext(options);       // released immediately ✅
+
+// BACKUP — finalizer safety net (non-deterministic)
+~SqlEngagementRepository()
+{
+    _connection?.Dispose(); // eventually — not good enough for production
+}
+```
+
+**Capital Access rule**: Every `SqlConnection`, `DbContext`, `FileStream`, `HttpResponseMessage` is inside a `using` block. We do not rely on finalizers for resource cleanup.
+
+---
+
+### Q137. How Does GC Behave When We Have a Destructor?
+
+Objects with a destructor (finalizer) go through a **two-step collection process**:
+
+```
+NORMAL OBJECT (no destructor):
+  GC runs → object unreachable → memory reclaimed immediately ✅ (1 GC cycle)
+
+OBJECT WITH DESTRUCTOR:
+  GC runs → object unreachable → NOT collected yet!
+  → placed on Finalization Queue
+  → Finalizer Thread (separate dedicated thread) picks it up
+  → Finalizer runs
+  → Object now moved to f-reachable queue
+  → NEXT GC cycle → memory reclaimed ❌ (2+ GC cycles, promoted to Gen 1 or Gen 2)
+```
+
+```csharp
+public class ExpensiveResource : IDisposable
+{
+    private bool _disposed = false;
+
+    // Having this finalizer means GC cannot immediately collect ExpensiveResource
+    // It must go through Finalization Queue first
+    ~ExpensiveResource()
+    {
+        Dispose(false);
+    }
+
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this); // ← removes from Finalization Queue → collected immediately ✅
+    }
+}
+```
+
+**Performance impact**: Objects with finalizers survive longer → promoted to Gen 1 or Gen 2 → trigger more expensive GC collections. Use `GC.SuppressFinalize(this)` in `Dispose()` to opt out of this overhead when already cleaned up.
+
+---
+
+### Q138. What Do You Think About an Empty Destructor?
+
+**An empty destructor is actively harmful — never write one.**
+
+```csharp
+// ❌ NEVER DO THIS
+public class EngagementActivity
+{
+    ~EngagementActivity() { } // EMPTY — does absolutely nothing useful
+}
+```
+
+**Why it's harmful:**
+```
+Without destructor: EngagementActivity collected in Gen 0 in < 1ms ✅
+
+With empty destructor: 
+  → GC puts it on Finalization Queue (even though finalizer does nothing)
+  → Finalizer Thread runs it (empty — wastes CPU cycles)
+  → Object survives Gen 0 → promoted to Gen 1
+  → Requires one MORE GC cycle to collect
+  → For 10,000 EngagementActivity objects: 10,000 unnecessary promotions ❌
+```
+
+**Rule**: Only write a finalizer when you have **actual unmanaged resources** to release. If you implement `IDisposable` and call `GC.SuppressFinalize(this)` in `Dispose()`, even a real finalizer's cost is eliminated for correctly-used instances.
+
+---
+
+### Q139. Explain the Dispose Pattern?
+
+The full Dispose pattern safely handles both managed and unmanaged resource cleanup, with a finalizer as a safety net:
+
+```csharp
+public class EngagementExporter : IDisposable
+{
+    private FileStream _outputFile;   // managed IDisposable
+    private IntPtr _nativeHandle;     // unmanaged resource (hypothetical)
+    private bool _disposed = false;   // guard flag
+
+    public EngagementExporter(string path)
+    {
+        _outputFile = new FileStream(path, FileMode.Create);
+    }
+
+    // Step 1: Public entry point — called by user or using statement
+    public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this); // no need for finalizer if Dispose already ran ✅
+    }
+
+    // Step 2: Core cleanup logic
+    // disposing = true  → called from Dispose()    → safe to touch managed resources
+    // disposing = false → called from finalizer    → do NOT touch managed resources
+    //                                                (they may already be collected)
+    protected virtual void Dispose(bool disposing)
+    {
+        if (_disposed) return; // idempotent — safe to call multiple times
+
+        if (disposing)
+        {
+            _outputFile?.Dispose(); // safe — disposing managed resource
+        }
+
+        // Always release unmanaged resources here (both paths)
+        if (_nativeHandle != IntPtr.Zero)
+        {
+            NativeApi.CloseHandle(_nativeHandle);
+            _nativeHandle = IntPtr.Zero;
+        }
+
+        _disposed = true;
+    }
+
+    // Step 3: Safety net — called by GC if user forgot Dispose()
+    ~EngagementExporter() => Dispose(false);
+}
+```
+
+**Capital Access**: `EngagementDbContext` follows this pattern internally. Every entity service gets the context via DI (Scoped lifetime) — the DI container calls Dispose() at end of the HTTP request automatically.
+
+---
+
+### Q140. Finalize vs Destructor?
+
+They are the **same thing** in C# — different names for the same mechanism.
+
+```csharp
+// What you write in C# — destructor syntax
+public class EngagementExporter
+{
+    ~EngagementExporter()
+    {
+        // cleanup
+    }
+}
+
+// What the compiler generates — override of Object.Finalize()
+protected override void Finalize()
+{
+    try
+    {
+        // your destructor body
+    }
+    finally
+    {
+        base.Finalize(); // MUST call base — compiler handles this
+    }
+}
+```
+
+**You cannot directly write `override Finalize()` in C#** — the compiler blocks it and requires the destructor syntax (`~ClassName()`). The compiler translates it to the proper `Finalize()` override including the try/finally and base call.
+
+| | Destructor | Finalize |
+|---|---|---|
+| Syntax | `~ClassName() { }` | `protected override void Finalize()` |
+| In C# | ✅ Write this | ❌ Compiler blocks direct override |
+| Same thing? | ✅ Yes — compiler converts destructor to Finalize |
+| Called by | GC (non-deterministic) | GC (same) |
+
+---
+
+### Q141. What Is the Use of the `using` Keyword?
+
+```csharp
+// USING STATEMENT — ensures Dispose() is called even if exception occurs
+// Compiler generates try/finally behind the scenes
+using (var context = new EngagementDbContext(options, tenantService))
+{
+    var results = await context.EngagementActivities.ToListAsync();
+} // Dispose() called HERE — even if exception thrown above ✅
+
+// What the compiler generates:
+var context = new EngagementDbContext(options, tenantService);
+try
+{
+    var results = await context.EngagementActivities.ToListAsync();
+}
+finally
+{
+    context?.Dispose(); // always runs
+}
+
+// C# 8+ USING DECLARATION — cleaner, disposes at end of enclosing scope
+using var context = new EngagementDbContext(options, tenantService);
+using var connection = new SqlConnection(connectionString);
+var results = await context.EngagementActivities.ToListAsync();
+// Both disposed at end of method scope ✅
+
+// USING DIRECTIVE (different use — importing namespaces)
+using System.Collections.Generic;  // not related to IDisposable
+using Microsoft.EntityFrameworkCore;
+```
+
+**Capital Access**: Every `DbContext`, `SqlConnection`, `HttpResponseMessage`, `FileStream`, and `MemoryStream` in our codebase uses `using var`. It's enforced via code review and Roslyn analyser rules.
+
+---
+
+### Q142. Can You Force the Garbage Collector?
+
+Yes — `GC.Collect()`:
+
+```csharp
+// Force collection of all generations (full GC)
+GC.Collect();
+
+// Force specific generation
+GC.Collect(0);  // Gen 0 only
+GC.Collect(1);  // Gen 0 + Gen 1
+GC.Collect(2);  // Full GC — all generations
+
+// More control
+GC.Collect(
+    generation: 2,
+    mode: GCCollectionMode.Forced,
+    blocking: true,   // wait for GC to complete before returning
+    compacting: true  // compact heap after collection
+);
+
+// Wait for finalizers to complete after a collection
+GC.WaitForPendingFinalizers();
+
+// Common pattern before heap snapshot (diagnostics only)
+GC.Collect();
+GC.WaitForPendingFinalizers();
+GC.Collect(); // second collect picks up objects whose finalizers just ran
+```
+
+---
+
+### Q143. Is It a Good Practice to Force GC?
+
+**Almost never — and definitely not in production request handling.**
+
+```
+Why forcing GC is usually wrong:
+1. Stop-the-world: GC pauses ALL application threads
+   In Capital Access: all 7 services stop responding during a forced full GC
+   Users see request timeouts if GC takes > 100ms
+
+2. GC knows better: it's tuned by Microsoft engineers based on decades of data
+   It collects at the optimal time for your workload
+   Forcing it interrupts that tuning
+
+3. Premature promotion: forcing Gen 0 GC while many short-lived objects are alive
+   → survivors get promoted to Gen 1 unnecessarily → more Gen 2 pressure
+
+4. Doesn't fix the root cause: if you think you need to force GC,
+   you likely have a real memory issue (leak, LOH pressure, large allocations)
+   Fix the cause, not the symptom
+```
+
+**The ONE legitimate use case:**
+```csharp
+// Before taking a diagnostic memory snapshot — you want a clean baseline
+GC.Collect();
+GC.WaitForPendingFinalizers();
+GC.Collect();
+var snapshot = TakeHeapSnapshot(); // now snapshot reflects true live objects
+// This is diagnostics only — never in production request path
+```
+
+---
+
+### Q144. How Can We Detect Memory Issues?
+
+```csharp
+// 1. From within the app — basic monitoring
+public class MemoryHealthCheck : IHealthCheck
+{
+    public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken ct)
+    {
+        var bytes = GC.GetTotalMemory(forceFullCollection: false);
+        var mb = bytes / 1024 / 1024;
+
+        return Task.FromResult(mb > 1500
+            ? HealthCheckResult.Degraded($"Heap at {mb}MB — above 1.5GB threshold")
+            : HealthCheckResult.Healthy($"Heap at {mb}MB"));
+    }
+}
+```
+
+```
+2. Task Manager / Process Explorer
+   Watch "Private Bytes" over time — steady growth = potential leak
+
+3. dotnet-counters (real-time)
+   dotnet-counters monitor --process-id <pid> System.Runtime
+   Key metrics:
+   - GC Heap Size (B)          → total managed heap
+   - Gen 0/1/2 GC Count        → how often each generation is collected
+   - GC Pause Time (%)         → percentage of time spent in GC
+
+4. Azure App Insights (Capital Access)
+   Custom metric: "gen2_heap_size_mb" tracked every 30s
+   Alert rule: if Gen2 heap > 1.5GB for 5 minutes → PagerDuty alert
+
+5. Windows Performance Monitor (perfmon)
+   Counter: .NET CLR Memory > # Bytes in all Heaps
+   Watch for: monotonically increasing line over hours = memory leak
+```
+
+---
+
+### Q145. How Can We Know the Exact Source of Memory Issues?
+
+**The dotnet-dump workflow — most powerful:**
+
+```bash
+# Step 1: Capture heap dump when memory is high
+dotnet-dump collect --process-id <pid> --output ./engagement-service.dmp
+
+# Step 2: Analyze
+dotnet-dump analyze engagement-service.dmp
+
+# Step 3: Find what's consuming memory by type
+> dumpheap -stat
+# Output (example):
+# MT       Count   TotalSize  Class Name
+# 7f3a...  85000   102000000  EngagementActivity  ← 85K instances? should be ~100!
+# 7f2b...  2000000  48000000  System.String
+
+# Step 4: Look at actual instances
+> dumpheap -type EngagementActivity -min 1000
+# Shows addresses of EngagementActivity objects on heap
+
+# Step 5: Find what is KEEPING them alive (retention path)
+> gcroot 00007f3a1234abcd
+# Output shows the reference chain from GC root to this object:
+# Static field Cache._activityStore → List<EngagementActivity> → your object
+# Found it! The static cache is holding all 85K activities ❌
+```
+
+```csharp
+// Visual Studio Memory Profiler workflow
+// 1. Debug > Performance Profiler > Memory Usage
+// 2. Take snapshot at start
+// 3. Run the suspected leaking operation 100 times
+// 4. Take snapshot again
+// 5. Compare: what types increased?
+// 6. Click on a type → see object retention graph → shows what's holding it
+
+// Capital Access: identified a leak in NotificationService where event handlers
+// to OwnershipAlertService were never unsubscribed → 50K stale handler objects
+```
+
+---
+
+### Q146. What Is a Memory Leak?
+
+A **memory leak** occurs when memory is allocated but never freed, and the amount grows over time — eventually exhausting available memory and crashing the process.
+
+```
+NOT a memory leak: object allocated → used → GC collects when unreachable ✅
+MEMORY LEAK:       object allocated → used → finished → STILL REFERENCED → GC cannot collect ❌
+                   → accumulates → OutOfMemoryException after hours/days
+```
+
+```csharp
+// Memory leak — static collection grows forever, never trimmed
+private static readonly List<EngagementActivity> _auditLog = new();
+
+public void LogActivity(EngagementActivity activity)
+{
+    _auditLog.Add(activity); // ❌ added but never removed
+    // After 1 week production: millions of entries, process crashes with OOM
+}
+
+// Memory leak — event handler never unsubscribed
+public class NotificationPanel
+{
+    public NotificationPanel(OwnershipAlertService alertSvc)
+    {
+        alertSvc.OwnershipChanged += OnOwnershipChanged; // ❌ alertSvc holds reference to this
+        // NotificationPanel can never be GC'd as long as alertSvc lives (= forever, it's singleton)
+    }
+    // Fix: implement IDisposable and unsubscribe in Dispose()
+}
+```
+
+---
+
+### Q147. Can a .NET Application Have Memory Leaks Even With GC?
+
+**Yes — absolutely.** GC only collects objects with **no references**. If your code accidentally keeps references to objects it no longer needs, GC cannot help.
+
+```
+GC is perfect — it works exactly as designed.
+The problem is YOUR CODE keeping references longer than needed.
+
+Common .NET memory leaks:
+  1. Event handlers not unsubscribed           → subscriber kept alive by publisher
+  2. Static collections growing unboundedly   → static = GC root = never collected
+  3. IDisposable not disposed                 → unmanaged resources + managed objects linger
+  4. Closure capturing large objects          → lambda keeps alive whatever it captured
+  5. Cache without expiry/eviction            → IMemoryCache with no expiry = leak
+  6. ThreadLocal<T> not disposed              → values per thread never cleaned
+
+Example: GC WANTS to collect but CAN'T
+```
+
+```csharp
+// GC would love to collect these 10,000 CompanyData objects
+// But it can't — they're referenced by the static cache
+private static Dictionary<string, CompanyData> _cache = new();
+// Dictionary is a GC root (static) → holds all CompanyData references → none collected
+// Solution: IMemoryCache with expiry, or WeakReference values
+```
+
+---
+
+### Q148. How to Detect Memory Leaks in .NET Applications?
+
+```
+STEP 1 — CONFIRM it is a leak (not just expected growth)
+  Monitor process memory over 2–4 hours with dotnet-counters
+  Leak: memory grows monotonically and never decreases after GC
+  Normal: memory fluctuates, GC brings it back down
+
+STEP 2 — IDENTIFY which type is leaking
+  dotnet-dump → dumpheap -stat → sort by TotalSize
+  Which type has WAY more instances than expected?
+
+STEP 3 — FIND what is holding the reference
+  dotnet-dump → gcroot <address>
+  Visual Studio Memory Profiler → object retention graph
+  PerfView → object allocation stacks
+
+STEP 4 — CODE REVIEW with findings in hand
+  Search for: event subscriptions without unsubscription
+  Search for: static collections that only add, never remove
+  Search for: IDisposable used without using or Dispose()
+  Search for: closures in long-lived objects
+
+STEP 5 — FIX and VERIFY
+  Deploy fix → monitor for 24h → confirm memory is stable
+```
+
+```csharp
+// Capital Access: leak detection in production
+// App Insights alert fires: Gen2 heap > 1.5GB
+// dotnet-dump taken → dumpheap -stat shows 200,000 EngagementActivity instances
+// gcroot shows: static _eventHandlers Dictionary<Guid, List<EventHandler>> is root
+// Root cause: Durable Function activity callbacks registered but never deregistered
+// Fix: store WeakReference<EventHandler> in the dictionary + cleanup on completion
+```
+
+---
+
+### Q149. Explain Weak and Strong References?
+
+```csharp
+// STRONG REFERENCE — normal reference. Keeps object alive. GC will NOT collect.
+var activity = new EngagementActivity(id, tenantId); // strong reference
+// As long as 'activity' variable exists and is reachable → object stays on heap
+
+// WEAK REFERENCE — does NOT prevent GC collection
+// GC can collect the object even if WeakReference exists
+var weakRef = new WeakReference<EngagementActivity>(activity);
+
+activity = null; // remove the strong reference
+
+// GC is now FREE to collect the object (it may not do so immediately)
+
+// Using a weak reference — always check if still alive
+if (weakRef.TryGetTarget(out var cachedActivity))
+{
+    // Object still alive — GC hasn't collected it yet
+    return cachedActivity; // use it ✅
+}
+else
+{
+    // Object was collected — recreate it
+    var fresh = await LoadFromDatabaseAsync(id);
+    weakRef.SetTarget(fresh); // update the weak reference
+    return fresh;
+}
+```
+
+```
+Strong Reference: 
+  Object alive → GC cannot collect → memory always used
+  Use for: anything you actively need
+
+Weak Reference:
+  Object alive only if memory allows → GC can collect under pressure
+  After GC collects it: TryGetTarget returns false
+  Use for: caches where data can be regenerated
+```
+
+---
+
+### Q150. When Will You Use Weak References?
+
+**Scenario 1 — Memory-sensitive cache (most common):**
+```csharp
+// Capital Access: large report PDFs cached after generation
+// Strong cache: if 2500 tenants each have a cached PDF (3MB each) → 7.5GB ❌
+// WeakReference cache: GC evicts least recently used PDFs under memory pressure
+private readonly ConcurrentDictionary<Guid, WeakReference<byte[]>> _reportCache = new();
+
+public async Task<byte[]> GetOrGenerateReportAsync(Guid reportId)
+{
+    if (_reportCache.TryGetValue(reportId, out var weakRef)
+        && weakRef.TryGetTarget(out var cachedPdf))
+    {
+        return cachedPdf; // cache hit — PDF still in memory ✅
+    }
+
+    // Cache miss or GC evicted it — regenerate
+    var pdf = await _reportGenerator.GenerateAsync(reportId);
+    _reportCache[reportId] = new WeakReference<byte[]>(pdf); // store weakly
+    return pdf;
+}
+// Under memory pressure: GC evicts PDFs → next request regenerates
+// No OutOfMemoryException — GC acts as automatic cache eviction ✅
+```
+
+**Scenario 2 — Event aggregator without holding subscribers alive:**
+```csharp
+// Publisher holds weak references to subscribers
+// When subscriber is no longer used, GC collects it → publisher doesn't prevent it
+public class WeakEventAggregator
+{
+    private readonly List<WeakReference<IOwnershipChangeHandler>> _handlers = new();
+
+    public void Subscribe(IOwnershipChangeHandler handler)
+    {
+        _handlers.Add(new WeakReference<IOwnershipChangeHandler>(handler));
+    }
+
+    public void Publish(OwnershipChangedEvent e)
+    {
+        _handlers.RemoveAll(wr => !wr.TryGetTarget(out _)); // prune dead refs
+        foreach (var wr in _handlers.ToList())
+        {
+            if (wr.TryGetTarget(out var handler))
+                handler.Handle(e);
+        }
+    }
+}
+// NotificationPanel can be GC'd naturally — no leak from event subscription ✅
+```
+
+**Summary — use WeakReference when:**
+```
+1. Cache: data can be regenerated if evicted — don't force it to stay in memory
+2. Event subscriptions: subscriber should not be kept alive by publisher
+3. Observer pattern: observer should die naturally without publisher holding it
+4. Any case where "nice to have if memory allows, fine to discard otherwise"
+
+Do NOT use WeakReference for:
+  - Data you genuinely need to be present
+  - Performance-critical paths (TryGetTarget has overhead)
+  - Simple DI-injected dependencies (use strong references)
+```
+
+---
+
+## 5. .NET Core & ASP.NET Core
 
 <!-- Content added in next session -->
 
