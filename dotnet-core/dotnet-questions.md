@@ -2830,7 +2830,974 @@ Do NOT use WeakReference for:
 
 ## 5. .NET Core & ASP.NET Core
 
-<!-- Content added in next session -->
+---
+
+### Q31. [Topic: ASP.NET Core] [EPAM] What is the request lifecycle in ASP.NET Core?
+
+Every HTTP request travels through this exact pipeline — order matters:
+
+```
+[Browser / Angular SPA]
+         │  GET /api/engagements/abc-123
+         ▼
+[Kestrel — Web Server]
+  Parses raw TCP bytes → creates HttpContext object
+         │
+         ▼
+[Middleware Pipeline] ← each middleware WRAPS everything below it
+  │
+  ├─ [1] ExceptionHandler     ← outermost — catches ALL exceptions below
+  ├─ [2] HTTPS Redirection    ← HTTP → HTTPS
+  ├─ [3] Correlation ID       ← add/read X-Correlation-Id header
+  ├─ [4] Request Logging      ← log incoming request
+  ├─ [5] Authentication       ← validate JWT → populate User.Claims
+  ├─ [6] Authorization        ← check [Authorize] roles/policies
+  ├─ [7] CORS                 ← handle OPTIONS preflight + add headers
+  ├─ [8] Rate Limiting        ← quota check per tenant
+  ├─ [9] Routing              ← match URL to controller action
+  └─ [10] Endpoint / MVC
+              │
+              ├─ Model Binding     → route/query/body → action params
+              ├─ Model Validation  → DataAnnotations
+              ├─ Action Filters    → OnActionExecuting
+              ├─ ► CONTROLLER ACTION  ← your code runs here
+              ├─ Action Filters    → OnActionExecuted
+              └─ Result Execution  → serialize to JSON
+         │
+         ▼ Response travels BACK UP through each middleware
+[Kestrel sends bytes to client]
+```
+
+```csharp
+// Program.cs — ORDER IS CRITICAL
+var app = builder.Build();
+
+app.UseExceptionHandler("/error");      // FIRST — catches everything below
+app.UseHttpsRedirection();
+app.UseMiddleware<CorrelationIdMiddleware>();
+app.UseAuthentication();                // BEFORE Authorization
+app.UseAuthorization();
+app.UseCors("CapitalAccessPolicy");
+app.UseRateLimiter();
+app.MapControllers();                   // LAST
+
+app.Run();
+```
+
+**Why order matters:**
+```csharp
+// ❌ Wrong — Authorization runs before Authentication
+app.UseAuthorization();   // User.Claims not populated yet — can't check roles
+app.UseAuthentication();
+
+// ✅ Correct
+app.UseAuthentication();  // populate User.Claims from JWT
+app.UseAuthorization();   // now roles are available ✅
+```
+
+**Model binding — where parameters come from:**
+```csharp
+[HttpGet("{tenantId}/engagements/{id:guid}")]
+public async Task<IActionResult> Get(
+    [FromRoute]  string tenantId,      // from URL path
+    [FromRoute]  Guid id,              // from URL path
+    [FromQuery]  string? filter,       // from ?filter=completed
+    [FromHeader] string correlationId, // from X-Correlation-Id header
+    [FromBody]   UpdateDto dto         // from JSON request body
+)
+```
+
+> **Interview line**: "In Capital Access, the Correlation ID middleware runs third — before authentication — so even failed auth attempts get a correlation ID in the logs. Authentication runs before Authorization because you can't check roles until the JWT is validated and User.Claims is populated."
+
+---
+
+### Q32. [Topic: ASP.NET Core] [EPAM] What is middleware? List all built-in middleware.
+
+Middleware is a component in the request pipeline that processes requests and responses. Each middleware calls the next one, forming a chain.
+
+```csharp
+// BUILT-IN MIDDLEWARE shipped with ASP.NET Core:
+app.UseExceptionHandler()       // global exception → ProblemDetails response
+app.UseStatusCodePages()        // 404/500 → readable error pages
+app.UseHsts()                   // Strict-Transport-Security header
+app.UseHttpsRedirection()       // HTTP → HTTPS redirect
+app.UseStaticFiles()            // serve wwwroot files
+app.UseRouting()                // endpoint routing (implicit in .NET 7+)
+app.UseRequestLocalization()    // i18n — culture from Accept-Language header
+app.UseAuthentication()         // validate JWT/cookie, populate User
+app.UseAuthorization()          // enforce [Authorize] attributes
+app.UseCors()                   // CORS headers + preflight handling
+app.UseRateLimiter()            // throttle requests per client/tenant
+app.UseResponseCaching()        // cache GET responses
+app.UseResponseCompression()    // gzip/brotli compress responses
+app.UseSession()                // session state (rare in APIs)
+app.UseWebSockets()             // HTTP → WebSocket upgrade
+app.MapControllers()            // MVC controllers as endpoints
+app.MapHealthChecks("/health")  // health check endpoint
+```
+
+---
+
+### Q33. [Topic: ASP.NET Core] [EPAM] How do you create custom middleware? Give a real example.
+
+```csharp
+// Capital Access — Correlation ID middleware
+// Adds unique trace ID to every request so we can trace across all 7 microservices
+public class CorrelationIdMiddleware
+{
+    private readonly RequestDelegate _next;
+    private readonly ILogger<CorrelationIdMiddleware> _logger;
+    private const string Header = "X-Correlation-Id";
+
+    public CorrelationIdMiddleware(RequestDelegate next,
+        ILogger<CorrelationIdMiddleware> logger)
+    {
+        _next = next;
+        _logger = logger;
+    }
+
+    public async Task InvokeAsync(HttpContext context)
+    {
+        // Read from incoming request or generate new one
+        var correlationId = context.Request.Headers[Header].FirstOrDefault()
+                            ?? Guid.NewGuid().ToString();
+
+        // Add to response so caller can log it
+        context.Response.Headers[Header] = correlationId;
+        context.Items["CorrelationId"] = correlationId;
+
+        // Add to all log statements in this request scope
+        using (_logger.BeginScope(new Dictionary<string, object>
+               { ["CorrelationId"] = correlationId }))
+        {
+            await _next(context); // call next middleware
+        }
+        // response flows back through here
+    }
+}
+
+// Register
+app.UseMiddleware<CorrelationIdMiddleware>();
+
+// Propagate to downstream HTTP calls (Capital Access — 7 microservices)
+public class CorrelationIdDelegatingHandler : DelegatingHandler
+{
+    private readonly IHttpContextAccessor _accessor;
+
+    protected override Task<HttpResponseMessage> SendAsync(
+        HttpRequestMessage request, CancellationToken ct)
+    {
+        var id = _accessor.HttpContext?.Response.Headers[Header].ToString();
+        if (!string.IsNullOrEmpty(id))
+            request.Headers.TryAddWithoutValidation(Header, id);
+        return base.SendAsync(request, ct);
+    }
+}
+// Every outbound HTTP call now carries the correlation ID ✅
+// App Insights: filter by correlationId → see ALL logs for one user action ✅
+```
+
+---
+
+### Q34. [Topic: ASP.NET Core] [EPAM] Middleware vs Action Filters — difference and when to use each?
+
+| | Middleware | Action Filter |
+|---|---|---|
+| Scope | Entire pipeline — every request | MVC layer only — controller actions |
+| Access to | Raw `HttpContext` | `ActionContext`, `ModelState`, action result |
+| Applied via | `app.UseMiddleware<>()` in Program.cs | `[ServiceFilter]`, global filters |
+| Runs before routing? | Yes | No — after routing |
+| Use for | Auth, CORS, logging, rate limiting, exceptions | Per-endpoint audit, validation, result shaping |
+
+```csharp
+// MIDDLEWARE — for ALL requests (static files, health checks, everything)
+public class RequestTimingMiddleware
+{
+    public async Task InvokeAsync(HttpContext ctx)
+    {
+        var sw = Stopwatch.StartNew();
+        await _next(ctx);
+        sw.Stop();
+
+        if (sw.ElapsedMilliseconds > 500)
+            _logger.LogWarning("Slow: {Method} {Path} — {Ms}ms",
+                ctx.Request.Method, ctx.Request.Path, sw.ElapsedMilliseconds);
+    }
+}
+
+// ACTION FILTER — for specific controllers, has MVC context
+public class TenantAuditFilter : IActionFilter
+{
+    public void OnActionExecuting(ActionExecutingContext context)
+    {
+        var tenantId = context.HttpContext.User.FindFirst("tenantId")?.Value;
+        var action   = context.ActionDescriptor.DisplayName;
+        _audit.Record(tenantId, action, DateTime.UtcNow); // per-endpoint audit ✅
+    }
+
+    public void OnActionExecuted(ActionExecutedContext context)
+    {
+        if (context.Exception is not null)
+            _audit.RecordFailure(context.Exception.Message);
+    }
+}
+
+// Apply to specific controller only
+[ServiceFilter(typeof(TenantAuditFilter))]
+public class EngagementController : ControllerBase { }
+```
+
+> **Interview line**: "Middleware runs for every request — even static file requests, health checks. Action Filters only run inside the MVC pipeline, which means they have access to ModelState and the action result. In Capital Access, our request timing and correlation ID are middleware (apply everywhere). Tenant audit logging is an Action Filter — it only makes sense for authenticated controller actions and needs access to the specific action name."
+
+---
+
+### Q35. [Topic: ASP.NET Core] [EPAM] What is DI? What are service lifetimes? What is the captive dependency trap?
+
+**Dependency Injection** — the framework creates and injects dependencies; classes don't create their own. Wired in Program.cs.
+
+```csharp
+// TRANSIENT — new instance every time requested from DI
+builder.Services.AddTransient<IEmailFormatter, HtmlEmailFormatter>();
+// Each class that injects IEmailFormatter gets its own separate instance
+
+// SCOPED — one instance per HTTP request
+builder.Services.AddScoped<EngagementDbContext>();
+builder.Services.AddScoped<IEngagementRepository, SqlEngagementRepository>();
+// All classes within ONE request share the SAME DbContext
+// Different requests → different DbContext instances ✅
+
+// SINGLETON — one instance for entire app lifetime
+builder.Services.AddSingleton<IMemoryCache, MemoryCache>();
+builder.Services.AddSingleton<ServiceBusClient>();
+// Shared across ALL requests, ALL threads — must be thread-safe
+```
+
+**Capital Access mapping:**
+```
+Transient:  IEmailFormatter, IPdfRenderer (cheap, stateless)
+Scoped:     EngagementDbContext, ICurrentTenantService, IEngagementRepository
+Singleton:  IMemoryCache, ServiceBusClient, IConfiguration
+```
+
+**The captive dependency trap:**
+```csharp
+// ❌ Singleton consuming Scoped service — runtime error in dev
+builder.Services.AddSingleton<IReportOrchestrator, ReportOrchestrator>();
+// ReportOrchestrator injects IEngagementRepository (Scoped)
+// Singleton lives forever → captures the FIRST request's Scoped instance
+// All subsequent requests share that stale instance → tenant data leaks ❌
+// .NET throws: "Cannot consume scoped service from singleton"
+
+// ✅ Fix: IServiceScopeFactory — create scope manually when needed
+public class ReportOrchestrator
+{
+    private readonly IServiceScopeFactory _scopeFactory;
+
+    public async Task GenerateAsync(Guid jobId)
+    {
+        using var scope = _scopeFactory.CreateScope();
+        var repo = scope.ServiceProvider.GetRequiredService<IEngagementRepository>();
+        // fresh scoped instance per call ✅
+    }
+}
+```
+
+| Lifetime | New instance | Can inject | Safe in Singleton? |
+|---|---|---|---|
+| Transient | Every DI request | Anything | ❌ Short-lived captured |
+| Scoped | Per HTTP request | Transient | ❌ Captured by singleton |
+| Singleton | App start | Transient + Singleton | ✅ |
+
+---
+
+### Q36. [Topic: ASP.NET Core] [EPAM] What is JWT authentication? Explain the full validation flow.
+
+```
+1. User logs in → Angular calls Okta /authorize
+2. Okta validates credentials → issues JWT:
+   Header.Payload.Signature  (Base64 encoded, dot-separated)
+   Payload: { "sub": "user-123", "tenantId": "spg-001",
+              "roles": ["IRAdmin"], "exp": 1750000000 }
+3. Angular stores token IN MEMORY (never localStorage → XSS risk)
+4. Every API request: Authorization: Bearer <token>
+
+5. ASP.NET Core Authentication middleware:
+   a. Extracts token from Authorization header
+   b. Validates SIGNATURE using Okta's public key (RS256)
+   c. Checks: expiry (exp), issuer (iss), audience (aud)
+   d. Populates HttpContext.User with claims from payload
+6. Authorization middleware: checks [Authorize(Roles = "IRAdmin")]
+7. Controller: reads tenantId from claims → EF Core global filter uses it
+```
+
+```csharp
+// Program.cs
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = "https://spglobal.okta.com/oauth2/default";
+        options.Audience  = "api://capital-access";
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer           = true,
+            ValidateAudience         = true,
+            ValidateLifetime         = true,
+            ValidateIssuerSigningKey = true,
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+    });
+
+// Controller
+[Authorize(Roles = "IRAdmin")]
+[HttpPost]
+public async Task<IActionResult> CreateEngagement([FromBody] CreateEngagementDto dto)
+{
+    var tenantId = User.FindFirst("tenantId")?.Value;    // custom Okta claim
+    var userId   = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+    // All DB queries auto-filtered to tenantId via global query filter ✅
+}
+```
+
+---
+
+### Q37. [Topic: ASP.NET Core] [EPAM] What is CORS and how do you configure it?
+
+CORS = Cross-Origin Resource Sharing. A **browser** security mechanism that prevents JavaScript from calling a different domain than the page was served from.
+
+```csharp
+// Capital Access: Angular at capitalaccess.spglobal.com, API at api.capitalaccess.com
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("CapitalAccessPolicy", policy =>
+        policy
+            .WithOrigins(
+                "https://capitalaccess.spglobal.com",
+                "https://staging.capitalaccess.com",
+                "http://localhost:4200")         // dev
+            .AllowAnyMethod()                   // GET, POST, PUT, DELETE, PATCH
+            .AllowAnyHeader()                   // Content-Type, Authorization, X-Correlation-Id
+            .AllowCredentials());               // allow Authorization header
+});
+
+app.UseCors("CapitalAccessPolicy"); // before UseAuthentication
+
+// Preflight (OPTIONS) — browser sends this before POST/PUT/DELETE
+// CORS middleware handles it automatically → 204 + CORS headers ✅
+```
+
+**Key fact**: CORS is a BROWSER restriction — not server security. The server receives the request regardless. CORS only prevents the browser from showing the response to the calling JavaScript.
+
+---
+
+### Q38. [Topic: ASP.NET Core] [EPAM] What is your error handling strategy in .NET Core?
+
+```csharp
+// Global exception handler — registered FIRST in pipeline
+app.UseExceptionHandler(errApp =>
+{
+    errApp.Run(async ctx =>
+    {
+        var ex     = ctx.Features.Get<IExceptionHandlerFeature>()?.Error;
+        var corrId = ctx.Response.Headers["X-Correlation-Id"].ToString();
+
+        _logger.LogError(ex, "Unhandled exception. CorrelationId: {Id}", corrId);
+
+        var (status, message) = ex switch
+        {
+            NotFoundException             => (404, ex.Message),
+            ValidationException v         => (400, v.Message),
+            UnauthorizedAccessException   => (403, "Access denied"),
+            DbUpdateConcurrencyException  => (409, "Data was modified — please refresh"),
+            _                             => (500, "An unexpected error occurred")
+        };
+
+        ctx.Response.StatusCode  = status;
+        ctx.Response.ContentType = "application/problem+json"; // RFC 7807
+        await ctx.Response.WriteAsJsonAsync(new
+        {
+            type   = $"https://capitalaccess.com/errors/{status}",
+            title  = message,
+            status,
+            correlationId = corrId // client reports this to support ✅
+        });
+    });
+});
+
+// Domain exceptions — thrown in business layer, caught by handler above
+public class EngagementNotFoundException : NotFoundException
+{
+    public EngagementNotFoundException(Guid id) : base($"Engagement {id} not found") { }
+}
+```
+
+---
+
+### Q39. [Topic: ASP.NET Core] [EPAM] How do you validate models in ASP.NET Core?
+
+```csharp
+// Data annotations on DTO
+public class CreateEngagementDto
+{
+    [Required]
+    [StringLength(20, MinimumLength = 2)]
+    public string CompanyId { get; set; } = "";
+
+    [Required]
+    [EnumDataType(typeof(ActivityType))]
+    public string ActivityType { get; set; } = "";
+
+    [FutureDate]                          // custom attribute
+    public DateTime ScheduledAt { get; set; }
+
+    [Range(1, 50)]
+    public int ExpectedAttendees { get; set; }
+}
+
+// Custom validation attribute
+public class FutureDateAttribute : ValidationAttribute
+{
+    public override bool IsValid(object? value)
+        => value is DateTime dt && dt > DateTime.UtcNow;
+
+    public override string FormatErrorMessage(string name)
+        => $"{name} must be a future date.";
+}
+
+// ASP.NET Core auto-validates BEFORE action runs
+// Invalid → 400 Bad Request with ModelState errors automatically
+// No if (!ModelState.IsValid) needed in every action ✅
+
+// FluentValidation — complex cross-field rules
+public class CreateEngagementValidator : AbstractValidator<CreateEngagementDto>
+{
+    public CreateEngagementValidator()
+    {
+        RuleFor(x => x.CompanyId)
+            .NotEmpty().Length(2, 20)
+            .Matches(@"^[A-Z]{2,6}$").WithMessage("Must be ticker format: 2-6 uppercase letters");
+
+        RuleFor(x => x.ScheduledAt)
+            .GreaterThan(DateTime.UtcNow).WithMessage("Must be a future date")
+            .LessThan(DateTime.UtcNow.AddYears(1)).WithMessage("Cannot schedule more than 1 year ahead");
+    }
+}
+```
+
+---
+
+### Q40. [Topic: ASP.NET Core] [EPAM] How do you manage configuration in .NET Core? What is IOptionsMonitor vs IOptionsSnapshot?
+
+**Configuration priority (highest overrides lowest):**
+```
+Azure Key Vault → Environment Variables → appsettings.{env}.json → appsettings.json
+```
+
+```csharp
+// Program.cs — build configuration in priority order
+builder.Configuration
+    .AddJsonFile("appsettings.json")
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true)
+    .AddEnvironmentVariables()
+    .AddAzureKeyVault(
+        new Uri($"https://ca-prod-kv.vault.azure.net/"),
+        new DefaultAzureCredential()); // Managed Identity — zero credentials in code ✅
+
+// Strongly typed options
+public class TargetingOptions
+{
+    public int CacheExpiryMinutes { get; set; }
+    public int MaxConcurrentRequests { get; set; }
+}
+builder.Services.Configure<TargetingOptions>(builder.Configuration.GetSection("Targeting"));
+```
+
+```csharp
+// IOptions<T> — Singleton. Reads ONCE at startup. Never refreshes.
+public class TargetingService(IOptions<TargetingOptions> opts)
+{
+    // opts.Value — same value for entire app lifetime
+}
+
+// IOptionsSnapshot<T> — Scoped. Re-reads per HTTP request. Picks up file changes.
+public class ReportController(IOptionsSnapshot<TargetingOptions> opts)
+{
+    // opts.Value — fresh read per request ✅
+}
+
+// IOptionsMonitor<T> — Singleton. Notifies on change. Always current value.
+public class FeatureFlagService(IOptionsMonitor<FeatureFlagOptions> monitor)
+{
+    public FeatureFlagService()
+    {
+        monitor.OnChange(opts => _logger.LogInformation("Feature flags refreshed"));
+    }
+    public bool IsEnabled(string flag) => monitor.CurrentValue.GetValueOrDefault(flag, false);
+}
+```
+
+| | `IOptions<T>` | `IOptionsSnapshot<T>` | `IOptionsMonitor<T>` |
+|---|---|---|---|
+| Lifetime | Singleton | Scoped | Singleton |
+| When read | App startup once | Per request | On change |
+| Use for | Immutable settings | Per-request config | Live feature flags |
+
+---
+
+### Q41. [Topic: ASP.NET Core] [EPAM] What is Azure Key Vault and why use Managed Identity instead of credentials?
+
+**The bootstrap problem:** If you need credentials to access Key Vault, where do you safely store those credentials?
+
+**Answer: Managed Identity — no credentials at all.**
+
+```csharp
+// ❌ WRONG — client secret in code (circular problem)
+.AddAzureKeyVault(vaultUri, new ClientSecretCredential(tenantId, clientId, clientSecret));
+// The clientSecret itself needs to be hidden somewhere — back to square one ❌
+
+// ✅ CORRECT — Managed Identity via DefaultAzureCredential
+.AddAzureKeyVault(new Uri("https://ca-prod-kv.vault.azure.net/"), new DefaultAzureCredential());
+// Zero credentials in code. Azure infrastructure IS the credential. ✅
+```
+
+**How Managed Identity works:**
+```
+[Azure App Service]
+    │  "Who am I?"
+    ▼
+[Azure Instance Metadata Service]
+    │  "You are 'ca-prod-api' (Managed Identity)"
+    ▼
+[Azure Active Directory]
+    │  Issues short-lived token automatically — no password
+    ▼
+[Azure Key Vault]
+    │  "Does 'ca-prod-api' have Key Vault Secrets Reader role?" → YES
+    ▼
+Returns secrets to app
+```
+
+**Setup (one-time, no code changes):**
+```bash
+# Assign Managed Identity to App Service
+az webapp identity assign --name ca-prod-api --resource-group ca-rg
+
+# Grant Key Vault access
+az keyvault set-policy --name ca-prod-kv --object-id <principalId> --secret-permissions get list
+```
+
+**DefaultAzureCredential — tries in order:**
+```
+Local dev:    Azure CLI (az login once) → your personal account
+CI/CD:        Environment variables (AZURE_CLIENT_ID + AZURE_CLIENT_SECRET)
+Production:   Managed Identity → automatic, no credentials ✅
+```
+
+**What goes where:**
+```
+appsettings.json (in git — safe to be public)
+  ✅ Key Vault URL, cache expiry, feature flags, topic names
+
+Azure Key Vault (access-controlled by Managed Identity)
+  ✅ Connection strings, JWT keys, API keys, storage account keys
+
+Code
+  ❌ Nothing sensitive — ever
+```
+
+---
+
+### Q42. [Topic: ASP.NET Core] [EPAM] What is REST? What are the key principles?
+
+REST = Representational State Transfer. Six constraints:
+
+| Constraint | Meaning | Capital Access |
+|---|---|---|
+| **Stateless** | Every request is self-contained. No server-side session. | JWT carries all identity. Server holds no session state. |
+| **Client-Server** | UI and backend are separated | Angular SPA fully separate from .NET services |
+| **Uniform Interface** | Standard HTTP verbs, resource URLs | `GET /api/engagements/{id}`, `POST /api/engagements` |
+| **Resource-based URLs** | Nouns, not verbs | ✅ `/api/engagements` ❌ `/api/getEngagement` |
+| **Cacheable** | Responses declare cacheability | GET responses include `Cache-Control` headers |
+| **Layered System** | Client doesn't know about intermediaries | Angular calls API Gateway — unaware of 7 microservices |
+
+**HTTP Verbs:**
+```
+GET    /api/engagements          → get all
+GET    /api/engagements/{id}     → get one
+POST   /api/engagements          → create new
+PUT    /api/engagements/{id}     → full replace
+PATCH  /api/engagements/{id}     → partial update
+DELETE /api/engagements/{id}     → delete
+```
+
+**Status codes — must know:**
+```
+200 OK           → success with body
+201 Created      → POST success, Location header points to new resource
+204 No Content   → DELETE/PUT success, no body
+400 Bad Request  → client sent invalid data
+401 Unauthorized → not authenticated (missing/invalid token)
+403 Forbidden    → authenticated but wrong role/permission
+404 Not Found    → resource doesn't exist
+409 Conflict     → optimistic concurrency conflict
+422 Unprocessable → validation errors
+500 Server Error → unhandled exception
+```
+
+---
+
+### Q43. [Topic: ASP.NET Core] [EPAM] How do you achieve API versioning?
+
+```csharp
+// Install: Microsoft.AspNetCore.Mvc.Versioning
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true; // adds api-supported-versions header
+});
+
+// APPROACH 1 — URL segment (Capital Access choice — most explicit)
+[ApiVersion("1.0")]
+[Route("api/v{version:apiVersion}/engagements")]
+public class EngagementV1Controller : ControllerBase
+{
+    [HttpGet("{id}")]
+    public IActionResult Get(Guid id) { /* basic response */ }
+}
+
+[ApiVersion("2.0")]
+[Route("api/v{version:apiVersion}/engagements")]
+public class EngagementV2Controller : ControllerBase
+{
+    [HttpGet("{id}")]
+    public IActionResult Get(Guid id) { /* paginated + richer response */ }
+}
+// /api/v1/engagements/abc → V1Controller
+// /api/v2/engagements/abc → V2Controller
+
+// APPROACH 2 — Query string: GET /api/engagements?api-version=2.0
+// APPROACH 3 — Header: api-version: 2.0
+
+// Deprecate old version
+[ApiVersion("1.0", Deprecated = true)]
+// Response adds: api-deprecated-versions: 1.0 header → clients get warning
+```
+
+---
+
+### Q44. [Topic: ASP.NET Core] Content Negotiation — how does it work?
+
+Client declares what format it accepts via `Accept` header. Server responds in best matching format.
+
+```csharp
+// Add XML support (JSON is default)
+builder.Services.AddControllers().AddXmlSerializerFormatters();
+
+// Capital Access — report download with content negotiation
+[HttpGet("{id}/download")]
+[Produces("application/pdf", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")]
+public async Task<IActionResult> DownloadReport(Guid id)
+{
+    var accept = Request.Headers["Accept"].ToString();
+
+    if (accept.Contains("application/pdf"))
+    {
+        var bytes = await _reportService.GeneratePdfAsync(id);
+        return File(bytes, "application/pdf", "report.pdf");
+    }
+    if (accept.Contains("spreadsheetml"))
+    {
+        var bytes = await _reportService.GenerateExcelAsync(id);
+        return File(bytes, "application/vnd.openxmlformats...", "report.xlsx");
+    }
+
+    return StatusCode(406); // 406 Not Acceptable
+}
+```
+
+---
+
+### Q45. [Topic: ASP.NET Core] How do you secure a Web API endpoint? Name all best practices.
+
+```
+1.  Authentication       → JWT (Okta) — every request needs valid token
+2.  Authorization        → [Authorize(Roles = "IRAdmin")] — RBAC on every endpoint
+3.  HTTPS only           → UseHttpsRedirection + HSTS header
+4.  CORS locked down     → specific origins, never wildcard (*) in production
+5.  Rate limiting        → prevent abuse per tenant/IP
+6.  Input validation     → FluentValidation on all DTOs
+7.  SQL Injection        → EF Core LINQ always — never string SQL concatenation
+8.  No secrets in URLs   → tokens/passwords never in query strings (logged everywhere)
+9.  Secrets in Key Vault → never in appsettings.json
+10. Least privilege DB   → app DB user has SELECT/INSERT/UPDATE only — no DROP/ALTER
+11. Security headers     → X-Content-Type-Options, X-Frame-Options, CSP
+12. Correlation ID       → every request traceable for security audit
+
+// Security headers middleware (Capital Access)
+app.Use(async (ctx, next) =>
+{
+    ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    ctx.Response.Headers["X-Frame-Options"]        = "DENY";
+    ctx.Response.Headers["Referrer-Policy"]        = "no-referrer";
+    await next();
+});
+```
+
+---
+
+### Q46. [Topic: ASP.NET Core] SQL Injection — what is it and how do you prevent it?
+
+```csharp
+// WHAT IT IS: attacker injects SQL code via user input
+string sql = $"SELECT * FROM Users WHERE Name = '{userInput}'";
+// Attacker sends: userInput = "'; DROP TABLE Users; --"
+// Result: SELECT * FROM Users WHERE Name = ''; DROP TABLE Users; --'
+// Table deleted ❌
+
+// PREVENTION 1: EF Core LINQ — always parameterised, injection impossible
+var result = await _context.EngagementActivities
+    .Where(e => e.TenantId == tenantId) // → WHERE TenantId = @p0 ✅
+    .ToListAsync();
+
+// PREVENTION 2: If raw SQL needed — use ExecuteSqlInterpolated (NOT raw)
+await _context.Database.ExecuteSqlInterpolatedAsync(
+    $"EXEC sp_GetEngagements @tenantId = {tenantId}"); // ✅ parameterised
+
+// ❌ NEVER — string concatenation in raw SQL
+await _context.Database.ExecuteSqlRawAsync(
+    $"SELECT * WHERE TenantId = '{tenantId}'"); // VULNERABLE ❌
+```
+
+---
+
+### Q47. [Topic: ASP.NET Core] How do you debug a slow API response?
+
+```
+Step 1 — REPRODUCE: exact endpoint, payload, tenant, time of day
+Step 2 — MEASURE: p50 vs p95 vs p99. Always slow or under load only?
+Step 3 — APP INSIGHTS: distributed trace shows exactly where time is spent
+Step 4 — FIX the specific bottleneck
+Step 5 — VERIFY: measure again after fix
+```
+
+| Root Cause | Fix |
+|---|---|
+| Missing DB index | Add index on WHERE/ORDER BY columns |
+| N+1 query | `.Include()` or `.Select()` projection |
+| No pagination | `.Skip().Take()` + paged response |
+| Sequential awaits | `Task.WhenAll()` for independent calls |
+| No AsNoTracking on reads | Add `.AsNoTracking()` |
+| LOH pressure (large byte[]) | `ArrayPool<byte>` for large buffers |
+| DbContext as Singleton | Fix to Scoped — one per request |
+| Downstream service slow | Cache + circuit breaker (Polly) |
+
+**N+1 — most common EF Core trap:**
+```csharp
+// ❌ 1 query + 1 per activity = 101 queries for 100 activities
+var activities = await _context.EngagementActivities.ToListAsync();
+foreach (var a in activities)
+    Console.WriteLine(a.Attendees.Count); // triggers DB call per activity ❌
+
+// ✅ 1 query with JOIN
+var activities = await _context.EngagementActivities
+    .Include(a => a.Attendees)
+    .ToListAsync();
+
+// ✅ Best — project to DTO (select only what you need)
+var dtos = await _context.EngagementActivities
+    .Select(a => new { a.Id, AttendeeCount = a.Attendees.Count })
+    .ToListAsync(); // COUNT(*) in SQL — no data transfer ✅
+```
+
+---
+
+### Q48. [Topic: ASP.NET Core] What is Clean Architecture and what are its benefits?
+
+```
+Domain Layer      → entities, value objects, domain events, repository INTERFACES
+                   Zero framework dependencies (no EF Core, no HTTP)
+Application Layer → use cases, command/query handlers, DTOs
+                   Depends on Domain only
+Infrastructure    → EF Core, SQL Server, Service Bus, Redis, HttpClient
+                   Implements Domain interfaces
+Presentation      → Controllers, Minimal APIs
+                   Depends on Application layer
+```
+
+**Dependency rule: always inward. Domain knows nothing about EF Core.**
+
+```csharp
+// Domain — zero framework deps, fully unit testable
+public interface IEngagementRepository  // interface here, implementation in Infrastructure
+{
+    Task<EngagementActivity?> GetByIdAsync(Guid id);
+    Task SaveAsync();
+}
+
+// Application — depends on Domain interfaces only
+public class CompleteEngagementHandler
+{
+    private readonly IEngagementRepository _repo; // interface, not EF Core
+    private readonly IEventPublisher _publisher;
+
+    public async Task Handle(CompleteEngagementCommand cmd)
+    {
+        var activity = await _repo.GetByIdAsync(cmd.ActivityId);
+        activity.Complete(cmd.Notes);
+        await _repo.SaveAsync();
+        await _publisher.PublishAsync(new EngagementCompletedEvent(cmd.ActivityId));
+    }
+}
+
+// Infrastructure — EF Core lives HERE only
+public class SqlEngagementRepository : IEngagementRepository
+{
+    private readonly EngagementDbContext _context; // hidden from Domain and Application
+}
+```
+
+**Benefits:**
+```
+1. Domain + Application are fully unit testable — no database, no HTTP needed
+2. Swap EF Core for Dapper → only Infrastructure changes
+3. Swap SQL Server for Cosmos DB → same Domain, different Infrastructure
+4. Controllers stay thin — all logic in Application/Domain
+5. Business rules never leak into Infrastructure
+```
+
+---
+
+### Q49. [Topic: ASP.NET Core] What is your approach to migrate from .NET Framework 4.7 to .NET 8?
+
+**Strangler Fig Pattern — don't rewrite all at once:**
+
+```
+Phase 1: ASSESS
+  Run .NET Upgrade Assistant → scan incompatible packages
+  Identify Windows-only deps (COM, System.Web, HttpContext.Current)
+
+Phase 2: SHARED LIBRARY FIRST
+  Extract domain logic into .NET Standard 2.0 libraries
+  .NET Standard 2.0 works in BOTH Framework 4.7 AND .NET 8
+  Both runtimes reference same business rules during migration
+
+Phase 3: MIGRATE ONE SERVICE AT A TIME
+  Move packages.config → PackageReference format
+  Replace HttpContext.Current → IHttpContextAccessor
+  Replace Unity/Autofac DI → built-in builder.Services
+  Replace ApiController → ControllerBase
+  Replace Global.asax + WebApiConfig → Program.cs
+
+Phase 4: RUN BOTH IN PARALLEL
+  New .NET 8 version handles traffic
+  Old .NET Framework version on standby
+  Feature-flagged traffic split → validate in production
+
+Phase 5: DECOMMISSION old version
+```
+
+**Key code changes:**
+```csharp
+// OLD: Global.asax + WebApiConfig
+public class WebApiApplication : HttpApplication
+{
+    protected void Application_Start()
+    {
+        GlobalConfiguration.Configure(WebApiConfig.Register);
+    }
+}
+
+// NEW: Program.cs — single entry point
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddControllers();
+var app = builder.Build();
+app.MapControllers();
+app.Run();
+
+// OLD: Unity DI
+container.RegisterType<IEngagementRepository, SqlEngagementRepository>(
+    new HierarchicalLifetimeManager());
+
+// NEW: Built-in DI
+builder.Services.AddScoped<IEngagementRepository, SqlEngagementRepository>();
+
+// OLD: System.Web.Http.ApiController
+public class EngagementController : ApiController { }
+
+// NEW: Microsoft.AspNetCore.Mvc.ControllerBase
+public class EngagementController : ControllerBase { }
+// Attributes are the same: [HttpGet], [FromBody], [Route] ✅
+```
+
+> **Interview line**: "We migrated Capital Access from .NET Framework 4.7 monolith to .NET 8 microservices using the strangler fig pattern. We extracted domain logic into .NET Standard 2.0 first so both runtimes could reference the same business rules. Then we replaced Unity with built-in DI, Global.asax with Program.cs, and ApiController with ControllerBase. The reward was 2.5× throughput improvement on the same hardware and the ability to deploy on Linux containers."
+
+---
+
+### Q50. [Topic: ASP.NET Core] Rate Limiting — Middleware vs Infrastructure Layer
+
+Both layers serve DIFFERENT purposes — they are complementary, not redundant.
+
+```
+[Internet]
+    ↓
+[API Gateway / Azure APIM / Cloudflare]   ← Layer 1: Infrastructure Rate Limiting
+    ↓
+[.NET Rate Limiting Middleware]           ← Layer 2: Application Rate Limiting
+    ↓
+[Controller]
+```
+
+**Layer 1 — API Gateway (before request hits your app):**
+```
+- Per IP address: max 1000 requests/minute
+- Per API key: max 10 requests/second
+- Block known bad actors by IP
+- Stop DDoS before wasting any server CPU
+- Cannot see: tenantId, user tier, which endpoint is expensive
+  (JWT not yet validated at this layer)
+```
+
+**Layer 2 — .NET Middleware (after authentication):**
+```csharp
+// KNOWS the tenantId (JWT already validated) — apply business rules
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddPolicy("TenantPolicy", context =>
+    {
+        var tenantId = context.User.FindFirst("tenantId")?.Value;
+        var tier     = context.User.FindFirst("tier")?.Value;
+
+        // Enterprise tenants: 500/min. Standard: 100/min.
+        return tier == "enterprise"
+            ? RateLimitPartition.GetFixedWindowLimiter(tenantId, _ =>
+                new() { PermitLimit = 500, Window = TimeSpan.FromMinutes(1) })
+            : RateLimitPartition.GetFixedWindowLimiter(tenantId, _ =>
+                new() { PermitLimit = 100, Window = TimeSpan.FromMinutes(1) });
+    });
+
+    // Report generation is CPU/memory expensive — stricter limit per endpoint
+    options.AddFixedWindowLimiter("ReportLimit", opt =>
+    {
+        opt.PermitLimit = 5;
+        opt.Window      = TimeSpan.FromMinutes(10); // max 5 reports per 10 min
+    });
+});
+
+[HttpPost("generate")]
+[EnableRateLimiting("ReportLimit")] // per-endpoint limit ✅
+public async Task<IActionResult> GenerateReport([FromBody] ReportRequestDto dto) { }
+```
+
+**Why you need BOTH:**
+```
+Attack 1 — Bot flood from 500 IPs:
+  API Gateway: blocks by IP before reaching .NET ✅ (saves CPU)
+
+Attack 2 — Valid enterprise tenant hammering reports:
+  API Gateway: valid client, passes through ✅
+  .NET middleware: reads tenantId → 5 reports/10min limit → throttled ✅
+  (API Gateway cannot do this — doesn't know which endpoint is expensive)
+```
 
 ## 5. Entity Framework Core
 
