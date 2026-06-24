@@ -150,6 +150,7 @@ flowchart TD
 | **Targeting Service** | Investor targeting scores, peer benchmarking, recommendations | Azure SQL + Redis Cache | Scores are read heavily by the UI — Redis caches top-N targeting results per company for sub-millisecond reads |
 | **Contacts Service** | IR contacts, investor contacts, meeting history, relationships | Azure SQL | Relational by nature — contacts belong to companies, meetings belong to contacts |
 | **Notifications Service** | Ownership change alerts, price movement alerts, delivery status | Azure Table Storage | High-volume write of alert events (cheap, scalable), reads are by user/timerange (partition key fits) |
+| **Engagement & Activity Service** | IR engagement lifecycle — meetings, roadshows, outcomes, follow-up tasks, sentiment scores | Azure SQL (EF Core 8, Code-First) | Deeply relational data (Activity → Attendees → FollowUpTasks), complex aggregate queries for board reporting, ACID transactions for status transitions, EF Core migrations as CI/CD deployment step |
 
 > ⚠️
 > **The Angular SPA calls microservices directly.** Each service exposes its own REST endpoint. Auth is validated at the service level — every service validates the incoming JWT independently against Okta's JWKS (JSON Web Key Set) endpoint. This means: no single point of failure, no gateway bottleneck, and each service scales completely independently. The trade-off is that cross-cutting concerns like rate limiting are handled per-service rather than centrally — we accept that for the scale we operate at.
@@ -1260,6 +1261,330 @@ Answer:
 
 Answer:
         First, the portal's Metrics blade — check normalized RU consumption and 429 throttling rate over time to confirm it's a throughput ceiling issue, not something else like network. Then Data Explorer's Query Stats on the suspect queries to see actual RU charge per call — that usually reveals a query that lost its partition-key filter, or a new access pattern doing cross-partition scans. Fix is either tightening the query to include the partition key, adding a more targeted index, or increasing provisioned RU/s (or moving to autoscale) if the load genuinely grew.
+
+## Deep Dive — EF Core 8 (IR Engagement & Activity Service)
+
+> ℹ️
+> **Where it fits:** The Contacts Service tracks *who* your investors are — contact profiles, scheduled meetings. The Engagement & Activity Service tracks *what happened* — meeting outcomes, discussion notes, follow-up tasks, and engagement effectiveness scores. This "what happened" data feeds the AI Textual Analytics module (sentiment scoring on outcome notes) and drives board-level IR engagement reports.
+
+### Why this service exists
+
+IR teams at public companies run hundreds of investor touchpoints per year — roadshows, non-deal roadshows (NDRs), earnings calls, one-on-one meetings. Capital Access had a gap: the Contacts Service records *that* a meeting was scheduled, but not *what happened* when it occurred. IR teams needed:
+
+1. Structured outcome recording — what was discussed, which investors attended, who no-showed
+2. Follow-up task tracking — materials to send, follow-up meetings to schedule
+3. Engagement effectiveness measurement — correlate investor meetings with ownership changes
+4. Board reporting — quarterly IR activity reports for corporate governance
+
+We built the Engagement & Activity Service as a dedicated microservice with Azure SQL and EF Core 8 (Code-First) as its data access layer.
+
+---
+
+### Code-First vs DB-First — the decision
+
+| | Code-First | DB-First |
+| --- | --- | --- |
+| Schema ownership | C# model classes are the source of truth; EF generates the schema | Existing database is the source of truth; EF generates C# classes from it |
+| Schema changes | EF migrations — tracked in git, applied in CI/CD pipeline | Hand-written DDL scripts or database project |
+| Fits when | Greenfield service, team owns schema evolution | Existing production database, DBA-managed schema |
+| Trade-off | Schema lives with the code — easy to evolve, but needs careful migration discipline | No up-front schema work, but changes are harder to track and automate |
+
+**We chose Code-First.** The Engagement Service is a greenfield microservice — no existing database to reverse-engineer. The product team iterates the data model frequently (new activity types, new engagement dimensions), so migrations tracked in git and auto-applied in CI/CD is far safer than coordinating hand-written DDL with every deploy.
+
+---
+
+### Entity model
+
+```csharp
+// Aggregate root
+public class EngagementActivity
+{
+    public Guid Id { get; private set; }
+    public string TenantId { get; private set; }           // multi-tenancy: every row scoped to a tenant
+    public string CompanyId { get; private set; }           // external reference to Profiles Service
+    public ActivityType ActivityType { get; private set; }
+    public EngagementStatus Status { get; private set; }
+
+    public DateTime ScheduledAt { get; private set; }
+    public DateTime? CompletedAt { get; private set; }
+
+    public string? AgendaNotes { get; private set; }
+    public string? OutcomeNotes { get; private set; }
+
+    public bool IsDeleted { get; private set; }             // soft delete — compliance, audit trail
+    public byte[] RowVersion { get; private set; }          // optimistic concurrency token
+
+    private readonly List<AttendeeRecord> _attendees = new();
+    public IReadOnlyCollection<AttendeeRecord> Attendees => _attendees.AsReadOnly();
+
+    private readonly List<FollowUpTask> _followUpTasks = new();
+    public IReadOnlyCollection<FollowUpTask> FollowUpTasks => _followUpTasks.AsReadOnly();
+
+    // Domain method — state transition with invariant enforcement
+    public void Complete(string outcomeNotes)
+    {
+        if (Status != EngagementStatus.Scheduled)
+            throw new InvalidOperationException("Only scheduled activities can be completed.");
+        Status = EngagementStatus.Completed;
+        CompletedAt = DateTime.UtcNow;
+        OutcomeNotes = outcomeNotes;
+    }
+
+    public void SoftDelete() => IsDeleted = true;
+}
+
+public class AttendeeRecord
+{
+    public Guid Id { get; private set; }
+    public Guid EngagementActivityId { get; private set; } // FK to parent activity
+    public string InvestorContactId { get; private set; }  // external ref to Contacts Service (no cross-DB FK)
+    public AttendanceStatus Attendance { get; private set; }
+    public decimal? SentimentScore { get; private set; }   // populated later by AI Textual Analytics
+}
+
+public class FollowUpTask
+{
+    public Guid Id { get; private set; }
+    public Guid EngagementActivityId { get; private set; }
+    public string TaskType { get; private set; }           // "SendMaterials" | "ScheduleFollowUp" | "ProvideFeedback"
+    public DateTime DueDate { get; private set; }
+    public string AssignedTo { get; private set; }
+    public bool IsCompleted { get; private set; }
+    public bool IsDeleted { get; private set; }
+}
+
+public enum ActivityType  { Roadshow, NDR, EarningsCall, OneOnOne, GroupPresentation }
+public enum EngagementStatus { Scheduled, InProgress, Completed, Cancelled }
+```
+
+---
+
+### DbContext — global query filters for multi-tenancy and soft delete
+
+```csharp
+public class EngagementDbContext : DbContext
+{
+    private readonly string _tenantId;
+
+    // ICurrentTenantService resolves the tenant ID from the HTTP context's JWT claim
+    // DbContext lifetime: Scoped (one instance per HTTP request)
+    public EngagementDbContext(DbContextOptions<EngagementDbContext> options,
+                               ICurrentTenantService tenantService)
+        : base(options)
+    {
+        _tenantId = tenantService.TenantId;
+    }
+
+    public DbSet<EngagementActivity> EngagementActivities => Set<EngagementActivity>();
+    public DbSet<FollowUpTask> FollowUpTasks => Set<FollowUpTask>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        // GLOBAL QUERY FILTER 1 — multi-tenancy
+        // Every LINQ query to EngagementActivities automatically includes:
+        //   AND TenantId = '{_tenantId}' AND IsDeleted = 0
+        // Client A can NEVER see Client B's activities — enforced at the ORM layer.
+        modelBuilder.Entity<EngagementActivity>()
+            .HasQueryFilter(e => e.TenantId == _tenantId && !e.IsDeleted);
+
+        // GLOBAL QUERY FILTER 2 — soft delete on follow-up tasks
+        modelBuilder.Entity<FollowUpTask>()
+            .HasQueryFilter(t => !t.IsDeleted);
+
+        // OPTIMISTIC CONCURRENCY — maps to SQL Server ROWVERSION column
+        // If two users try to complete the same meeting simultaneously,
+        // the second SaveChanges() throws DbUpdateConcurrencyException
+        modelBuilder.Entity<EngagementActivity>()
+            .Property(e => e.RowVersion)
+            .IsRowVersion();
+
+        // Store enum as string — readable in DB, stable if enum integer values change
+        modelBuilder.Entity<EngagementActivity>()
+            .Property(e => e.ActivityType)
+            .HasConversion<string>();
+    }
+}
+
+// Registration in Program.cs (DI):
+builder.Services.AddDbContext<EngagementDbContext>(options =>
+    options.UseSqlServer(connectionString)); // Scoped lifetime by default
+```
+
+---
+
+### Entity states — the change tracker
+
+EF Core's change tracker monitors every entity loaded from the database. On `SaveChanges()`, it generates SQL based on the current state of each tracked entity.
+
+| State | Meaning | SQL on SaveChanges() |
+| --- | --- | --- |
+| **Added** | New entity, not yet persisted | `INSERT` |
+| **Modified** | Loaded from DB, one or more properties changed | `UPDATE` (only changed columns) |
+| **Deleted** | Marked for deletion | `DELETE` |
+| **Unchanged** | Loaded from DB, no changes detected | None |
+| **Detached** | Not being tracked at all | None |
+
+```csharp
+// State walkthrough for completing an engagement meeting:
+
+// Step 1: load entity — State = Unchanged
+var activity = await _context.EngagementActivities
+    .Include(e => e.FollowUpTasks)
+    .FirstOrDefaultAsync(e => e.Id == activityId);
+
+Console.WriteLine(_context.Entry(activity).State); // Unchanged
+
+// Step 2: call domain method — change tracker detects property changes
+activity.Complete(outcomeNotes);
+
+Console.WriteLine(_context.Entry(activity).State); // Modified
+// Change tracker knows: Status, CompletedAt, OutcomeNotes changed
+
+// Step 3: save — EF generates minimal UPDATE:
+//   UPDATE EngagementActivities
+//   SET Status = 'Completed', CompletedAt = @now, OutcomeNotes = @notes
+//   WHERE Id = @id AND RowVersion = @originalVersion  ← optimistic concurrency
+await _context.SaveChangesAsync();
+// If RowVersion changed between load and save → DbUpdateConcurrencyException
+
+// Soft delete (we never issue DELETE for compliance):
+activity.SoftDelete();             // State: Modified (IsDeleted: false → true)
+await _context.SaveChangesAsync(); // UPDATE SET IsDeleted = 1  (NOT a DELETE statement)
+```
+
+---
+
+### Tracking vs No-Tracking queries
+
+```csharp
+// TRACKED (default) — for write operations
+// EF monitors every property. On SaveChanges(), generates precise UPDATE for what changed.
+// Cost: each entity consumes memory in the change tracker.
+public async Task CompleteActivityAsync(Guid activityId, string outcomeNotes)
+{
+    var activity = await _context.EngagementActivities
+        .Include(e => e.FollowUpTasks) // eager load — prevents N+1 on FollowUpTasks
+        .FirstOrDefaultAsync(e => e.Id == activityId);
+    // Global filter applied: WHERE TenantId = '...' AND IsDeleted = 0
+
+    activity.Complete(outcomeNotes);
+    await _context.SaveChangesAsync();
+}
+
+// NO-TRACKING — for read-only report queries
+// AsNoTracking(): EF skips the change-tracking overhead entirely
+// Result: ~30% faster on large result sets, lower memory usage
+// Trade-off: you cannot call SaveChanges() on these entities
+public async Task<List<EngagementSummaryDto>> GetBoardReportDataAsync(string companyId, int year)
+{
+    return await _context.EngagementActivities
+        .AsNoTracking()
+        .Where(e => e.CompanyId == companyId
+                 && e.Status == EngagementStatus.Completed
+                 && e.ScheduledAt.Year == year)
+        .Include(e => e.Attendees)
+        .Select(e => new EngagementSummaryDto  // projection — fetch only needed columns
+        {
+            ActivityId   = e.Id,
+            ActivityType = e.ActivityType.ToString(),
+            CompletedAt  = e.CompletedAt!.Value,
+            AttendeeCount = e.Attendees.Count(a => a.Attendance == AttendanceStatus.Present)
+        })
+        .ToListAsync();
+}
+
+// RULE OF THUMB:
+// Command (create, update, delete) → tracked (default)
+// Query (report, list, display)    → AsNoTracking()
+```
+
+---
+
+### Concurrency — optimistic locking with RowVersion
+
+```csharp
+// Two IR team members open the same roadshow meeting simultaneously.
+// Both click "Mark Complete" — the second one should fail gracefully.
+
+public async Task CompleteActivitySafeAsync(Guid activityId, string notes)
+{
+    try
+    {
+        var activity = await _context.EngagementActivities
+            .FirstOrDefaultAsync(e => e.Id == activityId);
+
+        activity.Complete(notes);
+        await _context.SaveChangesAsync();
+        // EF adds: WHERE Id = @id AND RowVersion = @loadedRowVersion
+        // First save: RowVersion matches → success → DB increments RowVersion
+        // Second save: RowVersion no longer matches → throws DbUpdateConcurrencyException
+    }
+    catch (DbUpdateConcurrencyException ex)
+    {
+        // The row was changed by another user between our load and our save
+        // Options:
+        // 1. Reload and retry (database wins)
+        // 2. Return 409 Conflict to the API caller and let the user decide
+        throw new BusinessException("This meeting was updated by another user. Please refresh.");
+    }
+}
+```
+
+---
+
+### Integration with existing architecture
+
+```
+Angular UI
+    │  POST /api/engagements/{id}/complete
+    ▼
+Engagement Service
+    ├── EF Core: loads EngagementActivity (tracked)
+    ├── Calls activity.Complete(outcomeNotes) → state = Modified
+    ├── SaveChangesAsync() → UPDATE in Azure SQL
+    │
+    │  Publishes EngagementCompletedEvent → Azure Service Bus Topic
+    ▼
+AI Textual Analytics Service (subscribes)
+    ├── Runs sentiment model on OutcomeNotes
+    ├── Calls back: PATCH /api/engagements/{attendeeId}/sentiment
+    └── Engagement Service: updates SentimentScore on AttendeeRecord → SaveChanges()
+
+Report Service (on board-report request)
+    └── Calls GET /api/engagements/board-summary?companyId=&year= → AsNoTracking() query
+```
+
+> ℹ️
+> **No cross-service DB joins.** The AttendeeRecord stores `InvestorContactId` as a plain string ID — not a foreign key into the Contacts Service database. If we need to display investor name + contact details alongside engagement data, we join them in the application layer: load engagement data from the Engagement Service, then hydrate investor details from the Contacts Service via a separate REST call. This maintains data ownership boundaries between microservices.
+
+---
+
+**Q: Why Code-First over DB-First for this service?**
+
+Answer:
+        Code-First was the right choice because the Engagement Service is greenfield — there's no existing database schema to reverse-engineer. The data model evolves with the product: when we added SentimentScore to AttendeeRecord or introduced the FollowUpTask entity, we simply ran `dotnet ef migrations add SentimentScore`, committed the migration file to git, and it ran automatically during the next Azure DevOps deployment pipeline. DB-First would have meant hand-writing DDL scripts for every schema change and coordinating them separately from the application code. Code-First keeps the schema and the code in lockstep, with migrations as the audit trail.
+
+**Q: What is the lifetime DbContext should be registered with and why?**
+
+Answer:
+        Scoped — one DbContext instance per HTTP request. AddDbContext<T>() registers it as Scoped by default, which is correct for a web API. A single request might create a meeting, load it back, update its status, and save — all within one DbContext instance sharing the same change tracker and transaction. If you register it as Singleton, all requests share one instance: change tracker state leaks between requests, concurrent requests corrupt the tracker, and connection pooling assumptions break. If you register it as Transient, you get a new DbContext for every injected service within the same request, so they have separate change trackers and can't participate in the same transaction or see each other's uncommitted changes. Scoped is the only lifetime that gives you one consistent unit of work per request.
+
+**Q: How do global query filters prevent one tenant from seeing another tenant's engagement data?**
+
+Answer:
+        We resolve the tenant ID from the validated JWT at the start of each HTTP request and inject it into the DbContext constructor via ICurrentTenantService. Global query filters on the EngagementActivity entity automatically append `WHERE TenantId = '{tenantId}'` to every LINQ query that touches that table — the developer writing the query doesn't have to remember to filter. Even if someone writes `_context.EngagementActivities.ToListAsync()` with no filter at all, the global filter makes it `WHERE TenantId = 'ClientA' AND IsDeleted = 0`. If a developer does need to bypass the filter — for example, an admin reporting job that runs cross-tenant — they explicitly call `.IgnoreQueryFilters()`, which is a visible opt-out rather than an invisible opt-in. That asymmetry means forgetting to filter is the safe default.
+
+**Q: What is optimistic concurrency and how does RowVersion implement it?**
+
+Answer:
+        Optimistic concurrency assumes conflicts are rare — it doesn't lock the row when you load it, but it checks at save time whether the row changed while you were working. In EF Core, marking a property as `.IsRowVersion()` maps to a SQL Server `ROWVERSION` column that the database auto-increments on every write. When EF generates the UPDATE, it adds `WHERE Id = @id AND RowVersion = @valueWeLoadedEarlier`. If another user saved the row between our load and our save, the RowVersion no longer matches, the UPDATE affects zero rows, and EF throws `DbUpdateConcurrencyException`. In the Engagement Service this protects against two IR team members simultaneously completing the same meeting — one succeeds, the other gets a 409 and is told to refresh. The alternative — pessimistic locking with SELECT FOR UPDATE — holds a database lock for the duration, which is risky on a multi-tenant SaaS under any real concurrent load.
+
+**Q: Why don't you use a Repository pattern wrapping EF Core's DbContext?**
+
+Answer:
+        We deliberated this. The Repository pattern made a lot more sense in the pre-ORM world where it abstracted raw ADO.NET or Dapper calls behind a consistent interface, and especially for testability where you'd swap the repository for an in-memory fake. With EF Core, DbContext already IS a unit of work with change tracking, and DbSet<T> already IS a queryable repository over each entity. Wrapping it in another Repository layer adds indirection without adding value — you end up creating a leaky abstraction where your repository methods gradually accumulate every query variant the application needs, and you lose the composability of IQueryable. We test the data access layer with the EF Core InMemory provider or a dedicated test database (via TestContainers), not by mocking a repository. The team decision was: use DbContext directly in service classes for straightforward cases, extract query objects or specifications only when a specific query becomes complex enough to warrant it.
+
+---
 
 ## Questions to Ask the Interviewer
 
