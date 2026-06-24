@@ -1470,66 +1470,428 @@ Multi-slot projection uses `select` with CSS attribute selectors. Angular 19 als
 
 ### Q17. [Topic: Angular 19] [EPAM] What are Signals in Angular 19 and how do they differ from Observables?
 
-Signals (stable since Angular 17, fully featured in Angular 19) are a reactive primitive for synchronous state. A Signal holds a value and notifies consumers when that value changes.
+#### The problem Signals solve
+
+Before Signals, Angular relied on Zone.js to detect changes — after every async event, it checked the entire component tree to find what changed. This is like asking a librarian to inspect every single book after every customer visit to find the one that was returned.
+
+**Signals make data self-aware.** Instead of Angular going to check if data changed, the data itself says *"I just changed — and here is exactly who needs to know."*
+
+#### Simple mental model — the box with notifications
+
+```
+Regular variable:              Signal:
+┌──────────────┐               ┌────────────────────────────┐
+│  count = 0   │               │  count = signal(0)         │
+└──────────────┘               │  + notifies Angular        │
+                               │    exactly which template  │
+Angular must go CHECK it.      │    expressions use it      │
+                               └────────────────────────────┘
+                               Angular is TOLD when it changes.
+```
+
+Think of it like a **live scoreboard** — you do not keep walking over to check the score. The scoreboard updates itself and everyone watching sees the change immediately.
+
+---
+
+#### The three core primitives
+
+**1. `signal()` — the box that holds a value**
 
 ```typescript
-import { signal, computed, effect } from '@angular/core';
+import { signal } from '@angular/core';
 
-const count = signal(0);
+const count = signal(0);       // create with initial value
 
-console.log(count());          // read: 0
-count.set(5);                  // write: absolute value
-count.update(n => n + 1);     // write: based on previous value
+// READ — call it like a function
+console.log(count());          // 0
 
-const doubled = computed(() => count() * 2);    // derived — lazy and memoized
-effect(() => console.log('Count is:', count())); // side effect — re-runs on change
+// WRITE — set to an absolute value
+count.set(5);
+console.log(count());          // 5
+
+// UPDATE — based on the previous value
+count.update(n => n + 1);
+console.log(count());          // 6
 ```
+
+In a component:
+```typescript
+@Component({
+  template: `
+    <p>Count: {{ count() }}</p>
+    <button (click)="increment()">+1</button>
+    <button (click)="reset()">Reset</button>
+  `
+})
+export class CounterComponent {
+  count = signal(0);
+
+  increment() { this.count.update(n => n + 1); }
+  reset()     { this.count.set(0); }
+}
+// No ngOnInit, no subscribe, no markForCheck — it just works
+```
+
+---
+
+**2. `computed()` — a value derived from other signals**
+
+`computed()` creates a **read-only signal** whose value is automatically calculated from other signals. It is lazy (only calculates when read) and memoized (caches the result, only recalculates when dependencies change).
+
+```typescript
+const price    = signal(100);
+const quantity = signal(3);
+const discount = signal(0.1);
+
+const total = computed(() => price() * quantity() * (1 - discount()));
+
+console.log(total()); // 270
+price.set(200);
+console.log(total()); // 540 — recalculated automatically
+```
+
+Real shopping cart example:
+```typescript
+@Component({
+  template: `
+    <p>Items: {{ itemCount() }}</p>
+    <p>Subtotal: {{ subtotal() | currency }}</p>
+    <p>Tax: {{ tax() | currency }}</p>
+    <p>Total: {{ total() | currency }}</p>
+  `
+})
+export class CartComponent {
+  items   = signal<CartItem[]>([]);
+  taxRate = signal(0.08);
+
+  // All derived — automatically stay in sync
+  itemCount = computed(() => this.items().length);
+  subtotal  = computed(() => this.items().reduce((sum, i) => sum + i.price, 0));
+  tax       = computed(() => this.subtotal() * this.taxRate());
+  total     = computed(() => this.subtotal() + this.tax());
+
+  addItem(item: CartItem) {
+    this.items.update(current => [...current, item]);
+    // itemCount, subtotal, tax, total all update automatically ✅
+  }
+}
+```
+
+---
+
+**3. `effect()` — run code when a signal changes**
+
+`effect()` is a side effect that automatically re-runs whenever any signal it reads changes.
+
+```typescript
+@Component({...})
+export class ThemeComponent {
+  theme = signal<'light' | 'dark'>('light');
+
+  constructor() {
+    // Runs immediately, then re-runs whenever theme() changes
+    effect(() => {
+      document.body.className = this.theme();
+      localStorage.setItem('theme', this.theme());
+    });
+  }
+
+  toggleTheme() {
+    this.theme.update(t => t === 'light' ? 'dark' : 'light');
+  }
+}
+```
+
+**Do/don't with `effect()`:**
+```typescript
+// ❌ Wrong — updating a signal inside effect() causes circular dependencies
+effect(() => {
+  this.total.set(this.price() * this.qty()); // don't do this
+});
+
+// ✅ Right — use computed() for derived values
+total = computed(() => this.price() * this.qty());
+
+// ✅ effect() is for side effects outside Angular's template
+effect(() => {
+  localStorage.setItem('theme', this.theme()); // storage
+  this.analytics.track('theme_changed', this.theme()); // analytics
+  this.thirdPartyLib.setTheme(this.theme()); // external library
+});
+```
+
+---
+
+#### Signal vs regular variable — what actually changes
+
+```typescript
+// Regular variable — Angular must check it every CD cycle
+@Component({ template: `<p>{{ username }}</p>` })
+export class OldComponent {
+  username = 'Alice';
+
+  updateName() {
+    this.username = 'Bob';
+    // Zone.js eventually triggers a full component tree check
+  }
+}
+
+// Signal — Angular knows EXACTLY which expression to update
+@Component({ template: `<p>{{ username() }}</p>` })
+export class NewComponent {
+  username = signal('Alice');
+
+  updateName() {
+    this.username.set('Bob');
+    // Only the one <p> expression re-evaluates — nothing else
+  }
+}
+```
+
+---
+
+#### Bridging Signals and Observables
+
+HTTP returns Observables. Your components use Signals. Two bridge functions connect them.
+
+**`toSignal()` — Observable → Signal (most common bridge):**
+```typescript
+import { toSignal } from '@angular/core/rxjs-interop';
+
+@Component({
+  template: `
+    @if (user()) {
+      <p>{{ user()!.name }}</p>   <!-- no async pipe needed -->
+    }
+  `
+})
+export class ProfileComponent {
+  // Converts Observable to Signal — auto-manages subscription and unsubscription
+  user = toSignal(
+    this.http.get<User>('/api/me'),
+    { initialValue: null }        // value shown before HTTP responds
+  );
+  // No subscribe(), no ngOnDestroy needed
+}
+```
+
+**`toObservable()` — Signal → Observable (when you need RxJS operators):**
+```typescript
+import { toObservable } from '@angular/core/rxjs-interop';
+
+export class SearchComponent {
+  searchTerm = signal('');
+
+  // Convert to Observable to use debounce, switchMap etc.
+  results$ = toObservable(this.searchTerm).pipe(
+    debounceTime(300),
+    distinctUntilChanged(),
+    switchMap(term => this.api.search(term))
+  );
+}
+```
+
+---
+
+#### Real-world complete example
+
+A profile page using signals end-to-end:
+```typescript
+@Component({
+  template: `
+    @if (user()) {
+      <div [class]="theme()">
+        <h2>{{ user()!.name }}</h2>
+        <p>Member for {{ membershipDays() }} days</p>
+        <button (click)="toggleTheme()">Switch Theme</button>
+      </div>
+    }
+  `
+})
+export class ProfileComponent {
+  userId = input.required<number>();         // signal-based input
+  theme  = signal<'light' | 'dark'>('light'); // local state
+
+  // HTTP data bridged to a signal
+  user = toSignal(
+    toObservable(this.userId).pipe(
+      switchMap(id => this.http.get<User>(`/api/users/${id}`))
+    ),
+    { initialValue: null }
+  );
+
+  // Derived — auto-updates when user() changes
+  membershipDays = computed(() => {
+    const u = this.user();
+    if (!u) return 0;
+    return Math.floor((Date.now() - new Date(u.joinedAt).getTime()) / 86400000);
+  });
+
+  constructor(private http: HttpClient) {
+    // Side effect — sync theme to localStorage
+    effect(() => localStorage.setItem('theme', this.theme()));
+  }
+
+  toggleTheme() {
+    this.theme.update(t => t === 'light' ? 'dark' : 'light');
+  }
+}
+```
+
+---
 
 **Signal vs Observable:**
 
 | Dimension | Signal | Observable (RxJS) |
 |---|---|---|
 | Synchrony | Always synchronous | Can be sync or async |
-| Reading current value | `count()` — always available | Requires `.subscribe()` or `.getValue()` (BehaviorSubject only) |
+| Reading current value | `count()` — always available | Requires `.subscribe()` or `.getValue()` |
 | Async operations | Not built-in | Native (HTTP, events, timers) |
 | Memoization | `computed()` is automatic | Requires `shareReplay()` or manual caching |
-| Change Detection integration | Fine-grained, drives zoneless CD | Requires `async` pipe or `markForCheck()` |
+| Change Detection | Fine-grained — only touched expressions update | Requires `async` pipe or `markForCheck()` |
 | Template syntax | `{{ count() }}` | `{{ count$ \| async }}` |
 
-**Rule of thumb in Angular 19**: Use Signals for component and feature state. Use Observables for async data streams (HTTP, WebSockets, timers). Bridge them with `toSignal()` and `toObservable()`.
+```
+Use Signals when:                     Use Observables when:
+──────────────────                    ──────────────────────
+Component / feature state             HTTP requests
+Values displayed in templates         WebSocket streams
+Derived / computed values             Complex operators (debounce, retry)
+Replacing BehaviorSubject             RxJS pipelines
+
+Bridge with:
+  toSignal()      → Observable into Signal (for templates)
+  toObservable()  → Signal into Observable (for RxJS operators)
+```
 
 ---
 
 ### Q18. [Topic: Angular 19] What are signal-based `input()`, `output()`, and `model()` in Angular 19?
 
-Angular 19 provides signal-based equivalents of `@Input()`, `@Output()`, and the two-way `[(x)]` pattern. All are stable in Angular 19.
+Angular 19 provides signal-based equivalents of `@Input()`, `@Output()`, and two-way `[(x)]` binding. All are stable in Angular 19 and the preferred approach for new components.
 
-**`input()` — signal-based input:**
+#### `input()` — signal-based @Input
+
 ```typescript
-@Component({ selector: 'app-user' })
-export class UserComponent {
-  userId = input.required<number>();          // required — compiler error if not provided
-  theme  = input<'light' | 'dark'>('light'); // optional with default
+@Component({ selector: 'app-user-card' })
+export class UserCardComponent {
+  // Required — compiler error if parent does not provide it
+  userId = input.required<number>();
 
-  fullLabel = computed(() => `User #${this.userId()}`); // reactive derived value
+  // Optional with default value
+  theme = input<'light' | 'dark'>('light');
+
+  // Because inputs are signals, you can derive from them directly
+  label     = computed(() => `User #${this.userId()}`);
+  isDark    = computed(() => this.theme() === 'dark');
 }
+
+// Parent usage:
+// <app-user-card [userId]="42" [theme]="'dark'" />
 ```
 
-**`output()` — signal-based output:**
+**`@Input()` vs `input()` comparison:**
 ```typescript
-saved = output<User>(); // no EventEmitter needed
+// Old decorator approach
+@Input() userId!: number;
+// → not a signal, no computed(), requires separate ngOnChanges to react
 
-saveUser() {
-  this.saved.emit(this.form.value);
-}
+// New signal approach
+userId = input.required<number>();
+// → IS a signal, computed() reacts to it, no ngOnChanges needed
+label = computed(() => `User #${this.userId()}`); // auto-updates ✅
 ```
 
-**`model()` — two-way binding signal:**
-```typescript
-value = model(0); // writable from both inside and outside the component
+---
 
-increment() { this.value.update(n => n + 1); }
-// Parent: <app-counter [(value)]="count">
+#### `output()` — signal-based @Output
+
+```typescript
+@Component({ selector: 'app-save-form' })
+export class SaveFormComponent {
+  saved   = output<User>();    // no EventEmitter<User>() needed
+  deleted = output<number>();  // emits the deleted user's id
+
+  onSave(user: User)      { this.saved.emit(user); }
+  onDelete(userId: number){ this.deleted.emit(userId); }
+}
+
+// Parent:
+// <app-save-form (saved)="handleSave($event)" (deleted)="handleDelete($event)" />
+```
+
+---
+
+#### `model()` — two-way binding signal
+
+`model()` creates a signal that is readable and writable from **both inside and outside** the component — perfect for form-like components where the parent wants to bind to the current value.
+
+```typescript
+@Component({
+  selector: 'app-toggle',
+  template: `
+    <button (click)="toggle()">
+      {{ isOn() ? 'ON' : 'OFF' }}
+    </button>
+  `
+})
+export class ToggleComponent {
+  isOn = model(false); // writable from parent and from inside
+
+  toggle() { this.isOn.update(v => !v); } // internal write
+}
+
+// Parent — two-way binding:
+// <app-toggle [(isOn)]="lightSwitch" />
+// lightSwitch updates when user clicks, toggle updates when parent changes lightSwitch
+```
+
+Under the hood `model()` is equivalent to `@Input() + @Output() xChange` — but in one line with Signal benefits.
+
+---
+
+#### All three together in one component
+
+```typescript
+@Component({
+  selector: 'app-quantity-picker',
+  template: `
+    <button (click)="decrement()" [disabled]="value() <= min()">-</button>
+    <span>{{ value() }}</span>
+    <button (click)="increment()" [disabled]="value() >= max()">+</button>
+  `
+})
+export class QuantityPickerComponent {
+  // Inputs
+  min = input(1);
+  max = input(99);
+
+  // Two-way bindable value
+  value = model(1);
+
+  // Output — notifies parent when limits are hit
+  limitReached = output<'min' | 'max'>();
+
+  increment() {
+    if (this.value() < this.max()) {
+      this.value.update(v => v + 1);
+    } else {
+      this.limitReached.emit('max');
+    }
+  }
+
+  decrement() {
+    if (this.value() > this.min()) {
+      this.value.update(v => v - 1);
+    } else {
+      this.limitReached.emit('min');
+    }
+  }
+}
+
+// Parent usage:
+// <app-quantity-picker [min]="1" [max]="10" [(value)]="cartQty"
+//                      (limitReached)="showLimitWarning($event)" />
 ```
 
 ---
