@@ -16,7 +16,7 @@ Progress so far: **5 of 13 services covered.**
 | 8 | Azure Redis Cache | ⏳ Planned |
 | 9 | Azure Blob Storage | ⏳ Planned |
 | 10 | Azure Key Vault | ⏳ Planned |
-| 11 | Azure App Insights | ⏳ Planned |
+| 11 | Azure App Insights (+ Splunk for log search) | ⏳ Planned |
 | 12 | Azure Front Door | ⏳ Planned |
 | 13 | Azure Static Web Apps | ⏳ Planned |
 
@@ -63,7 +63,7 @@ flowchart TD
 
     subgraph SUP["SUPPORTING SERVICES"]
         KV["Azure Key Vault<br/>Secrets · Managed Identity"]
-        AI["Azure App Insights<br/>Distributed tracing"]
+        AI["App Insights + Splunk<br/>Tracing (App Insights) · Log search (Splunk) · shared Correlation ID"]
         CICD["Azure DevOps CI/CD<br/>Pipeline · bundle gate"]
         Lifecycle["Blob Lifecycle Policy<br/>Hot 7d → Cool → Delete 90d"]
         SWA["Azure Static Web Apps<br/>Angular hosting, global CDN"]
@@ -86,7 +86,7 @@ flowchart TD
 
     Rep -- publish --> Queue
     Queue --> Func
-    Func -. "calls all services to aggregate" .-> Targ
+    Func -. "direct REST: aggregates Ownership/Profiles/Targeting/Contacts" .-> Targ
     Func --> Blob
     Func -- "report-ready event" --> Topics
     Blob -. "SAS URL download" .-> SPA

@@ -86,7 +86,7 @@ flowchart TD
 
     subgraph SUP["SUPPORTING SERVICES"]
         KV["Azure Key Vault<br/>Secrets · Managed Identity"]
-        AI["Azure App Insights<br/>Distributed tracing"]
+        AI["App Insights + Splunk<br/>Tracing (App Insights) · Log search (Splunk) · shared Correlation ID"]
         CICD["Azure DevOps CI/CD<br/>Pipeline · bundle gate"]
         Lifecycle["Blob Lifecycle Policy<br/>Hot 7d → Cool → Delete 90d"]
         SWA["Azure Static Web Apps<br/>Angular hosting, global CDN"]
@@ -109,7 +109,7 @@ flowchart TD
 
     Rep -- publish --> Queue
     Queue --> Func
-    Func -. "calls all services to aggregate" .-> Targ
+    Func -. "direct REST: aggregates Ownership/Profiles/Targeting/Contacts" .-> Targ
     Func --> Blob
     Func -- "report-ready event" --> Topics
     Blob -. "SAS URL download" .-> SPA
@@ -157,7 +157,51 @@ flowchart TD
 | **Engagement & Activity Service** | IR engagement lifecycle — meetings, roadshows, outcomes, follow-up tasks, sentiment scores | Azure SQL (EF Core 8, Code-First) | Deeply relational data (Activity → Attendees → FollowUpTasks), complex aggregate queries for board reporting, ACID transactions for status transitions, EF Core migrations as CI/CD deployment step |
 
 > ℹ️
-> **The Angular SPA talks to a single API Gateway, not directly to individual microservices.** Every request from the SPA carries the Bearer JWT and is sent to the Gateway's URL. The Gateway (Azure API Management) validates the JWT signature against Okta's JWKS, checks the tenant and role claims, applies rate limiting, and routes the request to the correct downstream microservice. Individual microservices trust the Gateway for SPA-originated traffic and don't need to re-implement that check on every request. The exception is service-to-service traffic that bypasses the Gateway entirely — for example the Report Worker (Azure Function) calling Targeting/Profiles/Contacts directly to aggregate data — those calls still validate the JWT independently against Okta's JWKS as a defense-in-depth measure, since they're not coming through the Gateway's boundary.
+> **The Angular SPA talks to a single API Gateway, not directly to individual microservices.** Every request from the SPA carries the Bearer JWT and is sent to the Gateway's URL. The Gateway (Azure API Management) validates the JWT signature against Okta's JWKS, checks the tenant and role claims, applies rate limiting, and routes the request to the correct downstream microservice. Individual microservices trust the Gateway for SPA-originated traffic and don't need to re-implement that check on every request. The exception is service-to-service traffic that bypasses the Gateway entirely — for example the Report Worker (Azure Function) calling Ownership/Profiles/Targeting/Contacts directly to aggregate data — those calls still validate the JWT independently against Okta's JWKS as a defense-in-depth measure, since they're not coming through the Gateway's boundary.
+
+## Service-to-Service Communication Patterns
+
+The architecture diagram shows the SPA → Gateway → services path and the Service Bus fan-out clearly, but it deliberately doesn't draw a separate arrow for every direct service-to-service call — that would turn the diagram into spaghetti. There are really three distinct patterns in play, and which one applies depends on what kind of communication it is.
+
+| Pattern | Where it's used | How it works | Trust / auth model |
+| --- | --- | --- | --- |
+| **Synchronous direct REST** | Report Worker (Azure Function) → Ownership, Profiles, Targeting, Contacts — aggregating data to build one report | The Function calls each service's REST endpoint directly, bypassing the Gateway entirely, and waits for the response before moving to the next step | Each call carries the JWT that originated the report request; since it didn't come through the Gateway, the receiving service validates that JWT itself against Okta's JWKS (defense-in-depth) |
+| **Asynchronous pub/sub (Service Bus Topics)** | Ownership changes → Targeting + Notifications; profile updates → Targeting; report-ready → Notifications | Publisher fires one event to a Topic; every Subscription on that Topic gets its own independent copy — publisher and subscribers never call each other directly | No per-request JWT check between services — trust is the Service Bus namespace boundary itself (network/IAM), with tenant ID carried inside the event payload and re-validated wherever it's used downstream |
+| **Task queue (Service Bus Queue)** | Report Service → report-generation-queue → Azure Function | Exactly one worker instance picks up and processes each queued job message | Same trust model as Topics — tenant ID and requesting user's context travel inside the queued message, not as a live JWT on a direct call |
+
+> ℹ️
+> **Why direct REST for the Report Worker specifically:** by the time the Function runs, it already has the full request context (tenant, jobId, which company) and needs synchronous answers right now to assemble one report — there's no "event" to publish, just data it needs to fetch immediately from four different owners. Pub/sub is reserved for the opposite case: multiple independent consumers reacting to a state change without being coupled to the producer or to each other.
+
+## Logging & Observability — App Insights + Splunk
+
+Two tools, two different jobs, tied together by one Correlation ID.
+
+```
+App Insights (distributed tracing / APM):
+  Auto-instruments each microservice via its SDK
+  On every incoming request, reads or creates a Correlation ID (W3C Trace Context header)
+  That same Correlation ID is propagated on every downstream call the service makes —
+    both synchronous REST calls AND Service Bus messages
+  Gives you: the trace TIMELINE — which service called which, how long each hop took,
+    where an exception was thrown, dependency call latency (e.g. SQL query took 120ms)
+
+Splunk (centralized log aggregation):
+  Every microservice ships structured logs (info/warn/error + payload context)
+  Each log line is stamped with the SAME Correlation ID that App Insights is propagating
+  Gives you: the actual LOG CONTENT — full request/response bodies, custom log
+    messages, stack traces — searchable across every service in one query
+  Also where ops dashboards and alerting live (error rate spikes, DLQ growth, etc.)
+
+In practice, debugging a production issue:
+  1. User reports a problem around a specific time / for a specific report job
+  2. Pull the Correlation ID from the App Insights trace (or from the initial log line)
+  3. Search that Correlation ID in Splunk → every log line, every service, one place
+  4. Cross-reference back to App Insights if you need the TIMING view (which hop was slow)
+    vs. Splunk for the CONTENT view (what exactly did each service log)
+```
+
+> ℹ️
+> **Why both, not just one:** App Insights is excellent at "what's slow and where" — the trace graph — but it isn't built as a general-purpose log search tool across arbitrary structured fields. Splunk is excellent at "search everything, build a dashboard, alert on a pattern" but doesn't give you the automatic distributed-trace timeline out of the box. Using both, joined by a shared Correlation ID, gives you both views without forcing one tool to do the other's job.
 
 Not all communication is synchronous. When ownership data changes, multiple downstream services need to react. We use **Azure Service Bus Topics** (pub/sub model) for this.
 
@@ -231,7 +275,8 @@ Angular 18 SPA (Azure Static Web Apps)
 | Azure Redis Cache | Targeting score caching | Sub-millisecond reads, cache-aside pattern, TTL-based auto-expiry |
 | Azure Blob Storage | Reports, exports, documents | Cheap, scalable object storage for non-queryable binary files |
 | Azure Key Vault | Secrets management | No connection strings in code or config files — services fetch secrets at runtime |
-| Azure App Insights | Distributed tracing | Correlation IDs trace a single user request across 3+ microservices |
+| Azure App Insights | Distributed tracing / APM | Auto-instruments each service, propagates Correlation ID (W3C Trace Context), gives the timing/dependency view of one request across services |
+| Splunk | Centralized log aggregation | Every service ships structured logs tagged with the same Correlation ID — the first place engineers search during an incident, across all services in one query |
 | Azure Front Door | CDN + WAF + load balancing | Global edge, DDoS protection, SSL termination at the edge |
 | Azure Static Web Apps | Hosting Angular SPA | Built-in CDN, CI/CD integration, free SSL, global distribution |
 | Azure Functions | Report Worker (serverless) | Queue-triggered, auto-scales to queue depth, no idle server cost, aggregates data from all services and generates PDF/Excel reports |
@@ -683,7 +728,12 @@ Answer:
 **Q: Q: How do you trace a request across 3–4 microservices when debugging?**
 
 Answer:
-        Azure Application Insights with distributed tracing. Every service is instrumented with the App Insights SDK. When a request arrives at any service, it reads or creates a correlation ID (W3C Trace Context header). This correlation ID is passed through every downstream call — both synchronous REST calls and the Service Bus messages. In App Insights, I can search by correlation ID and see the full end-to-end trace: Angular SPA → Targeting Service (50ms) → Redis cache miss → Azure SQL query (120ms) → response. If the Targeting Service also triggered a Service Bus event, that leg of the trace is linked too. Without this, debugging a slow request across microservices would be guesswork. With App Insights, the entire call chain is one query away.
+        Two tools working together. Azure Application Insights gives the timing view — every service is instrumented with the App Insights SDK, and when a request arrives it reads or creates a Correlation ID (W3C Trace Context header) that's passed through every downstream call, both synchronous REST calls and Service Bus messages. In App Insights I can search by Correlation ID and see the full end-to-end trace with timing: Angular SPA → Targeting Service (50ms) → Redis cache miss → Azure SQL query (120ms) → response. Splunk gives the content view — every service also ships structured logs tagged with that same Correlation ID, so I can search Splunk for that ID and pull the actual log lines, request/response payloads, and stack traces from every service involved, not just the timing graph. In practice: App Insights tells me which hop was slow, Splunk tells me exactly what happened on that hop.
+
+**Q: Q: Why isn't every service-to-service call shown as its own arrow in the architecture diagram?**
+
+Answer:
+        To keep the diagram readable, but the calls are real and there are three distinct patterns. The Report Worker uses direct synchronous REST to Ownership, Profiles, Targeting, and Contacts — it bypasses the Gateway entirely because it's calling on behalf of an already-authenticated request and needs answers immediately to assemble a report; each of those services validates the JWT itself via Okta's JWKS since the call didn't come through the Gateway. Ownership and profile changes use Service Bus Topics — pub/sub, no direct call at all, just an event that Targeting and Notifications each independently subscribe to. Report generation uses a Service Bus Queue — a task handed to exactly one worker. I'd draw the distinction this way in an interview: direct REST when you need an answer right now and already have full context, pub/sub when multiple independent consumers need to react to a state change, a queue when exactly one worker should do a piece of work exactly once.
 
 **Q: Q: How are secrets managed — connection strings, API keys?**
 

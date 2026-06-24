@@ -326,7 +326,7 @@ I work as a Lead Software Development Engineer on the frontend using Angular 18.
       <rect x="586" y="524" width="366" height="70" rx="6" fill="#6B21A8" stroke="#4A1570" stroke-width="1.5"/>
       <text x="769" y="544" fill="#E9D5FF" font-size="11" font-weight="bold" text-anchor="middle">Azure Function  (Report Worker)</text>
       <text x="769" y="559" fill="#fff"    font-size="9"  text-anchor="middle">Queue Trigger · Serverless · auto-scales to queue depth</text>
-      <text x="769" y="574" fill="#D8B4FE" font-size="9"  text-anchor="middle">Calls all 5 services → aggregates data → generates PDF / Excel</text>
+      <text x="769" y="574" fill="#D8B4FE" font-size="9"  text-anchor="middle">Calls Ownership/Profiles/Targeting/Contacts → aggregates → PDF/Excel</text>
       <text x="769" y="589" fill="#D8B4FE" font-size="8.5" text-anchor="middle">Uploads to Blob → updates job status → publishes report-ready event</text>
 
       <!-- ── BLOB STORAGE ── -->
@@ -385,8 +385,8 @@ I work as a Lead Software Development Engineer on the frontend using Angular 18.
       <text x="93"  y="789" fill="#CCC" font-size="8.5" text-anchor="middle">Secrets · Managed Identity</text>
 
       <rect x="188" y="759" width="195" height="38" rx="5" fill="#525252" stroke="#333"/>
-      <text x="285" y="775" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Azure App Insights</text>
-      <text x="285" y="789" fill="#CCC" font-size="8.5" text-anchor="middle">Distributed tracing · Correlation ID</text>
+      <text x="285" y="775" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">App Insights + Splunk</text>
+      <text x="285" y="789" fill="#CCC" font-size="8.5" text-anchor="middle">Tracing (App Insights) · Log search (Splunk) · shared Correlation ID</text>
 
       <rect x="393" y="759" width="172" height="38" rx="5" fill="#525252" stroke="#333"/>
       <text x="479" y="775" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Azure DevOps CI/CD</text>
@@ -439,7 +439,7 @@ I work as a Lead Software Development Engineer on the frontend using Angular 18.
 
       <!-- Azure Function data aggregation (calls services — curved arrow left) -->
       <path d="M 586 559 C 480 559 380 559 380 512 C 380 467 380 432 394 416 L 394 408" stroke="#6B21A8" stroke-width="1" stroke-dasharray="3,2" fill="none" marker-end="url(#ap)"/>
-      <text x="460" y="556" fill="#6B21A8" font-size="8" text-anchor="middle">calls all services to aggregate data</text>
+      <text x="460" y="556" fill="#6B21A8" font-size="8" text-anchor="middle">direct REST → Ownership/Profiles/Targeting/Contacts (bypasses Gateway)</text>
 
       <!-- Azure Function → Blob Storage -->
       <line x1="769" y1="594" x2="769" y2="604" stroke="#1D4ED8" stroke-width="1.8" marker-end="url(#ab)"/>
@@ -473,7 +473,7 @@ I work as a Lead Software Development Engineer on the frontend using Angular 18.
 
       <text x="755" y="834" fill="#555" font-size="8.5">✓ Gateway validates JWT (SPA traffic) · services self-validate direct calls</text>
       <text x="755" y="848" fill="#555" font-size="8.5">✓ Secrets from Key Vault (Managed Identity)</text>
-      <text x="755" y="862" fill="#555" font-size="8.5">✓ Traced via App Insights Correlation ID</text>
+      <text x="755" y="862" fill="#555" font-size="8.5">✓ Correlation ID: App Insights trace + Splunk log search</text>
       <text x="755" y="876" fill="#555" font-size="8.5">✓ Blob Lifecycle: Hot → Cool → Delete auto</text>
     </svg>
     </div>
@@ -489,7 +489,42 @@ I work as a Lead Software Development Engineer on the frontend using Angular 18.
     </table>
 
     <h3>API Gateway — Single Entry Point</h3>
-    <div class="callout blue"><strong>The Angular SPA talks to a single API Gateway, not directly to individual microservices.</strong> Every request from the SPA carries the Bearer JWT and is sent to the Gateway's URL. The Gateway validates the JWT signature against Okta's JWKS, checks the tenant and role claims, applies rate limiting, and routes the request to the correct downstream microservice. Individual microservices trust the Gateway for SPA-originated traffic and don't need to re-implement that check on every request. The exception is service-to-service traffic that bypasses the Gateway entirely — for example the Report Worker (Azure Function) calling Targeting/Profiles/Contacts directly to aggregate data — those calls still validate the JWT independently against Okta's JWKS as a defense-in-depth measure, since they're not coming through the Gateway's boundary.</div>
+    <div class="callout blue"><strong>The Angular SPA talks to a single API Gateway, not directly to individual microservices.</strong> Every request from the SPA carries the Bearer JWT and is sent to the Gateway's URL. The Gateway validates the JWT signature against Okta's JWKS, checks the tenant and role claims, applies rate limiting, and routes the request to the correct downstream microservice. Individual microservices trust the Gateway for SPA-originated traffic and don't need to re-implement that check on every request. The exception is service-to-service traffic that bypasses the Gateway entirely — for example the Report Worker (Azure Function) calling Ownership/Profiles/Targeting/Contacts directly to aggregate data — those calls still validate the JWT independently against Okta's JWKS as a defense-in-depth measure, since they're not coming through the Gateway's boundary.</div>
+
+    <h3>Service-to-Service Communication Patterns</h3>
+    <p>The architecture diagram shows the SPA → Gateway → services path and the Service Bus fan-out clearly, but it deliberately doesn't draw a separate arrow for every direct service-to-service call — that would turn the diagram into spaghetti. There are really three distinct patterns in play, and which one applies depends on what kind of communication it is.</p>
+    <table>
+      <tr><th>Pattern</th><th>Where it's used</th><th>How it works</th><th>Trust / auth model</th></tr>
+      <tr><td><strong>Synchronous direct REST</strong></td><td>Report Worker (Azure Function) → Ownership, Profiles, Targeting, Contacts — aggregating data to build one report</td><td>The Function calls each service's REST endpoint directly, bypassing the Gateway entirely, and waits for the response before moving to the next step</td><td>Each call carries the JWT that originated the report request; since it didn't come through the Gateway, the receiving service validates that JWT itself against Okta's JWKS (defense-in-depth)</td></tr>
+      <tr><td><strong>Asynchronous pub/sub (Service Bus Topics)</strong></td><td>Ownership changes → Targeting + Notifications; profile updates → Targeting; report-ready → Notifications</td><td>Publisher fires one event to a Topic; every Subscription on that Topic gets its own independent copy — publisher and subscribers never call each other directly</td><td>No per-request JWT check between services — trust is the Service Bus namespace boundary itself (network/IAM), with tenant ID carried inside the event payload and re-validated wherever it's used downstream</td></tr>
+      <tr><td><strong>Task queue (Service Bus Queue)</strong></td><td>Report Service → report-generation-queue → Azure Function</td><td>Exactly one worker instance picks up and processes each queued job message</td><td>Same trust model as Topics — tenant ID and requesting user's context travel inside the queued message, not as a live JWT on a direct call</td></tr>
+    </table>
+    <div class="callout blue"><strong>Why direct REST for the Report Worker specifically:</strong> by the time the Function runs, it already has the full request context (tenant, jobId, which company) and needs synchronous answers right now to assemble one report — there's no "event" to publish, just data it needs to fetch immediately from four different owners. Pub/sub is reserved for the opposite case: multiple independent consumers reacting to a state change without being coupled to the producer or to each other.</div>
+
+    <h3>Logging &amp; Observability — App Insights + Splunk</h3>
+    <p>Two tools, two different jobs, tied together by one Correlation ID.</p>
+    <div class="flow">App Insights (distributed tracing / APM):
+  Auto-instruments each microservice via its SDK
+  On every incoming request, reads or creates a Correlation ID (W3C Trace Context header)
+  That same Correlation ID is propagated on every downstream call the service makes —
+    both synchronous REST calls AND Service Bus messages
+  Gives you: the trace TIMELINE — which service called which, how long each hop took,
+    where an exception was thrown, dependency call latency (e.g. SQL query took 120ms)
+
+Splunk (centralized log aggregation):
+  Every microservice ships structured logs (info/warn/error + payload context)
+  Each log line is stamped with the SAME Correlation ID that App Insights is propagating
+  Gives you: the actual LOG CONTENT — full request/response bodies, custom log
+    messages, stack traces — searchable across every service in one query
+  Also where ops dashboards and alerting live (error rate spikes, DLQ growth, etc.)
+
+In practice, debugging a production issue:
+  1. User reports a problem around a specific time / for a specific report job
+  2. Pull the Correlation ID from the App Insights trace (or from the initial log line)
+  3. Search that Correlation ID in Splunk → every log line, every service, one place
+  4. Cross-reference back to App Insights if you need the TIMING view (which hop was slow)
+    vs. Splunk for the CONTENT view (what exactly did each service log)</div>
+    <div class="callout blue"><strong>Why both, not just one:</strong> App Insights is excellent at "what's slow and where" — the trace graph — but it isn't built as a general-purpose log search tool across arbitrary structured fields. Splunk is excellent at "search everything, build a dashboard, alert on a pattern" but doesn't give you the automatic distributed-trace timeline out of the box. Using both, joined by a shared Correlation ID, gives you both views without forcing one tool to do the other's job.</div>
 
     <h3>Async Communication — Azure Service Bus</h3>
     <p>Not all communication is synchronous. When ownership data changes, multiple downstream services need to react. We use <strong>Azure Service Bus Topics</strong> (pub/sub model) for this.</p>
@@ -558,7 +593,8 @@ Invalidation:
       <tr><td>Azure Redis Cache</td><td>Targeting score caching</td><td>Sub-millisecond reads, cache-aside pattern, TTL-based auto-expiry</td></tr>
       <tr><td>Azure Blob Storage</td><td>Reports, exports, documents</td><td>Cheap, scalable object storage for non-queryable binary files</td></tr>
       <tr><td>Azure Key Vault</td><td>Secrets management</td><td>No connection strings in code or config files — services fetch secrets at runtime</td></tr>
-      <tr><td>Azure App Insights</td><td>Distributed tracing</td><td>Correlation IDs trace a single user request across 3+ microservices</td></tr>
+      <tr><td>Azure App Insights</td><td>Distributed tracing / APM</td><td>Auto-instruments each service, propagates Correlation ID (W3C Trace Context), gives the timing/dependency view of one request across services</td></tr>
+      <tr><td>Splunk</td><td>Centralized log aggregation</td><td>Every service ships structured logs tagged with the same Correlation ID — the first place engineers search during an incident, across all services in one query</td></tr>
       <tr><td>Azure Front Door</td><td>CDN + WAF + load balancing</td><td>Global edge, DDoS protection, SSL termination at the edge</td></tr>
       <tr><td>Azure API Management (Gateway)</td><td>Single entry point for the SPA</td><td>Centralised JWT/tenant-claim validation, rate limiting, and routing instead of duplicating auth logic in every service for SPA-originated traffic</td></tr>
       <tr><td>Azure Static Web Apps</td><td>Hosting Angular SPA</td><td>Built-in CDN, CI/CD integration, free SSL, global distribution</td></tr>
@@ -1139,7 +1175,15 @@ The 30% bundle reduction meant the initial page load dropped noticeably for clie
       <div class="qa-q">Q: How do you trace a request across 3–4 microservices when debugging?</div>
       <div class="qa-a">
         <span class="label">Answer:</span>
-        Azure Application Insights with distributed tracing. Every service is instrumented with the App Insights SDK. When a request arrives at any service, it reads or creates a correlation ID (W3C Trace Context header). This correlation ID is passed through every downstream call — both synchronous REST calls and the Service Bus messages. In App Insights, I can search by correlation ID and see the full end-to-end trace: Angular SPA → Targeting Service (50ms) → Redis cache miss → Azure SQL query (120ms) → response. If the Targeting Service also triggered a Service Bus event, that leg of the trace is linked too. Without this, debugging a slow request across microservices would be guesswork. With App Insights, the entire call chain is one query away.
+        Two tools working together. Azure Application Insights gives the timing view — every service is instrumented with the App Insights SDK, and when a request arrives it reads or creates a Correlation ID (W3C Trace Context header) that's passed through every downstream call, both synchronous REST calls and Service Bus messages. In App Insights I can search by Correlation ID and see the full end-to-end trace with timing: Angular SPA → Targeting Service (50ms) → Redis cache miss → Azure SQL query (120ms) → response. Splunk gives the content view — every service also ships structured logs tagged with that same Correlation ID, so I can search Splunk for that ID and pull the actual log lines, request/response payloads, and stack traces from every service involved, not just the timing graph. In practice: App Insights tells me which hop was slow, Splunk tells me exactly what happened on that hop.
+      </div>
+    </div>
+
+    <div class="qa">
+      <div class="qa-q">Q: Why isn't every service-to-service call shown as its own arrow in the architecture diagram?</div>
+      <div class="qa-a">
+        <span class="label">Answer:</span>
+        To keep the diagram readable, but the calls are real and there are three distinct patterns. The Report Worker uses direct synchronous REST to Ownership, Profiles, Targeting, and Contacts — it bypasses the Gateway entirely because it's calling on behalf of an already-authenticated request and needs answers immediately to assemble a report; each of those services validates the JWT itself via Okta's JWKS since the call didn't come through the Gateway. Ownership and profile changes use Service Bus Topics — pub/sub, no direct call at all, just an event that Targeting and Notifications each independently subscribe to. Report generation uses a Service Bus Queue — a task handed to exactly one worker. I'd draw the distinction this way in an interview: direct REST when you need an answer right now and already have full context, pub/sub when multiple independent consumers need to react to a state change, a queue when exactly one worker should do a piece of work exactly once.
       </div>
     </div>
 
@@ -1834,79 +1878,4 @@ await container.UpsertItemAsync(record, new PartitionKey(record.CompanyId));</di
       <div class="qa-a">
         <span class="label">Answer:</span>
         Five levels: Strong, Bounded Staleness, Session (the default), Consistent Prefix, and Eventual — a tradeoff between consistency, latency, availability, and throughput. For ownership data, Session consistency is right: within a single client session you always read your own latest writes, but you're not paying the cross-region latency cost of Strong consistency, which ownership reporting doesn't need.
-      </div>
-    </div>
-
-    <div class="qa">
-      <div class="qa-q">Q: Cosmos DB supports multiple APIs — Core/SQL, MongoDB, Cassandra, Gremlin, Table. Why Core/SQL here?</div>
-      <div class="qa-a">
-        <span class="label">Answer:</span>
-        It's the native, default model — document-based, queried with SQL-like syntax, with full first-class SDK support in .NET. The other APIs mainly exist for migration scenarios — you already have a Mongo or Cassandra app and want to move to Cosmos without rewriting the data access layer. We're greenfield on Azure with a .NET stack, so there's no migration constraint pulling toward another API.
-      </div>
-    </div>
-
-    <div class="qa">
-      <div class="qa-q">Scenario: A teammate suggests partitioning the container by "quarter" instead of "companyId," since quarter is simpler. What's your concern?</div>
-      <div class="qa-a">
-        <span class="label">Answer:</span>
-        That creates a hot partition. Every company's data for the current quarter would land on the same partition, so during the heaviest ingestion period — quarter-end, when every data provider sends updates — all writes pile onto one partition's throughput budget while other partitions sit idle. Cosmos can't fix this after the fact; partition key choice is fixed at container creation. I'd confirm the real query pattern is "by company," which it is, and keep companyId as the partition key.
-      </div>
-      <div class="qa-tip">This is the most common Cosmos scenario question — always frame your answer around the actual read/write pattern, not a "simpler-sounding" key.</div>
-    </div>
-
-    <div class="qa">
-      <div class="qa-q">Scenario: Your report generation job calls the same Cosmos write twice due to a Service Bus message redelivery (at-least-once delivery). What breaks, and how do you prevent it?</div>
-      <div class="qa-a">
-        <span class="label">Answer:</span>
-        If the code uses CreateItemAsync, the second call throws a 409 Conflict, since the same id already exists in that partition — a safety net, but it needs explicit handling or the retry looks like a failure. The cleaner fix is UpsertItemAsync instead of CreateItemAsync for this kind of pipeline — insert-or-replace is naturally idempotent, so redelivery just overwrites the same document with the same data, no error, no special-casing needed.
-      </div>
-    </div>
-
-    <div class="qa">
-      <div class="qa-q">Scenario: A new feature needs "show every ownership change across all companies in the last 24 hours" — inherently cross-company. How do you support that without a slow cross-partition scan every time?</div>
-      <div class="qa-a">
-        <span class="label">Answer:</span>
-        I'd reach for the Change Feed instead of querying the container directly. It gives a continuous, ordered stream of inserts/updates per partition, which a separate Azure Function or dedicated reader can consume continuously and push into a separate summary container or downstream queue purpose-built for that "last 24 hours, all companies" shape. That turns an expensive ad-hoc cross-partition query into a cheap, pre-computed read path.
-      </div>
-    </div>
-
-    <div class="qa">
-      <div class="qa-q">Scenario: RU consumption is suddenly spiking and reports are timing out. How would you diagnose it?</div>
-      <div class="qa-a">
-        <span class="label">Answer:</span>
-        First, the portal's Metrics blade — check normalized RU consumption and 429 throttling rate over time to confirm it's a throughput ceiling issue, not something else like network. Then Data Explorer's Query Stats on the suspect queries to see actual RU charge per call — that usually reveals a query that lost its partition-key filter, or a new access pattern doing cross-partition scans. Fix is either tightening the query to include the partition key, adding a more targeted index, or increasing provisioned RU/s (or moving to autoscale) if the load genuinely grew.
-      </div>
-    </div>
-
-  </div>
-
-
-  <!-- ===================== SECTION 10 ===================== -->
-  <div class="section" id="s10">
-    <div class="section-header">
-      <div class="snum teal">10</div>
-      <h2 class="stitle">Questions to Ask the Interviewer</h2>
-    </div>
-
-    <div class="callout blue"><strong>Always ask 2–3 good questions.</strong> It shows genuine interest. Pick ones relevant to what they've discussed.</div>
-
-    <table>
-      <tr><th>Question</th><th>Why it's good</th></tr>
-      <tr><td>"How is the front-end team structured — are engineers aligned to features or to platform layers?"</td><td>Shows you care about team dynamics and working model</td></tr>
-      <tr><td>"What's the biggest technical debt the front-end team is dealing with right now?"</td><td>Gets real info about the actual codebase state</td></tr>
-      <tr><td>"How does the team balance new feature delivery with performance and security hardening?"</td><td>Shows maturity — you know both sides of the coin matter</td></tr>
-      <tr><td>"Is there a path toward micro-frontends or module federation, or is a monorepo SPA the long-term direction?"</td><td>Senior-level question about architectural roadmap</td></tr>
-      <tr><td>"How does accessibility compliance get validated — automated only or manual audits too?"</td><td>Relevant to regulated financial enterprise software</td></tr>
-    </table>
-  </div>
-
-  <div class="summary-box">
-    <h4>📌 The Four Things to Remember</h4>
-    1. <strong>You know the full stack</strong> — Angular 18 frontend + 5 named microservices + Azure Service Bus + Cosmos DB + Redis + Key Vault. Don't speak in vague terms — name the services.<br><br>
-    2. <strong>Every Azure service choice has a reason</strong> — Cosmos DB for time-series, SQL for relational, Redis for read performance, Service Bus Topics for fan-out events, Key Vault for secrets. Know the why for each.<br><br>
-    3. <strong>Client-side is UX, server-side is security</strong> — when asked about auth guards, JWT validation, or role access: always say both layers exist and explain which one is the real security boundary.<br><br>
-    4. <strong>You own, you don't just contribute</strong> — auth flow, bundle optimisation, CI/CD gates, and architecture decisions. Frame everything as ownership with measurable impact.
-  </div>
-
-  <div style="text-align:center; color:#888; font-size:12px; padding: 20px 0;">
-    📍 D:\Learning\Study Material · Capital Acc
+   
