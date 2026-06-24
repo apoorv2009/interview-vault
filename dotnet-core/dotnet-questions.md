@@ -1506,6 +1506,454 @@ public class EngagementService
 // readonly → runtime, any type, per-instance, set in constructor only
 ```
 
+### Q25. [Topic: C#] ref, out, in Parameters — Pass by Reference
+
+```csharp
+// ref — caller passes variable BY REFERENCE. Method can READ and WRITE the original.
+// Variable MUST be initialised before passing.
+public void ApplyDiscount(ref decimal price, decimal discountPercent)
+{
+    price = price * (1 - discountPercent / 100); // modifies original variable
+}
+
+decimal score = 100m;
+ApplyDiscount(ref score, 10);
+Console.WriteLine(score); // 90 — original was modified ✅
+
+// out — method MUST write to it before returning. Variable need NOT be initialised.
+// Capital Access — TryGet pattern avoids KeyNotFoundException
+public bool TryGetEngagement(Guid id, out EngagementActivity? activity)
+{
+    activity = _store.FirstOrDefault(e => e.Id == id); // must assign before return
+    return activity is not null;
+}
+
+// Clean usage — no exception handling needed
+if (TryGetEngagement(id, out var activity))
+{
+    activity.Complete(notes); // activity is not null here — safe ✅
+}
+
+// in — passes by reference but READ-ONLY. Method cannot modify the value.
+// Use for large structs to avoid copying without allowing modification.
+public decimal CalculateScore(in EngagementMetrics metrics)
+{
+    // metrics.TotalMeetings = 0; // ❌ compile error — in is read-only
+    return metrics.TotalMeetings * 10m + metrics.UniqueInvestors * 5m;
+}
+
+EngagementMetrics m = new(TotalMeetings: 5, UniqueInvestors: 3);
+CalculateScore(in m); // passed by reference, no copy, cannot be modified ✅
+```
+
+| | `ref` | `out` | `in` |
+|---|---|---|---|
+| Direction | Read + Write | Write only (output) | Read only |
+| Pre-initialised? | Must be | Not required | Must be |
+| Method must assign? | No | Yes | N/A |
+| Use case | Modify caller's variable | Return multiple values | Large struct, avoid copy |
+
+---
+
+### Q26. [Topic: C#] Pattern Matching — switch expressions, property patterns
+
+```csharp
+// IS PATTERN — type check + variable declaration in one line
+public string Describe(object item)
+{
+    if (item is EngagementActivity eng)          // type check + variable
+        return $"Engagement: {eng.Status}";
+
+    if (item is FollowUpTask task && !task.IsCompleted) // type + condition
+        return $"Pending task due {task.DueDate:d}";
+
+    if (item is null)                            // null check
+        return "Nothing";
+
+    return "Unknown";
+}
+
+// SWITCH EXPRESSION — clean multi-branch, returns a value
+public string GetStatusLabel(EngagementStatus status) => status switch
+{
+    EngagementStatus.Scheduled  => "Upcoming",
+    EngagementStatus.Completed  => "Done",
+    EngagementStatus.Cancelled  => "Cancelled",
+    _                           => "Unknown"    // default
+};
+
+// PROPERTY PATTERN — match on specific property values
+public decimal GetEngagementScore(EngagementActivity a) => a switch
+{
+    { Status: EngagementStatus.Completed, ActivityType: ActivityType.Roadshow }
+        => 100m,   // roadshow completed = max score
+    { Status: EngagementStatus.Completed }
+        => 75m,    // other completed activity
+    { Status: EngagementStatus.Cancelled }
+        => 0m,     // cancelled = no score
+    _   => 25m     // default (scheduled/in-progress)
+};
+
+// TUPLE PATTERN — match on multiple values together
+public string GetReportGenerator(string format, bool isLarge) => (format, isLarge) switch
+{
+    ("pdf",   true)  => "HeavyPdfGenerator",
+    ("pdf",   false) => "LightPdfGenerator",
+    ("excel", _)     => "ExcelGenerator",
+    ("csv",   _)     => "CsvGenerator",
+    _                => throw new ArgumentException($"Unknown format: {format}")
+};
+
+// Capital Access — pattern matching in report orchestrator removes all if/else
+public IReportGenerator SelectGenerator(ReportRequest req) => req switch
+{
+    { Format: "pdf",   PageCount: > 50 } => _pdfHeavyGenerator,
+    { Format: "pdf"                     } => _pdfLightGenerator,
+    { Format: "excel"                   } => _excelGenerator,
+    _ => throw new NotSupportedException($"Format {req.Format} not supported")
+};
+```
+
+> **Interview line**: "Pattern matching replaced a chain of if/else type checks and property comparisons in our report orchestrator. The property pattern `{ Format: "pdf", PageCount: > 50 }` reads like a specification — the compiler generates the same IL as the explicit if/else, but the code is far more readable and exhaustive (compiler warns if you miss a case)."
+
+---
+
+### Q27. [Topic: C#] Memory Leaks in .NET — Causes and How to Find Them
+
+Even with a GC, memory leaks happen when objects stay reachable (referenced) but are no longer needed. GC cannot collect objects that still have references.
+
+**Cause 1 — Event handlers not unsubscribed (most common):**
+```csharp
+// Publisher holds a reference to subscriber through the event delegate
+// If subscriber is not unsubscribed → publisher keeps subscriber alive forever
+public class OwnershipAlertService
+{
+    public event EventHandler<OwnershipChangedEvent>? OwnershipChanged;
+}
+
+public class NotificationPanel
+{
+    public NotificationPanel(OwnershipAlertService alertService)
+    {
+        // Subscribe — alertService now holds a reference to THIS component
+        alertService.OwnershipChanged += OnOwnershipChanged; // ❌ leak if never removed
+    }
+
+    private void OnOwnershipChanged(object? s, OwnershipChangedEvent e) { ... }
+
+    // FIX — unsubscribe when component is disposed
+    public void Dispose()
+    {
+        _alertService.OwnershipChanged -= OnOwnershipChanged; // ✅ release reference
+    }
+}
+```
+
+**Cause 2 — Static collections accumulating data:**
+```csharp
+// Static field lives for the entire app lifetime
+private static readonly List<EngagementActivity> _auditLog = new();
+
+public void TrackActivity(EngagementActivity activity)
+{
+    _auditLog.Add(activity); // ❌ grows forever — nothing ever removes items
+}
+// After weeks of production: millions of entries, GBs of memory
+// FIX: use IMemoryCache with expiry, or cap the list size
+```
+
+**Cause 3 — IDisposable objects not disposed:**
+```csharp
+// DbContext, HttpClient, SqlConnection — all hold unmanaged resources
+// If not disposed → connections stay open, resources leak
+public async Task GetData()
+{
+    var context = new EngagementDbContext(options); // ❌ not in using block
+    var results = await context.EngagementActivities.ToListAsync();
+    // context never disposed → DB connection stays open ❌
+}
+
+// FIX
+using var context = new EngagementDbContext(options); // disposed automatically ✅
+```
+
+**Cause 4 — Unbounded cache:**
+```csharp
+private static Dictionary<string, ReportData> _cache = new();
+
+public void Cache(string key, ReportData data)
+{
+    _cache[key] = data; // ❌ never expires, never evicts → grows forever
+}
+// FIX: use IMemoryCache with SlidingExpiration
+_memoryCache.Set(key, data, new MemoryCacheEntryOptions
+{
+    SlidingExpiration = TimeSpan.FromMinutes(30) // auto-evict unused entries ✅
+});
+```
+
+**Cause 5 — Closures capturing large objects:**
+```csharp
+public Func<string> CreateFormatter(List<ReportData> allReports)
+{
+    // Lambda captures 'allReports' — keeps entire list alive as long as lambda lives
+    return () => allReports.Count.ToString(); // ❌ allReports = potentially GBs
+}
+// FIX: capture only what you need
+var count = allReports.Count;
+return () => count.ToString(); // captures int only ✅
+```
+
+**How to detect memory leaks:**
+```
+1. dotnet-counters — CLI tool to watch GC heap size in real time
+   dotnet-counters monitor --process-id <pid> System.Runtime
+
+2. dotnet-dump — capture heap dump on high memory
+   dotnet-dump collect --process-id <pid>
+   dotnet-dump analyze <dump-file>
+
+3. Azure App Insights — memory usage metrics, alerts on Gen2 GC pressure
+
+4. Visual Studio Diagnostic Tools — .NET Object Allocation Tracking
+   (shows which types are holding the most memory)
+
+Capital Access: We set up App Insights alerts when managed heap > 1.5GB
+When triggered: dotnet-dump → analyze → look for unexpected EngagementActivity
+instances that should have been collected but are still referenced
+```
+
+> **Interview line**: "The most common memory leak we faced in Capital Access was event handler subscriptions. The Service Bus event dispatcher held references to all subscribers via delegates. When a new subscriber registered but never unregistered, it prevented GC collection. We fixed it by implementing IDisposable on subscribers and unsubscribing in Dispose(). We detect leaks via App Insights GC Gen2 heap alerts and dotnet-dump analysis."
+
+---
+
+### Q28. [Topic: C#] TaskCompletionSource — Bridging Callbacks to async/await
+
+`TaskCompletionSource<T>` lets you manually control when a Task completes. It bridges old callback-based or event-based APIs with the modern async/await model.
+
+```csharp
+// Problem: old callback-based API — not awaitable
+public void GetDataWithCallback(string query, Action<ReportData> onSuccess, Action<Exception> onError)
+{
+    // legacy code that calls onSuccess or onError when done
+}
+
+// Without TaskCompletionSource — can't use await
+var data = GetDataWithCallback(query, ...); // ❌ returns void, can't await
+
+// WITH TaskCompletionSource — wrap callback API to make it awaitable
+public Task<ReportData> GetDataAsync(string query)
+{
+    var tcs = new TaskCompletionSource<ReportData>();
+
+    GetDataWithCallback(
+        query,
+        onSuccess: result => tcs.SetResult(result),       // Task completes with value ✅
+        onError: ex => tcs.SetException(ex)               // Task completes with error ✅
+    );
+
+    return tcs.Task; // caller can await this
+}
+
+// Now it's awaitable
+var data = await GetDataAsync("SELECT ...");
+```
+
+**Capital Access — waiting for an external signal:**
+```csharp
+// Report generation is async — Azure Function processes it and sends a Service Bus message
+// API needs to wait for completion without polling
+public class ReportCompletionTracker
+{
+    private readonly ConcurrentDictionary<Guid, TaskCompletionSource<ReportResult>> _pending = new();
+
+    // Called when report job is submitted
+    public Task<ReportResult> WaitForCompletionAsync(Guid jobId, CancellationToken ct)
+    {
+        var tcs = new TaskCompletionSource<ReportResult>();
+        _pending[jobId] = tcs;
+
+        // Cancel when token fires
+        ct.Register(() => tcs.TrySetCanceled());
+
+        return tcs.Task; // caller awaits this — suspended until SetResult called
+    }
+
+    // Called when Service Bus delivers completion message
+    public void OnReportCompleted(Guid jobId, ReportResult result)
+    {
+        if (_pending.TryRemove(jobId, out var tcs))
+            tcs.SetResult(result); // waiting caller resumes here ✅
+    }
+}
+```
+
+**Key methods on TaskCompletionSource:**
+```csharp
+tcs.SetResult(value);         // complete successfully with a value
+tcs.SetException(ex);         // complete with an exception
+tcs.SetCanceled();            // complete as cancelled
+
+// "Try" variants — won't throw if already completed (use when multiple paths can complete)
+tcs.TrySetResult(value);
+tcs.TrySetException(ex);
+tcs.TrySetCanceled();
+```
+
+> **Interview line**: "TaskCompletionSource is the bridge between callback-based legacy code and async/await. In Capital Access, report generation is handed off to an Azure Durable Function. The API submits the job and the client polls for status. When the function completes, it publishes a Service Bus message. Our completion tracker uses TaskCompletionSource so the long-polling endpoint can genuinely await the result without a busy loop."
+
+---
+
+### Q29. [Topic: C#] How was DI implemented before .NET Core? (.NET Framework 4.7)
+
+.NET Framework 4.7 had **no built-in DI container**. Teams used third-party IoC containers:
+
+```
+Unity        → Microsoft's own library (separate NuGet)
+Autofac      → most popular, feature-rich
+Ninject      → annotation-based
+Castle Windsor → enterprise, convention-based
+StructureMap → older, still used in legacy apps
+```
+
+**How it worked with Unity in WebAPI (old way):**
+```csharp
+// Global.asax.cs — app startup
+public class WebApiApplication : HttpApplication
+{
+    protected void Application_Start()
+    {
+        var container = new UnityContainer();
+
+        // Manual registration — no extension methods, no builder pattern
+        container.RegisterType<IEngagementRepository, SqlEngagementRepository>(
+            new HierarchicalLifetimeManager()); // = Scoped equivalent
+
+        container.RegisterType<INotificationSender, EmailNotificationSender>(
+            new ContainerControlledLifetimeManager()); // = Singleton equivalent
+
+        container.RegisterType<IEngagementService, EngagementService>(
+            new TransientLifetimeManager()); // = Transient equivalent
+
+        // Wire up Web API to use this container
+        GlobalConfiguration.Configuration.DependencyResolver =
+            new UnityDependencyResolver(container);
+    }
+}
+```
+
+**Lifetime mapping old → new:**
+```
+Unity                             .NET Core equivalent
+ContainerControlledLifetimeManager  → Singleton
+HierarchicalLifetimeManager         → Scoped (one per request)
+TransientLifetimeManager            → Transient
+PerRequestLifetimeManager           → Scoped (via HTTP module)
+```
+
+**.NET Core / .NET 8 — built-in, no third-party needed:**
+```csharp
+// Program.cs — clean, no ceremony
+builder.Services.AddScoped<IEngagementRepository, SqlEngagementRepository>();
+builder.Services.AddSingleton<IMemoryCache, MemoryCache>();
+builder.Services.AddTransient<IEmailFormatter, HtmlEmailFormatter>();
+// No separate container. No DependencyResolver. No Global.asax.
+```
+
+**Why .NET Core DI is preferred:**
+- Built in — no extra NuGet dependency
+- Integrated with ASP.NET Core pipeline (middleware, controllers, background services)
+- Better diagnostics — scoped validation enabled by default in dev
+- Third-party containers (Autofac, etc.) still work via `IServiceProviderFactory` if needed
+
+> **Interview line**: "In .NET Framework projects I worked with Unity. You'd manually register every type in Application_Start and wire it to GlobalConfiguration.DependencyResolver. .NET Core brought DI as a first-class citizen — builder.Services.AddScoped is cleaner, integrates with the pipeline, and validates scope violations in development automatically. Moving from Unity to the built-in container was one of the wins when we migrated Capital Access from .NET Framework."
+
+---
+
+### Q30. [Topic: C#] Default Interface Methods vs Abstract Class (C# 8+)
+
+**Default interface methods** (C# 8+) allow an interface to provide a default implementation for a method, so existing implementations don't break when a new method is added.
+
+```csharp
+// BEFORE C# 8 — adding a method to an interface BREAKS all implementations
+public interface IReportGenerator
+{
+    Task<byte[]> GenerateAsync(ReportData data);
+    // Adding this NEW method → ALL existing implementations fail to compile:
+    string GetSupportedFormats(); // ❌ breaks PdfReportGenerator, ExcelReportGenerator...
+}
+
+// C# 8+ DEFAULT INTERFACE METHOD — existing implementations are not broken
+public interface IReportGenerator
+{
+    Task<byte[]> GenerateAsync(ReportData data);
+
+    // Default implementation — existing classes don't need to implement this
+    string GetSupportedFormats() => "Check documentation"; // default ✅
+
+    // Static methods in interfaces (C# 8+) — factory/utility methods
+    static IReportGenerator CreateDefault() => new PdfReportGenerator();
+}
+
+// Existing class — compiles fine without implementing GetSupportedFormats
+public class PdfReportGenerator : IReportGenerator
+{
+    public async Task<byte[]> GenerateAsync(ReportData data) { /* ... */ }
+    // GetSupportedFormats uses default — or can override:
+    public string GetSupportedFormats() => "pdf, pdf/a"; // optional override ✅
+}
+```
+
+**Default Interface Methods vs Abstract Class — when to use which:**
+
+```csharp
+// ABSTRACT CLASS — use when: shared state (fields), shared implementation, related hierarchy
+public abstract class BaseReportGenerator
+{
+    protected readonly ILogger _logger;           // fields — interfaces can't have these
+    protected readonly string _tenantId;
+
+    protected BaseReportGenerator(ILogger logger, string tenantId)
+    {
+        _logger = logger; _tenantId = tenantId;   // constructor — interfaces can't have this
+    }
+
+    // Shared implementation all generators use
+    protected void LogGeneration(string format)
+        => _logger.LogInformation("[{Tenant}] Generating {Format} report", _tenantId, format);
+
+    public abstract Task<byte[]> GenerateAsync(ReportData data); // child must implement
+}
+
+// DEFAULT INTERFACE METHOD — use when: evolving an existing interface without breaking changes
+// OR adding optional/utility behaviour to an interface
+public interface IExportable
+{
+    Task<byte[]> ExportAsync(ExportFormat format);
+
+    // Optional behaviour — implementors can override or use the default
+    string GetFileExtension(ExportFormat format) => format switch
+    {
+        ExportFormat.Pdf   => ".pdf",
+        ExportFormat.Excel => ".xlsx",
+        _                  => ".dat"
+    };
+}
+```
+
+| | Abstract Class | Default Interface Method |
+|---|---|---|
+| Can have fields? | ✅ Yes | ❌ No |
+| Can have constructor? | ✅ Yes | ❌ No |
+| Multiple inheritance? | ❌ One parent only | ✅ Implement many interfaces |
+| Shared state? | ✅ Yes | ❌ No |
+| Versioning (add without breaking)? | ❌ Adding abstract method breaks children | ✅ Add default = no break |
+| Use for | Shared implementation + state | Evolving interfaces, optional capability |
+
+> **Interview line**: "Default interface methods solve the interface versioning problem. Before C# 8, adding any method to a published interface broke every class that implemented it — a serious issue in a library or microservice contract. In Capital Access, we added a GetSupportedFormats() method to IReportGenerator with a default implementation. All existing generators continued to work. New generators can override it to return accurate format info. We'd use abstract class instead if the generators needed shared logger or tenant context fields."
+
+---
+
 ## 4. .NET Core & ASP.NET Core
 
 <!-- Content added in next session -->
