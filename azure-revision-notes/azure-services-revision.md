@@ -31,8 +31,9 @@ flowchart TD
     Okta["Okta<br/>OIDC Identity Provider · JWT · Custom claims (tenant, roles)"]
     FD["Azure Front Door + CDN<br/>Load balancing · WAF · DDoS · SSL termination"]
     SPA["Angular 18 SPA (Azure Static Web Apps)<br/>Standalone Components · NgRx · Okta Auth SDK · Role Guards"]
+    GW["Azure API Management — Gateway<br/>Validates JWT + tenant/role claims · Rate limiting · Routes to microservices"]
 
-    subgraph MS["MICROSERVICES — each validates JWT independently via Okta JWKS"]
+    subgraph MS["MICROSERVICES — trust Gateway-validated JWT for SPA traffic; self-validate via Okta JWKS for direct service-to-service calls"]
         Own["Ownership Service<br/>Institutional ownership %, history<br/>publishes → Service Bus"]
         Prof["Profiles Service<br/>Company profiles, financials<br/>publishes → Service Bus"]
         Targ["Targeting Service<br/>Investor scores, recommendations<br/>Redis cached, &lt;5ms reads<br/>subscribes ← Service Bus"]
@@ -70,12 +71,13 @@ flowchart TD
 
     Okta -- JWT --> FD
     FD --> SPA
-    SPA -- "REST Bearer JWT" --> Own
-    SPA -- "REST Bearer JWT" --> Prof
-    SPA -- "REST Bearer JWT" --> Targ
-    SPA -- "REST Bearer JWT" --> Cont
-    SPA -- "REST Bearer JWT" --> Notif
-    SPA -- "REST Bearer JWT" --> Rep
+    SPA -- "REST Bearer JWT" --> GW
+    GW -- "Routed (JWT validated)" --> Own
+    GW -- "Routed (JWT validated)" --> Prof
+    GW -- "Routed (JWT validated)" --> Targ
+    GW -- "Routed (JWT validated)" --> Cont
+    GW -- "Routed (JWT validated)" --> Notif
+    GW -- "Routed (JWT validated)" --> Rep
 
     Own -- publish --> Topics
     Prof -- publish --> Topics
@@ -99,6 +101,7 @@ flowchart TD
     classDef identity fill:#007DC1,color:#fff,stroke:#005A9E
     classDef edge fill:#0078D4,color:#fff,stroke:#005A9E
     classDef frontend fill:#B91C1C,color:#fff,stroke:#7F1010
+    classDef gateway fill:#0F766E,color:#fff,stroke:#0B5A54
     classDef svc fill:#003057,color:#fff,stroke:#001933
     classDef report fill:#14532D,color:#fff,stroke:#0A3A1E
     classDef bus fill:#92400E,color:#fff,stroke:#5C2800
@@ -111,6 +114,7 @@ flowchart TD
     class Okta identity
     class FD edge
     class SPA frontend
+    class GW gateway
     class Own,Prof,Targ,Cont,Notif svc
     class Rep report
     class Topics,Queue bus
@@ -120,7 +124,7 @@ flowchart TD
     class KV,AI,CICD,Lifecycle,SWA support
 ```
 
-The story in one breath: a user logs in through **Okta**, hits the SPA through **Front Door**, calls microservices directly (no gateway — each service trusts the JWT on its own). Ownership and profile changes fan out through **Service Bus Topics** to whoever cares. Report requests go through a **Service Bus Queue** to a single **Azure Function**, which has grown into a **Durable Functions** orchestration so the multi-step PDF pipeline survives crashes. Each microservice owns its own store, and **Cosmos DB** specifically holds the high-volume ownership time-series data because of its write pattern and partition-key fit.
+The story in one breath: a user logs in through **Okta**, hits the SPA through **Front Door**, and every SPA request is routed through the **Azure API Management Gateway**, which validates the JWT and tenant/role claims once and routes to the right microservice — individual services trust that for SPA traffic but still self-validate the JWT via Okta's JWKS for direct service-to-service calls (defense-in-depth). Ownership and profile changes fan out through **Service Bus Topics** to whoever cares. Report requests go through a **Service Bus Queue** to a single **Azure Function**, which has grown into a **Durable Functions** orchestration so the multi-step PDF pipeline survives crashes. Each microservice owns its own store, and **Cosmos DB** specifically holds the high-volume ownership time-series data because of its write pattern and partition-key fit.
 
 ---
 

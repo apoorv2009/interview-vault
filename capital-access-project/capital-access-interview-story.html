@@ -195,7 +195,7 @@ I work as a Lead Software Development Engineer on the frontend using Angular 18.
 
     <h3>Full System Architecture — Visual Diagram</h3>
     <div style="overflow-x:auto;margin:12px 0;">
-    <svg viewBox="0 0 960 830" xmlns="http://www.w3.org/2000/svg" style="width:100%;min-width:700px;font-family:Arial,sans-serif;display:block;">
+    <svg viewBox="0 0 960 902" xmlns="http://www.w3.org/2000/svg" style="width:100%;min-width:700px;font-family:Arial,sans-serif;display:block;">
       <defs>
         <marker id="ab" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#0066A1"/></marker>
         <marker id="ao" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#B85200"/></marker>
@@ -210,18 +210,18 @@ I work as a Lead Software Development Engineer on the frontend using Angular 18.
       <text x="12" y="81" fill="#888" font-size="9" font-weight="bold">EDGE</text>
       <rect x="2" y="138" width="956" height="70"  rx="8" fill="#FEF0F2" stroke="#F5C6CB" stroke-width="1"/>
       <text x="12" y="149" fill="#888" font-size="9" font-weight="bold">FRONTEND</text>
-      <rect x="2" y="214" width="956" height="130" rx="8" fill="#EEF2EE" stroke="#C3D9C3" stroke-width="1"/>
-      <text x="12" y="225" fill="#888" font-size="9" font-weight="bold">MICROSERVICES  ·  each service validates JWT independently via Okta JWKS endpoint</text>
-      <rect x="2" y="350" width="956" height="88"  rx="8" fill="#FFF3E0" stroke="#FFCC80" stroke-width="1"/>
-      <text x="12" y="361" fill="#888" font-size="9" font-weight="bold">ASYNC MESSAGING — Azure Service Bus</text>
-      <rect x="2" y="444" width="956" height="138" rx="8" fill="#F5EEF8" stroke="#D8BEF8" stroke-width="1"/>
-      <text x="12" y="455" fill="#888" font-size="9" font-weight="bold">REPORT GENERATION — Azure Function (serverless, auto-scales) + Blob Storage</text>
-      <rect x="2" y="588" width="956" height="85"  rx="8" fill="#EAF4F0" stroke="#A9DFC0" stroke-width="1"/>
-      <text x="12" y="599" fill="#888" font-size="9" font-weight="bold">DATA STORES  ·  each service owns its own — no shared DB</text>
-      <rect x="2" y="679" width="956" height="52"  rx="8" fill="#F5F5F5" stroke="#DCDCDC" stroke-width="1"/>
-      <text x="12" y="690" fill="#888" font-size="9" font-weight="bold">SUPPORTING SERVICES</text>
-      <rect x="2" y="737" width="956" height="88"  rx="8" fill="#FAFAFA" stroke="#E0E0E0" stroke-width="1"/>
-      <text x="12" y="748" fill="#555" font-size="9" font-weight="bold">LEGEND</text>
+      <rect x="2" y="286" width="956" height="130" rx="8" fill="#EEF2EE" stroke="#C3D9C3" stroke-width="1"/>
+      <text x="12" y="297" fill="#888" font-size="9" font-weight="bold">MICROSERVICES  ·  trust Gateway-validated JWT for SPA traffic; self-validate via Okta JWKS for direct service-to-service calls</text>
+      <rect x="2" y="422" width="956" height="88"  rx="8" fill="#FFF3E0" stroke="#FFCC80" stroke-width="1"/>
+      <text x="12" y="433" fill="#888" font-size="9" font-weight="bold">ASYNC MESSAGING — Azure Service Bus</text>
+      <rect x="2" y="516" width="956" height="138" rx="8" fill="#F5EEF8" stroke="#D8BEF8" stroke-width="1"/>
+      <text x="12" y="527" fill="#888" font-size="9" font-weight="bold">REPORT GENERATION — Azure Function (serverless, auto-scales) + Blob Storage</text>
+      <rect x="2" y="660" width="956" height="85"  rx="8" fill="#EAF4F0" stroke="#A9DFC0" stroke-width="1"/>
+      <text x="12" y="671" fill="#888" font-size="9" font-weight="bold">DATA STORES  ·  each service owns its own — no shared DB</text>
+      <rect x="2" y="751" width="956" height="52"  rx="8" fill="#F5F5F5" stroke="#DCDCDC" stroke-width="1"/>
+      <text x="12" y="762" fill="#888" font-size="9" font-weight="bold">SUPPORTING SERVICES</text>
+      <rect x="2" y="809" width="956" height="88"  rx="8" fill="#FAFAFA" stroke="#E0E0E0" stroke-width="1"/>
+      <text x="12" y="820" fill="#555" font-size="9" font-weight="bold">LEGEND</text>
 
       <!-- ── OKTA ── -->
       <rect x="370" y="10" width="220" height="46" rx="7" fill="#007DC1" stroke="#005A9E" stroke-width="1.5"/>
@@ -238,158 +238,167 @@ I work as a Lead Software Development Engineer on the frontend using Angular 18.
       <text x="480" y="168" fill="#fff" font-size="13" font-weight="bold" text-anchor="middle">Angular 18 SPA  (Azure Static Web Apps)</text>
       <text x="480" y="185" fill="#FFCDD2" font-size="10" text-anchor="middle">Standalone Components · NgRx · Okta Auth SDK · HTTP Interceptor (Bearer JWT) · Role Guards · Lazy Modules</text>
 
+      <!-- ── API GATEWAY BAND ── -->
+      <rect x="2" y="210" width="956" height="68" rx="8" fill="#E6F7F5" stroke="#A8E0DA" stroke-width="1"/>
+      <text x="12" y="221" fill="#888" font-size="9" font-weight="bold">API GATEWAY  ·  single entry point for SPA traffic</text>
+
+      <!-- ── API GATEWAY ── -->
+      <rect x="270" y="224" width="420" height="46" rx="7" fill="#0F766E" stroke="#0B5A54" stroke-width="1.5"/>
+      <text x="480" y="245" fill="#fff" font-size="12" font-weight="bold" text-anchor="middle">Azure API Management — Gateway</text>
+      <text x="480" y="261" fill="#99F6E4" font-size="9.5" text-anchor="middle">Validates JWT + tenant/role claims · Rate limiting · Routes to microservices</text>
+
       <!-- ── 6 SERVICE BOXES  w=148 gap=8  xs: 8,164,320,476,632,788 ── -->
       <!-- Ownership -->
-      <rect x="8"   y="232" width="148" height="104" rx="6" fill="#003057" stroke="#001933" stroke-width="1.5"/>
-      <text x="82"  y="252" fill="#7FBFFF" font-size="11" font-weight="bold" text-anchor="middle">Ownership</text>
-      <text x="82"  y="265" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
-      <line x1="8" y1="272" x2="156" y2="272" stroke="#1A4A6E" stroke-width="1"/>
-      <text x="82"  y="284" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Institutional ownership %</text>
-      <text x="82"  y="296" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Historical data by quarter</text>
-      <text x="82"  y="308" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Change tracking</text>
-      <text x="82"  y="328" fill="#4ADE80" font-size="8"   text-anchor="middle">publishes → Service Bus</text>
+      <rect x="8"   y="304" width="148" height="104" rx="6" fill="#003057" stroke="#001933" stroke-width="1.5"/>
+      <text x="82"  y="324" fill="#7FBFFF" font-size="11" font-weight="bold" text-anchor="middle">Ownership</text>
+      <text x="82"  y="337" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
+      <line x1="8" y1="344" x2="156" y2="344" stroke="#1A4A6E" stroke-width="1"/>
+      <text x="82"  y="356" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Institutional ownership %</text>
+      <text x="82"  y="368" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Historical data by quarter</text>
+      <text x="82"  y="380" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Change tracking</text>
+      <text x="82"  y="400" fill="#4ADE80" font-size="8"   text-anchor="middle">publishes → Service Bus</text>
 
       <!-- Profiles -->
-      <rect x="164" y="232" width="148" height="104" rx="6" fill="#003057" stroke="#001933" stroke-width="1.5"/>
-      <text x="238" y="252" fill="#7FBFFF" font-size="11" font-weight="bold" text-anchor="middle">Profiles</text>
-      <text x="238" y="265" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
-      <line x1="164" y1="272" x2="312" y2="272" stroke="#1A4A6E" stroke-width="1"/>
-      <text x="238" y="284" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Company profiles</text>
-      <text x="238" y="296" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Financials · Sector</text>
-      <text x="238" y="308" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Market cap · IR team</text>
-      <text x="238" y="328" fill="#4ADE80" font-size="8"   text-anchor="middle">publishes → Service Bus</text>
+      <rect x="164" y="304" width="148" height="104" rx="6" fill="#003057" stroke="#001933" stroke-width="1.5"/>
+      <text x="238" y="324" fill="#7FBFFF" font-size="11" font-weight="bold" text-anchor="middle">Profiles</text>
+      <text x="238" y="337" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
+      <line x1="164" y1="344" x2="312" y2="344" stroke="#1A4A6E" stroke-width="1"/>
+      <text x="238" y="356" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Company profiles</text>
+      <text x="238" y="368" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Financials · Sector</text>
+      <text x="238" y="380" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Market cap · IR team</text>
+      <text x="238" y="400" fill="#4ADE80" font-size="8"   text-anchor="middle">publishes → Service Bus</text>
 
       <!-- Targeting -->
-      <rect x="320" y="232" width="148" height="104" rx="6" fill="#003057" stroke="#001933" stroke-width="1.5"/>
-      <text x="394" y="252" fill="#7FBFFF" font-size="11" font-weight="bold" text-anchor="middle">Targeting</text>
-      <text x="394" y="265" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
-      <line x1="320" y1="272" x2="468" y2="272" stroke="#1A4A6E" stroke-width="1"/>
-      <text x="394" y="284" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Investor scores</text>
-      <text x="394" y="296" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Recommendations</text>
-      <text x="394" y="308" fill="#FCD34D" font-size="8"   text-anchor="middle">Redis cached &lt;5ms reads</text>
-      <text x="394" y="328" fill="#FCA5A5" font-size="8"   text-anchor="middle">subscribes ← Service Bus</text>
+      <rect x="320" y="304" width="148" height="104" rx="6" fill="#003057" stroke="#001933" stroke-width="1.5"/>
+      <text x="394" y="324" fill="#7FBFFF" font-size="11" font-weight="bold" text-anchor="middle">Targeting</text>
+      <text x="394" y="337" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
+      <line x1="320" y1="344" x2="468" y2="344" stroke="#1A4A6E" stroke-width="1"/>
+      <text x="394" y="356" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Investor scores</text>
+      <text x="394" y="368" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Recommendations</text>
+      <text x="394" y="380" fill="#FCD34D" font-size="8"   text-anchor="middle">Redis cached &lt;5ms reads</text>
+      <text x="394" y="400" fill="#FCA5A5" font-size="8"   text-anchor="middle">subscribes ← Service Bus</text>
 
       <!-- Contacts -->
-      <rect x="476" y="232" width="148" height="104" rx="6" fill="#003057" stroke="#001933" stroke-width="1.5"/>
-      <text x="550" y="252" fill="#7FBFFF" font-size="11" font-weight="bold" text-anchor="middle">Contacts</text>
-      <text x="550" y="265" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
-      <line x1="476" y1="272" x2="624" y2="272" stroke="#1A4A6E" stroke-width="1"/>
-      <text x="550" y="284" fill="#AAD4F0" font-size="8.5" text-anchor="middle">IR contacts</text>
-      <text x="550" y="296" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Investor relationships</text>
-      <text x="550" y="308" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Meeting history</text>
-      <text x="550" y="328" fill="#AAD4F0" font-size="8"   text-anchor="middle">REST only (sync)</text>
+      <rect x="476" y="304" width="148" height="104" rx="6" fill="#003057" stroke="#001933" stroke-width="1.5"/>
+      <text x="550" y="324" fill="#7FBFFF" font-size="11" font-weight="bold" text-anchor="middle">Contacts</text>
+      <text x="550" y="337" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
+      <line x1="476" y1="344" x2="624" y2="344" stroke="#1A4A6E" stroke-width="1"/>
+      <text x="550" y="356" fill="#AAD4F0" font-size="8.5" text-anchor="middle">IR contacts</text>
+      <text x="550" y="368" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Investor relationships</text>
+      <text x="550" y="380" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Meeting history</text>
+      <text x="550" y="400" fill="#AAD4F0" font-size="8"   text-anchor="middle">REST only (sync)</text>
 
       <!-- Notifications -->
-      <rect x="632" y="232" width="148" height="104" rx="6" fill="#003057" stroke="#001933" stroke-width="1.5"/>
-      <text x="706" y="252" fill="#7FBFFF" font-size="11" font-weight="bold" text-anchor="middle">Notifications</text>
-      <text x="706" y="265" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
-      <line x1="632" y1="272" x2="780" y2="272" stroke="#1A4A6E" stroke-width="1"/>
-      <text x="706" y="284" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Alerts · In-app · Email</text>
-      <text x="706" y="296" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Report ready alerts</text>
-      <text x="706" y="308" fill="#FCD34D" font-size="8"   text-anchor="middle">Ownership change alerts</text>
-      <text x="706" y="328" fill="#FCA5A5" font-size="8"   text-anchor="middle">subscribes ← Service Bus</text>
+      <rect x="632" y="304" width="148" height="104" rx="6" fill="#003057" stroke="#001933" stroke-width="1.5"/>
+      <text x="706" y="324" fill="#7FBFFF" font-size="11" font-weight="bold" text-anchor="middle">Notifications</text>
+      <text x="706" y="337" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
+      <line x1="632" y1="344" x2="780" y2="344" stroke="#1A4A6E" stroke-width="1"/>
+      <text x="706" y="356" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Alerts · In-app · Email</text>
+      <text x="706" y="368" fill="#AAD4F0" font-size="8.5" text-anchor="middle">Report ready alerts</text>
+      <text x="706" y="380" fill="#FCD34D" font-size="8"   text-anchor="middle">Ownership change alerts</text>
+      <text x="706" y="400" fill="#FCA5A5" font-size="8"   text-anchor="middle">subscribes ← Service Bus</text>
 
       <!-- Report Service -->
-      <rect x="788" y="232" width="162" height="104" rx="6" fill="#14532D" stroke="#0A3A1E" stroke-width="1.5"/>
-      <text x="869" y="252" fill="#86EFAC" font-size="11" font-weight="bold" text-anchor="middle">Report</text>
-      <text x="869" y="265" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
-      <line x1="788" y1="272" x2="950" y2="272" stroke="#1A5C30" stroke-width="1"/>
-      <text x="869" y="284" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Job management</text>
-      <text x="869" y="296" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Status tracking</text>
-      <text x="869" y="308" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Generates SAS URL</text>
-      <text x="869" y="328" fill="#4ADE80" font-size="8"   text-anchor="middle">publishes → Queue</text>
+      <rect x="788" y="304" width="162" height="104" rx="6" fill="#14532D" stroke="#0A3A1E" stroke-width="1.5"/>
+      <text x="869" y="324" fill="#86EFAC" font-size="11" font-weight="bold" text-anchor="middle">Report</text>
+      <text x="869" y="337" fill="#fff"    font-size="9"  text-anchor="middle">Service</text>
+      <line x1="788" y1="344" x2="950" y2="344" stroke="#1A5C30" stroke-width="1"/>
+      <text x="869" y="356" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Job management</text>
+      <text x="869" y="368" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Status tracking</text>
+      <text x="869" y="380" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Generates SAS URL</text>
+      <text x="869" y="400" fill="#4ADE80" font-size="8"   text-anchor="middle">publishes → Queue</text>
 
       <!-- ── SERVICE BUS TOPICS ── -->
-      <rect x="8"   y="360" width="570" height="72" rx="6" fill="#92400E" stroke="#5C2800" stroke-width="1.5"/>
-      <text x="293" y="380" fill="#fff"    font-size="12" font-weight="bold" text-anchor="middle">Azure Service Bus — Topics (Pub/Sub fan-out)</text>
-      <text x="293" y="396" fill="#FDE68A" font-size="9"  text-anchor="middle">ownership-changed  →  [Targeting Service]  [Notifications Service]</text>
-      <text x="293" y="410" fill="#FDE68A" font-size="9"  text-anchor="middle">profile-updated    →  [Targeting Service]          ·          report-ready  →  [Notifications Service]</text>
-      <text x="293" y="424" fill="#FCD34D" font-size="8.5" text-anchor="middle">Guaranteed delivery · Dead Letter Queue on failure · At-least-once</text>
+      <rect x="8"   y="432" width="570" height="72" rx="6" fill="#92400E" stroke="#5C2800" stroke-width="1.5"/>
+      <text x="293" y="452" fill="#fff"    font-size="12" font-weight="bold" text-anchor="middle">Azure Service Bus — Topics (Pub/Sub fan-out)</text>
+      <text x="293" y="468" fill="#FDE68A" font-size="9"  text-anchor="middle">ownership-changed  →  [Targeting Service]  [Notifications Service]</text>
+      <text x="293" y="482" fill="#FDE68A" font-size="9"  text-anchor="middle">profile-updated    →  [Targeting Service]          ·          report-ready  →  [Notifications Service]</text>
+      <text x="293" y="496" fill="#FCD34D" font-size="8.5" text-anchor="middle">Guaranteed delivery · Dead Letter Queue on failure · At-least-once</text>
 
       <!-- ── SERVICE BUS QUEUE ── -->
-      <rect x="586" y="360" width="366" height="72" rx="6" fill="#7C2D12" stroke="#4C1A0A" stroke-width="1.5"/>
-      <text x="769" y="380" fill="#fff"    font-size="12" font-weight="bold" text-anchor="middle">Azure Service Bus — Queue</text>
-      <text x="769" y="397" fill="#FED7AA" font-size="10" text-anchor="middle">report-generation-queue</text>
-      <text x="769" y="413" fill="#FED7AA" font-size="9"  text-anchor="middle">ONE worker per job · task, not event fan-out</text>
-      <text x="769" y="427" fill="#FED7AA" font-size="8.5" text-anchor="middle">Message lock · auto-retry · Dead Letter Queue</text>
+      <rect x="586" y="432" width="366" height="72" rx="6" fill="#7C2D12" stroke="#4C1A0A" stroke-width="1.5"/>
+      <text x="769" y="452" fill="#fff"    font-size="12" font-weight="bold" text-anchor="middle">Azure Service Bus — Queue</text>
+      <text x="769" y="469" fill="#FED7AA" font-size="10" text-anchor="middle">report-generation-queue</text>
+      <text x="769" y="485" fill="#FED7AA" font-size="9"  text-anchor="middle">ONE worker per job · task, not event fan-out</text>
+      <text x="769" y="499" fill="#FED7AA" font-size="8.5" text-anchor="middle">Message lock · auto-retry · Dead Letter Queue</text>
 
       <!-- ── AZURE FUNCTION ── -->
-      <rect x="586" y="452" width="366" height="70" rx="6" fill="#6B21A8" stroke="#4A1570" stroke-width="1.5"/>
-      <text x="769" y="472" fill="#E9D5FF" font-size="11" font-weight="bold" text-anchor="middle">Azure Function  (Report Worker)</text>
-      <text x="769" y="487" fill="#fff"    font-size="9"  text-anchor="middle">Queue Trigger · Serverless · auto-scales to queue depth</text>
-      <text x="769" y="502" fill="#D8B4FE" font-size="9"  text-anchor="middle">Calls all 5 services → aggregates data → generates PDF / Excel</text>
-      <text x="769" y="517" fill="#D8B4FE" font-size="8.5" text-anchor="middle">Uploads to Blob → updates job status → publishes report-ready event</text>
+      <rect x="586" y="524" width="366" height="70" rx="6" fill="#6B21A8" stroke="#4A1570" stroke-width="1.5"/>
+      <text x="769" y="544" fill="#E9D5FF" font-size="11" font-weight="bold" text-anchor="middle">Azure Function  (Report Worker)</text>
+      <text x="769" y="559" fill="#fff"    font-size="9"  text-anchor="middle">Queue Trigger · Serverless · auto-scales to queue depth</text>
+      <text x="769" y="574" fill="#D8B4FE" font-size="9"  text-anchor="middle">Calls all 5 services → aggregates data → generates PDF / Excel</text>
+      <text x="769" y="589" fill="#D8B4FE" font-size="8.5" text-anchor="middle">Uploads to Blob → updates job status → publishes report-ready event</text>
 
       <!-- ── BLOB STORAGE ── -->
-      <rect x="626" y="534" width="286" height="50" rx="6" fill="#1D4ED8" stroke="#1339A8" stroke-width="1.5"/>
-      <text x="769" y="555" fill="#fff"    font-size="11" font-weight="bold" text-anchor="middle">Azure Blob Storage</text>
-      <text x="769" y="570" fill="#BFDBFE" font-size="9"  text-anchor="middle">reports/{tenantId}/{jobId}/report.pdf   ·   private container</text>
-      <text x="769" y="580" fill="#93C5FD" font-size="8"  font-style="italic" text-anchor="middle">SAS URL (15 min · read-only) returned to Angular for download</text>
+      <rect x="626" y="606" width="286" height="50" rx="6" fill="#1D4ED8" stroke="#1339A8" stroke-width="1.5"/>
+      <text x="769" y="627" fill="#fff"    font-size="11" font-weight="bold" text-anchor="middle">Azure Blob Storage</text>
+      <text x="769" y="642" fill="#BFDBFE" font-size="9"  text-anchor="middle">reports/{tenantId}/{jobId}/report.pdf   ·   private container</text>
+      <text x="769" y="652" fill="#93C5FD" font-size="8"  font-style="italic" text-anchor="middle">SAS URL (15 min · read-only) returned to Angular for download</text>
 
       <!-- ── DATA STORES ── -->
       <!-- Cosmos DB (Ownership) -->
-      <rect x="8"   y="596" width="148" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
-      <text x="82"  y="616" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Cosmos DB</text>
-      <text x="82"  y="630" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Ownership time-series</text>
-      <text x="82"  y="643" fill="#BBF7D0" font-size="8.5" text-anchor="middle">High-vol writes · NoSQL</text>
-      <text x="82"  y="658" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Ownership Service</text>
+      <rect x="8"   y="668" width="148" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
+      <text x="82"  y="688" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Cosmos DB</text>
+      <text x="82"  y="702" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Ownership time-series</text>
+      <text x="82"  y="715" fill="#BBF7D0" font-size="8.5" text-anchor="middle">High-vol writes · NoSQL</text>
+      <text x="82"  y="730" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Ownership Service</text>
 
       <!-- Azure SQL (Profiles) -->
-      <rect x="164" y="596" width="148" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
-      <text x="238" y="616" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Azure SQL</text>
-      <text x="238" y="630" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Company profiles</text>
-      <text x="238" y="643" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Structured · relational</text>
-      <text x="238" y="658" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Profiles Service</text>
+      <rect x="164" y="668" width="148" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
+      <text x="238" y="688" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Azure SQL</text>
+      <text x="238" y="702" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Company profiles</text>
+      <text x="238" y="715" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Structured · relational</text>
+      <text x="238" y="730" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Profiles Service</text>
 
       <!-- Azure SQL + Redis (Targeting) -->
-      <rect x="320" y="596" width="148" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
-      <text x="394" y="613" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Azure SQL</text>
-      <text x="394" y="626" fill="#BBF7D0" font-size="8.5" text-anchor="middle">+ Redis Cache</text>
-      <text x="394" y="639" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Scores · cache-aside</text>
-      <text x="394" y="652" fill="#FCD34D" font-size="8"   text-anchor="middle">&lt;5ms cached reads</text>
-      <text x="394" y="662" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Targeting Service</text>
+      <rect x="320" y="668" width="148" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
+      <text x="394" y="685" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Azure SQL</text>
+      <text x="394" y="698" fill="#BBF7D0" font-size="8.5" text-anchor="middle">+ Redis Cache</text>
+      <text x="394" y="711" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Scores · cache-aside</text>
+      <text x="394" y="724" fill="#FCD34D" font-size="8"   text-anchor="middle">&lt;5ms cached reads</text>
+      <text x="394" y="734" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Targeting Service</text>
 
       <!-- Azure SQL (Contacts) -->
-      <rect x="476" y="596" width="148" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
-      <text x="550" y="616" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Azure SQL</text>
-      <text x="550" y="630" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Contacts · meetings</text>
-      <text x="550" y="643" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Relational structure</text>
-      <text x="550" y="658" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Contacts Service</text>
+      <rect x="476" y="668" width="148" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
+      <text x="550" y="688" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Azure SQL</text>
+      <text x="550" y="702" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Contacts · meetings</text>
+      <text x="550" y="715" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Relational structure</text>
+      <text x="550" y="730" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Contacts Service</text>
 
       <!-- Table Storage (Notifications) -->
-      <rect x="632" y="596" width="148" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
-      <text x="706" y="616" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Table Storage</text>
-      <text x="706" y="630" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Alert events · delivery</text>
-      <text x="706" y="643" fill="#BBF7D0" font-size="8.5" text-anchor="middle">High-vol · low cost</text>
-      <text x="706" y="658" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Notifications Service</text>
+      <rect x="632" y="668" width="148" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
+      <text x="706" y="688" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Table Storage</text>
+      <text x="706" y="702" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Alert events · delivery</text>
+      <text x="706" y="715" fill="#BBF7D0" font-size="8.5" text-anchor="middle">High-vol · low cost</text>
+      <text x="706" y="730" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Notifications Service</text>
 
       <!-- Azure SQL (Report jobs) -->
-      <rect x="788" y="596" width="162" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
-      <text x="869" y="616" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Azure SQL</text>
-      <text x="869" y="630" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Report jobs table</text>
-      <text x="869" y="643" fill="#BBF7D0" font-size="8.5" text-anchor="middle">jobId · status · blobPath</text>
-      <text x="869" y="658" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Report Service</text>
+      <rect x="788" y="668" width="162" height="70" rx="5" fill="#15803D" stroke="#0E5529" stroke-width="1.5"/>
+      <text x="869" y="688" fill="#fff"    font-size="10" font-weight="bold" text-anchor="middle">Azure SQL</text>
+      <text x="869" y="702" fill="#BBF7D0" font-size="8.5" text-anchor="middle">Report jobs table</text>
+      <text x="869" y="715" fill="#BBF7D0" font-size="8.5" text-anchor="middle">jobId · status · blobPath</text>
+      <text x="869" y="730" fill="#FCD34D" font-size="8"   text-anchor="middle">↑ Report Service</text>
 
       <!-- ── SUPPORTING SERVICES ── -->
-      <rect x="8"   y="687" width="170" height="38" rx="5" fill="#525252" stroke="#333"/>
-      <text x="93"  y="703" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Azure Key Vault</text>
-      <text x="93"  y="717" fill="#CCC" font-size="8.5" text-anchor="middle">Secrets · Managed Identity</text>
+      <rect x="8"   y="759" width="170" height="38" rx="5" fill="#525252" stroke="#333"/>
+      <text x="93"  y="775" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Azure Key Vault</text>
+      <text x="93"  y="789" fill="#CCC" font-size="8.5" text-anchor="middle">Secrets · Managed Identity</text>
 
-      <rect x="188" y="687" width="195" height="38" rx="5" fill="#525252" stroke="#333"/>
-      <text x="285" y="703" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Azure App Insights</text>
-      <text x="285" y="717" fill="#CCC" font-size="8.5" text-anchor="middle">Distributed tracing · Correlation ID</text>
+      <rect x="188" y="759" width="195" height="38" rx="5" fill="#525252" stroke="#333"/>
+      <text x="285" y="775" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Azure App Insights</text>
+      <text x="285" y="789" fill="#CCC" font-size="8.5" text-anchor="middle">Distributed tracing · Correlation ID</text>
 
-      <rect x="393" y="687" width="172" height="38" rx="5" fill="#525252" stroke="#333"/>
-      <text x="479" y="703" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Azure DevOps CI/CD</text>
-      <text x="479" y="717" fill="#CCC" font-size="8.5" text-anchor="middle">Pipeline · Bundle size gate</text>
+      <rect x="393" y="759" width="172" height="38" rx="5" fill="#525252" stroke="#333"/>
+      <text x="479" y="775" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Azure DevOps CI/CD</text>
+      <text x="479" y="789" fill="#CCC" font-size="8.5" text-anchor="middle">Pipeline · Bundle size gate</text>
 
-      <rect x="575" y="687" width="178" height="38" rx="5" fill="#525252" stroke="#333"/>
-      <text x="664" y="703" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Blob Lifecycle Policy</text>
-      <text x="664" y="717" fill="#CCC" font-size="8.5" text-anchor="middle">Hot 7d → Cool → Delete 90d</text>
+      <rect x="575" y="759" width="178" height="38" rx="5" fill="#525252" stroke="#333"/>
+      <text x="664" y="775" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Blob Lifecycle Policy</text>
+      <text x="664" y="789" fill="#CCC" font-size="8.5" text-anchor="middle">Hot 7d → Cool → Delete 90d</text>
 
-      <rect x="763" y="687" width="189" height="38" rx="5" fill="#525252" stroke="#333"/>
-      <text x="857" y="703" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Azure Static Web Apps</text>
-      <text x="857" y="717" fill="#CCC" font-size="8.5" text-anchor="middle">Angular hosting · global CDN</text>
+      <rect x="763" y="759" width="189" height="38" rx="5" fill="#525252" stroke="#333"/>
+      <text x="857" y="775" fill="#fff" font-size="10" font-weight="bold" text-anchor="middle">Azure Static Web Apps</text>
+      <text x="857" y="789" fill="#CCC" font-size="8.5" text-anchor="middle">Angular hosting · global CDN</text>
 
       <!-- ── ARROWS ── -->
       <!-- Okta → Front Door -->
@@ -399,69 +408,73 @@ I work as a Lead Software Development Engineer on the frontend using Angular 18.
       <!-- Front Door → Angular -->
       <line x1="480" y1="124" x2="480" y2="144" stroke="#0066A1" stroke-width="1.8" marker-end="url(#ab)"/>
 
-      <!-- Angular → Services (6 short dashed arrows) -->
-      <line x1="82"  y1="204" x2="82"  y2="230" stroke="#0066A1" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ab)"/>
-      <line x1="238" y1="204" x2="238" y2="230" stroke="#0066A1" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ab)"/>
-      <line x1="394" y1="204" x2="394" y2="230" stroke="#0066A1" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ab)"/>
-      <line x1="550" y1="204" x2="550" y2="230" stroke="#0066A1" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ab)"/>
-      <line x1="706" y1="204" x2="706" y2="230" stroke="#0066A1" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ab)"/>
-      <line x1="869" y1="204" x2="869" y2="230" stroke="#15803D" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ag)"/>
-      <!-- REST label -->
-      <text x="480" y="222" fill="#0066A1" font-size="8" text-anchor="middle">REST  (Bearer JWT)</text>
+      <!-- Angular → API Gateway -->
+      <line x1="480" y1="204" x2="480" y2="222" stroke="#0066A1" stroke-width="1.8" marker-end="url(#ab)"/>
+      <text x="488" y="216" fill="#0066A1" font-size="8">REST (Bearer JWT)</text>
+
+      <!-- API Gateway → Services (6 short dashed arrows) -->
+      <line x1="82"  y1="270" x2="82"  y2="302" stroke="#0066A1" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ab)"/>
+      <line x1="238" y1="270" x2="238" y2="302" stroke="#0066A1" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ab)"/>
+      <line x1="394" y1="270" x2="394" y2="302" stroke="#0066A1" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ab)"/>
+      <line x1="550" y1="270" x2="550" y2="302" stroke="#0066A1" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ab)"/>
+      <line x1="706" y1="270" x2="706" y2="302" stroke="#0066A1" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ab)"/>
+      <line x1="869" y1="270" x2="869" y2="302" stroke="#15803D" stroke-width="1.2" stroke-dasharray="4,2" marker-end="url(#ag)"/>
+      <!-- Routed label -->
+      <text x="480" y="293" fill="#0066A1" font-size="8" text-anchor="middle">Routed by Gateway (JWT + tenant claims validated)</text>
 
       <!-- Ownership + Profiles → SB Topics (publish) -->
-      <path d="M 82 336 L 82 358" stroke="#B85200" stroke-width="1.5" marker-end="url(#ao)"/>
-      <path d="M 238 336 L 238 358" stroke="#B85200" stroke-width="1.5" marker-end="url(#ao)"/>
+      <path d="M 82 408 L 82 430" stroke="#B85200" stroke-width="1.5" marker-end="url(#ao)"/>
+      <path d="M 238 408 L 238 430" stroke="#B85200" stroke-width="1.5" marker-end="url(#ao)"/>
 
       <!-- SB Topics → Targeting (subscription, up) -->
-      <path d="M 320 360 L 320 344 L 394 344 L 394 336" stroke="#B85200" stroke-width="1.4" stroke-dasharray="5,2" fill="none" marker-end="url(#ao)"/>
+      <path d="M 320 432 L 320 416 L 394 416 L 394 408" stroke="#B85200" stroke-width="1.4" stroke-dasharray="5,2" fill="none" marker-end="url(#ao)"/>
       <!-- SB Topics → Notifications (subscription, up) -->
-      <path d="M 450 360 L 450 344 L 706 344 L 706 336" stroke="#B85200" stroke-width="1.4" stroke-dasharray="5,2" fill="none" marker-end="url(#ao)"/>
+      <path d="M 450 432 L 450 416 L 706 416 L 706 408" stroke="#B85200" stroke-width="1.4" stroke-dasharray="5,2" fill="none" marker-end="url(#ao)"/>
 
       <!-- Report Service → SB Queue -->
-      <path d="M 869 336 L 869 358" stroke="#7C2D12" stroke-width="1.5" marker-end="url(#ao)"/>
+      <path d="M 869 408 L 869 430" stroke="#7C2D12" stroke-width="1.5" marker-end="url(#ao)"/>
 
       <!-- SB Queue → Azure Function -->
-      <line x1="769" y1="432" x2="769" y2="450" stroke="#6B21A8" stroke-width="1.8" marker-end="url(#ap)"/>
+      <line x1="769" y1="504" x2="769" y2="522" stroke="#6B21A8" stroke-width="1.8" marker-end="url(#ap)"/>
 
       <!-- Azure Function data aggregation (calls services — curved arrow left) -->
-      <path d="M 586 487 C 480 487 380 487 380 440 C 380 395 380 360 394 344 L 394 336" stroke="#6B21A8" stroke-width="1" stroke-dasharray="3,2" fill="none" marker-end="url(#ap)"/>
-      <text x="460" y="484" fill="#6B21A8" font-size="8" text-anchor="middle">calls all services to aggregate data</text>
+      <path d="M 586 559 C 480 559 380 559 380 512 C 380 467 380 432 394 416 L 394 408" stroke="#6B21A8" stroke-width="1" stroke-dasharray="3,2" fill="none" marker-end="url(#ap)"/>
+      <text x="460" y="556" fill="#6B21A8" font-size="8" text-anchor="middle">calls all services to aggregate data</text>
 
       <!-- Azure Function → Blob Storage -->
-      <line x1="769" y1="522" x2="769" y2="532" stroke="#1D4ED8" stroke-width="1.8" marker-end="url(#ab)"/>
+      <line x1="769" y1="594" x2="769" y2="604" stroke="#1D4ED8" stroke-width="1.8" marker-end="url(#ab)"/>
 
       <!-- Azure Function → SB Topics (report-ready event) -->
-      <path d="M 586 478 L 380 478 L 380 432" stroke="#B85200" stroke-width="1.2" stroke-dasharray="4,2" fill="none" marker-end="url(#ao)"/>
-      <text x="486" y="474" fill="#B85200" font-size="8" text-anchor="middle">report-ready event</text>
+      <path d="M 586 550 L 380 550 L 380 504" stroke="#B85200" stroke-width="1.2" stroke-dasharray="4,2" fill="none" marker-end="url(#ao)"/>
+      <text x="486" y="546" fill="#B85200" font-size="8" text-anchor="middle">report-ready event</text>
 
       <!-- SAS URL return arrow (right edge, going up) -->
-      <path d="M 912 534 C 945 534 945 174 912 174" stroke="#15803D" stroke-width="1.3" stroke-dasharray="5,2" fill="none" marker-end="url(#ag)"/>
-      <text x="950" y="360" fill="#15803D" font-size="8" text-anchor="middle" transform="rotate(90,950,360)">SAS URL → Angular (download)</text>
+      <path d="M 912 606 C 945 606 945 174 912 174" stroke="#15803D" stroke-width="1.3" stroke-dasharray="5,2" fill="none" marker-end="url(#ag)"/>
+      <text x="950" y="432" fill="#15803D" font-size="8" text-anchor="middle" transform="rotate(90,950,432)">SAS URL → Angular (download)</text>
 
       <!-- ── LEGEND ── -->
-      <line x1="70" y1="762" x2="98" y2="762" stroke="#0066A1" stroke-width="1.8" marker-end="url(#ab)"/>
-      <text x="103" y="766" fill="#0066A1" font-size="9">Sync REST (Bearer JWT)</text>
+      <line x1="70" y1="834" x2="98" y2="834" stroke="#0066A1" stroke-width="1.8" marker-end="url(#ab)"/>
+      <text x="103" y="838" fill="#0066A1" font-size="9">Sync REST (Bearer JWT)</text>
 
-      <line x1="70" y1="778" x2="98" y2="778" stroke="#0066A1" stroke-width="1.8" stroke-dasharray="4,2" marker-end="url(#ab)"/>
-      <text x="103" y="782" fill="#0066A1" font-size="9">Sync REST (Angular → Service)</text>
+      <line x1="70" y1="850" x2="98" y2="850" stroke="#0066A1" stroke-width="1.8" stroke-dasharray="4,2" marker-end="url(#ab)"/>
+      <text x="103" y="854" fill="#0066A1" font-size="9">Sync REST (Angular → Service)</text>
 
-      <line x1="280" y1="762" x2="308" y2="762" stroke="#B85200" stroke-width="1.8" marker-end="url(#ao)"/>
-      <text x="313" y="766" fill="#B85200" font-size="9">Async publish → Service Bus</text>
+      <line x1="280" y1="834" x2="308" y2="834" stroke="#B85200" stroke-width="1.8" marker-end="url(#ao)"/>
+      <text x="313" y="838" fill="#B85200" font-size="9">Async publish → Service Bus</text>
 
-      <line x1="280" y1="778" x2="308" y2="778" stroke="#B85200" stroke-width="1.8" stroke-dasharray="4,2" marker-end="url(#ao)"/>
-      <text x="313" y="782" fill="#B85200" font-size="9">Topic subscription (fan-out)</text>
+      <line x1="280" y1="850" x2="308" y2="850" stroke="#B85200" stroke-width="1.8" stroke-dasharray="4,2" marker-end="url(#ao)"/>
+      <text x="313" y="854" fill="#B85200" font-size="9">Topic subscription (fan-out)</text>
 
-      <line x1="510" y1="762" x2="538" y2="762" stroke="#6B21A8" stroke-width="1.8" stroke-dasharray="3,2" marker-end="url(#ap)"/>
-      <text x="543" y="766" fill="#6B21A8" font-size="9">Report pipeline (Queue → Function)</text>
+      <line x1="510" y1="834" x2="538" y2="834" stroke="#6B21A8" stroke-width="1.8" stroke-dasharray="3,2" marker-end="url(#ap)"/>
+      <text x="543" y="838" fill="#6B21A8" font-size="9">Report pipeline (Queue → Function)</text>
 
-      <line x1="510" y1="778" x2="538" y2="778" stroke="#15803D" stroke-width="1.8" marker-end="url(#ag)"/>
-      <text x="543" y="782" fill="#15803D" font-size="9">Data store / SAS URL download</text>
+      <line x1="510" y1="850" x2="538" y2="850" stroke="#15803D" stroke-width="1.8" marker-end="url(#ag)"/>
+      <text x="543" y="854" fill="#15803D" font-size="9">Data store / SAS URL download</text>
 
-      <text x="755" y="762" fill="#555" font-size="8.5">✓ No shared DB · JWT per-service via Okta JWKS</text>
-      <text x="755" y="776" fill="#555" font-size="8.5">✓ Secrets from Key Vault (Managed Identity)</text>
-      <text x="755" y="790" fill="#555" font-size="8.5">✓ Traced via App Insights Correlation ID</text>
-      <text x="755" y="804" fill="#555" font-size="8.5">✓ Blob Lifecycle: Hot → Cool → Delete auto</text>
+      <text x="755" y="834" fill="#555" font-size="8.5">✓ Gateway validates JWT (SPA traffic) · services self-validate direct calls</text>
+      <text x="755" y="848" fill="#555" font-size="8.5">✓ Secrets from Key Vault (Managed Identity)</text>
+      <text x="755" y="862" fill="#555" font-size="8.5">✓ Traced via App Insights Correlation ID</text>
+      <text x="755" y="876" fill="#555" font-size="8.5">✓ Blob Lifecycle: Hot → Cool → Delete auto</text>
     </svg>
     </div>
 
@@ -475,8 +488,8 @@ I work as a Lead Software Development Engineer on the frontend using Angular 18.
       <tr><td><strong>Notifications Service</strong></td><td>Ownership change alerts, price movement alerts, delivery status</td><td>Azure Table Storage</td><td>High-volume write of alert events (cheap, scalable), reads are by user/timerange (partition key fits)</td></tr>
     </table>
 
-    <h3>Why No API Gateway?</h3>
-    <div class="callout amber"><strong>The Angular SPA calls microservices directly.</strong> Each service exposes its own REST endpoint. Auth is validated at the service level — every service validates the incoming JWT independently against Okta's JWKS (JSON Web Key Set) endpoint. This means: no single point of failure, no gateway bottleneck, and each service scales completely independently. The trade-off is that cross-cutting concerns like rate limiting are handled per-service rather than centrally — we accept that for the scale we operate at.</div>
+    <h3>API Gateway — Single Entry Point</h3>
+    <div class="callout blue"><strong>The Angular SPA talks to a single API Gateway, not directly to individual microservices.</strong> Every request from the SPA carries the Bearer JWT and is sent to the Gateway's URL. The Gateway validates the JWT signature against Okta's JWKS, checks the tenant and role claims, applies rate limiting, and routes the request to the correct downstream microservice. Individual microservices trust the Gateway for SPA-originated traffic and don't need to re-implement that check on every request. The exception is service-to-service traffic that bypasses the Gateway entirely — for example the Report Worker (Azure Function) calling Targeting/Profiles/Contacts directly to aggregate data — those calls still validate the JWT independently against Okta's JWKS as a defense-in-depth measure, since they're not coming through the Gateway's boundary.</div>
 
     <h3>Async Communication — Azure Service Bus</h3>
     <p>Not all communication is synchronous. When ownership data changes, multiple downstream services need to react. We use <strong>Azure Service Bus Topics</strong> (pub/sub model) for this.</p>
@@ -547,6 +560,7 @@ Invalidation:
       <tr><td>Azure Key Vault</td><td>Secrets management</td><td>No connection strings in code or config files — services fetch secrets at runtime</td></tr>
       <tr><td>Azure App Insights</td><td>Distributed tracing</td><td>Correlation IDs trace a single user request across 3+ microservices</td></tr>
       <tr><td>Azure Front Door</td><td>CDN + WAF + load balancing</td><td>Global edge, DDoS protection, SSL termination at the edge</td></tr>
+      <tr><td>Azure API Management (Gateway)</td><td>Single entry point for the SPA</td><td>Centralised JWT/tenant-claim validation, rate limiting, and routing instead of duplicating auth logic in every service for SPA-originated traffic</td></tr>
       <tr><td>Azure Static Web Apps</td><td>Hosting Angular SPA</td><td>Built-in CDN, CI/CD integration, free SSL, global distribution</td></tr>
       <tr><td>Azure Functions</td><td>Report Worker (serverless)</td><td>Queue-triggered, auto-scales to queue depth, no idle server cost, aggregates data from all services and generates PDF/Excel reports</td></tr>
       <tr><td>Azure Durable Functions</td><td>Multi-step report pipeline orchestration</td><td>Checkpointed, crash-safe workflow (generate → blob upload → SAS URL) without hand-rolled progress tracking</td></tr>
@@ -1097,10 +1111,10 @@ The 30% bundle reduction meant the initial page load dropped noticeably for clie
     </div>
 
     <div class="qa">
-      <div class="qa-q">Q: How do services validate the JWT without an API Gateway?</div>
+      <div class="qa-q">Q: If the Gateway already validates the JWT, why do individual microservices still validate it too?</div>
       <div class="qa-a">
         <span class="label">Answer:</span>
-        Every service fetches Okta's JWKS (JSON Web Key Set) endpoint at startup — that's the set of public keys Okta uses to sign JWTs. When a request arrives with a Bearer token, the service validates the JWT signature against those keys, checks the issuer (must be our Okta domain), checks expiry, and checks the audience claim (must be our API). This is all stateless — the service doesn't call Okta on every request, it just validates the signature locally using the cached JWKS. The JWKS is refreshed periodically in case Okta rotates keys. It means each service independently enforces security with no shared dependency on a gateway.
+        Defense in depth. The Gateway is the trust boundary for SPA-originated traffic — it validates the JWT signature, tenant claim, and roles, then routes to the right service, so most requests only pay that validation cost once. But not every call goes through the Gateway: the Report Worker (Azure Function) calls Targeting, Profiles, Contacts, and other services directly to aggregate data for a report, and that traffic never touches the Gateway. Each service fetches Okta's JWKS (JSON Web Key Set) endpoint at startup and can validate a JWT signature locally and statelessly — checking issuer, expiry, and audience — without calling Okta on every request. So services that only ever receive Gateway-routed traffic can lean on the Gateway's validation, while anything reachable directly still enforces its own check rather than assuming the network path is trustworthy.
       </div>
     </div>
 
@@ -1895,9 +1909,4 @@ await container.UpsertItemAsync(record, new PartitionKey(record.CompanyId));</di
   </div>
 
   <div style="text-align:center; color:#888; font-size:12px; padding: 20px 0;">
-    📍 D:\Learning\Study Material · Capital Access Interview Story · Updated June 2026
-  </div>
-
-</div>
-</body>
-</html>
+    📍 D:\Learning\Study Material · Capital Acc

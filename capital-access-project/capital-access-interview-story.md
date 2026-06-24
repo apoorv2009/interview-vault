@@ -54,8 +54,9 @@ flowchart TD
     Okta["Okta<br/>OIDC Identity Provider · JWT · Custom claims (tenant, roles)"]
     FD["Azure Front Door + CDN<br/>Load balancing · WAF · DDoS · SSL termination"]
     SPA["Angular 18 SPA (Azure Static Web Apps)<br/>Standalone Components · NgRx · Okta Auth SDK · Role Guards"]
+    GW["Azure API Management — Gateway<br/>Validates JWT + tenant/role claims · Rate limiting · Routes to microservices"]
 
-    subgraph MS["MICROSERVICES — each validates JWT independently via Okta JWKS"]
+    subgraph MS["MICROSERVICES — trust Gateway-validated JWT for SPA traffic; self-validate via Okta JWKS for direct service-to-service calls"]
         Own["Ownership Service<br/>Institutional ownership %, history<br/>publishes → Service Bus"]
         Prof["Profiles Service<br/>Company profiles, financials<br/>publishes → Service Bus"]
         Targ["Targeting Service<br/>Investor scores, recommendations<br/>Redis cached, &lt;5ms reads<br/>subscribes ← Service Bus"]
@@ -93,12 +94,13 @@ flowchart TD
 
     Okta -- JWT --> FD
     FD --> SPA
-    SPA -- "REST Bearer JWT" --> Own
-    SPA -- "REST Bearer JWT" --> Prof
-    SPA -- "REST Bearer JWT" --> Targ
-    SPA -- "REST Bearer JWT" --> Cont
-    SPA -- "REST Bearer JWT" --> Notif
-    SPA -- "REST Bearer JWT" --> Rep
+    SPA -- "REST Bearer JWT" --> GW
+    GW -- "Routed (JWT validated)" --> Own
+    GW -- "Routed (JWT validated)" --> Prof
+    GW -- "Routed (JWT validated)" --> Targ
+    GW -- "Routed (JWT validated)" --> Cont
+    GW -- "Routed (JWT validated)" --> Notif
+    GW -- "Routed (JWT validated)" --> Rep
 
     Own -- publish --> Topics
     Prof -- publish --> Topics
@@ -122,6 +124,7 @@ flowchart TD
     classDef identity fill:#007DC1,color:#fff,stroke:#005A9E
     classDef edge fill:#0078D4,color:#fff,stroke:#005A9E
     classDef frontend fill:#B91C1C,color:#fff,stroke:#7F1010
+    classDef gateway fill:#0F766E,color:#fff,stroke:#0B5A54
     classDef svc fill:#003057,color:#fff,stroke:#001933
     classDef report fill:#14532D,color:#fff,stroke:#0A3A1E
     classDef bus fill:#92400E,color:#fff,stroke:#5C2800
@@ -134,6 +137,7 @@ flowchart TD
     class Okta identity
     class FD edge
     class SPA frontend
+    class GW gateway
     class Own,Prof,Targ,Cont,Notif svc
     class Rep report
     class Topics,Queue bus
@@ -152,8 +156,8 @@ flowchart TD
 | **Notifications Service** | Ownership change alerts, price movement alerts, delivery status | Azure Table Storage | High-volume write of alert events (cheap, scalable), reads are by user/timerange (partition key fits) |
 | **Engagement & Activity Service** | IR engagement lifecycle — meetings, roadshows, outcomes, follow-up tasks, sentiment scores | Azure SQL (EF Core 8, Code-First) | Deeply relational data (Activity → Attendees → FollowUpTasks), complex aggregate queries for board reporting, ACID transactions for status transitions, EF Core migrations as CI/CD deployment step |
 
-> ⚠️
-> **The Angular SPA calls microservices directly.** Each service exposes its own REST endpoint. Auth is validated at the service level — every service validates the incoming JWT independently against Okta's JWKS (JSON Web Key Set) endpoint. This means: no single point of failure, no gateway bottleneck, and each service scales completely independently. The trade-off is that cross-cutting concerns like rate limiting are handled per-service rather than centrally — we accept that for the scale we operate at.
+> ℹ️
+> **The Angular SPA talks to a single API Gateway, not directly to individual microservices.** Every request from the SPA carries the Bearer JWT and is sent to the Gateway's URL. The Gateway (Azure API Management) validates the JWT signature against Okta's JWKS, checks the tenant and role claims, applies rate limiting, and routes the request to the correct downstream microservice. Individual microservices trust the Gateway for SPA-originated traffic and don't need to re-implement that check on every request. The exception is service-to-service traffic that bypasses the Gateway entirely — for example the Report Worker (Azure Function) calling Targeting/Profiles/Contacts directly to aggregate data — those calls still validate the JWT independently against Okta's JWKS as a defense-in-depth measure, since they're not coming through the Gateway's boundary.
 
 Not all communication is synchronous. When ownership data changes, multiple downstream services need to react. We use **Azure Service Bus Topics** (pub/sub model) for this.
 
@@ -220,6 +224,7 @@ Angular 18 SPA (Azure Static Web Apps)
 | Technology | Used for | Why chosen |
 | --- | --- | --- |
 | Okta | Identity / OIDC | Enterprise IdP, MFA, custom JWT claims, okta-auth-js SDK for Angular |
+| Azure API Management (Gateway) | Single entry point for the SPA | Centralised JWT/tenant-claim validation, rate limiting, and routing instead of duplicating auth logic in every service for SPA-originated traffic |
 | Azure Service Bus | Async inter-service events | Pub/Sub Topics, guaranteed delivery, Dead Letter Queue, native Azure |
 | Azure Cosmos DB | Ownership time-series | Horizontally scalable, flexible schema, fast writes for high-volume financial data |
 | Azure SQL | Profiles, Contacts, Targeting | Relational structure, ACID transactions, rich querying |
@@ -658,10 +663,10 @@ Answer:
 Answer:
         Three options, three different use cases. Event Grid is for reactive infrastructure events — "a blob was uploaded", "a VM was deallocated". Not suited for business domain events between services. Event Hubs is a high-throughput streaming platform — Kafka-compatible, designed for millions of events per second, ideal for telemetry or log ingestion. But we don't need that scale, and Event Hubs is pull-based with complex consumer group management. Service Bus is the right fit for us: it's a proper messaging broker with Topics for pub/sub fan-out, guaranteed at-least-once delivery, Dead Letter Queue for failed messages, and message ordering within sessions if we need it. Our ownership change events need reliable delivery to multiple subscribers — Service Bus Topics give us exactly that without the operational overhead of Kafka or Event Hubs.
 
-**Q: Q: How do services validate the JWT without an API Gateway?**
+**Q: Q: If the Gateway already validates the JWT, why do individual microservices still validate it too?**
 
 Answer:
-        Every service fetches Okta's JWKS (JSON Web Key Set) endpoint at startup — that's the set of public keys Okta uses to sign JWTs. When a request arrives with a Bearer token, the service validates the JWT signature against those keys, checks the issuer (must be our Okta domain), checks expiry, and checks the audience claim (must be our API). This is all stateless — the service doesn't call Okta on every request, it just validates the signature locally using the cached JWKS. The JWKS is refreshed periodically in case Okta rotates keys. It means each service independently enforces security with no shared dependency on a gateway.
+        Defense-in-depth. For SPA-originated traffic, the Azure API Management Gateway validates the JWT signature, issuer, expiry, and tenant/role claims before routing the request — microservices trust that for traffic that came through the Gateway. But not all traffic comes through the Gateway: the Report Worker (Azure Function) calls Targeting, Profiles, and Contacts services directly, server-to-server, to aggregate report data — that path never touches the Gateway. So every service still fetches Okta's JWKS (JSON Web Key Set) at startup and can independently validate a JWT's signature, issuer, expiry, and audience claim locally and statelessly. That means a service never blindly trusts an inbound request just because it's on the internal network — it can always verify the token itself, whether the caller is the Gateway-fronted SPA or another service calling it directly.
 
 **Q: Q: How does Redis caching work in the Targeting Service? What about stale data?**
 
