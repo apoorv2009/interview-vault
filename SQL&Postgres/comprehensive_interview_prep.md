@@ -685,6 +685,1006 @@ LEFT JOIN orders o
 
 ---
 
-*(Further questions and answers will be appended here as the session progresses.)*
+---
+
+## Part 2 — SQL Server Interview Questions (Capital Access Project Context)
+
+> All examples reference the **Capital Access** platform at S&P Global:
+> 7 microservices (Ownership, Profiles, Targeting, Contacts, Notifications, Report, Engagement/Activity),
+> Azure SQL + Cosmos DB + Redis, Okta OIDC JWT, Azure Service Bus, Angular 18 + NgRx.
+
+---
+
+### Q5 — Explain Normalization (1NF, 2NF, 3NF)
+
+**Goal:** eliminate redundancy and prevent update anomalies.
+
+```
+1NF — Atomic values: one value per cell, no comma-separated lists, all rows unique.
+2NF — No partial dependency: every non-key column depends on the WHOLE composite PK.
+3NF — No transitive dependency: non-key columns must depend on PK only, not on each other.
+```
+
+**1NF violation — comma-separated list in one cell:**
+```sql
+-- ❌ Violates 1NF: multiple attendees in one column
+EngagementActivities(Id, TenantId, Attendees = 'alice@spg.com, bob@spg.com')
+
+-- ✅ 1NF: separate table, one value per row
+EngagementActivities(Id, TenantId)
+EngagementAttendees(EngagementId, AttendeeEmail)
+```
+
+**2NF violation — partial dependency (composite PK only):**
+```sql
+-- ❌ Violates 2NF: TenantName depends on TenantId alone, not on (TenantId, CompanyId) PK
+EngagementActivities(TenantId, CompanyId, TenantName, Status)
+--                   ↑─────── composite PK ──────↑   └─ depends only on TenantId ❌
+
+-- ✅ 2NF: move TenantName to its own table
+Tenants(TenantId, TenantName)
+EngagementActivities(TenantId, CompanyId, Status)
+```
+
+**3NF violation — transitive dependency:**
+```sql
+-- ❌ Violates 3NF: TenantName depends on TenantId, which depends on EngagementId (A→B→C)
+EngagementActivities(EngagementId, TenantId, TenantName)
+-- TenantName depends on TenantId, not directly on EngagementId ❌
+
+-- ✅ 3NF: split transitive chain
+EngagementActivities(EngagementId, TenantId)
+Tenants(TenantId, TenantName)
+```
+
+**Denormalization** — intentional break of normal forms for read performance.
+In Capital Access, the **CQRS read model** (Targeting service) stores pre-joined data in Redis.
+Duplicated on write; <10ms reads. OLAP side of the system.
+
+**OLTP vs OLAP:**
+
+| Property | OLTP | OLAP |
+|----------|------|------|
+| Purpose | Transactional: read/write individual rows | Analytics: aggregate millions of rows |
+| Normalization | Fully normalized (3NF) | Denormalized (star schema) |
+| Query pattern | Point lookups, short transactions | Full scans, GROUP BY, aggregations |
+| Example | Engagement writes (Azure SQL) | PDF reports (Report service + Azure Functions) |
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| Normal form rules | Standard ANSI — identical | Same standard |
+| Covering index for read-side denorm | `CREATE INDEX ... INCLUDE (col)` | `CREATE INDEX ... INCLUDE (col)` — PG 11+ |
+| Partial / Filtered index | `CREATE INDEX ... WHERE Status = 'Active'` | `CREATE INDEX ... WHERE status = 'active'` — same syntax |
+
+---
+
+### Q6 — CHAR vs VARCHAR vs NCHAR vs NVARCHAR
+
+| Type | Storage | Encoding | Padding | Use when |
+|------|---------|----------|---------|----------|
+| `CHAR(n)` | Fixed: n bytes | ASCII (1 byte/char) | Padded with spaces | Fixed-length codes: status flags, country codes |
+| `VARCHAR(n)` | Variable: actual + 2 bytes | ASCII (1 byte/char) | No padding | Variable-length ASCII strings |
+| `NCHAR(n)` | Fixed: 2n bytes | Unicode UTF-16 | Padded | Fixed-length Unicode |
+| `NVARCHAR(n)` | Variable: 2×actual + 2 bytes | Unicode UTF-16 | No padding | Variable-length Unicode (names, addresses) |
+| `NVARCHAR(MAX)` | Up to 2 GB | Unicode | No padding | Long text (notes, descriptions) |
+
+**Capital Access:** `TenantId VARCHAR(50)`, `CompanyName NVARCHAR(200)` (supports Japanese/Chinese names), `Status CHAR(20)` (fixed enum values).
+
+Always prefix Unicode literals: `WHERE CompanyName = N'Müller'`
+Without `N` prefix SQL Server coerces to ASCII — special characters are lost.
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| Unicode type | `NVARCHAR` (UTF-16) | `TEXT` or `VARCHAR` — all strings are UTF-8 natively |
+| Unlimited text | `NVARCHAR(MAX)` | `TEXT` — no size limit, no overhead |
+| Unicode literal prefix | `N'value'` required | Not needed — all literals are UTF-8 |
+| Prefer in practice | `NVARCHAR` for text | `TEXT` (PG docs recommend TEXT over VARCHAR(n)) |
+
+---
+
+### Q7 — Primary Key vs Unique Key
+
+| Property | Primary Key | Unique Key |
+|----------|------------|------------|
+| NULLs allowed | ❌ Never | ✅ One NULL allowed (SQL Server) |
+| Count per table | One only | Multiple |
+| Clustered index | ✅ Created automatically | ❌ Non-clustered by default |
+| Implicit index | ✅ Always | ✅ Always (UNIQUE constraint = index) |
+| Purpose | Identifies each row | Enforces business uniqueness |
+
+```sql
+CREATE TABLE EngagementActivities (
+    Id             INT          PRIMARY KEY IDENTITY(1,1),  -- PK: clustered, not null, auto-inc
+    ExternalRefCode NVARCHAR(50) UNIQUE,                    -- unique but nullable, non-clustered
+    TenantId       VARCHAR(50)  NOT NULL
+);
+```
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| NULL in UNIQUE | One NULL per column allowed | Multiple NULLs allowed (NULLs ≠ each other in PG) |
+| PK → clustered | ✅ Auto-creates clustered index | ❌ PK creates B-tree; no heap-level clustering |
+| UUID PK | `NEWID()` (random, causes page splits) or `NEWSEQUENTIALID()` | `gen_random_uuid()` PG 13+ |
+
+---
+
+### Q8 — Indexes (Clustered vs Non-Clustered vs Covering)
+
+**Clustered Index:**
+- **IS the table** — data pages physically sorted in clustered key order
+- Leaf nodes = actual data rows
+- **One per table** (one physical sort order)
+- Default: created on PRIMARY KEY
+
+**Non-Clustered Index:**
+- Separate B-Tree alongside the table
+- Leaf nodes = indexed columns + pointer (clustered key)
+- Up to 999 per table
+- Explicitly created (except UNIQUE constraint)
+
+```
+Clustered (EngagementId):      Non-Clustered (TenantId):
+      [1000-2000]                    [hfrg-002]
+      /          \                   /         \
+ [1000-1500]  [1501-2000]      [hfrg-002]   [spg-001]
+    |                |            |                |
+[actual rows]  [actual rows]  [TenantId + EngId]  [TenantId + EngId]
+                                     ↓ Key Lookup ↓
+                                 clustered index
+                                 (fetch missing columns)
+```
+
+**Key Lookup** — most common execution plan bottleneck. Fix with INCLUDE (covering index):
+```sql
+-- ❌ Non-clustered without INCLUDE → Key Lookup for every row
+CREATE NONCLUSTERED INDEX IX_Tenant ON EngagementActivities(TenantId);
+
+-- ✅ Covering index: all needed columns in leaf node → zero table access
+CREATE NONCLUSTERED INDEX IX_Tenant_Covering
+ON EngagementActivities(TenantId)
+INCLUDE (Status, ScheduledAt, CompanyId);
+-- Query: SELECT Status, ScheduledAt FROM EngagementActivities WHERE TenantId = 'spg-001'
+-- Result: Index Only Scan — never touches the table ✅
+```
+
+**Index Seek vs Index Scan:**
+
+| | Index Seek | Index Scan |
+|---|-----------|-----------|
+| Reads | Only matching branch | Entire index |
+| Complexity | O(log n) | O(n) |
+| Triggered by | SARGable predicates | Non-SARGable predicates |
+
+**SARGable — enables Seek:**
+```sql
+WHERE TenantId = 'spg-001'                                       -- ✅ Seek
+WHERE ScheduledAt >= '2025-01-01' AND ScheduledAt < '2026-01-01' -- ✅ Seek
+WHERE TenantId LIKE 'spg%'                                       -- ✅ Seek (leading wildcard fixed)
+```
+
+**Non-SARGable — forces Scan:**
+```sql
+WHERE YEAR(ScheduledAt) = 2025    -- ❌ function wraps column → fix with date range
+WHERE LOWER(Status) = 'completed' -- ❌ function wraps column → store consistently
+WHERE TenantId LIKE '%001'        -- ❌ leading wildcard
+```
+
+**Composite index — left-most prefix rule:**
+```sql
+CREATE INDEX IX ON EngagementActivities(TenantId, Status, ScheduledAt);
+-- Uses index: WHERE TenantId = ?                              ✅
+-- Uses index: WHERE TenantId = ? AND Status = ?              ✅
+-- Skips index: WHERE Status = ?                              ❌ no left prefix
+```
+
+**GUID vs INT as clustered key:**
+`NEWID()` (random GUID) → random page insertions → page splits → fragmentation.
+Fix: `NEWSEQUENTIALID()` — monotonically increasing GUIDs.
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| Clustered index | Reorders heap physically | No native concept — `CLUSTER` reorders once but drift resumes |
+| INCLUDE covering | `CREATE INDEX ... INCLUDE (cols)` | `CREATE INDEX ... INCLUDE (cols)` — PG 11+ |
+| FK auto-index | ❌ Not automatic | ❌ Not automatic — same |
+| Expression index | Computed column workaround | `CREATE INDEX ON t(lower(col))` — native |
+| Hash index | ❌ Not available | ✅ `USING HASH` — equality-only, fast |
+| GIN / GiST | ❌ (use full-text index) | ✅ GIN for jsonb/arrays, GiST for geometric/range |
+
+---
+
+### Q9 — Stored Procedures vs Functions
+
+| Property | Stored Procedure | Function |
+|----------|-----------------|----------|
+| Return value | Optional (OUTPUT param or result sets) | Must return a value |
+| Use in SELECT | ❌ Cannot | ✅ Scalar UDF can appear in SELECT |
+| DML (INSERT/UPDATE/DELETE) | ✅ Allowed | ❌ Not allowed |
+| Transaction control | ✅ BEGIN TRAN / ROLLBACK | ❌ |
+| Multiple result sets | ✅ Can return many | ❌ Returns one value or table |
+| Call syntax | `EXEC dbo.sp_Name @param` | `SELECT dbo.fn_Name(@param)` |
+
+**Capital Access:** `sp_CreateEngagement` is a stored procedure (inserts + publishes Service Bus event). `fn_GetTenantDisplayName(@TenantId)` is a scalar function — used only in SELECT, never in WHERE (per-row execution cost).
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| Stored Procedure | `CREATE PROCEDURE` | `CREATE PROCEDURE` (PG 11+) or `CREATE FUNCTION ... RETURNS VOID` |
+| Call syntax | `EXEC sp_Name @p` | `CALL proc_name(val)` |
+| Scalar function | `CREATE FUNCTION ... RETURNS type` | `CREATE FUNCTION ... RETURNS type LANGUAGE plpgsql` |
+
+---
+
+### Q10 — How to Improve Stored Procedure Performance
+
+**① SET NOCOUNT ON — always first line:**
+```sql
+CREATE PROCEDURE sp_GetEngagements @TenantId VARCHAR(50)
+AS BEGIN
+    SET NOCOUNT ON;  -- eliminates "X rows affected" network message per statement ✅
+```
+
+**② Parameter Sniffing — biggest hidden killer:**
+SQL Server caches the execution plan from the first call. If first run had atypical data, all subsequent calls use that bad plan.
+```sql
+-- Fix A: OPTION(RECOMPILE) — fresh plan per execution (preferred, statement-level)
+SELECT * FROM EngagementActivities WHERE TenantId = @TenantId OPTION (RECOMPILE);
+
+-- Fix B: WITH RECOMPILE on SP — recompiles entire SP each call
+CREATE PROCEDURE sp_GetEngagements @TenantId VARCHAR(50) WITH RECOMPILE AS ...
+
+-- Fix C: local variable — optimizer cannot peek at value, uses average estimate
+DECLARE @LocalId VARCHAR(50) = @TenantId;
+SELECT * FROM EngagementActivities WHERE TenantId = @LocalId;
+
+-- Fix D: OPTIMIZE FOR — plan for the most common value
+SELECT * FROM EngagementActivities WHERE TenantId = @TenantId
+OPTION (OPTIMIZE FOR (@TenantId = 'spg-001'));
+```
+
+**③ Avoid non-SARGable predicates:**
+```sql
+WHERE YEAR(ScheduledAt) = 2025                                     -- ❌ full scan
+WHERE ScheduledAt >= '2025-01-01' AND ScheduledAt < '2026-01-01'  -- ✅ index seek
+```
+
+**④ SELECT only needed columns — never SELECT \***
+
+**⑤ Replace cursors with set-based operations:**
+```sql
+-- ❌ Cursor: one UPDATE per row — 50,000 iterations for 50,000 rows
+-- ✅ Set-based: one UPDATE for all matching rows — SQL Server optimizes the whole set
+UPDATE cp SET cp.LastEngagedAt = GETUTCDATE()
+FROM   CompanyProfiles cp
+WHERE  cp.Id IN (SELECT DISTINCT CompanyId FROM EngagementActivities WHERE TenantId = @TenantId);
+```
+
+**⑥ Avoid scalar UDFs in SELECT/WHERE** — execute once per row (same problem as cursors).
+
+**⑦ Keep transactions short** — all preparation outside BEGIN TRAN; only writes inside.
+
+**⑧ EXISTS not COUNT(\*) for existence checks:**
+```sql
+-- ❌ COUNT: scans all matching rows
+IF (SELECT COUNT(*) FROM EngagementActivities WHERE CompanyId = @Id) > 0
+-- ✅ EXISTS: stops at first match ✅
+IF EXISTS (SELECT 1 FROM EngagementActivities WHERE CompanyId = @Id)
+```
+
+**⑨ Schema-qualify all objects:** `dbo.EngagementActivities` not `EngagementActivities`
+
+**⑩ sp_executesql for dynamic SQL — parameterized, cached, safe:**
+```sql
+DECLARE @SQL NVARCHAR(MAX) = N'SELECT * FROM dbo.EngagementActivities WHERE TenantId = @TenantId';
+EXEC sp_executesql @SQL, N'@TenantId VARCHAR(50)', @TenantId = @TenantId;
+```
+
+**⑪ Temp tables for large intermediate results used multiple times:**
+```sql
+CREATE TABLE #ActiveTenants (TenantId VARCHAR(50) PRIMARY KEY);
+INSERT INTO #ActiveTenants SELECT DISTINCT TenantId FROM EngagementActivities
+WHERE ScheduledAt > DATEADD(MONTH, -3, GETUTCDATE());
+-- Use #ActiveTenants twice — computed once, indexed, statistics built ✅
+DROP TABLE #ActiveTenants;
+```
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| Parameter sniffing fix | `OPTION(RECOMPILE)` | `EXECUTE format(...) USING val` in PL/pgSQL avoids caching |
+| SET NOCOUNT equivalent | `SET NOCOUNT ON` | Not needed — PG doesn't send per-statement row counts same way |
+| Dynamic SQL | `sp_executesql @sql, @paramdef, @val` | `EXECUTE format('...', val)` in PL/pgSQL |
+| Temp tables | `#local` (session), `##global` (all sessions) — tempdb | `CREATE TEMP TABLE` — session-scoped, auto-dropped at session end |
+
+---
+
+### Q11 — Triggers (AFTER vs INSTEAD OF)
+
+**AFTER trigger** — fires after DML completes. Audit logs, cascading updates.
+```sql
+CREATE TRIGGER trg_EngagementAudit
+ON EngagementActivities
+AFTER UPDATE
+AS BEGIN
+    SET NOCOUNT ON;
+    INSERT INTO EngagementAuditLog (EngagementId, OldStatus, NewStatus, ChangedAt)
+    SELECT d.Id, d.Status, i.Status, GETUTCDATE()
+    FROM INSERTED i               -- virtual table: NEW values after update
+    JOIN DELETED  d ON d.Id = i.Id  -- virtual table: OLD values before update
+    WHERE d.Status <> i.Status;   -- log only actual status changes
+END;
+```
+
+**INSTEAD OF trigger** — replaces the DML. Used on views or to prevent invalid actions.
+```sql
+CREATE TRIGGER trg_PreventDeleteCompleted
+ON EngagementActivities
+INSTEAD OF DELETE
+AS BEGIN
+    SET NOCOUNT ON;
+    IF EXISTS (SELECT 1 FROM DELETED WHERE Status = 'Completed')
+    BEGIN
+        RAISERROR('Cannot delete completed engagements.', 16, 1);
+        RETURN;
+    END;
+    DELETE FROM EngagementActivities WHERE Id IN (SELECT Id FROM DELETED);
+END;
+```
+
+**INSERTED / DELETED virtual tables:**
+
+| Trigger Event | INSERTED | DELETED |
+|--------------|----------|---------|
+| INSERT | New rows | Empty |
+| DELETE | Empty | Old rows (before delete) |
+| UPDATE | New values | Old values |
+
+**Trigger types:** DML (INSERT/UPDATE/DELETE), DDL (ALTER/DROP TABLE), Logon
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| Trigger body | Inline in `CREATE TRIGGER ... AS BEGIN ... END` | Separate function: `CREATE FUNCTION fn() RETURNS trigger ... CREATE TRIGGER ... EXECUTE FUNCTION fn()` |
+| Row vs statement | Statement-level (INSERTED/DELETED = all rows) | `FOR EACH ROW` or `FOR EACH STATEMENT` — explicit |
+| NEW / OLD access | `INSERTED` (new), `DELETED` (old) | `NEW` (new row), `OLD` (old row) in FOR EACH ROW |
+| INSTEAD OF on table | ✅ Supported | ❌ Use BEFORE trigger to achieve same effect |
+
+---
+
+### Q12 — IDENTITY and Transactions
+
+**IDENTITY:**
+```sql
+CREATE TABLE EngagementActivities (
+    Id INT IDENTITY(1, 1) PRIMARY KEY   -- seed=1, increment=1
+);
+
+INSERT INTO EngagementActivities(TenantId) VALUES('spg-001');
+SELECT SCOPE_IDENTITY();   -- ✅ last Id in current scope (safe with triggers)
+-- @@IDENTITY: last Id in session — dangerous if trigger inserts into another identity table
+```
+
+**Transactions + ACID:**
+```sql
+BEGIN TRANSACTION;
+BEGIN TRY
+    UPDATE InvestorProfiles SET AumUsd += 1000000 WHERE Id = @InvestorId;
+    INSERT INTO EngagementActivities(TenantId, CompanyId, Status)
+    VALUES (@TenantId, @CompanyId, 'Pending');
+    COMMIT TRANSACTION;
+END TRY
+BEGIN CATCH
+    ROLLBACK TRANSACTION;
+    THROW;
+END CATCH;
+```
+
+| ACID | Meaning |
+|------|---------|
+| Atomicity | All or nothing — ROLLBACK undoes partial work |
+| Consistency | Constraints (FK, CHECK, NOT NULL) enforced at commit |
+| Isolation | Concurrent transactions don't see each other's uncommitted data |
+| Durability | WAL flushed to disk before COMMIT returns |
+
+**Isolation Levels:**
+
+| Level | Dirty Read | Non-Repeatable Read | Phantom Read |
+|-------|-----------|---------------------|--------------|
+| READ UNCOMMITTED | ✅ possible | ✅ | ✅ |
+| READ COMMITTED *(default)* | ❌ | ✅ | ✅ |
+| REPEATABLE READ | ❌ | ❌ | ✅ |
+| SERIALIZABLE | ❌ | ❌ | ❌ |
+| SNAPSHOT | ❌ | ❌ | ❌ (row versioning — no locks) |
+
+**Azure SQL has `READ_COMMITTED_SNAPSHOT ON` by default** — readers use row versions, not locks. Report generation doesn't block engagement writes in Capital Access.
+
+**Deadlock** — circular lock dependency. SQL Server kills one transaction automatically.
+Prevention: consistent lock order, short transactions, SNAPSHOT isolation.
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| Default isolation | READ COMMITTED | READ COMMITTED |
+| SNAPSHOT isolation | `SET TRANSACTION ISOLATION LEVEL SNAPSHOT` | All transactions use MVCC — no dirty reads possible at any level |
+| Dirty reads | Possible at READ UNCOMMITTED / `WITH (NOLOCK)` | Not possible — MVCC prevents them |
+| SCOPE_IDENTITY equivalent | `SCOPE_IDENTITY()` | `INSERT ... RETURNING id` (preferred) or `lastval()` |
+
+---
+
+### Q13 — JOINs
+
+**INNER JOIN** — only rows matching in both tables:
+```sql
+SELECT e.Id, e.Status, p.InvestorName
+FROM   EngagementActivities e
+INNER JOIN InvestorProfiles p ON p.InvestorId = e.InvestorId;
+-- Engagements with no InvestorProfiles match → excluded ✅
+```
+
+**LEFT JOIN** — ALL from left + matching from right (NULLs where no match):
+```sql
+SELECT e.Id, e.Status, p.InvestorName   -- NULL where profile missing ✅
+FROM   EngagementActivities e
+LEFT JOIN InvestorProfiles p ON p.InvestorId = e.InvestorId;
+
+-- ⚠️ Classic trap: WHERE on right-table column silently turns LEFT into INNER JOIN
+WHERE p.InvestorName = 'BlackRock'    -- ❌ excludes NULL rows → now INNER
+-- ✅ Fix: filter in ON clause
+LEFT JOIN InvestorProfiles p
+    ON p.InvestorId = e.InvestorId AND p.InvestorName = 'BlackRock'
+```
+
+**LEFT vs RIGHT table — purely positional:**
+- Table after `FROM` = **LEFT**
+- Table after `JOIN` keyword = **RIGHT**
+- `LEFT JOIN` keeps ALL rows from the FROM table
+
+**RIGHT JOIN** — ALL from right table + matching from left (rare, rewrite as LEFT JOIN).
+
+**FULL OUTER JOIN** — ALL rows from both tables, NULLs on non-matching side.
+
+**CROSS JOIN** — Cartesian product (m × n rows), no ON clause:
+```sql
+SELECT r.ReportType, t.TenantId
+FROM   ReportTypes r CROSS JOIN Tenants t;
+-- 5 report types × 20 tenants = 100 rows — generate all combinations ✅
+```
+
+**Self Join** — table joined to itself using two aliases:
+```sql
+SELECT e.Name AS Employee, m.Name AS Manager
+FROM   Employees e
+JOIN   Employees m ON m.EmployeeId = e.ManagerId
+WHERE  e.Salary > m.Salary;   -- employees earning more than their manager
+```
+
+**SQL vs PostgreSQL:**
+
+| JOIN Type | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| INNER / LEFT / RIGHT / FULL OUTER / CROSS | ✅ Identical | ✅ Identical |
+| `CROSS APPLY` | ✅ = INNER JOIN LATERAL | ❌ Use `JOIN LATERAL ON true` |
+| `OUTER APPLY` | ✅ = LEFT JOIN LATERAL | ❌ Use `LEFT JOIN LATERAL ON true` |
+| `WITH (NOLOCK)` | ✅ dirty read hint | ❌ Not needed — MVCC prevents dirty reads |
+| `NATURAL JOIN` | ❌ | ✅ Supported (avoid in production — fragile) |
+
+---
+
+### Q14 — UNION vs UNION ALL
+
+```sql
+-- UNION: removes duplicates (sorts to find them — slower)
+SELECT TenantId FROM EngagementActivities
+UNION
+SELECT TenantId FROM EngagementHistory;
+-- spg-001 in both → appears once ✅
+
+-- UNION ALL: keeps all rows including duplicates (faster — no sort/dedup)
+SELECT TenantId FROM EngagementActivities
+UNION ALL
+SELECT TenantId FROM EngagementHistory;
+-- spg-001 in both → appears twice
+
+-- Rules: same column count in both SELECT, compatible data types
+-- Column names come from first SELECT
+```
+
+**Capital Access:** activity feed uses `UNION ALL` — events from different source tables are distinct by source system, no duplicates possible → no need to pay dedup cost.
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| `UNION` / `UNION ALL` | ✅ Standard | ✅ Identical |
+| `EXCEPT` | ✅ | ✅ |
+| `INTERSECT` | ✅ | ✅ |
+| `MINUS` | ❌ (use EXCEPT) | ❌ (use EXCEPT) |
+
+---
+
+### Q15 — Aggregate Functions, GROUP BY, HAVING
+
+```sql
+SELECT
+    TenantId,
+    COUNT(*)                           AS TotalEngagements,   -- includes NULLs
+    COUNT(AttendeeEmail)               AS WithAttendees,       -- skips NULLs
+    COUNT(DISTINCT CompanyId)          AS UniqueCompanies,
+    SUM(AttendeeCount)                 AS TotalAttendees,
+    AVG(CAST(AttendeeCount AS FLOAT))  AS AvgAttendees,
+    MIN(ScheduledAt)                   AS FirstEngagement,
+    MAX(ScheduledAt)                   AS LastEngagement,
+    STRING_AGG(Status, ', ')           AS AllStatuses
+FROM EngagementActivities
+WHERE ScheduledAt >= '2025-01-01'    -- WHERE runs BEFORE GROUP BY → filters rows
+GROUP BY TenantId
+HAVING COUNT(*) > 10                 -- HAVING runs AFTER GROUP BY → filters groups
+ORDER BY TotalEngagements DESC;
+```
+
+**SQL Execution Order:**
+```
+FROM → JOIN → WHERE → GROUP BY → HAVING → SELECT → DISTINCT → ORDER BY → TOP/OFFSET
+```
+
+| Clause | Filters | Aggregates allowed? |
+|--------|---------|---------------------|
+| `WHERE` | Individual rows (before grouping) | ❌ No |
+| `HAVING` | Groups (after aggregation) | ✅ Yes |
+
+**NULL behavior in aggregates:** SUM / AVG / MIN / MAX / COUNT(col) all **skip NULLs**. Only COUNT(*) includes them.
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| `STRING_AGG` | SQL Server 2017+ | PG 9.0+, same syntax |
+| `GROUP BY` with PK | Must list all non-agg SELECT cols | `GROUP BY id` infers functional dependency — other cols of same table implied (PG 9.1+) |
+| Conditional aggregate | `SUM(CASE WHEN status='Active' THEN 1 END)` | Same + `COUNT(*) FILTER (WHERE status = 'active')` — cleaner PG syntax |
+
+---
+
+### Q16 — NULL Handling
+
+```sql
+WHERE ManagerId IS NULL        -- ✅ correct NULL check
+WHERE ManagerId = NULL         -- ❌ always UNKNOWN (never TRUE)
+
+-- ISNULL(expr, replacement) — SQL Server only
+SELECT ISNULL(AttendeeCount, 0)
+
+-- COALESCE(a, b, c) — ANSI standard, returns first non-NULL
+SELECT COALESCE(MobilePhone, OfficePhone, 'No phone')
+
+-- NULLIF(a, b) — returns NULL if a = b, else returns a
+SELECT NULLIF(Status, 'Unknown')   -- 'Unknown' → NULL; anything else → itself
+
+-- NULL in JOIN: NULL ≠ NULL → rows with NULL join column are always excluded
+```
+
+---
+
+### Q17 — CASE Statement
+
+```sql
+-- Searched CASE (any condition)
+SELECT
+    CASE
+        WHEN AttendeeCount >= 50 THEN 'Large'
+        WHEN AttendeeCount >= 10 THEN 'Medium'
+        WHEN AttendeeCount >= 1  THEN 'Small'
+        ELSE                          'Virtual Only'
+    END AS EventSize,
+    -- CASE in ORDER BY — custom sort
+    CASE Status WHEN 'Pending' THEN 1 WHEN 'Completed' THEN 2 ELSE 3 END AS SortOrder
+FROM EngagementActivities
+ORDER BY SortOrder;
+
+-- Conditional aggregate using CASE
+SELECT
+    COUNT(CASE WHEN Status = 'Completed' THEN 1 END) AS Completed,
+    COUNT(CASE WHEN Status = 'Pending'   THEN 1 END) AS Pending
+FROM EngagementActivities;
+```
+
+---
+
+### Q18 — Self-Referencing Tables and Self Join
+
+**Self-referencing table** — FK pointing to the same table (hierarchy):
+```sql
+CREATE TABLE Employees (
+    EmployeeId INT PRIMARY KEY,
+    Name       NVARCHAR(100),
+    Salary     DECIMAL(18,2),
+    ManagerId  INT NULL REFERENCES Employees(EmployeeId)   -- FK to self ✅
+);
+```
+
+**Self join** — two aliases on the same table to read related rows simultaneously:
+```sql
+-- Employees earning more than their manager
+SELECT e.Name AS Employee, e.Salary, m.Name AS Manager, m.Salary AS ManagerSalary
+FROM   Employees e
+JOIN   Employees m ON m.EmployeeId = e.ManagerId
+WHERE  e.Salary > m.Salary;
+
+-- No manager (top of hierarchy)
+SELECT * FROM Employees WHERE ManagerId IS NULL;
+
+-- Who is a manager (has at least one direct report)
+SELECT DISTINCT m.EmployeeId, m.Name
+FROM Employees e JOIN Employees m ON m.EmployeeId = e.ManagerId;
+
+-- Highest paid per department using DENSE_RANK
+WITH Ranked AS (
+    SELECT *, DENSE_RANK() OVER (PARTITION BY Department ORDER BY Salary DESC) AS Rnk
+    FROM Employees
+)
+SELECT * FROM Ranked WHERE Rnk = 1;
+```
+
+---
+
+### Q19 — Subqueries and Correlated Subqueries
+
+**Regular subquery** — runs once, result used by outer query:
+```sql
+SELECT * FROM EngagementActivities
+WHERE CompanyId IN (
+    SELECT Id FROM Companies WHERE Sector = 'Finance'   -- runs ONCE ✅
+);
+```
+
+**Correlated subquery** — references outer column, runs **once per outer row** (O(n²)):
+```sql
+-- ❌ Correlated — runs per EngagementActivity row
+SELECT e.Id,
+    (SELECT COUNT(*) FROM Attendees WHERE EngagementId = e.Id) AS AttendeeCount
+FROM EngagementActivities e;
+
+-- ✅ Rewrite as JOIN — runs once as a set
+SELECT e.Id, COUNT(a.Email) AS AttendeeCount
+FROM   EngagementActivities e
+LEFT JOIN EngagementAttendees a ON a.EngagementId = e.Id
+GROUP BY e.Id;
+```
+
+**EXISTS vs IN:**
+```sql
+-- EXISTS — short-circuits at first match ✅ (faster for large datasets)
+WHERE EXISTS (SELECT 1 FROM Attendees WHERE EngagementId = e.Id)
+
+-- IN — collects all values first; NULL in subquery can cause unexpected exclusions
+-- NULL IN (1, NULL) = UNKNOWN → row excluded
+WHERE Id IN (SELECT EngagementId FROM Attendees)   -- safe only if no NULLs in subquery
+```
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| Correlated subquery | Supported | Supported |
+| `LATERAL` subquery | `CROSS APPLY` / `OUTER APPLY` | `JOIN LATERAL ON true` / `LEFT JOIN LATERAL ON true` |
+| `IN` with NULLs | NULL causes row exclusion | Same — identical NULL semantics |
+
+---
+
+### Q20 — CTE (Common Table Expression) and Recursive CTE
+
+Named temporary result set, scoped to **one statement**:
+```sql
+WITH ActiveEngagements AS (
+    SELECT * FROM EngagementActivities WHERE Status = 'Pending'
+),
+TenantSummary AS (
+    SELECT TenantId, COUNT(*) AS Total FROM ActiveEngagements GROUP BY TenantId
+)
+SELECT * FROM TenantSummary WHERE Total > 5;
+
+-- DELETE / UPDATE through CTE modifies the base table physically
+WITH ToDelete AS (
+    SELECT TOP 100 * FROM EngagementActivities WHERE Status = 'Cancelled'
+)
+DELETE FROM ToDelete;   -- actual rows deleted from EngagementActivities ✅
+```
+
+**Recursive CTE — org chart / hierarchy:**
+```sql
+WITH OrgChart AS (
+    -- Anchor: top of hierarchy
+    SELECT EmployeeId, Name, ManagerId, 0 AS Level, CAST(Name AS NVARCHAR(MAX)) AS Path
+    FROM   Employees WHERE ManagerId IS NULL
+
+    UNION ALL   -- must be UNION ALL, not UNION
+
+    -- Recursive: join each employee to their found parent
+    SELECT e.EmployeeId, e.Name, e.ManagerId, h.Level + 1, h.Path + ' > ' + e.Name
+    FROM   Employees e JOIN OrgChart h ON h.EmployeeId = e.ManagerId
+)
+SELECT Level, Path, Name FROM OrgChart ORDER BY Level, Name;
+OPTION (MAXRECURSION 0);   -- default limit 100; 0 = unlimited
+```
+
+**CTE vs Temp Table:**
+
+| Property | CTE | Temp Table (`#`) |
+|----------|-----|-----------------|
+| Storage | None — may re-evaluate | tempdb — computed once |
+| Scope | One statement | Session |
+| Index | ❌ Cannot | ✅ Can add indexes |
+| Statistics | ❌ None | ✅ SQL Server builds stats |
+| Recursive | ✅ | ❌ |
+| Large dataset reused | ❌ May re-evaluate each reference | ✅ Computed once |
+| Best for | Single use, clean syntax, recursion | Large result used multiple times |
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| CTE syntax | `WITH name AS (...)` | Identical |
+| CTE DELETE | `DELETE FROM CTE WHERE rn > 1` — base table modified | PG: CTE is read-only in DML — must `DELETE FROM table WHERE id IN (SELECT id FROM cte WHERE rn > 1)` |
+| CTE materialization | Optimizer may re-evaluate | PG 12+: optimizer decides; pre-PG12 CTEs were always optimization fences |
+| Recursive CTE max | `OPTION (MAXRECURSION n)` | No limit by default |
+
+---
+
+### Q21 — Window Functions
+
+Execute a calculation across related rows **without collapsing them**.
+
+```sql
+SELECT TenantId, CompanyId, AttendeeCount, ScheduledAt,
+
+    -- Ranking
+    ROW_NUMBER()   OVER (PARTITION BY TenantId ORDER BY ScheduledAt DESC) AS RowNum,
+    RANK()         OVER (PARTITION BY TenantId ORDER BY AttendeeCount DESC) AS Rnk,
+    DENSE_RANK()   OVER (PARTITION BY TenantId ORDER BY AttendeeCount DESC) AS DenseRnk,
+    NTILE(4)       OVER (PARTITION BY TenantId ORDER BY AttendeeCount DESC) AS Quartile,
+
+    -- Analytic (neighbouring rows)
+    LAG(ScheduledAt, 1)  OVER (PARTITION BY TenantId ORDER BY ScheduledAt) AS PrevDate,
+    LEAD(ScheduledAt, 1) OVER (PARTITION BY TenantId ORDER BY ScheduledAt) AS NextDate,
+
+    -- Aggregate as window function
+    COUNT(*)       OVER (PARTITION BY TenantId)                               AS TotalForTenant,
+    SUM(AttendeeCount) OVER (PARTITION BY TenantId ORDER BY ScheduledAt)      AS RunningTotal,
+    AVG(AttendeeCount) OVER (PARTITION BY TenantId)                           AS AvgForTenant
+
+FROM EngagementActivities;
+-- ALL rows returned — nothing collapsed ✅
+```
+
+**PARTITION BY vs GROUP BY:**
+
+| | GROUP BY | PARTITION BY |
+|---|----------|-------------|
+| Output rows | One per group | All original rows kept |
+| Row detail | Lost | Preserved alongside aggregate |
+| Use when | "Total per group?" | "Each row WITH its group's stats?" |
+
+```sql
+-- GROUP BY: 2 rows for 2 tenants — individual engagement data gone ❌
+SELECT TenantId, COUNT(*) AS Total FROM EngagementActivities GROUP BY TenantId;
+
+-- PARTITION BY: all rows, tenant total stamped on each ✅
+SELECT TenantId, CompanyId, Status,
+    COUNT(*) OVER (PARTITION BY TenantId) AS TenantTotal
+FROM EngagementActivities;
+```
+
+**RANK vs DENSE_RANK:**
+```
+Data: AttendeeCount = 50, 40, 40, 30
+RANK:       1, 2, 2, 4   ← gap (3 skipped — two people shared 2nd) ❌
+DENSE_RANK: 1, 2, 2, 3   ← no gap ✅
+ROW_NUMBER: 1, 2, 3, 4   ← always unique, ignores ties
+```
+
+For "Nth highest" queries → always use DENSE_RANK (no gap means Nth rank always exists).
+
+**Nth highest salary pattern:**
+```sql
+WITH Ranked AS (
+    SELECT *, DENSE_RANK() OVER (ORDER BY Salary DESC) AS Rnk FROM Employees
+)
+SELECT * FROM Ranked WHERE Rnk = 2;   -- 2nd highest, all ties included ✅
+```
+
+**Most recent engagement per tenant-company pair:**
+```sql
+WITH Latest AS (
+    SELECT *,
+        ROW_NUMBER() OVER (PARTITION BY TenantId, CompanyId ORDER BY ScheduledAt DESC) AS rn
+    FROM EngagementActivities
+)
+SELECT TenantId, CompanyId, Status, ScheduledAt FROM Latest WHERE rn = 1;
+```
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| Window function syntax | `OVER (PARTITION BY ... ORDER BY ...)` | Identical |
+| `ROW_NUMBER` / `RANK` / `DENSE_RANK` / `LAG` / `LEAD` | ✅ | ✅ Identical |
+| `FILTER` on window aggregate | ❌ | ✅ `SUM(val) FILTER (WHERE cond) OVER (...)` |
+| `DISTINCT ON` (first row per group) | ❌ — use ROW_NUMBER CTE | ✅ `SELECT DISTINCT ON (tenant_id) * FROM ... ORDER BY tenant_id, date DESC` |
+
+---
+
+### Q22 — Find Unique / Duplicate Records
+
+```sql
+-- DISTINCT: remove visual duplicates from output
+SELECT DISTINCT TenantId, CompanyId, Status FROM EngagementActivities;
+
+-- Truly unique rows (appear ONCE — no duplicate at all)
+SELECT TenantId, CompanyId, Status, ScheduledAt
+FROM   EngagementActivities
+GROUP BY TenantId, CompanyId, Status, ScheduledAt
+HAVING COUNT(*) = 1;
+
+-- Duplicate rows (appear MORE than once)
+SELECT TenantId, CompanyId, Status, ScheduledAt, COUNT(*) AS Occurrences
+FROM   EngagementActivities
+GROUP BY TenantId, CompanyId, Status, ScheduledAt
+HAVING COUNT(*) > 1;
+```
+
+---
+
+### Q23 — Delete Duplicate Records
+
+**Method 1 — With Id (keep lowest Id):**
+```sql
+DELETE FROM EngagementActivities
+WHERE Id NOT IN (
+    SELECT MIN(Id)
+    FROM   EngagementActivities
+    GROUP BY TenantId, CompanyId, Status, ScheduledAt
+);
+
+-- OR: self-join approach
+DELETE e1
+FROM   EngagementActivities e1
+JOIN   EngagementActivities e2
+    ON  e1.TenantId = e2.TenantId AND e1.CompanyId = e2.CompanyId
+    AND e1.Status = e2.Status AND e1.ScheduledAt = e2.ScheduledAt
+    AND e1.Id > e2.Id;   -- keep lower Id, delete higher ✅
+```
+
+**Method 2 — Without Id (add temp identity column):**
+```sql
+ALTER TABLE EngagementActivities ADD TempRowId INT IDENTITY(1,1);
+DELETE FROM EngagementActivities
+WHERE TempRowId NOT IN (
+    SELECT MIN(TempRowId) FROM EngagementActivities
+    GROUP BY TenantId, CompanyId, Status, ScheduledAt
+);
+ALTER TABLE EngagementActivities DROP COLUMN TempRowId;
+```
+
+**Method 3 — CTE (cleanest, interview preferred):**
+```sql
+-- Preview first:
+WITH DuplicateCTE AS (
+    SELECT *,
+        ROW_NUMBER() OVER (
+            PARTITION BY TenantId, CompanyId, Status, ScheduledAt
+            ORDER BY Id   -- keep lowest Id
+        ) AS rn
+    FROM EngagementActivities
+)
+SELECT * FROM DuplicateCTE WHERE rn > 1;  -- verify what will be deleted ✅
+-- Then:
+DELETE FROM DuplicateCTE WHERE rn > 1;    -- change SELECT to DELETE ✅
+```
+
+**Method 4 — Millions of rows without performance impact:**
+```sql
+-- One DELETE of 10M rows: fills transaction log, locks table for minutes ❌
+-- Batch approach: delete in small chunks, release locks between batches ✅
+
+DECLARE @BatchSize INT = 5000;
+DECLARE @DeletedCount INT = 1;
+
+WHILE @DeletedCount > 0
+BEGIN
+    WITH DuplicateCTE AS (
+        SELECT TOP (@BatchSize) *,
+            ROW_NUMBER() OVER (
+                PARTITION BY TenantId, CompanyId, Status, ScheduledAt
+                ORDER BY Id
+            ) AS rn
+        FROM EngagementActivities
+    )
+    DELETE FROM DuplicateCTE WHERE rn > 1;
+
+    SET @DeletedCount = @@ROWCOUNT;
+    RAISERROR('Batch: %d rows deleted', 0, 1, @DeletedCount) WITH NOWAIT;
+
+    IF @DeletedCount > 0
+        WAITFOR DELAY '00:00:01';  -- 1-second pause: lets other queries run ✅
+END;
+
+-- Alternative: staging table swap (near-zero downtime for very large tables)
+SELECT * INTO EngagementActivities_Clean
+FROM (
+    SELECT *,
+        ROW_NUMBER() OVER (PARTITION BY TenantId, CompanyId, Status, ScheduledAt ORDER BY Id) AS rn
+    FROM EngagementActivities
+) t WHERE rn = 1;
+
+EXEC sp_rename 'EngagementActivities',       'EngagementActivities_Old';
+EXEC sp_rename 'EngagementActivities_Clean', 'EngagementActivities';
+-- Verify, then: DROP TABLE EngagementActivities_Old;
+```
+
+**Why batching works:**
+```
+5,000 rows deleted → small transaction → minimal log growth ✅
+Transaction commits → log space released, locks freed ✅
+1-second pause → other queries can run between batches ✅
+10M rows / 5,000 per batch = 2,000 batches ≈ 33 minutes — server stays responsive ✅
+```
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| CTE DELETE | `DELETE FROM CTE WHERE rn > 1` — modifies base table | PG CTEs are read-only in DML: `DELETE FROM t WHERE id IN (SELECT id FROM cte WHERE rn > 1)` |
+| Batch delete loop | `WHILE @count > 0 DELETE TOP(@n) ...` | `DO $$ LOOP DELETE ... LIMIT n; EXIT WHEN n = 0; END LOOP; $$ LANGUAGE plpgsql` |
+| `@@ROWCOUNT` | `@@ROWCOUNT` after DML | `GET DIAGNOSTICS count = ROW_COUNT` in PL/pgSQL |
+
+---
+
+### Q24 — Employee / Manager Self-Join Problems
+
+```sql
+-- Employees earning MORE than their manager
+SELECT e.Name AS Employee, e.Salary, m.Name AS Manager, m.Salary AS ManagerSalary
+FROM   Employees e
+JOIN   Employees m ON m.EmployeeId = e.ManagerId
+WHERE  e.Salary > m.Salary;
+
+-- No manager (CEO / top of org chart)
+SELECT * FROM Employees WHERE ManagerId IS NULL;
+
+-- Who is a manager (has at least one direct report)
+SELECT DISTINCT m.EmployeeId, m.Name
+FROM Employees e JOIN Employees m ON m.EmployeeId = e.ManagerId;
+
+-- Highest paid per department
+WITH Ranked AS (
+    SELECT *, DENSE_RANK() OVER (PARTITION BY Department ORDER BY Salary DESC) AS Rnk
+    FROM Employees
+)
+SELECT * FROM Ranked WHERE Rnk = 1;
+
+-- Full org hierarchy with level and path
+WITH OrgChart AS (
+    SELECT EmployeeId, Name, ManagerId, 0 AS Level, CAST(Name AS NVARCHAR(MAX)) AS Path
+    FROM   Employees WHERE ManagerId IS NULL
+    UNION ALL
+    SELECT e.EmployeeId, e.Name, e.ManagerId, h.Level + 1, h.Path + ' > ' + e.Name
+    FROM   Employees e JOIN OrgChart h ON h.EmployeeId = e.ManagerId
+)
+SELECT Level, Path, Name FROM OrgChart ORDER BY Level, Name;
+```
+
+---
+
+*(Further questions will be appended as new topics are covered.)*
 
 ---
