@@ -3801,8 +3801,957 @@ Attack 2 — Valid enterprise tenant hammering reports:
 
 ## 5. Entity Framework Core
 
-<!-- Content added in next session -->
+### What is EF Core?
+ORM (Object-Relational Mapper) that maps C# classes to database tables. In Capital Access, the Engagement/Activity service uses EF Core 8 with Azure SQL.
 
-## 6. LINQ
+### Code-First vs Database-First
 
-<!-- Content added in next session -->
+| | Code-First | Database-First |
+|---|-----------|---------------|
+| Source of truth | C# entity classes | Existing DB schema |
+| Command | `dotnet ef migrations add Init` → `dotnet ef database update` | `dotnet ef dbcontext scaffold "connStr" Microsoft.EntityFrameworkCore.SqlServer` |
+| Use when | Greenfield, team owns schema | Legacy DB exists, DBA owns schema |
+
+**Capital Access uses Code-First** — migrations tracked in git.
+
+### DbContext and DbSet
+```csharp
+public class CapitalAccessDbContext : DbContext
+{
+    public DbSet<EngagementActivity> EngagementActivities { get; set; }
+    public DbSet<InvestorProfile>    InvestorProfiles     { get; set; }
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<EngagementActivity>(e => {
+            e.ToTable("EngagementActivities");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.TenantId).HasMaxLength(50).IsRequired();
+            e.HasIndex(x => x.TenantId);
+            e.HasOne(x => x.Company)
+             .WithMany(c => c.Engagements)
+             .HasForeignKey(x => x.CompanyId);
+        });
+    }
+}
+```
+
+### Entity States — Change Tracking
+
+| State | What happens at SaveChanges() |
+|-------|------------------------------|
+| Added | INSERT |
+| Unchanged | Nothing |
+| Modified | UPDATE |
+| Deleted | DELETE |
+| Detached | Not tracked — ignored |
+
+```csharp
+var e = await _context.EngagementActivities.FindAsync(id); // Unchanged
+e.Status = "Completed";                                     // Modified (auto-detected)
+await _context.SaveChangesAsync();                          // UPDATE runs
+
+// Manually set state (entity from API body — not loaded from context)
+_context.Entry(entity).State = EntityState.Modified;
+await _context.SaveChangesAsync();
+```
+
+### N+1 Problem — Most Important EF Core Interview Question
+
+```csharp
+// ❌ N+1: 1 query for engagements + N queries for Company (one per row)
+var list = await _context.EngagementActivities.ToListAsync();
+foreach (var e in list) Console.WriteLine(e.Company.Name); // lazy load per row ❌
+
+// ✅ Fix: Eager loading with Include — one JOIN query
+var list = await _context.EngagementActivities
+    .Include(e => e.Company)
+    .Include(e => e.Attendees)
+        .ThenInclude(a => a.ContactInfo)
+    .ToListAsync();
+```
+
+**Three loading strategies:**
+- **Eager** — `Include()` — one query with JOINs ✅ Use this
+- **Lazy** — `virtual` nav props + proxy package — loads on access ❌ Causes N+1
+- **Explicit** — `_context.Entry(e).Reference(x => x.Company).LoadAsync()` — manual control
+
+### AsNoTracking — Read-Only Performance
+```csharp
+// Without: EF tracks every entity → memory + CPU overhead
+// With: no snapshot, no change tracking → faster reads ✅
+var list = await _context.EngagementActivities
+    .AsNoTracking()
+    .Where(e => e.TenantId == tenantId)
+    .ToListAsync();
+// Use for all read-only API endpoints ✅
+```
+
+### Migrations
+```bash
+dotnet ef migrations add AddEngagementPriority  # generates Up() + Down()
+dotnet ef database update                        # applies migration
+dotnet ef database update PreviousMigration      # rollback
+```
+
+### EF Core 8 Bulk Operations (no loading required)
+```csharp
+// ExecuteUpdateAsync — UPDATE without loading entities
+await _context.EngagementActivities
+    .Where(e => e.TenantId == tenantId && e.Status == "Pending")
+    .ExecuteUpdateAsync(e => e.SetProperty(x => x.Status, "Cancelled"));
+
+// ExecuteDeleteAsync — DELETE without loading entities
+await _context.EngagementActivities
+    .Where(e => e.IsDeleted)
+    .ExecuteDeleteAsync();
+```
+
+### EF Performance Bottlenecks
+- N+1 queries → use Include()
+- No AsNoTracking on read-only queries
+- SELECT * (no projection) → use `.Select(e => new Dto {...})`
+- Calling `.ToList()` too early → filter in IQueryable before materializing
+- Missing indexes on FK / filter columns → add via `HasIndex()` in Fluent API
+
+---
+
+## 6. LINQ (Language Integrated Query)
+
+### Method Syntax vs Query Syntax
+```csharp
+// Method syntax ← use this in interviews
+var result = EngagementActivities
+    .Where(e => e.TenantId == "spg-001" && e.Status == "Pending")
+    .OrderByDescending(e => e.ScheduledAt)
+    .Select(e => new { e.Id, e.Status });
+
+// Query syntax (SQL-like — same result)
+var result = from e in EngagementActivities
+             where e.TenantId == "spg-001" && e.Status == "Pending"
+             orderby e.ScheduledAt descending
+             select new { e.Id, e.Status };
+```
+
+### Deferred vs Immediate Execution — Most Important LINQ Concept
+
+```csharp
+// DEFERRED — query defined but NOT run yet (no DB hit)
+var query = engagements.Where(e => e.Status == "Pending");
+
+// IMMEDIATE — executes NOW
+var list  = query.ToList();           // ← executes
+var arr   = query.ToArray();          // ← executes
+var count = query.Count();            // ← executes
+var first = query.FirstOrDefault();   // ← executes
+
+// Power of deferred — add filters conditionally, ONE SQL query at the end
+var q = _context.EngagementActivities.Where(e => e.TenantId == tenantId);
+if (status != null)    q = q.Where(e => e.Status == status);
+if (from.HasValue)     q = q.Where(e => e.ScheduledAt >= from);
+var results = await q.ToListAsync();  // ONE query with all filters ✅
+```
+
+### IQueryable vs IEnumerable
+
+```csharp
+// IQueryable → filter translated to SQL → runs in database ✅
+IQueryable<Engagement> q = _context.EngagementActivities.Where(e => e.TenantId == id);
+var result = q.Where(e => e.AttendeeCount > 10).ToList();
+// SQL: WHERE TenantId = ? AND AttendeeCount > 10 — ONE filtered query ✅
+
+// IEnumerable → loads ALL into memory first, then filters in C# ❌
+IEnumerable<Engagement> e = q.AsEnumerable();   // loads ALL rows here
+var result = e.Where(x => x.AttendeeCount > 10).ToList(); // C# filters in memory ❌
+// 100,000 rows fetched, 50 used ❌
+
+// Rule: stay IQueryable as long as possible. AsEnumerable() only for C#-specific logic.
+```
+
+### Key LINQ Operators
+
+```csharp
+// Filtering
+.Where(e => e.Status == "Pending")
+.OfType<ConcreteType>()
+
+// Projection
+.Select(e => new EngagementDto { Id = e.Id, Status = e.Status })
+
+// SelectMany — flatten nested collections (1:many → flat list)
+var emails = engagements.SelectMany(e => e.Attendees).Select(a => a.Email);
+// [[a1,a2],[a3],[a4,a5]] → [a1,a2,a3,a4,a5] ← flattened ✅
+// Select vs SelectMany: Select = 1:1, SelectMany = 1:many flatten
+
+// Ordering
+.OrderBy(e => e.TenantId).ThenByDescending(e => e.ScheduledAt)
+
+// Grouping
+engagements.GroupBy(e => e.TenantId)
+           .Select(g => new { TenantId = g.Key, Count = g.Count() })
+
+// Aggregation
+.Count()                          // total rows
+.Count(e => e.Status == "Pending") // conditional count
+.Sum(e => e.AttendeeCount)
+.Average(e => e.AttendeeCount)
+.Min(e => e.ScheduledAt)
+.Max(e => e.ScheduledAt)
+
+// Element operators
+.First(e => e.Id == id)           // throws if empty
+.FirstOrDefault(e => e.Id == id)  // null if empty ← use this ✅
+.Single(e => e.Id == id)          // throws if 0 or >1 match
+.SingleOrDefault(e => e.Id == id) // null if empty, throws if >1
+
+// Quantifiers
+.Any(e => e.Status == "Pending")  // true if at least one ✅ (short-circuits)
+.All(e => e.Status == "Active")   // true if ALL match
+.Contains(item)
+
+// Any() is faster than Count() > 0 for existence check ✅
+
+// Set operations
+.Distinct()
+.Union(otherList)     // distinct values from both
+.Intersect(otherList) // values in both
+.Except(otherList)    // values in first NOT in second
+
+// Pagination
+.Skip(20).Take(10)    // page 2 of 10
+
+// Conversion
+.ToList() .ToArray() .ToDictionary(e => e.Id) .ToHashSet()
+```
+
+### Divisible-by-N Examples (EPAM Specific)
+```csharp
+var numbers = Enumerable.Range(1, 30);
+
+// Divisible by 3
+var divBy3 = numbers.Where(n => n % 3 == 0).ToList();
+
+// Divisible by 5
+var divBy5 = numbers.Where(n => n % 5 == 0).ToList();
+
+// Divisible by BOTH (FizzBuzz)
+var divByBoth = numbers.Where(n => n % 3 == 0 && n % 5 == 0).ToList();
+
+// Generic — divisible by N
+int N = 4;
+Func<int, bool> isDivisibleByN = n => n % N == 0;
+var divByN = numbers.Where(isDivisibleByN).ToList();
+
+// Count and Sum
+int count = numbers.Count(n => n % 3 == 0);   // 10
+int sum   = numbers.Where(n => n % 3 == 0).Sum(); // 165
+bool any  = numbers.Any(n => n % 7 == 0);     // true
+```
+
+---
+
+## 7. Generics and Delegates
+
+### Generics — Benefits
+```csharp
+// Without generics: separate class per type, or object (loses type safety)
+public class IntRepository  { public int GetById(int id) {...} }
+public class StringRepository { public string GetById(int id) {...} }
+
+// With generics: one implementation, type-safe, reusable
+public class Repository<T> where T : class
+{
+    private readonly DbContext _context;
+    public Repository(DbContext context) => _context = context;
+
+    public async Task<T?> GetByIdAsync(int id) => await _context.Set<T>().FindAsync(id);
+    public async Task<List<T>> GetAllAsync() => await _context.Set<T>().ToListAsync();
+    public void Add(T entity) => _context.Set<T>().Add(entity);
+}
+
+// Usage — same class works for any entity
+var engRepo = new Repository<EngagementActivity>(context);
+var profRepo = new Repository<InvestorProfile>(context);
+```
+
+**Generic Constraints:**
+```csharp
+where T : class          // must be reference type
+where T : struct         // must be value type
+where T : new()          // must have parameterless constructor
+where T : BaseClass      // must inherit from BaseClass
+where T : IInterface     // must implement interface
+where T : class, new()   // multiple constraints combined
+```
+
+**Generic Methods:**
+```csharp
+public static T Max<T>(T a, T b) where T : IComparable<T>
+    => a.CompareTo(b) >= 0 ? a : b;
+
+Max(3, 7);      // returns 7 (int)
+Max("a", "z");  // returns "z" (string)
+```
+
+### Delegates — Action\<T\>, Func\<T\>, Predicate\<T\>
+
+```csharp
+// Action<T> — takes parameters, returns VOID
+Action<string> log = message => Console.WriteLine(message);
+Action<string, int> logWithLevel = (msg, level) => Console.WriteLine($"[{level}] {msg}");
+log("Engagement created");
+
+// Func<T, TResult> — takes parameters, returns a VALUE
+// Last type parameter = return type
+Func<int, bool>        isEven    = n => n % 2 == 0;
+Func<int, int, int>    add       = (a, b) => a + b;
+Func<string, string>   toUpper   = s => s.ToUpper();
+Func<int, bool>        divBy3    = n => n % 3 == 0;
+
+bool result = isEven(4);  // true
+
+// Predicate<T> — takes T, always returns bool (shorthand for Func<T, bool>)
+Predicate<int> isPositive = n => n > 0;
+bool pos = isPositive(5);  // true
+// Predicate<T> == Func<T, bool> — functionally identical, Predicate is older convention
+
+// Capital Access: passing behaviour as parameter
+public List<EngagementActivity> Filter(Func<EngagementActivity, bool> predicate)
+    => _context.EngagementActivities.Where(predicate).ToList();
+
+var pending   = Filter(e => e.Status == "Pending");
+var large     = Filter(e => e.AttendeeCount > 50);
+var myTenant  = Filter(e => e.TenantId == "spg-001");
+```
+
+**Custom Delegate (old style — rarely needed now):**
+```csharp
+delegate int MathOperation(int a, int b);  // define delegate type
+MathOperation add = (a, b) => a + b;
+int result = add(3, 4);  // 7
+```
+
+**Events using delegates:**
+```csharp
+public event Action<string> OnEngagementCreated;
+OnEngagementCreated?.Invoke(engagementId);  // fire event
+OnEngagementCreated += id => SendNotification(id);  // subscribe
+```
+
+---
+
+## 8. async/await Pitfalls and Memory Leaks
+
+### async/await Pitfalls
+
+**① Deadlock with .Result or .Wait() ← Most Common Bug**
+```csharp
+// ❌ Deadlock: .Result blocks the calling thread while awaiting completion
+// The async method needs the same thread to continue → both wait forever
+public IActionResult Get()
+{
+    var result = GetDataAsync().Result;  // ❌ DEADLOCK in ASP.NET classic
+    return Ok(result);
+}
+
+// ✅ Fix: async all the way — never block on async code
+public async Task<IActionResult> Get()
+{
+    var result = await GetDataAsync();  // ✅
+    return Ok(result);
+}
+```
+
+**② async void ← Silent Exception Killer**
+```csharp
+// ❌ async void: exceptions are unhandled, crash the process, cannot be awaited
+public async void SendNotification(string msg)
+{
+    await _emailService.SendAsync(msg);  // exception here → process crash ❌
+}
+
+// ✅ async Task: exceptions propagate correctly, can be awaited
+public async Task SendNotificationAsync(string msg)
+{
+    await _emailService.SendAsync(msg);  // exception caught by caller ✅
+}
+
+// async void ONLY acceptable for: event handlers (button click etc.)
+button.Click += async (s, e) => { await DoWorkAsync(); };  // only valid use ✅
+```
+
+**③ ConfigureAwait(false)**
+```csharp
+// In library code (not ASP.NET controllers): avoid capturing synchronization context
+public async Task<string> GetDataAsync()
+{
+    var data = await _httpClient.GetStringAsync(url).ConfigureAwait(false);
+    // .ConfigureAwait(false): don't resume on original thread → no deadlock risk ✅
+    return data;
+}
+// In ASP.NET Core: synchronization context removed — ConfigureAwait(false) not strictly needed
+// In class libraries: always use ConfigureAwait(false) to be safe
+```
+
+**④ Not awaiting → fire and forget (silent failure)**
+```csharp
+// ❌ No await: exception silently swallowed, method returns before completion
+SendNotificationAsync(msg);  // ← not awaited! "fire and forget"
+
+// ✅ Await it
+await SendNotificationAsync(msg);
+```
+
+**⑤ Async/await is NOT always faster**
+```csharp
+// For CPU-bound work: async adds overhead without benefit
+// async/await shines for I/O-bound: HTTP calls, DB queries, file reads
+// CPU-bound: use Task.Run to offload to thread pool
+var result = await Task.Run(() => ExpensiveCpuCalculation());
+```
+
+### Memory Leaks in .NET
+
+```csharp
+// ① Event handlers not unsubscribed — most common memory leak
+public class EngagementNotifier
+{
+    public EngagementNotifier(EventBus bus)
+    {
+        bus.OnEngagement += HandleEngagement;  // ← subscriber keeps EventBus alive ❌
+        // If EngagementNotifier goes out of scope, EventBus still holds reference
+    }
+
+    // ✅ Fix: unsubscribe in Dispose
+    public void Dispose()
+    {
+        bus.OnEngagement -= HandleEngagement;  // ✅
+    }
+}
+
+// ② Static collections holding references
+static List<EngagementActivity> _cache = new();  // never cleared → grows forever ❌
+// Fix: use WeakReference, or bounded cache, or IMemoryCache with expiry ✅
+
+// ③ Not disposing IDisposable (HttpClient, DbContext, FileStream)
+var client = new HttpClient();  // ❌ socket exhaustion — never disposed
+// ✅ Use IHttpClientFactory or using block
+using var client = new HttpClient();
+
+// ④ Long-lived DbContext — holds tracked entities in memory
+// Capital Access: DbContext registered as Scoped (per HTTP request) — auto-disposed ✅
+// Anti-pattern: Singleton DbContext → tracks everything forever ❌
+
+// ⑤ Capturing variables in long-lived lambdas
+var largeList = GetMillionItems();
+Action callback = () => Console.WriteLine(largeList.Count);  // largeList can't be GC'd ❌
+```
+
+**How to detect memory leaks:**
+- `dotnet-counters monitor` — watch GC heap size
+- Visual Studio Diagnostic Tools → Memory Usage snapshot
+- Application Insights memory metrics in production
+- `GC.GetTotalMemory(false)` — check allocated bytes
+
+---
+
+## 9. Default Interface Methods vs Abstract Classes
+
+### Default Interface Methods (C# 8+)
+```csharp
+public interface INotificationService
+{
+    Task SendAsync(string message);   // abstract — must implement
+
+    // Default implementation — optional to override
+    async Task SendWithRetryAsync(string message, int maxRetries = 3)
+    {
+        for (int i = 0; i < maxRetries; i++)
+        {
+            try { await SendAsync(message); return; }
+            catch when (i < maxRetries - 1) { await Task.Delay(1000); }
+        }
+    }
+}
+
+// Implementing class — doesn't need to override SendWithRetryAsync
+public class EmailNotificationService : INotificationService
+{
+    public async Task SendAsync(string message) { /* email logic */ }
+    // Inherits SendWithRetryAsync for free ✅
+}
+```
+
+### Interface vs Abstract Class — Decision Guide
+
+| | Interface | Abstract Class |
+|---|-----------|---------------|
+| Multiple inheritance | ✅ A class can implement many | ❌ Only one base class |
+| Constructor | ❌ | ✅ Can have constructor |
+| State (fields) | ❌ No instance fields | ✅ Can have fields |
+| Access modifiers | Public only (historically) | Any (public, protected, private) |
+| Default methods | ✅ C# 8+ | ✅ Always |
+| IS-A relationship | "can do" / capability | "is a" / true inheritance |
+| When to use | Define a contract/capability (IDisposable, ILogger) | Share code + enforce structure (BaseController) |
+
+**Capital Access:**
+```csharp
+// Interface: IEngagementService — any service that provides engagement operations
+// Abstract class: BaseApiController — shared auth + error handling for all controllers
+public abstract class BaseApiController : ControllerBase
+{
+    protected string TenantId => User.FindFirst("tenantId")?.Value;
+    protected IActionResult HandleError(Exception ex) { /* common logic */ }
+}
+```
+
+**When EPAM asks "why not just use abstract class?"**
+→ Because a class can only inherit ONE abstract class, but implement MANY interfaces. Interfaces enable composition over inheritance. Default methods (C# 8+) close the gap by allowing shared implementation without forcing a class hierarchy.
+
+---
+
+## 10. Configuration — IOptions, IOptionsMonitor, IOptionsSnapshot, Key Vault
+
+### Configuration Sources in .NET Core (priority order, last wins)
+```
+appsettings.json
+→ appsettings.{Environment}.json (Development, Production)
+→ Environment Variables
+→ Azure Key Vault
+→ Command-line arguments
+```
+
+```csharp
+// appsettings.json
+{
+  "EngagementSettings": {
+    "MaxAttendeesPerEvent": 500,
+    "DefaultTimeoutSeconds": 30
+  }
+}
+
+// POCO class
+public class EngagementSettings
+{
+    public int MaxAttendeesPerEvent { get; set; }
+    public int DefaultTimeoutSeconds { get; set; }
+}
+
+// Register
+builder.Services.Configure<EngagementSettings>(
+    builder.Configuration.GetSection("EngagementSettings"));
+```
+
+### IOptions\<T\> vs IOptionsSnapshot\<T\> vs IOptionsMonitor\<T\>
+
+| | IOptions\<T\> | IOptionsSnapshot\<T\> | IOptionsMonitor\<T\> |
+|---|--------------|----------------------|---------------------|
+| Lifetime | Singleton | Scoped (per request) | Singleton |
+| Reads config at | App startup only | Each request | App startup + on change |
+| Reflects config changes | ❌ No | ✅ Yes (next request) | ✅ Yes (immediately via OnChange) |
+| Use in | Singleton services | Scoped/Transient services | Background services + live reload |
+
+```csharp
+// IOptions<T> — config read once at startup, never reloads
+public class EngagementService
+{
+    private readonly EngagementSettings _settings;
+    public EngagementService(IOptions<EngagementSettings> options)
+        => _settings = options.Value;  // cached forever ✅ for static config
+}
+
+// IOptionsSnapshot<T> — re-reads config each HTTP request (Scoped)
+public class ReportController : ControllerBase
+{
+    public ReportController(IOptionsSnapshot<EngagementSettings> options)
+        => _settings = options.Value;  // fresh value per request ✅
+}
+
+// IOptionsMonitor<T> — live reload + change notification (Singleton-safe)
+public class BackgroundWorker : BackgroundService
+{
+    public BackgroundWorker(IOptionsMonitor<EngagementSettings> monitor)
+    {
+        _settings = monitor.CurrentValue;
+        monitor.OnChange(newSettings => {
+            _settings = newSettings;   // called when appsettings changes ✅
+            _logger.LogInformation("Config reloaded");
+        });
+    }
+}
+```
+
+### Azure Key Vault Integration
+```csharp
+// Program.cs — adds Key Vault as a configuration source
+builder.Configuration.AddAzureKeyVault(
+    new Uri($"https://{builder.Configuration["KeyVaultName"]}.vault.azure.net/"),
+    new DefaultAzureCredential());  // uses Managed Identity in Azure ✅ (no secrets in code)
+
+// Capital Access: database connection strings, Service Bus connection strings,
+// Okta client secrets → all stored in Key Vault, retrieved via Managed Identity
+// Never hardcode secrets in appsettings.json ✅
+```
+
+---
+
+## 11. Content Negotiation
+
+Content negotiation = client and server agree on the **format** of the response.
+
+```
+Client sends:  Accept: application/json     → "I want JSON"
+               Accept: application/xml      → "I want XML"
+               Accept: text/csv            → "I want CSV"
+
+Server sends:  Content-Type: application/json  → "Here's JSON"
+```
+
+```csharp
+// ASP.NET Core handles content negotiation automatically
+// Add XML support (JSON is default)
+builder.Services.AddControllers()
+    .AddXmlSerializerFormatters();   // ✅ now supports Accept: application/xml
+
+// Custom formatter (e.g., CSV)
+builder.Services.AddControllers(options =>
+    options.OutputFormatters.Add(new CsvOutputFormatter()));
+
+// Capital Access: all APIs return JSON only
+// Explicitly reject non-JSON requests:
+builder.Services.AddControllers(options =>
+    options.RespectBrowserAcceptHeader = true);
+
+// [Produces] attribute: restrict to specific format
+[Produces("application/json")]
+[HttpGet("{id}")]
+public async Task<IActionResult> GetEngagement(int id) { ... }
+```
+
+---
+
+## 12. Correlation ID — Purpose and Generation
+
+**What it is:** A unique ID attached to every request that travels through all microservices, logs, and external calls — so you can trace a single user action across the entire system.
+
+```
+User request → API Gateway → Engagement Service → Notification Service → Email Provider
+               X-Correlation-ID: abc-123         abc-123                abc-123
+                                   ↓
+               All logs share same ID → grep "abc-123" → full trace ✅
+```
+
+**Capital Access implementation:**
+```csharp
+// Middleware: generate or forward Correlation ID on every request
+public class CorrelationIdMiddleware
+{
+    private const string Header = "X-Correlation-ID";
+    private readonly RequestDelegate _next;
+
+    public CorrelationIdMiddleware(RequestDelegate next) => _next = next;
+
+    public async Task InvokeAsync(HttpContext context)
+    {
+        // Use incoming ID (from upstream service) or generate new one
+        var correlationId = context.Request.Headers[Header].FirstOrDefault()
+                         ?? Guid.NewGuid().ToString();
+
+        // Store in HttpContext so controllers + services can read it
+        context.Items[Header] = correlationId;
+
+        // Echo back in response so client can trace their request
+        context.Response.Headers[Header] = correlationId;
+
+        // Add to logging scope — all log statements in this request include it
+        using (_logger.BeginScope(new { CorrelationId = correlationId }))
+        {
+            await _next(context);
+        }
+    }
+}
+
+// Register in Program.cs
+app.UseMiddleware<CorrelationIdMiddleware>();
+
+// Forward to downstream services (HttpClient)
+_httpClient.DefaultRequestHeaders.Add("X-Correlation-ID",
+    _httpContext.Items["X-Correlation-ID"]?.ToString());
+```
+
+---
+
+## 13. SQL Injection
+
+**What it is:** Attacker inserts SQL code into user input that gets executed by the database.
+
+```csharp
+// ❌ Vulnerable: string concatenation builds raw SQL
+string sql = "SELECT * FROM Users WHERE Email = '" + userInput + "'";
+// Input: ' OR '1'='1
+// Result: SELECT * FROM Users WHERE Email = '' OR '1'='1'
+// Returns ALL users ❌
+
+// Input: '; DROP TABLE Users; --
+// Deletes entire Users table ❌
+```
+
+**Fixes:**
+```csharp
+// ✅ Fix 1: Parameterized queries (ADO.NET)
+var cmd = new SqlCommand("SELECT * FROM Users WHERE Email = @Email", conn);
+cmd.Parameters.AddWithValue("@Email", userInput);
+// @Email is treated as DATA not SQL — injection impossible ✅
+
+// ✅ Fix 2: sp_executesql for dynamic SQL
+EXEC sp_executesql N'SELECT * FROM Users WHERE Email = @Email',
+                   N'@Email NVARCHAR(200)', @Email = @userInput;
+
+// ✅ Fix 3: EF Core (always parameterized automatically)
+var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
+// EF Core NEVER concatenates — always uses parameters ✅
+
+// ✅ Fix 4: Stored Procedures (parameters enforced)
+EXEC sp_GetUserByEmail @Email = @userInput;
+```
+
+**Additional protection:**
+- Principle of least privilege: DB user has only SELECT/INSERT rights, not DROP ✅
+- Input validation + model validation attributes
+- Web Application Firewall (WAF) in Azure
+
+---
+
+## 14. SQL Views
+
+**What is a View?** A stored SELECT query — behaves like a virtual table.
+```sql
+-- Standard view — stored query, no physical storage, always fresh data
+CREATE VIEW vw_PendingEngagements AS
+SELECT e.Id, e.TenantId, e.CompanyId, e.Status, c.CompanyName
+FROM   EngagementActivities e
+JOIN   Companies c ON c.Id = e.CompanyId
+WHERE  e.Status = 'Pending';
+
+-- Use like a table
+SELECT * FROM vw_PendingEngagements WHERE TenantId = 'spg-001';
+```
+
+**Benefits:**
+- Simplifies complex queries for consumers
+- Security: expose only specific columns (hide sensitive data)
+- Backward compatibility: underlying table changes, view stays the same
+
+**Indexed (Materialized) View** — physically stores the result:
+```sql
+CREATE VIEW vw_TenantEngagementSummary WITH SCHEMABINDING AS
+SELECT TenantId, COUNT_BIG(*) AS Total, SUM(AttendeeCount) AS TotalAttendees
+FROM dbo.EngagementActivities
+GROUP BY TenantId;
+
+CREATE UNIQUE CLUSTERED INDEX IX_vw_Summary ON vw_TenantEngagementSummary(TenantId);
+-- Now SQL Server maintains this pre-computed result and updates it on DML ✅
+-- Fast for heavy aggregation queries ✅
+```
+
+**Which operation does having many non-clustered indexes slow down?**
+→ **Write operations (INSERT, UPDATE, DELETE)** — every write must update ALL indexes ❌
+→ Read operations get FASTER with more indexes ✅
+
+---
+
+## 15. Clean Architecture
+
+```
+┌─────────────────────────────────┐
+│         Presentation            │  Controllers, API endpoints, Angular
+├─────────────────────────────────┤
+│         Application             │  Use Cases, CQRS Commands/Queries, DTOs
+├─────────────────────────────────┤
+│           Domain                │  Entities, Value Objects, Domain Events (no dependencies)
+├─────────────────────────────────┤
+│        Infrastructure           │  EF Core, Azure Service Bus, HTTP Clients, Key Vault
+└─────────────────────────────────┘
+
+Dependency Rule: outer layers depend on inner layers. Inner layers know NOTHING about outer layers.
+Domain has zero external dependencies ✅
+```
+
+**Benefits:**
+- Testable: domain logic tested without DB or HTTP
+- Swappable: replace EF Core with Dapper → only Infrastructure changes
+- Clear boundaries: each layer has one responsibility
+
+**Capital Access:** Engagement service uses Clean Architecture — MediatR handles CQRS commands in Application layer, EF Core in Infrastructure, domain entities in Domain layer.
+
+---
+
+## 16. How to Scale a Service
+
+```
+Vertical Scaling (Scale Up):   Bigger machine — more CPU/RAM. Limited ceiling. ❌ single point of failure
+Horizontal Scaling (Scale Out): More instances behind a load balancer ✅ preferred
+```
+
+**Stateless design** — required for horizontal scaling:
+```csharp
+// ❌ Stateful: session stored in memory — sticky routing needed
+HttpContext.Session.SetString("userId", id);
+
+// ✅ Stateless: JWT carries state, Redis for shared cache
+// Any instance can handle any request ✅
+```
+
+**Capital Access scaling strategies:**
+- Azure Kubernetes Service (AKS) — auto-scale pods on CPU/memory
+- Azure Service Bus — decouple services, absorb traffic spikes
+- Redis cache — reduce DB load on hot read paths
+- Async processing — Azure Functions / Durable Functions for long-running work
+- Read replicas — route read-only queries away from primary DB
+- API Gateway — rate limiting, load distribution
+
+---
+
+## 17. .NET Framework 4.7 → Modern .NET Migration
+
+**Why migrate?**
+- Cross-platform (Linux containers, AKS)
+- Performance: .NET 8 is 3-5× faster than .NET Framework
+- Modern features: minimal APIs, top-level statements, EF Core 8
+- .NET Framework is in maintenance mode — no new features
+
+**Migration approach (phased):**
+
+```
+Phase 1: Compatibility Analysis
+  → Run .NET Upgrade Assistant: dotnet tool install -g upgrade-assistant
+  → identifies incompatible NuGet packages, deprecated APIs
+  → run: upgrade-assistant analyze MyApp.sln
+
+Phase 2: Migrate Libraries First (bottom-up)
+  → Convert class libraries to .NET Standard 2.0 first (compatible with both)
+  → Replace incompatible packages (System.Web → Microsoft.AspNetCore)
+  → Remove HttpContext.Current → IHttpContextAccessor
+
+Phase 3: Migrate Entry Point (Web/API project)
+  → Replace Global.asax → Program.cs + Startup.cs pattern
+  → Replace Web.config → appsettings.json + environment variables
+  → Replace System.Web.Http → Microsoft.AspNetCore.Mvc
+  → Replace Unity/Autofac DI → built-in Microsoft.Extensions.DependencyInjection
+
+Phase 4: Run Both in Parallel (Strangler Fig)
+  → Route some traffic to new service while old runs
+  → Gradually shift 100% when confident
+
+Phase 5: Decommission old service
+```
+
+**DI in .NET Framework 4.7** (before built-in DI):
+```csharp
+// Had to use third-party containers:
+// Unity: container.RegisterType<IEngagementService, EngagementService>();
+// Autofac: builder.RegisterType<EngagementService>().As<IEngagementService>();
+// Ninject, Castle Windsor, StructureMap
+
+// .NET Core 2.0+: built-in DI
+services.AddScoped<IEngagementService, EngagementService>();
+```
+
+---
+
+## 18. MCP (Model Context Protocol) Server
+
+**What is MCP?**
+An open protocol (by Anthropic) that lets AI assistants (Claude, Copilot) connect to external tools and data sources in a standardized way.
+
+```
+Without MCP:  AI has only training data — no live system access
+With MCP:     AI connects to your DB, APIs, file system via MCP servers
+
+Architecture:
+  AI (Claude) ←→ MCP Client ←→ MCP Server ←→ Your Tool/Data
+```
+
+**MCP Server exposes three things:**
+```
+Tools:     Functions AI can call (e.g., createEngagement, getInvestorProfile)
+Resources: Data AI can read (e.g., files, DB records)
+Prompts:   Reusable prompt templates
+```
+
+**Capital Access example — MCP server for engagement data:**
+```typescript
+// MCP Server (TypeScript/Node)
+server.tool("getEngagementsByTenant", async ({ tenantId }) => {
+    const data = await db.query(
+        "SELECT * FROM EngagementActivities WHERE TenantId = ?", [tenantId]
+    );
+    return { content: [{ type: "text", text: JSON.stringify(data) }] };
+});
+// Claude can now call this tool to answer "What engagements does spg-001 have?"
+```
+
+**How Claude Code uses MCP in this session:**
+- Connected to your file system as an MCP server
+- Reading/writing files, running git commands
+- All through the MCP protocol
+
+---
+
+## 19. Observability in Microservices
+
+**Three pillars:**
+
+```
+Logs:    What happened?           → Application Insights, Serilog, ELK Stack
+Metrics: How is the system?       → Prometheus, Grafana, Azure Monitor (CPU, req/s, latency)
+Traces:  Where did time go?       → Distributed tracing with Correlation ID across services
+```
+
+**Capital Access:**
+```csharp
+// Structured logging with Serilog + Application Insights
+Log.Information("Engagement created {@EngagementId} for {@TenantId}", id, tenantId);
+// JSON log: searchable in Application Insights ✅
+
+// Correlation ID flows through all services (see section 12)
+// Health checks exposed for AKS liveness/readiness probes
+app.MapHealthChecks("/health");
+```
+
+**How to debug slow API response time:**
+1. Check Application Insights → requests → slow requests → drill into traces
+2. Look at dependency calls — is DB slow? External API slow?
+3. Check SQL execution plans for slow queries
+4. Use distributed trace → find which service/step takes the most time
+5. Check CPU/memory metrics — is the service overloaded?
+6. Check connection pool exhaustion (too many concurrent DB connections)
+
+---
+
+## 20. How to Track Issues in Production
+
+```
+1. Centralized Logging:    Application Insights / ELK Stack
+   → Search by Correlation ID, Exception type, TenantId
+   → Alert on error rate spike
+
+2. Exception Monitoring:   Application Insights Exceptions blade
+   → Stack trace, request details, frequency
+
+3. Health Checks:          /health endpoint → AKS restarts unhealthy pods
+   app.MapHealthChecks("/health/live");   // liveness: is app alive?
+   app.MapHealthChecks("/health/ready");  // readiness: is app ready for traffic?
+
+4. Alerts:                 Azure Monitor alerts → PagerDuty / Teams notifications
+   → Alert: error rate > 5% in 5 minutes
+   → Alert: p99 latency > 2000ms
+
+5. Blue-Green / Canary:    Deploy to 10% traffic first
+   → Monitor error rate before full rollout
+
+Capital Access:
+  → Application Insights for logs + traces
+  → Correlation ID on all requests (X-Correlation-ID header)
+  → Azure Service Bus dead-letter queue monitoring for failed messages
+```

@@ -3433,3 +3433,246 @@ provideClientHydration(withHttpTransferCache())
 **4. Non-deterministic templates** — `Date.now()` or `Math.random()` in templates cause hydration mismatches (server HTML ≠ client HTML). Always use stable values in templates.
 
 ---
+
+## JIT vs AOT Compilation
+
+| | JIT (Just-In-Time) | AOT (Ahead-of-Time) |
+|---|-------------------|---------------------|
+| When compiled | At runtime in browser | At build time on server |
+| Build speed | Fast (dev builds) | Slower |
+| Runtime performance | Slower startup | Faster startup ✅ |
+| Bundle size | Larger (compiler included) | Smaller ✅ |
+| Template errors | Found at runtime ❌ | Found at build time ✅ |
+| Use in | Development | Production ✅ |
+
+```bash
+ng build              # AOT by default in Angular CLI
+ng serve              # JIT by default (dev only)
+ng build --aot=false  # force JIT (rare)
+```
+
+**AOT is production default since Angular 9 (Ivy).** Template errors surface during `ng build` not at runtime — safer for production.
+
+---
+
+## Change Detection
+
+Angular checks if the view (DOM) needs updating when:
+- An event fires (click, input, HTTP response)
+- A timer fires (setTimeout, setInterval)
+- A Promise or Observable resolves
+
+### Default Change Detection
+```typescript
+// Angular walks the ENTIRE component tree from root on every change
+// Simple but expensive for large apps
+@Component({ changeDetection: ChangeDetectionStrategy.Default })
+```
+
+### OnPush Change Detection ← Performance Optimization
+```typescript
+// Angular ONLY checks this component when:
+// 1. An @Input() reference changes (not just value — the reference)
+// 2. An event originates from this component or its children
+// 3. An Observable used with async pipe emits
+// 4. markForCheck() / detectChanges() called manually
+
+@Component({
+    selector: 'app-engagement-card',
+    changeDetection: ChangeDetectionStrategy.OnPush,  // ✅
+    template: `<div>{{ engagement.status }}</div>`
+})
+export class EngagementCardComponent {
+    @Input() engagement!: EngagementActivity;
+    // ❌ engagement.status = 'Completed'  → no re-render (same reference)
+    // ✅ engagement = { ...engagement, status: 'Completed' } → new reference → re-renders
+}
+```
+
+**Capital Access:** All leaf components use OnPush — the engagement grid renders 1000+ rows, OnPush prevents unnecessary re-renders on parent state changes.
+
+---
+
+## Angular State Management
+
+### Input / Output (Component Communication)
+```typescript
+// Parent → Child: @Input()
+@Component({ template: `<app-card [engagement]="eng" (statusChange)="onStatusChange($event)">` })
+// Child → Parent: @Output() + EventEmitter
+@Output() statusChange = new EventEmitter<string>();
+this.statusChange.emit('Completed');
+```
+
+### Services (Shared State)
+```typescript
+@Injectable({ providedIn: 'root' })
+export class EngagementStateService {
+    private engagements$ = new BehaviorSubject<EngagementActivity[]>([]);
+    engagements = this.engagements$.asObservable();
+
+    update(data: EngagementActivity[]) { this.engagements$.next(data); }
+}
+```
+
+### NgRx (Redux pattern — for complex state)
+```typescript
+// State → Selector → Component (reads)
+// Component → Action → Reducer → State (writes)
+// Side effects → Effect → Action
+
+// Action
+export const loadEngagements = createAction('[Engagement] Load', props<{ tenantId: string }>());
+
+// Reducer
+export const engagementReducer = createReducer(
+    initialState,
+    on(loadEngagementsSuccess, (state, { engagements }) => ({ ...state, engagements }))
+);
+
+// Effect (handles API call)
+loadEngagements$ = createEffect(() => this.actions$.pipe(
+    ofType(loadEngagements),
+    switchMap(({ tenantId }) => this.service.getAll(tenantId).pipe(
+        map(data => loadEngagementsSuccess({ engagements: data })),
+        catchError(err => of(loadEngagementsFailure({ error: err })))
+    ))
+));
+
+// Selector
+export const selectPendingEngagements = createSelector(
+    selectAll,
+    engagements => engagements.filter(e => e.status === 'Pending')
+);
+```
+
+### Signals (Angular 16+)
+```typescript
+// Simpler reactive state — no RxJS needed for local state
+export class EngagementComponent {
+    count   = signal(0);                          // writable signal
+    doubled = computed(() => this.count() * 2);   // derived signal (auto-updates)
+
+    increment() { this.count.update(c => c + 1); }
+    // count() to read, count.set(5) or count.update(fn) to write
+}
+```
+
+**When to use what:**
+- `@Input/@Output` — parent/child communication
+- Service + BehaviorSubject — shared state, simple apps
+- NgRx — complex state, many components sharing state, time-travel debugging
+- Signals — local component state, replacing simple BehaviorSubjects
+
+---
+
+## RxJS and Observable Types
+
+```typescript
+// Observable: lazy stream, only executes when subscribed
+const obs$ = new Observable(observer => {
+    observer.next(1);
+    observer.next(2);
+    observer.complete();
+});
+
+// Subject: Observable + Observer — multicast, can emit values manually
+const subject$ = new Subject<string>();
+subject$.subscribe(v => console.log('A:', v));
+subject$.subscribe(v => console.log('B:', v));
+subject$.next('hello');  // both A and B receive 'hello'
+
+// BehaviorSubject: Subject + current value — new subscribers get last value immediately
+const state$ = new BehaviorSubject<string>('initial');
+state$.subscribe(v => console.log(v));  // immediately logs 'initial'
+state$.next('updated');                 // logs 'updated'
+// Capital Access: used in services for shared state ✅
+
+// ReplaySubject: replays N last values to new subscribers
+const replay$ = new ReplaySubject<number>(3);  // buffer last 3
+replay$.next(1); replay$.next(2); replay$.next(3); replay$.next(4);
+replay$.subscribe(v => console.log(v));  // logs 2, 3, 4 (last 3)
+
+// AsyncSubject: only emits last value when complete()
+const async$ = new AsyncSubject<number>();
+async$.next(1); async$.next(2); async$.next(3);
+async$.subscribe(v => console.log(v));  // nothing yet
+async$.complete();  // now logs 3 (only last value)
+```
+
+**Common RxJS operators:**
+```typescript
+.pipe(
+    map(x => x * 2),                  // transform each value
+    filter(x => x > 0),               // filter values
+    switchMap(id => this.api.get(id)), // cancel previous, switch to new (HTTP search)
+    mergeMap(id => this.api.get(id)),  // run all concurrently (parallel calls)
+    concatMap(id => this.api.get(id)), // queue sequentially
+    debounceTime(300),                 // wait 300ms after last emit (search input)
+    distinctUntilChanged(),            // skip if same as previous value
+    takeUntil(this.destroy$),          // unsubscribe when component destroys
+    catchError(err => of([])),         // handle error, return fallback
+)
+```
+
+---
+
+## Angular Performance Optimization
+
+```
+1. OnPush change detection on all leaf components
+2. trackBy in *ngFor — prevents full list re-render on data change
+   *ngFor="let e of engagements; trackBy: trackById"
+   trackById = (index: number, e: Engagement) => e.id;
+
+3. Virtual scrolling (CDK) — render only visible rows
+   <cdk-virtual-scroll-viewport itemSize="50">
+     <div *cdkVirtualFor="let item of items">{{ item.name }}</div>
+   </cdk-virtual-scroll-viewport>
+
+4. Lazy loading feature modules — load only when route activated
+   { path: 'reports', loadComponent: () => import('./report.component') }
+
+5. async pipe — auto-subscribes + unsubscribes, no memory leaks
+   {{ engagements$ | async }}
+
+6. AOT compilation + tree shaking (production build default)
+
+7. Preloading strategy for secondary routes
+   RouterModule.forRoot(routes, { preloadingStrategy: PreloadAllModules })
+```
+
+---
+
+## Jasmine Unit Testing (Angular)
+
+```typescript
+describe('EngagementService', () => {
+    let service: EngagementService;
+    let httpMock: HttpTestingController;
+
+    beforeEach(() => {
+        TestBed.configureTestingModule({
+            imports: [HttpClientTestingModule],
+            providers: [EngagementService]
+        });
+        service    = TestBed.inject(EngagementService);
+        httpMock   = TestBed.inject(HttpTestingController);
+    });
+
+    afterEach(() => httpMock.verify());  // ensure no unexpected HTTP calls
+
+    it('should fetch engagements for tenant', () => {
+        const mockData = [{ id: 1, status: 'Pending' }];
+
+        service.getAll('spg-001').subscribe(data => {
+            expect(data.length).toBe(1);
+            expect(data[0].status).toBe('Pending');
+        });
+
+        const req = httpMock.expectOne('/api/engagements?tenantId=spg-001');
+        expect(req.request.method).toBe('GET');
+        req.flush(mockData);  // return mock response
+    });
+});
+```
