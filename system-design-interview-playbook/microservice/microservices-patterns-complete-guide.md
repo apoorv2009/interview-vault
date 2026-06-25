@@ -19,7 +19,8 @@
 11. [SAGA Pattern](#11-saga-pattern)
 12. [Choreography vs Orchestration](#12-choreography-vs-orchestration)
 13. [CQRS Pattern](#13-cqrs-pattern)
-14. [Interview Strategy](#14-interview-strategy)
+14. [BFF — Backend for Frontend](#14-bff--backend-for-frontend)
+15. [Interview Strategy](#15-interview-strategy)
 
 ---
 
@@ -271,6 +272,81 @@ Relay Process (runs every second):
 
 **Always use when:** Publishing critical events (orders, payments) that cannot be lost
 
+### Outbox Pattern — Capital Access C# Implementation
+
+```csharp
+// OutboxMessage table — same Azure SQL DB as the entity
+public class OutboxMessage
+{
+    public Guid      Id          { get; set; } = Guid.NewGuid();
+    public string    EventType   { get; set; } = "";
+    public string    Payload     { get; set; } = "";
+    public DateTime  CreatedAt   { get; set; } = DateTime.UtcNow;
+    public DateTime? ProcessedAt { get; set; }
+}
+
+// Step 1: Save entity + outbox message in ONE atomic transaction
+public class CreateEngagementHandler : IRequestHandler<CreateEngagementCommand, Guid>
+{
+    public async Task<Guid> Handle(CreateEngagementCommand cmd, CancellationToken ct)
+    {
+        var activity = EngagementActivity.Create(cmd.TenantId, cmd.CompanyId, cmd.Type);
+
+        _context.EngagementActivities.Add(activity);
+        _context.OutboxMessages.Add(new OutboxMessage   // same DbContext = same transaction ✅
+        {
+            EventType = nameof(EngagementCreatedEvent),
+            Payload   = JsonSerializer.Serialize(new EngagementCreatedEvent(
+                activity.Id, activity.TenantId, activity.CompanyId))
+        });
+
+        await _context.SaveChangesAsync(ct); // ONE commit — both or neither ✅
+        return activity.Id;
+    }
+}
+
+// Step 2: Background relay — reads outbox, publishes to Service Bus, marks sent
+public class OutboxRelayService : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            var pending = await _context.OutboxMessages
+                .Where(m => m.ProcessedAt == null)
+                .OrderBy(m => m.CreatedAt)
+                .Take(100)
+                .ToListAsync(ct);
+
+            foreach (var msg in pending)
+            {
+                try
+                {
+                    var sender = _busClient.CreateSender(msg.EventType);
+                    await sender.SendMessageAsync(new ServiceBusMessage(msg.Payload), ct);
+                    msg.ProcessedAt = DateTime.UtcNow;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Failed to publish outbox message {Id}", msg.Id);
+                    // leave ProcessedAt null → will retry next poll ✅
+                }
+            }
+
+            await _context.SaveChangesAsync(ct);
+            await Task.Delay(TimeSpan.FromSeconds(5), ct);
+        }
+    }
+}
+```
+
+**Failure guarantees:**
+```
+DB fails          → outbox not written → nothing published ✅ (no partial state)
+Service Bus fails → outbox not marked sent → retried on next poll ✅
+App crashes       → relay restarts, picks up unpublished rows from outbox ✅
+```
+
 ---
 
 ### Request-Reply over Messaging
@@ -490,6 +566,66 @@ Friend not answering. After 5 unanswered calls → stop calling 2 hours (OPEN). 
 
 **Tools:** Polly (.NET), Hystrix / Resilience4j (Java)
 
+### Circuit Breaker — Capital Access C# Implementation (Polly)
+
+```csharp
+// Program.cs — wrap Ownership Service client with circuit breaker + retry
+builder.Services.AddHttpClient<IOwnershipServiceClient, OwnershipServiceClient>()
+    .AddPolicyHandler(GetRetryPolicy())
+    .AddPolicyHandler(GetCircuitBreakerPolicy());
+
+static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy() =>
+    HttpPolicyExtensions
+        .HandleTransientHttpError()
+        .WaitAndRetryAsync(
+            retryCount: 3,
+            sleepDurationProvider: attempt => TimeSpan.FromSeconds(Math.Pow(2, attempt)),
+            onRetry: (outcome, delay, attempt, _) =>
+                Log.Warning("Retry {Attempt} after {Delay}ms: {Reason}",
+                    attempt, delay.TotalMilliseconds, outcome.Exception?.Message));
+
+static IAsyncPolicy<HttpResponseMessage> GetCircuitBreakerPolicy() =>
+    HttpPolicyExtensions
+        .HandleTransientHttpError()
+        .CircuitBreakerAsync(
+            handledEventsAllowedBeforeBreaking: 5,
+            durationOfBreak: TimeSpan.FromSeconds(30),
+            onBreak:    (outcome, duration) =>
+                Log.Warning("Circuit OPEN for {Sec}s — {Reason}", duration.TotalSeconds,
+                    outcome.Exception?.Message ?? outcome.Result?.StatusCode.ToString()),
+            onReset:    () => Log.Information("Circuit CLOSED — Ownership service recovered"),
+            onHalfOpen: () => Log.Information("Circuit HALF-OPEN — sending probe request"));
+
+// Ownership Service call — policy applied automatically via HttpClient pipeline
+public class OwnershipServiceClient : IOwnershipServiceClient
+{
+    private readonly HttpClient _http;
+
+    public async Task<OwnershipData?> GetPortfolioAsync(string portfolioId)
+    {
+        try
+        {
+            return await _http.GetFromJsonAsync<OwnershipData>($"/api/portfolios/{portfolioId}");
+        }
+        catch (BrokenCircuitException)
+        {
+            // Circuit is OPEN — return cached fallback instead of throwing ✅
+            return _cache.GetCachedPortfolio(portfolioId);
+        }
+    }
+}
+```
+
+**Why Circuit Breaker + Retry must be ordered correctly:**
+```
+WRONG: Retry wraps Circuit Breaker
+  → retry exhausted before circuit opens → cascades
+
+CORRECT: Circuit Breaker wraps Retry  (outermost = evaluated first)
+  → 5 failures → circuit OPENS → retries immediately stopped ✅
+  → rest of platform gets instant fallback, not 3× slow retries
+```
+
 ---
 
 ## 11. SAGA Pattern
@@ -529,6 +665,81 @@ COMPENSATION ALWAYS IN REVERSE ORDER:
 > Compensating: Release 2 iPhones back to stock
 
 **Use when:** Business operation spans multiple services · Each service has its own DB · Eventual consistency is acceptable
+
+### SAGA — Capital Access C# Implementation (Azure Durable Functions)
+
+In Capital Access, generating a report spans 4 services. Durable Functions acts as the Saga orchestrator.
+
+```csharp
+// Durable Functions orchestrator — the Saga coordinator
+[FunctionName("ReportSagaOrchestrator")]
+public static async Task RunOrchestrator(
+    [OrchestrationTrigger] IDurableOrchestrationContext context,
+    ILogger log)
+{
+    var input     = context.GetInput<ReportSagaInput>();
+    var completed = new List<string>();
+
+    try
+    {
+        // Step 1: Create report job record
+        var jobId = await context.CallActivityAsync<Guid>("CreateReportJob", input);
+        completed.Add("CreateReportJob");
+
+        // Step 2 + 3: Fetch data from two services in parallel (fan-out)
+        var ownershipTask = context.CallActivityAsync<OwnershipData>("FetchOwnershipData", input.PortfolioId);
+        var targetingTask = context.CallActivityAsync<TargetingData>("FetchTargetingData", input.Filters);
+        await Task.WhenAll(ownershipTask, targetingTask);
+        completed.Add("FetchOwnershipData");
+        completed.Add("FetchTargetingData");
+
+        // Step 4: Generate and store report
+        await context.CallActivityAsync("GenerateAndStoreReport",
+            new ReportGenInput(jobId, ownershipTask.Result, targetingTask.Result));
+        completed.Add("GenerateAndStoreReport");
+    }
+    catch (Exception ex)
+    {
+        log.LogError(ex, "Saga failed at step after: {Steps}", string.Join(", ", completed));
+
+        // Run compensating transactions in REVERSE ORDER
+        foreach (var step in Enumerable.Reverse(completed))
+        {
+            try { await context.CallActivityAsync($"Compensate_{step}", input); }
+            catch (Exception compEx)
+            { log.LogError(compEx, "Compensation failed for {Step}", step); }
+        }
+    }
+}
+
+// Each activity is one step — and has a compensating pair
+[FunctionName("CreateReportJob")]
+public static async Task<Guid> CreateReportJob(
+    [ActivityTrigger] ReportSagaInput input, ILogger log)
+{
+    var jobId = Guid.NewGuid();
+    await _reportRepo.CreateJobAsync(jobId, input.TenantId, "Queued");
+    log.LogInformation("Report job {JobId} created", jobId);
+    return jobId;
+}
+
+[FunctionName("Compensate_CreateReportJob")]
+public static async Task CompensateCreateJob(
+    [ActivityTrigger] ReportSagaInput input, ILogger log)
+{
+    await _reportRepo.DeletePendingJobAsync(input.TenantId);
+    log.LogInformation("Compensated: deleted pending report job for {TenantId}", input.TenantId);
+}
+```
+
+**Why Durable Functions for Saga orchestration:**
+```
+State persisted automatically  → app restart doesn't lose saga progress ✅
+Retry built-in                 → transient failures handled without code ✅
+Fan-out/fan-in built-in        → Task.WhenAll works across activities ✅
+Full history queryable         → can inspect saga state at any point ✅
+Timer support                  → timeout and escalation without polling ✅
+```
 
 ---
 
@@ -674,13 +885,205 @@ Benefits: full audit trail · time travel · replay events to rebuild any view
 | **Outbox** | Dual-write reliability | Atomic DB write + event publish |
 | **Event Sourcing** | Audit trail / time travel | Store events not state |
 
+### CQRS — Capital Access C# Implementation (MediatR)
+
+```csharp
+// COMMAND side — write, validate, publish domain event
+public record CreateEngagementCommand(
+    string TenantId, string CompanyId, ActivityType Type, DateTime ScheduledAt)
+    : IRequest<Guid>;
+
+public class CreateEngagementHandler : IRequestHandler<CreateEngagementCommand, Guid>
+{
+    private readonly IEngagementRepository _repo;
+    private readonly IPublisher            _publisher;
+
+    public async Task<Guid> Handle(CreateEngagementCommand cmd, CancellationToken ct)
+    {
+        // Business rule enforced on the WRITE side only
+        if (await _repo.HasActiveEngagementAsync(cmd.CompanyId, cmd.TenantId))
+            throw new DuplicateEngagementException(cmd.CompanyId);
+
+        var activity = EngagementActivity.Create(
+            cmd.TenantId, cmd.CompanyId, cmd.Type, cmd.ScheduledAt);
+        await _repo.AddAsync(activity);
+        await _repo.SaveAsync();
+
+        // Publish domain event → read model will update itself
+        await _publisher.Publish(
+            new EngagementCreatedEvent(activity.Id, activity.TenantId, activity.CompanyId), ct);
+        return activity.Id;
+    }
+}
+
+// QUERY side — read, no business logic, no domain model
+public record GetEngagementDashboardQuery(string TenantId, int PageSize = 20)
+    : IRequest<DashboardDto>;
+
+public class GetDashboardHandler : IRequestHandler<GetEngagementDashboardQuery, DashboardDto>
+{
+    private readonly EngagementReadDbContext _readCtx; // separate read context ✅
+
+    public async Task<DashboardDto> Handle(GetEngagementDashboardQuery q, CancellationToken ct)
+    {
+        // AsNoTracking — no EF change tracking needed for reads ✅
+        var engagements = await _readCtx.EngagementSummaries  // denormalized view
+            .AsNoTracking()
+            .Where(e => e.TenantId == q.TenantId)
+            .OrderByDescending(e => e.ScheduledAt)
+            .Take(q.PageSize)
+            .Select(e => new EngagementCardDto
+            {
+                Id          = e.Id,
+                CompanyName = e.CompanyName,   // already joined — read model carries it ✅
+                Status      = e.Status,
+                ScheduledAt = e.ScheduledAt
+            })
+            .ToListAsync(ct);
+
+        return new DashboardDto
+        {
+            Engagements = engagements,
+            TotalCount  = await _readCtx.EngagementSummaries
+                .CountAsync(e => e.TenantId == q.TenantId, ct)
+        };
+    }
+}
+
+// Read model update — consumes domain event, updates denormalized view
+public class UpdateEngagementSummaryOnCreate
+    : INotificationHandler<EngagementCreatedEvent>
+{
+    public async Task Handle(EngagementCreatedEvent e, CancellationToken ct)
+    {
+        var company = await _companiesCtx.Companies.FindAsync(e.CompanyId);
+        _readCtx.EngagementSummaries.Add(new EngagementSummary
+        {
+            Id          = e.ActivityId,
+            TenantId    = e.TenantId,
+            CompanyName = company!.Name,   // denormalized join stored here ✅
+            Status      = "Pending"
+        });
+        await _readCtx.SaveChangesAsync(ct);
+    }
+}
+```
+
+**Capital Access mapping:**
+```
+Commands: CreateEngagement, CompleteEngagement, RescheduleEngagement, CancelEngagement
+Queries:  GetDashboard, GetEngagementById, GetEngagementHistory, GetOverdueEngagements
+
+Write DB: EngagementActivities (normalized, EF Core with change tracking, ACID)
+Read DB:  EngagementSummaries  (denormalized view, AsNoTracking, fast SELECT)
+```
+
 ### Interview Answer
 
 > "CQRS separates the write model from the read model. The command side handles all state changes with strong consistency. The query side handles reads from a denormalized, eventually-consistent view. The write side publishes domain events; the read side consumes them to update its read models. This lets you scale reads and writes independently and optimize each side for its access pattern. The main cost is eventual consistency and the overhead of maintaining two databases."
 
 ---
 
-## 14. Interview Strategy
+## 14. BFF — Backend for Frontend
+
+### The Problem
+
+One API serving both Angular SPA and mobile app — the response is a compromise that fits neither perfectly.
+
+```
+WITHOUT BFF:
+  Angular SPA ──▶  Single API ──▶ giant response (SPA uses 80%, ignores 20%) ❌
+  Mobile App  ──▶  Same API   ──▶ downloads 5× more data than needed ❌
+  Angular needs:   3 services aggregated into one dashboard call
+  Mobile needs:    1 service, minimal fields
+
+  One API cannot satisfy both without over-fetching or multiple round-trips.
+```
+
+### What BFF Does
+
+```
+WITH BFF:
+  Angular SPA ──▶  Web BFF    ──▶  internal microservices
+  Mobile App  ──▶  Mobile BFF ──▶  same internal microservices (different shape)
+
+  Each BFF is OWNED by the frontend team.
+  Each BFF shapes the response exactly for its client.
+  Microservices stay dumb — they serve raw data.
+  BFF is the intelligence layer in between.
+```
+
+### Capital Access — Web BFF Implementation
+
+```csharp
+// Web BFF endpoint — aggregates 3 microservices in one call for the Angular dashboard
+[ApiController]
+[Route("bff/dashboard")]
+public class DashboardBffController : ControllerBase
+{
+    private readonly IEngagementServiceClient _engagementClient;
+    private readonly IMetricsServiceClient    _metricsClient;
+    private readonly IAlertServiceClient      _alertsClient;
+
+    [HttpGet]
+    public async Task<DashboardResponse> GetDashboard()
+    {
+        var tenantId = User.FindFirst("tenantId")!.Value;
+
+        // Call 3 microservices IN PARALLEL — BFF orchestrates ✅
+        var engagementsTask = _engagementClient.GetRecentAsync(tenantId, take: 10);
+        var metricsTask     = _metricsClient.GetSummaryAsync(tenantId);
+        var alertsTask      = _alertsClient.GetActiveAsync(tenantId);
+        await Task.WhenAll(engagementsTask, metricsTask, alertsTask);
+
+        // Shape response EXACTLY for the Angular dashboard component
+        return new DashboardResponse
+        {
+            Engagements = engagementsTask.Result.Select(e => new DashboardEngagementDto
+            {
+                Id          = e.Id,
+                CompanyName = e.CompanyName,
+                Status      = e.Status,
+                DaysUntil   = (e.ScheduledAt - DateTime.UtcNow).Days
+            }),
+            Metrics     = metricsTask.Result,
+            Alerts      = alertsTask.Result.Take(5), // top 5 only for sidebar ✅
+            LastRefreshed = DateTime.UtcNow
+        };
+        // Angular: 1 HTTP call instead of 3 ✅
+        // Response carries exactly the fields the dashboard template binds to ✅
+        // No transformation needed in Angular ✅
+    }
+}
+```
+
+### BFF vs API Gateway
+
+```
+API Gateway:  infrastructure concern — auth, routing, rate limit, SSL termination
+              One gateway for ALL clients
+              Does NOT aggregate or reshape data
+
+BFF:          product concern — aggregate, filter, shape data for ONE specific client
+              One BFF per client type (Web, Mobile, TV app...)
+              Owned by the frontend team, not platform team
+```
+
+### When to Use / Not Use
+
+**Use BFF when:**
+- Multiple client types with meaningfully different data needs (SPA vs mobile vs TV)
+- Frontend team owns their own API contract
+- API aggregation / orchestration needed on behalf of the client
+- Want to shield the client from internal microservice complexity
+
+**Don't use BFF when:**
+- Single client type — one API is fine
+- All clients need identical data — duplication with no benefit
+
+---
+
+## 15. Interview Strategy
 
 ### System Design — The 5 Gears
 
