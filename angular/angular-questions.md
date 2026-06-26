@@ -3644,6 +3644,138 @@ async$.complete();  // now logs 3 (only last value)
 
 ---
 
+## Angular Fundamentals — Verbal Interview Answers (Q1–Q25)
+
+### Q1. What's the use of Angular?
+Angular is a TypeScript-based front-end framework for building Single Page Applications. It gives you a structured way to build complex UIs through components, handles data binding between your UI and logic, provides routing without page reloads, and includes built-in tools for forms, HTTP calls, and dependency injection — everything you need in one framework.
+
+---
+
+### Q2. What are directives in Angular?
+Directives are instructions you place in the HTML that tell Angular to do something to a DOM element — change its appearance, add or remove it, or give it new behaviour. Think of them as custom HTML attributes that Angular understands.
+
+---
+
+### Q3. Types of Angular directives?
+Three types. **Component directives** — a component is actually a directive with a template, it's the most common type. **Structural directives** — change the DOM structure by adding or removing elements, like `*ngIf` which adds or removes an element based on a condition, and `*ngFor` which repeats an element for each item in a list. **Attribute directives** — change the appearance or behaviour of an existing element without adding or removing it, like `ngClass` to add CSS classes dynamically and `ngStyle` to apply inline styles.
+
+---
+
+### Q4. NPM and Node_Modules folder?
+NPM stands for Node Package Manager — it's the tool you use to install, manage, and update all the third-party libraries your Angular project needs. When you run `npm install`, NPM downloads all the packages listed in package.json and puts them in the `node_modules` folder. That folder contains all the actual library code. You never commit node_modules to git — it can be recreated any time from package.json.
+
+---
+
+### Q5. Package.json?
+Package.json is the project manifest — it describes your project and lists everything it depends on. It has two key sections: `dependencies` which are packages needed in production like Angular itself, and `devDependencies` which are only needed during development like the Angular CLI and testing tools. It also contains scripts — shortcuts for commands like `npm start` to run the app and `npm test` to run tests. It's the single source of truth for what your project needs.
+
+---
+
+### Q6. TypeScript — what and why?
+TypeScript is a superset of JavaScript that adds static typing. Every valid JavaScript is valid TypeScript, but TypeScript adds the ability to declare types for variables, function parameters, and return values. The benefit is that type errors are caught at compile time in your editor — before the code even runs — rather than at runtime in the browser. This makes large codebases much easier to maintain and refactor. Angular is built entirely in TypeScript and requires it.
+
+---
+
+### Q7. Angular CLI?
+Angular CLI is a command-line tool that automates all the repetitive tasks in Angular development. `ng new` scaffolds a complete new project with all configuration. `ng generate component` creates a component with all its files. `ng serve` runs a development server with hot reload. `ng build` compiles the app for production. Without the CLI you'd have to set up webpack, TypeScript config, and project structure manually every time.
+
+---
+
+### Q8. Components and Modules?
+A **component** is the basic building block of Angular UI — it consists of a TypeScript class containing the logic, an HTML template defining what it renders, and a CSS file for styling. Every piece of UI you see is a component.
+
+A **module** is a container that groups related components, services, directives, and pipes together. In older Angular, NgModules were mandatory. In Angular 18 with standalone components, modules are optional — components can be self-contained. In Capital Access we migrated from NgModule architecture to standalone components, which reduced our bundle size by 30%.
+
+---
+
+### Q9. Decorator in Angular?
+A decorator is a special function prefixed with `@` that you attach to a class to give Angular information about what that class is and how it should behave. `@Component` tells Angular this class is a component and provides its template and selector. `@Injectable` tells Angular this class can be injected as a dependency. `@NgModule` marks a class as an Angular module. Decorators are TypeScript's way of adding metadata to classes without changing the class logic itself.
+
+---
+
+### Q10. Annotations / Metadata?
+Annotations and metadata mean the same thing in Angular context — they are the configuration objects you pass inside decorators. For example in `@Component({ selector: 'app-root', templateUrl: './app.component.html' })` — the object inside the brackets is the metadata. It tells Angular what HTML selector to use, where the template lives, and what styles to apply. Angular reads this metadata at compile time to understand how to process and render the class.
+
+---
+
+### Q11. Template?
+A template is the HTML view associated with a component — it defines what the component renders on the screen. Templates in Angular are not plain HTML — they can contain Angular-specific syntax like data binding expressions `{{}}`, structural directives like `*ngIf`, and references to other components. The template is what the user actually sees and interacts with.
+
+---
+
+### Q12. Four types of Data Binding?
+**Interpolation** — one-way from component to template. Double curly braces `{{title}}` display a component property value in the HTML.
+
+**Property binding** — one-way from component to template. Square brackets `[src]="imageUrl"` bind a component property to an HTML element property.
+
+**Event binding** — one-way from template to component. Parentheses `(click)="onSave()"` listen to DOM events and call component methods.
+
+**Two-way binding** — both directions simultaneously. `[(ngModel)]="username"` — the component updates the input field and the input field updates the component property at the same time. The banana-in-a-box syntax `[()]` is a reminder that it combines both property and event binding.
+
+---
+
+### Q13. Architecture of Angular?
+Angular architecture has eight building blocks. **Modules** group the application into cohesive blocks. **Components** define the UI and logic. **Templates** define the HTML view. **Metadata** via decorators tells Angular how to process classes. **Data binding** connects the component and template. **Directives** add behaviour to DOM elements. **Services** contain shared business logic. **Dependency Injection** provides services to components without them creating instances themselves.
+
+---
+
+### Q14. SPA in Angular?
+SPA stands for Single Page Application. Instead of the browser loading a new HTML page every time you navigate, a SPA loads one HTML page initially and then dynamically updates the content as you navigate — without a full page reload. Angular is built specifically for this pattern. The result is a much faster, app-like user experience because only the data changes, not the entire page. Capital Access is a SPA — the IR user navigates between Ownership, Targeting, and Reports modules without any page reload.
+
+---
+
+### Q15. How to implement SPA in Angular?
+Through Angular Router. You define a routes array that maps URL paths to components. You place a `<router-outlet>` in your main template — this is the placeholder where Angular swaps components in and out as you navigate. You use `routerLink` instead of `href` for navigation so the browser doesn't reload the page. The Router intercepts navigation, matches the URL to a route, and renders the correct component inside the outlet — all without a page reload.
+
+---
+
+### Q16. How to implement Routing?
+Import RouterModule, define a Routes array where each route is an object with a path and a component. Register the routes with RouterModule.forRoot in the app module or use provideRouter in standalone setup. Place `<router-outlet>` in the app template. Use `routerLink` for navigation links. Use the Router service programmatically to navigate from TypeScript — `this.router.navigate(['/dashboard'])`.
+
+---
+
+### Q17. Lazy Loading?
+Lazy loading means a feature module or component is only downloaded and loaded when the user actually navigates to that route — not upfront when the app first loads. Without lazy loading, every module is bundled together and downloaded on first page load, making it slow. With lazy loading, the initial bundle is small and fast — additional code is only fetched when needed. In Capital Access, all 8+ feature modules are lazy loaded — the user only downloads the Investor Targeting module when they navigate to that section.
+
+---
+
+### Q18. How to implement Lazy Loading?
+In your route config, instead of importing the component directly, use `loadComponent` with a dynamic import — a function that returns the component only when that route is activated. Angular CLI automatically splits that into a separate bundle. The user's browser downloads that bundle only when they first navigate to that route.
+
+---
+
+### Q19. Services?
+A service is a TypeScript class that contains business logic or data that needs to be shared across multiple components. Services are singletons by default — one instance shared across the entire application. Examples: an AuthService that manages the logged-in user, an HttpService that makes API calls. Components should stay focused on the view — business logic belongs in services.
+
+---
+
+### Q20. Dependency Injection?
+Dependency Injection is a design pattern where a class doesn't create its own dependencies — Angular creates them and provides them. Instead of a component calling `new UserService()` itself, Angular creates the UserService and injects it into the component's constructor. The component doesn't need to know how to create the service, and you can easily swap implementations — especially useful for testing where you inject a mock service instead of the real one.
+
+---
+
+### Q21. How to implement DI?
+Three steps. First, mark the service class with `@Injectable({ providedIn: 'root' })` — this tells Angular this class can be injected and should be a singleton. Second, Angular registers it in the root injector automatically. Third, in any component or service that needs it, declare it as a constructor parameter with the correct type — Angular sees the type, looks it up in its injector, and provides the instance automatically.
+
+---
+
+### Q23. Benefits of DI?
+Four main benefits. **Loose coupling** — components don't depend on specific implementations, just interfaces. **Testability** — you can inject mock versions of services in unit tests without touching the real implementation. **Reusability** — one service instance shared across the whole app, no duplication. **Lifecycle management** — Angular controls when services are created and destroyed, you don't manage that yourself.
+
+---
+
+### Q24. ng serve vs ng build?
+`ng serve` compiles the app in memory and runs a local development server with hot module replacement — when you change a file, the browser updates automatically. Nothing is written to disk. It's for development only.
+
+`ng build` compiles the app and writes the output to a `dist` folder on disk. This is what you deploy to a server. By default it's a development build — not optimised. You add `--configuration production` for a production-ready build.
+
+---
+
+### Q25. --prod parameter in ng build?
+The `--prod` flag (now `--configuration production` in modern Angular) enables all production optimisations in one go: AOT compilation converts templates to JavaScript at build time rather than runtime, minification removes whitespace and shortens variable names, tree shaking removes unused code, uglification makes the code unreadable to protect it, and source maps are excluded. The result is a significantly smaller, faster bundle. In Capital Access, production build combined with standalone component migration reduced our bundle size by 30%.
+
+---
+
 ## Jasmine Unit Testing (Angular)
 
 ```typescript
