@@ -17,6 +17,7 @@
 9. [API Gateway & Bypass Security](#9-api-gateway--bypass-security)
 10. [Circuit Breaker Pattern](#10-circuit-breaker-pattern)
 11. [SAGA Pattern](#11-saga-pattern)
+11a. [Fan-out / Fan-in](#11a-fan-out--fan-in)
 12. [Choreography vs Orchestration](#12-choreography-vs-orchestration)
 13. [CQRS Pattern](#13-cqrs-pattern)
 14. [BFF — Backend for Frontend](#14-bff--backend-for-frontend)
@@ -773,6 +774,54 @@ Fan-out/fan-in built-in        → Task.WhenAll works across activities ✅
 Full history queryable         → can inspect saga state at any point ✅
 Timer support                  → timeout and escalation without polling ✅
 ```
+
+---
+
+## 11a. Fan-out / Fan-in
+
+**Fan-out** means splitting one task into multiple parallel sub-tasks that all run at the same time.
+
+**Fan-in** means waiting for all those parallel sub-tasks to complete and combining their results back into one before proceeding.
+
+### The Mental Model — Manager Delegating Work
+
+Instead of asking one person to do four things one after another, you give all four people their tasks simultaneously and wait for everyone to finish before the team moves forward. That's fan-out/fan-in.
+
+### Sequential vs Parallel
+
+```
+WITHOUT fan-out (sequential):
+  Call Ownership  → wait 500ms
+  Call Profiles   → wait 400ms
+  Call Targeting  → wait 300ms
+  Call Contacts   → wait 200ms
+  Total: 1,400ms ❌
+
+WITH fan-out/fan-in (parallel):
+  Call all four simultaneously → wait for slowest (500ms)
+  Total: 500ms ✅  (nearly 3× faster)
+```
+
+### Key Points
+
+- **Fan-out** = fire all calls at the same time
+- **Fan-in** = the wait point — you don't proceed until ALL parallel branches return
+- If any branch fails, the fan-in fails — the SAGA then handles compensation
+- The total time is determined by the **slowest** parallel call, not the sum
+
+### When to Use
+
+**Use fan-out/fan-in when:**
+- Multiple independent data sources are needed for one response
+- Each call does not depend on the result of another
+- Reducing latency matters — sequential calls add up
+
+**Don't use when:**
+- Calls depend on each other (Call B needs the result of Call A first — must be sequential)
+- One slow downstream service would always be the bottleneck regardless
+
+> 🗣️ **Capital Access — How to explain in interview:**
+> "In report generation, the Azure Function needs data from four services — Ownership, Profiles, Targeting, and Contacts. These four calls are completely independent of each other — none of them needs the result of another to proceed. So instead of calling them sequentially, which would take 1,400ms total, we fan-out — fire all four calls simultaneously — and fan-in when all four respond. Total time drops to 500ms, the slowest single call. Azure Durable Functions has this built in — you start all four activity calls and await them together. The fan-in point is where the orchestrator holds until every branch is back, then moves to the PDF generation step. If any one of the four fails, the fan-in fails and the SAGA runs compensation."
 
 ---
 
