@@ -4542,6 +4542,291 @@ export class InvestorGridComponent {}
 
 ---
 
+## Angular Q45–Q55 — RxJS
+
+### Q45. Full form of RxJS?
+**Reactive Extensions for JavaScript.**
+
+---
+
+### Q46. Purpose of RxJS?
+RxJS is a library for **reactive programming** — it lets you treat asynchronous data as streams. HTTP responses, user keystrokes, WebSocket messages, timers — RxJS treats all of these as streams of values over time, with powerful operators to transform, filter, combine, and react to them. You write code that **reacts to data arriving**, rather than polling for it.
+
+In Angular, RxJS is built in — `HttpClient`, `Router`, `FormControl`, `NgRx Effects` all use Observables under the hood.
+
+---
+
+### Q47. Observables and Observers?
+
+**Observable** — a stream that can emit zero, one, or many values over time, then complete or error. Like a pipe — values flow through it.
+
+**Observer** — the consumer. It has three callbacks: `next` (receives each value), `error` (receives errors), `complete` (called when stream ends cleanly).
+
+Calling `.subscribe()` connects an Observer to an Observable — the stream starts, the observer reacts.
+
+```typescript
+import { Observable } from 'rxjs';
+
+// Creating an Observable
+const investorStream$ = new Observable<string>(observer => {
+  observer.next('Investor A');   // emit value 1
+  observer.next('Investor B');   // emit value 2
+  observer.complete();           // stream ends
+});
+
+// Observer subscribes
+investorStream$.subscribe({
+  next:     (value) => console.log('Received:', value),  // runs twice
+  error:    (err)   => console.error('Error:', err),
+  complete: ()      => console.log('Stream complete')
+});
+// Output:
+// Received: Investor A
+// Received: Investor B
+// Stream complete
+```
+
+---
+
+### Q48. Subscribe with sample code?
+
+`.subscribe()` activates a lazy Observable and connects your Observer. Returns a `Subscription` object — store it to unsubscribe later.
+
+```typescript
+export class InvestorComponent implements OnInit, OnDestroy {
+  investors: Investor[] = [];
+  private sub!: Subscription;
+
+  constructor(private investorService: InvestorService) {}
+
+  ngOnInit() {
+    // subscribe — this is what actually fires the HTTP call
+    this.sub = this.investorService.getAll('spg-001').subscribe({
+      next:     (data) => { this.investors = data; this.isLoading = false; },
+      error:    (err)  => { this.errorMsg = 'Failed to load investors'; },
+      complete: ()     => { console.log('Done'); }
+    });
+  }
+
+  ngOnDestroy() {
+    this.sub.unsubscribe(); // prevent memory leak
+  }
+}
+```
+
+---
+
+### Q49. How to unsubscribe in RxJS?
+
+Four approaches — choose based on complexity:
+
+```typescript
+// 1. Manual unsubscribe — simple, verbose
+private sub!: Subscription;
+ngOnInit()   { this.sub = this.service.getData().subscribe(...); }
+ngOnDestroy(){ this.sub.unsubscribe(); }
+
+// 2. takeUntil with destroy$ Subject — best for multiple subscriptions
+private destroy$ = new Subject<void>();
+
+ngOnInit() {
+  this.service.getInvestors().pipe(takeUntil(this.destroy$)).subscribe(...);
+  this.service.getProfiles().pipe(takeUntil(this.destroy$)).subscribe(...);
+  // add as many streams as you want — all stop on destroy
+}
+ngOnDestroy() {
+  this.destroy$.next();    // signal all streams to stop
+  this.destroy$.complete();
+}
+
+// 3. async pipe — Angular handles everything automatically (best for templates)
+// <div *ngFor="let inv of investors$ | async">{{ inv.name }}</div>
+investors$ = this.investorService.getAll('spg-001'); // no subscribe/unsubscribe needed
+
+// 4. takeUntilDestroyed — Angular 16+ cleanest approach
+investorService = inject(InvestorService);
+
+ngOnInit() {
+  this.investorService.getAll('spg-001')
+    .pipe(takeUntilDestroyed())  // automatically tied to component lifecycle
+    .subscribe(...);
+}
+```
+
+---
+
+### Q50. Operators with sample code?
+
+Operators are pure functions chained in `.pipe()` to transform, filter, or combine streams.
+
+```typescript
+import { map, filter, switchMap, forkJoin, catchError,
+         tap, debounceTime, distinctUntilChanged, combineLatest } from 'rxjs';
+
+// map — transform each value
+this.investorService.getAll().pipe(
+  map(investors => investors.filter(i => i.aum > 1_000_000)) // filter high AUM
+)
+
+// switchMap — cancel previous inner Observable (search box pattern)
+this.searchControl.valueChanges.pipe(
+  debounceTime(300),            // wait 300ms after user stops typing
+  distinctUntilChanged(),       // don't re-fire if value hasn't changed
+  switchMap(term =>             // cancel previous HTTP call, start new one
+    this.investorService.search(term).pipe(catchError(() => of([])))
+  )
+).subscribe(results => this.results = results);
+
+// forkJoin — Capital Access report generation (fan-out/fan-in)
+forkJoin({
+  ownership:  this.ownershipService.get(reportId),
+  profiles:   this.profileService.get(reportId),
+  targeting:  this.targetingService.get(reportId),
+  contacts:   this.contactService.get(reportId)
+}).subscribe(({ ownership, profiles, targeting, contacts }) => {
+  // all 4 arrived — build the report
+  this.generatePdf({ ownership, profiles, targeting, contacts });
+});
+
+// tap — side effects without changing the stream
+this.investorService.getAll().pipe(
+  tap(data => console.log('Fetched investors:', data.length)), // log
+  map(data => data.sort((a, b) => b.aum - a.aum))             // then sort
+)
+
+// combineLatest — combine two streams, re-emit when either changes
+combineLatest([this.investors$, this.activeFilter$]).pipe(
+  map(([investors, filter]) =>
+    investors.filter(i => filter === 'all' || i.type === filter))
+).subscribe(filtered => this.filteredInvestors = filtered);
+```
+
+---
+
+### Q51. How to install RxJS?
+
+```bash
+npm install rxjs
+```
+
+In any Angular project, RxJS is already a dependency — `ng new` installs it automatically. You never need to install it manually for Angular. Just import from `rxjs`:
+
+```typescript
+import { Observable, Subject, BehaviorSubject, of, from, forkJoin } from 'rxjs';
+import { map, filter, switchMap, catchError, takeUntil } from 'rxjs/operators';
+```
+
+---
+
+### Q52. Promise vs RxJS Observable?
+
+| | Promise | Observable |
+|---|---|---|
+| Values emitted | Single (one result) | Multiple over time |
+| Lazy? | No — executes immediately on creation | Yes — nothing until `.subscribe()` |
+| Cancellable? | No | Yes — `.unsubscribe()` |
+| Operators | `.then()`, `.catch()` | `pipe(map, filter, switchMap...)` — 100+ operators |
+| Error handling | `.catch()` | `catchError()` in pipe |
+| Use case | One-time async (file read, single API call) | Streams, events, HTTP, real-time data |
+
+```typescript
+// Promise — executes immediately, one value
+const p = fetch('/api/investor/1').then(r => r.json());  // starts NOW
+
+// Observable — lazy, multiple values possible
+const obs$ = this.http.get('/api/investor/1');  // does NOTHING yet
+obs$.subscribe(data => console.log(data));      // NOW it fires
+
+// Observable can emit multiple values — Promise cannot
+interval(1000).pipe(take(5)).subscribe(n => console.log(n));
+// emits: 0, 1, 2, 3, 4  — one per second — impossible with Promise
+```
+
+---
+
+### Q53. Where have you used RxJS in Angular (Capital Access)?
+
+```typescript
+// 1. HttpClient — every API call returns Observable
+this.http.get<Investor[]>('/api/investors').subscribe(...)
+
+// 2. Router events — show global loading spinner
+this.router.events.pipe(
+  filter(e => e instanceof NavigationStart || e instanceof NavigationEnd)
+).subscribe(e => this.isLoading = e instanceof NavigationStart);
+
+// 3. FormControl.valueChanges — search box with debounce
+this.searchForm.get('query')!.valueChanges.pipe(
+  debounceTime(300), distinctUntilChanged(), switchMap(q => this.search(q))
+).subscribe(results => this.results = results);
+
+// 4. NgRx Effects — Actions as Observable stream
+@Effect()
+loadInvestors$ = this.actions$.pipe(
+  ofType(InvestorActions.loadInvestors),
+  switchMap(({ tenantId }) =>
+    this.investorService.getAll(tenantId).pipe(
+      map(investors => InvestorActions.loadInvestorsSuccess({ investors })),
+      catchError(err => of(InvestorActions.loadInvestorsFailure({ error: err })))
+    )
+  )
+);
+
+// 5. BehaviorSubject — shared tenant context
+private tenant$ = new BehaviorSubject<Tenant | null>(null);
+```
+
+---
+
+### Q54. Which operators have you used from RxJS?
+
+| Operator | Used for in Capital Access |
+|---|---|
+| `map` | Transform API DTOs to view models |
+| `switchMap` | Investor search — cancel old call on new keystroke |
+| `forkJoin` | Report generation — 4 parallel API calls, wait for all |
+| `combineLatest` | Combine investor list + active filter → filtered list |
+| `catchError` | Per-API error handling, return `[]` as fallback |
+| `tap` | Logging, dispatching loading state in NgRx Effects |
+| `debounceTime` | Search box — wait 300ms after user stops typing |
+| `distinctUntilChanged` | Don't re-fire search if value unchanged |
+| `takeUntil` | Clean unsubscription via `destroy$` Subject |
+| `mergeMap` | Bulk engagement updates — parallel calls |
+| `filter` | Router events — only act on NavigationStart/End |
+| `of` | Return fallback Observable in `catchError` |
+
+---
+
+### Q55. Push/Reactive vs Pull/Imperative?
+
+**Pull (Imperative)** — you are in control. You ask for data when you need it. Call a function, get a value immediately. You pull on demand.
+
+**Push (Reactive)** — the data source is in control. You subscribe once and react when the source pushes data to you. You don't ask — you listen and respond.
+
+```typescript
+// PULL — imperative, you ask
+const investors = getInvestors();   // you call it, you get it back synchronously
+console.log(investors);             // you are in control of timing
+
+// PUSH — reactive, source notifies you
+this.investorService.getAll().subscribe(investors => {
+  // source pushes data when ready — you just react
+  this.investors = investors;
+});
+
+// Real-time push example — WebSocket
+const ws$ = webSocket('wss://api.capital-access.com/live-ownership');
+ws$.subscribe(update => {
+  // source PUSHES ownership changes as they happen
+  // you didn't ask — you just reacted
+  this.updateOwnershipTable(update);
+});
+```
+
+**Interview line:** "Pull is asking, Push is listening. RxJS makes listening in JavaScript elegant — instead of polling an API every few seconds, I subscribe once and react when data arrives."
+
+---
+
 ## Jasmine Unit Testing (Angular)
 
 ```typescript
