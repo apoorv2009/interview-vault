@@ -128,6 +128,24 @@ For decomposing existing monoliths. Put an API Gateway in front. Extract one ser
 
 ## 3. Communication Patterns — Overview
 
+> 🗣️ **Capital Access — Service-to-Service Communication Map:**
+>
+> **Pattern 1 — REST (synchronous):** Angular SPA → APIM Gateway → any microservice. Used whenever the UI needs data immediately to render the page. For example, user opens the investor targeting page → Angular calls APIM → APIM routes to Targeting Service → returns targeting scores.
+>
+> **Pattern 2 — Service Bus Pub/Sub (async, one event → many consumers):**
+> - Ownership Service publishes "OwnershipChanged" event to Service Bus Topic when S&P data feed updates ownership data
+> - Targeting Service **subscribes** → recalculates investor scores for that company
+> - Notifications Service **subscribes** → sends email or in-app alerts to users who set up ownership alerts
+> - Ownership Service has zero knowledge of Targeting or Notifications — it just publishes the event
+>
+> **Pattern 3 — Service Bus Queue (async, one job → one worker):**
+> - User requests a report → Reports Service puts a job message on Service Bus Queue → immediately returns a job ID to the user
+> - Azure Function picks up the message → calls Ownership, Profiles, Targeting, and Contacts directly via REST to aggregate data → generates PDF → stores in Blob Storage → publishes "ReportReady" event → Notifications Service alerts the user
+>
+> **Why direct REST inside the Report Worker?** The Function already has full context (tenant, jobId, which company) and needs answers immediately from four services to assemble one report. Pub/Sub is for reactions to a state change — not for "I need data right now."
+>
+> **One-liner:** "SPA to services is always REST through APIM. Service-to-service state changes go through Service Bus Topics. Long-running jobs go through Service Bus Queue to Azure Functions."
+
 > 🗣️ **Capital Access — How to explain in interview:**
 > "In Capital Access we have three distinct communication patterns and we chose each one deliberately. When the Angular SPA needs data to render a page — like loading investor targeting scores — it makes a synchronous REST call through APIM to the Targeting Service and waits for the response. When ownership data changes and multiple services need to react — Targeting needs to recalculate scores and Notifications needs to send alerts — we publish an OwnershipChanged event to Azure Service Bus Topics. Both services get their own independent copy and react without knowing about each other. And for report generation — which is a long-running job meant for exactly one worker — we use a Service Bus Queue. One message, one Azure Function picks it up, generates the PDF. The question I always ask to choose the pattern is: does the caller need the result right now? If yes, REST. If no, queue or pub/sub. And if multiple services react to the same event, pub/sub. If only one should handle it, queue."
 
