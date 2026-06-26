@@ -4432,6 +4432,116 @@ export class HeaderComponent implements OnInit {
 
 ---
 
+## Angular Q42–Q44 — Pipes
+
+### Q42. What is the need of Angular Pipes?
+
+Pipes transform data **for display** in templates without changing the underlying component data. Instead of writing formatting logic in TypeScript or cluttering the template, a pipe sits between the data and what the user sees — reusable, clean, and efficient. Angular only re-runs a pipe when its input actually changes.
+
+In Capital Access: pipes format investor AUM as currency, format engagement dates, and convert ownership percentages — without touching component logic.
+
+```html
+<!-- Without pipe — messy template logic -->
+{{ investor.aum / 1000000000 | number:'1.1-1' }}B
+
+<!-- With pipe — clean and reusable -->
+{{ investor.aum | aumFormat }}
+
+<!-- Pipe chaining — transform then format -->
+{{ investor.name | uppercase | slice:0:20 }}
+```
+
+---
+
+### Q43. Built-in Angular Pipes?
+
+| Pipe | Example | Output |
+|---|---|---|
+| `date` | `{{ date \| date:'dd MMM yyyy' }}` | `26 Jun 2026` |
+| `currency` | `{{ 1500000 \| currency:'USD' }}` | `$1,500,000.00` |
+| `number` | `{{ 3.14159 \| number:'1.2-2' }}` | `3.14` |
+| `percent` | `{{ 0.256 \| percent:'1.1-1' }}` | `25.6%` |
+| `uppercase` | `{{ 'hello' \| uppercase }}` | `HELLO` |
+| `lowercase` | `{{ 'HELLO' \| lowercase }}` | `hello` |
+| `titlecase` | `{{ 'john doe' \| titlecase }}` | `John Doe` |
+| `slice` | `{{ [1,2,3,4,5] \| slice:0:3 }}` | `[1,2,3]` |
+| `json` | `{{ obj \| json }}` | JSON string (debug) |
+| `async` | `{{ investors$ \| async }}` | auto-subscribes + unsubscribes |
+| `keyvalue` | `*ngFor="let item of obj \| keyvalue"` | iterate object properties |
+
+```html
+<!-- async pipe — most important for reactive code -->
+<!-- Auto-subscribes to Observable, auto-unsubscribes on destroy = no memory leaks -->
+<div *ngFor="let investor of investors$ | async">
+  {{ investor.name | titlecase }} — {{ investor.aum | currency:'USD':'symbol':'1.0-0' }}
+</div>
+
+<!-- date pipe with format -->
+<span>Last engaged: {{ engagement.date | date:'dd MMM yyyy, h:mm a' }}</span>
+
+<!-- keyvalue pipe — iterate over an object -->
+<div *ngFor="let item of investorProfile | keyvalue">
+  <b>{{ item.key }}</b>: {{ item.value }}
+</div>
+```
+
+---
+
+### Q44. How to create Custom Pipes?
+
+Three steps: decorate with `@Pipe`, implement `PipeTransform`, add to component imports.
+
+The `transform()` method is a pure function — same input always returns same output. Angular skips re-running it if input hasn't changed, making pipes very efficient.
+
+```typescript
+// Step 1 & 2 — create the pipe class
+import { Pipe, PipeTransform } from '@angular/core';
+
+@Pipe({ name: 'aumFormat', standalone: true })
+export class AumFormatPipe implements PipeTransform {
+  transform(value: number, decimals: number = 1): string {
+    if (!value) return '$0';
+    if (value >= 1_000_000_000) return `$${(value / 1_000_000_000).toFixed(decimals)}B`;
+    if (value >= 1_000_000)     return `$${(value / 1_000_000).toFixed(decimals)}M`;
+    if (value >= 1_000)         return `$${(value / 1_000).toFixed(decimals)}K`;
+    return `$${value}`;
+  }
+}
+// Usage: {{ 1500000000 | aumFormat }}     → $1.5B
+// Usage: {{ 1500000000 | aumFormat:2 }}   → $1.50B
+
+// Another Capital Access example — "3 days ago" format
+@Pipe({ name: 'sinceEngagement', standalone: true })
+export class SinceEngagementPipe implements PipeTransform {
+  transform(date: string | Date): string {
+    const diff = Date.now() - new Date(date).getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    if (days === 0) return 'Today';
+    if (days === 1) return 'Yesterday';
+    return `${days} days ago`;
+  }
+}
+// Usage: {{ investor.lastEngagement | sinceEngagement }}  → "3 days ago"
+
+// Step 3 — add to component imports (standalone)
+@Component({
+  selector: 'app-investor-grid',
+  standalone: true,
+  imports: [CommonModule, AumFormatPipe, SinceEngagementPipe],
+  template: `
+    <td>{{ investor.aum | aumFormat }}</td>
+    <td>{{ investor.lastEngagement | sinceEngagement }}</td>
+  `
+})
+export class InvestorGridComponent {}
+```
+
+**Pure vs Impure pipes:**
+- **Pure** (default) — only runs when input reference changes. Efficient. Use for most cases.
+- **Impure** — runs on every change detection cycle. Use only when input is a mutable object/array that changes internally. Set `pure: false` in `@Pipe`.
+
+---
+
 ## Jasmine Unit Testing (Angular)
 
 ```typescript
