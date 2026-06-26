@@ -4827,7 +4827,7 @@ ws$.subscribe(update => {
 
 ---
 
-### Q56. RxJS vs NgRx — are they different?
+### Bonus Q: RxJS vs NgRx — are they different?
 
 Yes, completely different things — but NgRx is **built on top of RxJS**.
 
@@ -4874,6 +4874,163 @@ this.investors$ = this.store.select(selectAllInvestors); // Observable<Investor[
 - **NgRx on top** — investor targeting state specifically, because multiple feature modules share it and it changes from multiple sources
 
 **Interview line:** "RxJS is the stream tool, NgRx is the state management framework that uses RxJS streams internally. You need RxJS to use NgRx, but you don't need NgRx to use RxJS."
+
+---
+
+## Angular Q56–Q59 — HTTP Interceptors
+
+### Q56. What are interceptors in Angular?
+
+An interceptor sits **between your application and every HTTP call** — it intercepts every outgoing request and every incoming response. It's a central place to apply logic that applies to ALL HTTP calls without repeating it in every service.
+
+Think of it like **middleware in Express.js** — all HTTP traffic passes through it.
+
+In Capital Access: one interceptor adds the JWT bearer token to every request, another handles 401/500 responses globally — no individual service deals with auth headers or token expiry.
+
+---
+
+### Q57. How to implement interceptors?
+
+Two styles — class-based (older) and functional (Angular 15+ modern approach):
+
+```typescript
+// === STYLE 1: Class-based interceptor ===
+@Injectable()
+export class AuthInterceptor implements HttpInterceptor {
+  constructor(private authService: AuthService) {}
+
+  intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    const token = this.authService.getToken();
+
+    // Requests are IMMUTABLE — must clone to modify
+    const authReq = req.clone({
+      setHeaders: { Authorization: `Bearer ${token}` }
+    });
+
+    return next.handle(authReq); // pass modified request along the chain
+  }
+}
+
+// Register in app.module.ts (class-based)
+@NgModule({
+  providers: [
+    { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true }
+    // multi: true = ADD to chain, not REPLACE the chain
+  ]
+})
+
+// === STYLE 2: Functional interceptor (Angular 15+ / Standalone — Capital Access pattern) ===
+export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  const authService = inject(AuthService);
+  const token = authService.getToken();
+
+  const authReq = req.clone({
+    setHeaders: { Authorization: `Bearer ${token}` }
+  });
+
+  return next(authReq);
+};
+
+// Register in app.config.ts (standalone)
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideHttpClient(
+      withInterceptors([authInterceptor, errorInterceptor, loggingInterceptor])
+    )
+  ]
+};
+```
+
+---
+
+### Q58. Uses of Interceptors?
+
+```typescript
+// 1. AUTH TOKEN — add JWT to every request
+export const authInterceptor: HttpInterceptorFn = (req, next) => {
+  const token = inject(AuthService).getToken();
+  return next(req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }));
+};
+
+// 2. GLOBAL ERROR HANDLING — 401 → re-auth, 500 → show toast
+export const errorInterceptor: HttpInterceptorFn = (req, next) => {
+  const auth  = inject(AuthService);
+  const toast = inject(ToastService);
+
+  return next(req).pipe(
+    catchError((error: HttpErrorResponse) => {
+      if (error.status === 401) auth.logout();          // token expired
+      if (error.status >= 500) toast.error('Server error, please try again.');
+      return throwError(() => error);
+    })
+  );
+};
+
+// 3. CORRELATION ID — trace requests across all microservices
+export const correlationInterceptor: HttpInterceptorFn = (req, next) => {
+  const correlationId = crypto.randomUUID();
+  return next(req.clone({
+    setHeaders: { 'X-Correlation-ID': correlationId }
+  }));
+};
+
+// 4. LOADING SPINNER — auto show/hide for every HTTP call
+export const loadingInterceptor: HttpInterceptorFn = (req, next) => {
+  const loader = inject(LoadingService);
+  loader.show();
+  return next(req).pipe(
+    finalize(() => loader.hide())  // hide on complete OR error
+  );
+};
+
+// 5. LOGGING — log every request + response time
+export const loggingInterceptor: HttpInterceptorFn = (req, next) => {
+  const start = Date.now();
+  console.log(`→ ${req.method} ${req.url}`);
+  return next(req).pipe(
+    tap(event => {
+      if (event instanceof HttpResponse) {
+        console.log(`← ${req.url} ${Date.now() - start}ms [${event.status}]`);
+      }
+    })
+  );
+};
+```
+
+---
+
+### Q59. Can we provide multiple interceptors?
+
+Yes — they form a **pipeline**. Request flows through interceptors in registration order (1 → 2 → 3 → API). Response comes back in reverse (API → 3 → 2 → 1).
+
+```typescript
+// app.config.ts — order matters!
+provideHttpClient(
+  withInterceptors([
+    loggingInterceptor,      // 1st — logs the outgoing request
+    correlationInterceptor,  // 2nd — adds correlation ID
+    authInterceptor,         // 3rd — adds JWT token
+    errorInterceptor         // 4th — handles error responses
+  ])
+)
+
+// Flow:
+// REQUEST:  App → logging → correlation → auth → error → API
+// RESPONSE: API → error → auth → correlation → logging → App
+
+// With class-based — each gets { provide: HTTP_INTERCEPTORS, multi: true }
+// multi: true is CRITICAL — without it, each provider REPLACES the previous one
+providers: [
+  { provide: HTTP_INTERCEPTORS, useClass: LoggingInterceptor,     multi: true },
+  { provide: HTTP_INTERCEPTORS, useClass: CorrelationInterceptor, multi: true },
+  { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor,        multi: true },
+  { provide: HTTP_INTERCEPTORS, useClass: ErrorInterceptor,       multi: true },
+]
+```
+
+**Capital Access pattern:** 3 interceptors in order — logging first (to log the original request), then correlation ID, then auth token attachment, with error handling on the response pipe inside the auth interceptor.
+
+**Interview tip:** Always mention `multi: true` when talking about multiple interceptors — it shows you know the gotcha.
 
 ---
 
