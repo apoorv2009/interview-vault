@@ -3659,6 +3659,16 @@ Directives are instructions you place in the HTML that tell Angular to do someth
 ### Q3. Types of Angular directives?
 Three types. **Component directives** — a component is actually a directive with a template, it's the most common type. **Structural directives** — change the DOM structure by adding or removing elements, like `*ngIf` which adds or removes an element based on a condition, and `*ngFor` which repeats an element for each item in a list. **Attribute directives** — change the appearance or behaviour of an existing element without adding or removing it, like `ngClass` to add CSS classes dynamically and `ngStyle` to apply inline styles.
 
+```html
+<!-- Structural — adds/removes element -->
+<div *ngIf="isLoggedIn">Welcome back!</div>
+<li *ngFor="let user of users">{{ user.name }}</li>
+
+<!-- Attribute — changes appearance -->
+<div [ngClass]="{ 'active': isActive, 'disabled': !isActive }">Status</div>
+<div [ngStyle]="{ 'color': isError ? 'red' : 'green' }">Message</div>
+```
+
 ---
 
 ### Q4. NPM and Node_Modules folder?
@@ -3686,10 +3696,35 @@ A **component** is the basic building block of Angular UI — it consists of a T
 
 A **module** is a container that groups related components, services, directives, and pipes together. In older Angular, NgModules were mandatory. In Angular 18 with standalone components, modules are optional — components can be self-contained. In Capital Access we migrated from NgModule architecture to standalone components, which reduced our bundle size by 30%.
 
+```typescript
+// Standalone Component (Angular 18 — no NgModule needed)
+@Component({
+  selector: 'app-investor-card',
+  standalone: true,
+  imports: [CommonModule],
+  templateUrl: './investor-card.component.html'
+})
+export class InvestorCardComponent {
+  @Input() investorName: string = '';
+}
+```
+
 ---
 
 ### Q9. Decorator in Angular?
 A decorator is a special function prefixed with `@` that you attach to a class to give Angular information about what that class is and how it should behave. `@Component` tells Angular this class is a component and provides its template and selector. `@Injectable` tells Angular this class can be injected as a dependency. `@NgModule` marks a class as an Angular module. Decorators are TypeScript's way of adding metadata to classes without changing the class logic itself.
+
+```typescript
+@Component({                          // ← decorator
+  selector: 'app-root',              // ← metadata
+  templateUrl: './app.component.html',
+  styleUrls: ['./app.component.css']
+})
+export class AppComponent { }
+
+@Injectable({ providedIn: 'root' })  // ← decorator + metadata
+export class AuthService { }
+```
 
 ---
 
@@ -3712,6 +3747,23 @@ A template is the HTML view associated with a component — it defines what the 
 
 **Two-way binding** — both directions simultaneously. `[(ngModel)]="username"` — the component updates the input field and the input field updates the component property at the same time. The banana-in-a-box syntax `[()]` is a reminder that it combines both property and event binding.
 
+```html
+<!-- 1. Interpolation — component → template -->
+<h1>{{ pageTitle }}</h1>
+
+<!-- 2. Property binding — component → template -->
+<img [src]="profileImageUrl" [alt]="userName" />
+<button [disabled]="isLoading">Save</button>
+
+<!-- 3. Event binding — template → component -->
+<button (click)="onSave()">Save</button>
+<input (keyup)="onSearch($event)" />
+
+<!-- 4. Two-way binding — both directions -->
+<input [(ngModel)]="searchTerm" />
+<!-- equivalent to: [value]="searchTerm" (input)="searchTerm=$event.target.value" -->
+```
+
 ---
 
 ### Q13. Architecture of Angular?
@@ -3732,6 +3784,28 @@ Through Angular Router. You define a routes array that maps URL paths to compone
 ### Q16. How to implement Routing?
 Import RouterModule, define a Routes array where each route is an object with a path and a component. Register the routes with RouterModule.forRoot in the app module or use provideRouter in standalone setup. Place `<router-outlet>` in the app template. Use `routerLink` for navigation links. Use the Router service programmatically to navigate from TypeScript — `this.router.navigate(['/dashboard'])`.
 
+```typescript
+// app.routes.ts
+export const routes: Routes = [
+  { path: '',        redirectTo: '/dashboard', pathMatch: 'full' },
+  { path: 'dashboard',  component: DashboardComponent },
+  { path: 'profile/:id', component: ProfileComponent }
+];
+
+// app.component.html
+// <nav>
+//   <a routerLink="/dashboard">Dashboard</a>
+//   <a routerLink="/profile/1">Profile</a>
+// </nav>
+// <router-outlet></router-outlet>   ← components render here
+
+// programmatic navigation
+constructor(private router: Router) {}
+goToProfile(id: number) {
+  this.router.navigate(['/profile', id]);
+}
+```
+
 ---
 
 ### Q17. Lazy Loading?
@@ -3741,6 +3815,25 @@ Lazy loading means a feature module or component is only downloaded and loaded w
 
 ### Q18. How to implement Lazy Loading?
 In your route config, instead of importing the component directly, use `loadComponent` with a dynamic import — a function that returns the component only when that route is activated. Angular CLI automatically splits that into a separate bundle. The user's browser downloads that bundle only when they first navigate to that route.
+
+```typescript
+// Lazy loading with standalone components (Angular 18 — Capital Access pattern)
+export const routes: Routes = [
+  {
+    path: 'investor-targeting',
+    loadComponent: () =>
+      import('./features/targeting/targeting.component')
+        .then(m => m.TargetingComponent)   // downloaded only when user navigates here
+  },
+  {
+    path: 'ownership',
+    loadComponent: () =>
+      import('./features/ownership/ownership.component')
+        .then(m => m.OwnershipComponent)
+  }
+];
+// Each feature = separate JS bundle = faster initial load ✅
+```
 
 ---
 
@@ -3757,6 +3850,26 @@ Dependency Injection is a design pattern where a class doesn't create its own de
 ### Q21. How to implement DI?
 Three steps. First, mark the service class with `@Injectable({ providedIn: 'root' })` — this tells Angular this class can be injected and should be a singleton. Second, Angular registers it in the root injector automatically. Third, in any component or service that needs it, declare it as a constructor parameter with the correct type — Angular sees the type, looks it up in its injector, and provides the instance automatically.
 
+```typescript
+// Step 1 — mark service as injectable
+@Injectable({ providedIn: 'root' })   // singleton across the whole app
+export class EngagementService {
+  getAll() { return this.http.get('/api/engagements'); }
+  constructor(private http: HttpClient) {}
+}
+
+// Step 2 — inject into component via constructor
+@Component({ selector: 'app-dashboard', ... })
+export class DashboardComponent {
+  constructor(private engagementService: EngagementService) {}
+  // Angular sees the type → looks it up → provides the singleton instance ✅
+
+  ngOnInit() {
+    this.engagementService.getAll().subscribe(...);
+  }
+}
+```
+
 ---
 
 ### Q23. Benefits of DI?
@@ -3768,6 +3881,23 @@ Four main benefits. **Loose coupling** — components don't depend on specific i
 `ng serve` compiles the app in memory and runs a local development server with hot module replacement — when you change a file, the browser updates automatically. Nothing is written to disk. It's for development only.
 
 `ng build` compiles the app and writes the output to a `dist` folder on disk. This is what you deploy to a server. By default it's a development build — not optimised. You add `--configuration production` for a production-ready build.
+
+```bash
+# Development — runs in memory, hot reload, not optimised
+ng serve
+ng serve --port 4200 --open
+
+# Build for deployment — writes to /dist folder
+ng build                              # development build
+ng build --configuration production   # production build (minified, AOT, tree-shaken)
+
+# Output
+# dist/
+#   my-app/
+#     main.js        ← your app code (minified in prod)
+#     polyfills.js
+#     index.html
+```
 
 ---
 
