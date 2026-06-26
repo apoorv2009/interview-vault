@@ -3906,6 +3906,193 @@ The `--prod` flag (now `--configuration production` in modern Angular) enables a
 
 ---
 
+## Angular Q26–Q31 — ViewChild, Content Projection & Slots
+
+### Q26. ViewChild and ViewChildren?
+
+`@ViewChild` gives you a reference to a single element, component, or directive from your component's **own template**. You use it when you need to access a child component's methods or properties from the parent TypeScript class. `@ViewChildren` does the same but returns a `QueryList` of **all matching elements** instead of just one. Both are available after `ngAfterViewInit` — because the view needs to be rendered before you can query it.
+
+```typescript
+// Child component
+@Component({ selector: 'app-chart', ... })
+export class ChartComponent {
+  refresh() { console.log('chart refreshed'); }
+}
+
+// Parent component
+@Component({
+  template: `
+    <app-chart #myChart></app-chart>
+    <app-chart #myChart2></app-chart>
+    <button (click)="refreshChart()">Refresh</button>
+  `
+})
+export class DashboardComponent implements AfterViewInit {
+  @ViewChild(ChartComponent) chart!: ChartComponent;          // single
+  @ViewChildren(ChartComponent) charts!: QueryList<ChartComponent>; // all
+
+  ngAfterViewInit() {
+    // view is rendered — safe to access now
+    this.chart.refresh();
+  }
+
+  refreshChart() {
+    this.charts.forEach(c => c.refresh()); // refresh all charts
+  }
+}
+```
+
+---
+
+### Q27. Template Reference Variables?
+
+A template reference variable is a way to name a DOM element or component directly in the HTML using the `#` symbol. Once named, you can pass that reference to other elements in the same template, or access it in TypeScript via `@ViewChild`. Without template reference variables, you'd have to query the DOM manually — they give Angular a cleaner, declarative way to reference elements.
+
+```html
+<!-- Reference a DOM element — use directly in template -->
+<input #searchInput type="text" />
+<button (click)="search(searchInput.value)">Search</button>
+
+<!-- Reference a component instance — call its methods -->
+<app-chart #chartRef></app-chart>
+<button (click)="chartRef.refresh()">Refresh</button>
+```
+
+```typescript
+// Access template reference variable in TypeScript via @ViewChild
+@ViewChild('searchInput') searchInput!: ElementRef;
+
+ngAfterViewInit() {
+  this.searchInput.nativeElement.focus(); // auto-focus on load
+}
+```
+
+---
+
+### Q28. Content Projection?
+
+Content projection is how you pass HTML from a parent component **into** a child component's template. The child defines a slot using `<ng-content>` — a placeholder that says "put whatever the parent gives me here." The parent then places its HTML between the child component's opening and closing tags. It's different from `@Input` — `@Input` passes data, content projection passes actual HTML structure.
+
+```typescript
+// Child — card component with a content slot
+@Component({
+  selector: 'app-card',
+  template: `
+    <div class="card">
+      <div class="card-header">Card Title</div>
+      <div class="card-body">
+        <ng-content></ng-content>   <!-- parent's content goes here -->
+      </div>
+    </div>
+  `
+})
+export class CardComponent {}
+
+// Parent — fills the slot with any HTML it wants
+// <app-card>
+//   <p>This paragraph is projected into the card body.</p>
+//   <button>Action</button>
+// </app-card>
+```
+
+---
+
+### Q29. Content Projection Slot?
+
+When a child component needs to accept multiple different pieces of projected content in different places, you use named slots. The child defines multiple `<ng-content>` tags each with a `select` attribute targeting a CSS selector. The parent marks its content with matching selectors so Angular knows which content goes into which slot.
+
+```typescript
+// Child — multi-slot card
+@Component({
+  selector: 'app-card',
+  template: `
+    <div class="card">
+      <div class="header">
+        <ng-content select="[card-header]"></ng-content>  <!-- slot 1 -->
+      </div>
+      <div class="body">
+        <ng-content select="[card-body]"></ng-content>    <!-- slot 2 -->
+      </div>
+      <div class="footer">
+        <ng-content select="[card-footer]"></ng-content>  <!-- slot 3 -->
+      </div>
+    </div>
+  `
+})
+export class CardComponent {}
+
+// Parent — fills each named slot
+// <app-card>
+//   <h2 card-header>Investor Report</h2>
+//   <p  card-body>Q3 ownership summary...</p>
+//   <button card-footer>Download PDF</button>
+// </app-card>
+```
+
+---
+
+### Q30. ContentChild and ContentChildren?
+
+`@ContentChild` gives you a reference to a single element that was **projected into** your component via `<ng-content>`. `@ContentChildren` gives you a `QueryList` of all projected matching elements. Both are available after `ngAfterContentInit` — content is projected before the view renders. The key distinction: ViewChild queries your own template, ContentChild queries what the parent passed in.
+
+```typescript
+// Child component — queries projected content
+@Component({
+  selector: 'app-card',
+  template: `<ng-content></ng-content>`
+})
+export class CardComponent implements AfterContentInit {
+  @ContentChild('cardTitle')   title!: ElementRef;        // single projected element
+  @ContentChildren('cardItem') items!: QueryList<ElementRef>; // all projected items
+
+  ngAfterContentInit() {
+    // content has been projected — safe to access now
+    console.log('Title:', this.title.nativeElement.textContent);
+    console.log('Items count:', this.items.length);
+  }
+}
+
+// Parent — projects content with template reference variables
+// <app-card>
+//   <h2 #cardTitle>Report Summary</h2>
+//   <p #cardItem>Item 1</p>
+//   <p #cardItem>Item 2</p>
+// </app-card>
+```
+
+---
+
+### Q31. ViewChild vs ViewChildren vs ContentChild vs ContentChildren?
+
+Two dimensions — **where** the content lives, and **how many** you're querying.
+
+| Decorator | Queries | Returns | Available after |
+|---|---|---|---|
+| `@ViewChild` | Own template | Single element | `ngAfterViewInit` |
+| `@ViewChildren` | Own template | `QueryList` (all matches) | `ngAfterViewInit` |
+| `@ContentChild` | Projected content (`ng-content`) | Single element | `ngAfterContentInit` |
+| `@ContentChildren` | Projected content (`ng-content`) | `QueryList` (all matches) | `ngAfterContentInit` |
+
+```typescript
+@Component({
+  selector: 'app-parent',
+  template: `
+    <app-child>
+      <p #projected>I am projected</p>   <!-- ContentChild territory -->
+    </app-child>
+    <div #ownDiv>I am in own template</div>  <!-- ViewChild territory -->
+  `
+})
+export class ParentComponent implements AfterViewInit, AfterContentInit {
+  @ViewChild('ownDiv')     ownDiv!: ElementRef;      // own template ✅
+  @ContentChild('projected') projected!: ElementRef; // projected ✅ (in child)
+}
+```
+
+**Memory trick:** View = what YOU render. Content = what the PARENT gives you.
+
+---
+
 ## Jasmine Unit Testing (Angular)
 
 ```typescript
