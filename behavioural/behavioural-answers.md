@@ -2,6 +2,34 @@
 
 ---
 
+## Q: Tell me about yourself / Walk me through your career journey
+
+"Hi, I'm Apoorv Jain — Application Architect with 16 years of experience, based in Hyderabad. My expertise is in Azure cloud architecture, full-stack .NET and Angular development, and more recently AI and GenAI systems.
+
+I started my career in 2010 at **Cerebrata Software**, where I built Azure Storage management tools — Cerebrata Azure Management Studio — which at its peak was used by over **100,000 Azure developers worldwide**. That's where I got very deep into Azure fundamentals early on, well before it was mainstream.
+
+From there I joined **Applied Information Services**, where I spent 9 years growing from Software Engineer all the way to Module Lead. I delivered **15+ enterprise projects** across healthcare, insurance, and eCommerce — leading teams of 5 to 12 developers. This is where I matured as an architect — I designed multi-tenant SaaS platforms on Azure SQL supporting 50,000 concurrent users, established Angular front-end standards adopted across 6 project teams, and led SQL Server migrations to Azure SQL Managed Instance achieving **40% infrastructure cost reduction**.
+
+In 2022 I moved to **Wipro as Application Architect**, where I worked at much larger scale — I led cloud migration programmes for Fortune 500 clients, defining target-state Azure architectures across IaaS, PaaS, and SaaS workloads. I also architected JTI-TERA, an enterprise mobility platform serving **5,000 field sales users across 20 markets**, with an offline-first sync architecture on Azure Service Bus.
+
+Since December 2024 I've been at **S&P Global as Application Architect** on Capital Access — an enterprise investor relations SaaS platform serving **500+ institutional clients**. I own the front-end platform architecture on Angular 18 and NgRx, designed OIDC authentication flows, led a migration from legacy webpack to Angular 18 standalone components cutting **bundle size by 30%**, and drive the overall CI/CD strategy on Azure DevOps.
+
+Outside of work, I recently built **Aagam Mitra** — a production RAG and Agentic AI assistant for a Jain temple community app, using Groq, Pinecone, and Gemini Embeddings. This gave me deep hands-on experience in LLM integration, vector search, and agentic function calling — which I'm actively bringing into my architecture thinking.
+
+So in summary — 16 years across capital markets, healthcare, insurance and eCommerce, from developer to architect, with a strong Azure foundation and now an AI layer on top. I'm excited about EPAM because of the scale and diversity of engineering challenges you work on."
+
+**Career timeline at a glance:**
+
+| Period | Company | Role | Key highlight |
+|---|---|---|---|
+| 2010–2013 | Cerebrata Software | Software Engineer | Azure tools used by 100K+ devs |
+| 2013–2022 | Applied Information Services | SE → Module Lead | 15+ projects, 9 years, 40% cost reduction |
+| 2022–2024 | Wipro | Application Architect | Fortune 500 cloud migration, 5K users/20 markets |
+| 2024–Now | S&P Global | Application Architect | Capital Access SaaS, 500+ clients, 30% bundle reduction |
+| Side project | — | Solo Architect | Aagam Mitra — RAG + Agentic AI assistant |
+
+---
+
 ## Q: Tell me about your previous project — roles and responsibilities
 
 "I've been working at S&P Global on a platform called **Capital Access**, which is a B2B SaaS product that connects institutional investors with public companies to facilitate engagement activities — think investor meetings, conference calls, roadshows.
