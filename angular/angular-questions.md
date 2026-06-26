@@ -4093,6 +4093,111 @@ export class ParentComponent implements AfterViewInit, AfterContentInit {
 
 ---
 
+## Angular Q32–Q34 — Component Lifecycle
+
+### Q32. Importance of Component Lifecycle?
+
+A component in Angular goes through a defined lifecycle — it gets created, renders, gets updated when data changes, and eventually gets destroyed. Angular provides **lifecycle hooks** — special methods you can implement to plug into these moments.
+
+This matters for three reasons:
+- **Timing** — you need to know exactly when `@Input` values are available, when child components are ready, when projected content is initialised
+- **Resource management** — without `ngOnDestroy`, subscriptions and timers keep running after the component is gone, causing **memory leaks**
+- **Change tracking** — `ngOnChanges` lets you react every time an `@Input` value changes, not just on first load
+
+In Capital Access: `ngOnInit` fetches investor data, `ngAfterViewInit` initialises the virtual scroll grid, `ngOnDestroy` unsubscribes all RxJS streams.
+
+---
+
+### Q33. Events and Sequence of Component Lifecycle?
+
+Eight hooks in this exact order:
+
+| # | Hook | When it runs | Use for |
+|---|---|---|---|
+| 1 | `ngOnChanges` | Before init & on every @Input change | React to input changes, get prev/current values |
+| 2 | `ngOnInit` | Once after first ngOnChanges | HTTP calls, initialisation logic |
+| 3 | `ngDoCheck` | Every change detection cycle | Custom change detection |
+| 4 | `ngAfterContentInit` | Once after ng-content is projected | @ContentChild is now available |
+| 5 | `ngAfterContentChecked` | After every projected content check | Rarely used |
+| 6 | `ngAfterViewInit` | Once after view & child views init | @ViewChild is now available, init 3rd-party libs |
+| 7 | `ngAfterViewChecked` | After every view check | Rarely used |
+| 8 | `ngOnDestroy` | Just before component destroyed | Unsubscribe, clear timers, prevent memory leaks |
+
+```typescript
+@Component({ selector: 'app-investor', template: `...` })
+export class InvestorComponent implements OnInit, OnChanges, AfterViewInit, OnDestroy {
+
+  @Input() tenantId!: string;
+  @ViewChild('grid') grid!: ElementRef;
+
+  private sub = new Subscription();
+
+  constructor(private investorService: InvestorService) {
+    // DI only — @Input not set yet, template not rendered
+  }
+
+  ngOnChanges(changes: SimpleChanges) {
+    // runs BEFORE ngOnInit and on every @Input change
+    if (changes['tenantId']) {
+      console.log('prev:', changes['tenantId'].previousValue);
+      console.log('curr:', changes['tenantId'].currentValue);
+    }
+  }
+
+  ngOnInit() {
+    // @Input values are NOW set — safe to use tenantId
+    this.sub = this.investorService.getAll(this.tenantId).subscribe();
+  }
+
+  ngAfterViewInit() {
+    // @ViewChild is NOW available — safe to access DOM
+    this.grid.nativeElement.focus();
+  }
+
+  ngOnDestroy() {
+    // MUST clean up to prevent memory leaks
+    this.sub.unsubscribe();
+  }
+}
+```
+
+---
+
+### Q34. Constructor vs ngOnInit?
+
+**Constructor** — plain TypeScript concept. Runs when the class is instantiated, before any lifecycle hooks. At this point: `@Input` properties are NOT set, template is NOT rendered, child components do NOT exist. Use it **only for Dependency Injection**.
+
+**ngOnInit** — Angular's first lifecycle hook. By the time it runs: all `@Input` values are set, component metadata is processed, ready to work. Use it for **all initialisation logic** — HTTP calls, reading inputs, subscribing to Observables.
+
+**Rule: Constructor = DI only. ngOnInit = everything else.**
+
+```typescript
+@Component({ selector: 'app-report', template: `...` })
+export class ReportComponent implements OnInit {
+
+  @Input() reportId!: string;
+
+  constructor(private reportService: ReportService) {
+    // ✅ DI — inject the service
+    // ❌ DON'T call API here — reportId is undefined at this point
+  }
+
+  ngOnInit() {
+    // ✅ @Input reportId is NOW set — safe to use
+    this.reportService.load(this.reportId).subscribe();
+  }
+}
+
+// Why it matters:
+// Constructor runs before Angular sets @Input values.
+// If you call an API in constructor using an @Input → undefined → wrong data or crash.
+// ngOnInit runs after inputs are set → works correctly every time.
+```
+
+**Interview line:** "I use the constructor only as a DI receiver. Everything else goes in ngOnInit — that's the Angular way."
+
+---
+
 ## Jasmine Unit Testing (Angular)
 
 ```typescript
