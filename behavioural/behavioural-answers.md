@@ -77,24 +77,6 @@ Concrete example: used Claude to scaffold the initial Durable Functions orchestr
 
 ---
 
-## Q: How does the API validate the JWT token — does it call Okta on every request?
-
-"No — calling Okta on every request would be too slow and would make our system dependent on Okta's availability for every single API call.
-
-Here's how it actually works. When Okta issues a JWT token, it signs it using its private key — think of it like a wax seal that only Okta can create. Okta also publishes its public keys at a well-known JWKS endpoint — JWKS stands for JSON Web Key Set. This is a public URL anyone can reach.
-
-When Azure API Management starts up, it fetches those public keys from the JWKS endpoint and caches them locally. From that point, every incoming JWT is validated in memory using the cached public key — pure cryptographic signature verification, no network call to Okta needed. Along with the signature, APIM also checks that the token hasn't expired, the issuer is correct, and the tenant and role claims are valid.
-
-**Why not call Okta every time?** Three reasons — performance, availability, and scale. A live Okta call would add 50 to 200 milliseconds of latency to every API request. If Okta had a brief outage, our entire platform would go down with it. Caching the public keys keeps validation fast and our system independent of Okta's availability per request.
-
-**Key rotation** — Okta rotates its signing keys periodically. Each JWT carries a `kid` (key ID) in its header. When APIM sees a `kid` it doesn't recognise in its cache, it automatically refreshes from the JWKS endpoint. No manual intervention needed.
-
-**Token revocation limitation** — since validation is local, a stolen token remains valid until it expires. That's why access tokens are kept short-lived — 15 to 60 minutes — and we use a refresh token to silently get a new access token when the old one expires. Short lifetime = small window of risk."
-
-**One-liner:** "APIM fetches Okta's public keys once and caches them. Every JWT is validated locally using that cached public key — no Okta call per request. Fast, reliable, and decoupled from Okta's availability."
-
----
-
 ## Q: How do you build an API that is secure and performance-centric?
 
 **Security:**
