@@ -5034,6 +5034,293 @@ providers: [
 
 ---
 
+## Angular Q60–Q72 — Forms & Validation
+
+### Q60. Two ways of doing validation in Angular?
+
+1. **Template-driven forms** — validation rules in the HTML template via directives (`required`, `minlength`, `email`). Angular creates the form model implicitly.
+2. **Reactive forms** — validation defined explicitly in TypeScript using `FormControl`, `FormGroup`, and `Validators`. Form model lives in code.
+
+---
+
+### Q61. Template-driven vs Reactive Forms?
+
+| | Template-driven | Reactive |
+|---|---|---|
+| Validation defined in | HTML template (directives) | TypeScript (`Validators`) |
+| Form model | Implicit (Angular creates it) | Explicit (`FormGroup`/`FormControl`) |
+| Two-way binding | `ngModel` | `formControlName` + `FormControl` |
+| Dynamic fields | Difficult | Easy (`FormArray`) |
+| Testability | Hard (requires DOM) | Easy (pure TypeScript) |
+| Best for | Simple, static forms | Complex, dynamic, testable forms |
+
+---
+
+### Q62. When to use which?
+
+**Template-driven:** Simple, static forms — login, contact, feedback. When structure doesn't change at runtime and you want to write it quickly.
+
+**Reactive:** Complex or dynamic forms — fields added/removed at runtime, cross-field validation (password confirm), need to subscribe to value changes, or form logic needs unit testing.
+
+In Capital Access, all forms are **reactive** — the investor targeting filter has dynamic fields that appear based on the selected filter type.
+
+---
+
+### Q63. Template reference variables in forms?
+
+Covered in Q27. In forms specifically — `#f="ngForm"` gets a reference to the `NgForm` directive, exposing form validity directly in the template.
+
+```html
+<form #f="ngForm" (ngSubmit)="onSubmit(f)">
+  <input name="email" ngModel required email #emailRef="ngModel" />
+
+  <!-- show error only after user has touched the field -->
+  <span *ngIf="emailRef.invalid && emailRef.touched">Invalid email</span>
+
+  <!-- disable submit until form is valid -->
+  <button [disabled]="f.invalid">Submit</button>
+</form>
+```
+
+---
+
+### Q64. How to implement Template-driven forms?
+
+```html
+<!-- Import FormsModule in component -->
+<form #f="ngForm" (ngSubmit)="onSubmit(f)">
+
+  <input name="name"
+         ngModel
+         required
+         minlength="3"
+         #nameRef="ngModel" />
+  <span *ngIf="nameRef.errors?.['required'] && nameRef.touched">Name is required</span>
+  <span *ngIf="nameRef.errors?.['minlength'] && nameRef.touched">Min 3 characters</span>
+
+  <input name="email"
+         ngModel
+         required
+         email
+         #emailRef="ngModel" />
+  <span *ngIf="emailRef.errors?.['email'] && emailRef.touched">Invalid email format</span>
+
+  <button [disabled]="f.invalid">Submit</button>
+</form>
+```
+
+```typescript
+onSubmit(form: NgForm) {
+  if (form.valid) {
+    console.log(form.value);  // { name: 'Apoorv', email: 'apoorv@sp.com' }
+  }
+}
+```
+
+---
+
+### Q65. How to check overall and specific validation?
+
+```typescript
+// Reactive Forms
+this.form.valid           // true if ALL fields pass
+this.form.invalid         // true if ANY field fails
+
+// Specific field validity
+this.form.get('email')?.valid
+this.form.get('email')?.invalid
+
+// Specific error on specific field
+this.form.get('email')?.hasError('required')
+this.form.get('email')?.hasError('email')
+this.form.get('email')?.errors?.['minlength']?.requiredLength
+
+// Field state flags — use to control when to show errors
+this.form.get('email')?.touched    // user focused + left the field
+this.form.get('email')?.dirty      // user has typed in it
+this.form.get('email')?.pristine   // user hasn't touched it yet
+```
+
+```html
+<!-- Best practice — show error only after touched -->
+<span *ngIf="form.get('email')?.invalid && form.get('email')?.touched">
+  <span *ngIf="form.get('email')?.hasError('required')">Email is required</span>
+  <span *ngIf="form.get('email')?.hasError('email')">Invalid email format</span>
+</span>
+```
+
+---
+
+### Q66. How to implement Reactive Forms?
+
+```typescript
+// TypeScript — build form model with validators
+@Component({ standalone: true, imports: [ReactiveFormsModule] })
+export class LoginComponent {
+  loginForm = new FormGroup({
+    email:    new FormControl('', [Validators.required, Validators.email]),
+    password: new FormControl('', [Validators.required, Validators.minLength(8)])
+  });
+
+  onSubmit() {
+    if (this.loginForm.valid) {
+      console.log(this.loginForm.value); // { email: '...', password: '...' }
+    }
+  }
+}
+```
+
+```html
+<!-- Template — bind using [formGroup] and formControlName -->
+<form [formGroup]="loginForm" (ngSubmit)="onSubmit()">
+  <input formControlName="email" />
+  <span *ngIf="loginForm.get('email')?.hasError('email') && loginForm.get('email')?.touched">
+    Invalid email
+  </span>
+
+  <input type="password" formControlName="password" />
+
+  <button [disabled]="loginForm.invalid">Login</button>
+</form>
+```
+
+---
+
+### Q67. Composite (Cross-field) Validations?
+
+Composite validation checks multiple fields together — e.g., password === confirmPassword. A FormGroup-level validator receives the whole group, reads both fields, and sets an error on the group.
+
+```typescript
+// Custom cross-field validator function
+function passwordMatchValidator(group: AbstractControl): ValidationErrors | null {
+  const password        = group.get('password')?.value;
+  const confirmPassword = group.get('confirmPassword')?.value;
+  return password === confirmPassword ? null : { passwordMismatch: true };
+}
+
+// Apply validator to the FormGroup, not individual controls
+this.registerForm = new FormGroup({
+  password:        new FormControl('', Validators.required),
+  confirmPassword: new FormControl('', Validators.required)
+}, { validators: passwordMatchValidator });  // ← group-level validator
+```
+
+```html
+<!-- Error shows at group level -->
+<span *ngIf="registerForm.hasError('passwordMismatch')">Passwords do not match</span>
+```
+
+---
+
+### Q68. Dynamic Validation?
+
+Add or remove validators at runtime using `setValidators()` / `clearValidators()`. Must call `updateValueAndValidity()` after to trigger re-evaluation.
+
+```typescript
+// Capital Access example — Company Reg# required only for Institution type
+this.form.get('investorType')!.valueChanges.subscribe(type => {
+  const regControl = this.form.get('companyRegNumber')!;
+
+  if (type === 'Institution') {
+    regControl.setValidators([Validators.required, Validators.minLength(6)]);
+  } else {
+    regControl.clearValidators();  // Individual — not required
+  }
+
+  regControl.updateValueAndValidity();  // ← CRITICAL — re-evaluate now
+});
+```
+
+---
+
+### Q69. Built-in Validators?
+
+```typescript
+import { Validators } from '@angular/forms';
+
+new FormControl('', [
+  Validators.required,          // field must have a value
+  Validators.email,             // must be valid email format
+  Validators.minLength(3),      // minimum character count
+  Validators.maxLength(50),     // maximum character count
+  Validators.min(0),            // number minimum value
+  Validators.max(100),          // number maximum value
+  Validators.pattern(/^[A-Z]{2}[0-9]{10}$/),  // must match regex (ISIN format)
+  Validators.requiredTrue,      // checkbox must be checked
+]);
+```
+
+---
+
+### Q70. Custom Validator?
+
+A validator is a function that takes an `AbstractControl`, returns `null` (valid) or a `ValidationErrors` object (invalid).
+
+```typescript
+// Field-level custom validator — ISIN format check
+function isinValidator(control: AbstractControl): ValidationErrors | null {
+  const value = control.value;
+  if (!value) return null;  // let required handle empty
+  const isinRegex = /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/;
+  return isinRegex.test(value) ? null : { invalidIsin: true };
+}
+
+// Use in FormControl
+new FormControl('', [Validators.required, isinValidator])
+
+// Template
+// <span *ngIf="form.get('isin')?.hasError('invalidIsin')">Invalid ISIN format</span>
+
+// Async custom validator (checks uniqueness via API)
+function uniqueEmailValidator(service: AuthService): AsyncValidatorFn {
+  return (control: AbstractControl): Observable<ValidationErrors | null> =>
+    service.checkEmailExists(control.value).pipe(
+      map(exists => exists ? { emailTaken: true } : null),
+      catchError(() => of(null))
+    );
+}
+new FormControl('', [Validators.required], [uniqueEmailValidator(this.authService)])
+```
+
+---
+
+### Q71. Can we implement validators without a FORM tag?
+
+Yes — in Reactive Forms the `<form>` tag is optional. Form model is in TypeScript, you bind with `[formGroup]` on any element. You can also use a standalone `FormControl` on a single input without any `FormGroup` or form tag.
+
+Template-driven forms DO require a `<form>` tag — `NgForm` attaches to it automatically.
+
+```typescript
+// Standalone FormControl — no form tag, no FormGroup needed
+searchControl = new FormControl('', [Validators.minLength(3)]);
+
+// In template — no <form> needed
+// <input [formControl]="searchControl" />
+// <span *ngIf="searchControl.hasError('minlength')">Min 3 chars</span>
+```
+
+---
+
+### Q72. `[ngModelOptions]="{standalone: true}"`?
+
+Normally every `ngModel` field in a template-driven form registers itself with the parent `NgForm` (via the `name` attribute). It contributes to `form.valid`.
+
+`standalone: true` tells Angular to **skip registration** — the field gets two-way binding via `ngModel` but does NOT affect form validity or `form.value`. Use it for UI-only fields inside a form that shouldn't block submission.
+
+```html
+<form #f="ngForm" (ngSubmit)="onSubmit(f)">
+  <input name="email" ngModel required />  <!-- registered — affects f.valid -->
+
+  <!-- UI preference toggle — doesn't affect form validity -->
+  <input [(ngModel)]="darkMode"
+         [ngModelOptions]="{ standalone: true }" />
+
+  <button [disabled]="f.invalid">Submit</button>
+</form>
+```
+
+---
+
 ## Jasmine Unit Testing (Angular)
 
 ```typescript
