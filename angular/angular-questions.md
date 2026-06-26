@@ -4198,6 +4198,240 @@ export class ReportComponent implements OnInit {
 
 ---
 
+## Angular Q35–Q41 — HTTP, Component Communication & Data Passing
+
+### Q35. How to make HTTP calls in Angular?
+
+Register `HttpClient` via `provideHttpClient()` in standalone app config (or `HttpClientModule` in NgModule apps). Inject `HttpClient` into a service, then call `.get()`, `.post()`, `.put()`, `.delete()` — these return **Observables**. Subscribe to trigger the call and receive the response. Always make HTTP calls from a **service**, never directly from a component.
+
+```typescript
+// app.config.ts (standalone)
+export const appConfig: ApplicationConfig = {
+  providers: [provideHttpClient(), provideRouter(routes)]
+};
+
+// investor.service.ts
+@Injectable({ providedIn: 'root' })
+export class InvestorService {
+  private apiUrl = 'https://api.capital-access.com/investors';
+
+  constructor(private http: HttpClient) {}
+
+  getAll(tenantId: string): Observable<Investor[]> {
+    return this.http.get<Investor[]>(`${this.apiUrl}?tenantId=${tenantId}`);
+  }
+
+  create(investor: Investor): Observable<Investor> {
+    return this.http.post<Investor>(this.apiUrl, investor);
+  }
+}
+
+// component — calls service, not HttpClient directly
+export class InvestorListComponent implements OnInit {
+  investors: Investor[] = [];
+  constructor(private investorService: InvestorService) {}
+
+  ngOnInit() {
+    this.investorService.getAll('spg-001').subscribe(data => {
+      this.investors = data;
+    });
+  }
+}
+```
+
+---
+
+### Q36. What is the need of Subscribe?
+
+`HttpClient` methods return **Observables** — they are lazy. An Observable does nothing until something subscribes to it. Without `.subscribe()`, the HTTP call never fires.
+
+`.subscribe()` takes three callbacks: `next` (receives each emitted value — for HTTP, the response), `error` (receives any error), `complete` (runs when the Observable finishes).
+
+```typescript
+this.investorService.getAll('spg-001').subscribe({
+  next: (data) => {
+    this.investors = data;    // ✅ response received — update UI
+  },
+  error: (err) => {
+    console.error('Failed to load investors', err); // ❌ handle error
+  },
+  complete: () => {
+    this.isLoading = false;   // ✅ done — hide spinner
+  }
+});
+
+// Without subscribe() — HTTP call NEVER fires ❌
+const obs$ = this.investorService.getAll('spg-001');
+// Nothing happens — no network request made
+```
+
+---
+
+### Q37. How to handle errors when HTTP fails?
+
+Two levels: **per-call** with `catchError`, and **global** with `HttpInterceptor`.
+
+```typescript
+// Per-call error handling with catchError
+import { catchError, of } from 'rxjs';
+
+getAll(tenantId: string): Observable<Investor[]> {
+  return this.http.get<Investor[]>(`${this.apiUrl}?tenantId=${tenantId}`).pipe(
+    catchError((error: HttpErrorResponse) => {
+      console.error('API error:', error.status, error.message);
+      return of([]);  // return empty array as fallback — app keeps running
+    })
+  );
+}
+
+// Global error handling via HttpInterceptor (Capital Access pattern)
+@Injectable()
+export class ErrorInterceptor implements HttpInterceptor {
+  constructor(private authService: AuthService, private toast: ToastService) {}
+
+  intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    return next.handle(req).pipe(
+      catchError((error: HttpErrorResponse) => {
+        if (error.status === 401) {
+          this.authService.logout();          // token expired → re-auth
+        } else if (error.status >= 500) {
+          this.toast.show('Server error. Please try again.'); // 5xx → show toast
+        }
+        return throwError(() => error);
+      })
+    );
+  }
+}
+```
+
+---
+
+### Q38. How to pass data between components?
+
+Four approaches depending on the relationship:
+
+| Relationship | Approach |
+|---|---|
+| Parent → Child | `@Input` |
+| Child → Parent | `@Output` + `EventEmitter` |
+| Sibling / Unrelated | Shared service with `BehaviorSubject` or NgRx |
+| Between routes/pages | Route params, query params, navigation state |
+
+```typescript
+// Parent → Child via @Input
+// parent template: <app-card [investor]="selectedInvestor"></app-card>
+
+// Child → Parent via @Output
+// parent template: <app-card (selected)="onInvestorSelected($event)"></app-card>
+
+// Sibling via shared service
+@Injectable({ providedIn: 'root' })
+export class SelectionService {
+  private selected$ = new BehaviorSubject<Investor | null>(null);
+  currentInvestor$ = this.selected$.asObservable();
+  select(investor: Investor) { this.selected$.next(investor); }
+}
+// Component A: this.selectionService.select(investor);
+// Component B: this.selectionService.currentInvestor$.subscribe(i => this.investor = i);
+```
+
+---
+
+### Q39. Importance of @Input, @Output, EventEmitter?
+
+`@Input` passes data **downward** (parent → child). `@Output` + `EventEmitter` passes events **upward** (child → parent). Together they enforce clean separation — child components never reach up and modify parent data directly. They just emit events and let the parent decide what to do.
+
+```typescript
+// Child component
+@Component({ selector: 'app-investor-card', template: `
+  <div (click)="onSelect()">{{ investor.name }}</div>
+` })
+export class InvestorCardComponent {
+  @Input()  investor!: Investor;                    // receives data from parent
+  @Output() selected = new EventEmitter<Investor>(); // sends events to parent
+
+  onSelect() {
+    this.selected.emit(this.investor); // child emits — parent handles
+  }
+}
+
+// Parent component template
+// <app-investor-card
+//   [investor]="inv"                        ← @Input: pass data down
+//   (selected)="onInvestorSelected($event)" ← @Output: listen to child event
+// ></app-investor-card>
+
+export class TargetingPageComponent {
+  onInvestorSelected(investor: Investor) {
+    this.selectedInvestor = investor;  // parent decides what to do
+  }
+}
+```
+
+---
+
+### Q40. How to pass data during routing?
+
+Three ways — choose based on whether data needs to be in the URL:
+
+```typescript
+// 1. Route parameters — required, identifies the resource, part of the URL
+// URL: /investor/12345
+const routes = [{ path: 'investor/:id', component: InvestorDetailComponent }];
+// Navigate:
+this.router.navigate(['/investor', investor.id]);
+// Read:
+this.route.snapshot.paramMap.get('id');
+
+// 2. Query parameters — optional, filtering/sorting, survives page refresh
+// URL: /investors?page=2&filter=active
+this.router.navigate(['/investors'], { queryParams: { page: 2, filter: 'active' } });
+// Read:
+this.route.snapshot.queryParamMap.get('filter');
+
+// 3. Navigation state — temporary, NOT in URL, lost on refresh
+// Use for passing objects to avoid a second API call
+this.router.navigate(['/investor-detail'], {
+  state: { investor: this.selectedInvestor }
+});
+// Read on the next page:
+const nav = this.router.getCurrentNavigation();
+this.investor = nav?.extras?.state?.['investor'];
+```
+
+---
+
+### Q41. Is it good practice to pass data using services?
+
+Yes — for shared state between unrelated or sibling components, a shared service with `BehaviorSubject` is clean and simple. No extra library needed.
+
+**Use a shared service when:** state is limited to one feature area, or shared between a few components.
+
+**Switch to NgRx when:** state is global across many features, changes frequently from multiple sources, or you need predictable debugging with Redux DevTools.
+
+```typescript
+// Shared service — right for simple cross-component state
+@Injectable({ providedIn: 'root' })
+export class TenantContextService {
+  private tenant$ = new BehaviorSubject<Tenant | null>(null);
+  currentTenant$ = this.tenant$.asObservable();  // read-only for consumers
+  setTenant(tenant: Tenant) { this.tenant$.next(tenant); }
+}
+
+// Any component can inject and subscribe — no prop drilling
+export class HeaderComponent implements OnInit {
+  tenant!: Tenant;
+  constructor(private ctx: TenantContextService) {}
+  ngOnInit() {
+    this.ctx.currentTenant$.subscribe(t => this.tenant = t!);
+  }
+}
+```
+
+**Capital Access pattern:** Shared service for current user/tenant context (simple, read-only). NgRx for investor targeting state (global, many consumers, changes frequently).
+
+---
+
 ## Jasmine Unit Testing (Angular)
 
 ```typescript
