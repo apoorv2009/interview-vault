@@ -4827,6 +4827,56 @@ ws$.subscribe(update => {
 
 ---
 
+### Q56. RxJS vs NgRx — are they different?
+
+Yes, completely different things — but NgRx is **built on top of RxJS**.
+
+| | RxJS | NgRx |
+|---|---|---|
+| What it is | Reactive programming library | Angular state management library |
+| Framework-specific? | No — works in any JS project | Yes — Angular only |
+| Solves | Async data streams | Shared application state across components |
+| Built on | Native JS | RxJS (Observables under the hood) |
+| Can use without the other? | Yes | No — NgRx requires RxJS |
+
+**Analogy:** RxJS is **electricity** — a fundamental utility. NgRx is a **refrigerator** — an appliance that runs on electricity (RxJS) to solve a specific problem (state management). You can use electricity without a refrigerator. You cannot run the refrigerator without electricity.
+
+```typescript
+// RxJS alone — handles async streams (HTTP, forms, events)
+this.http.get<Investor[]>('/api/investors').pipe(
+  map(data => data.filter(i => i.aum > 1_000_000)),
+  catchError(() => of([]))
+).subscribe(data => this.investors = data);
+
+// NgRx — built ON TOP of RxJS, manages shared state
+// Actions (dispatched from anywhere)
+store.dispatch(InvestorActions.loadInvestors({ tenantId: 'spg-001' }));
+
+// Effects (NgRx uses RxJS operators internally)
+loadInvestors$ = createEffect(() =>
+  this.actions$.pipe(               // actions$ is an RxJS Observable
+    ofType(InvestorActions.loadInvestors),
+    switchMap(({ tenantId }) =>     // switchMap is an RxJS operator
+      this.investorService.getAll(tenantId).pipe(  // HttpClient returns Observable
+        map(investors => InvestorActions.loadInvestorsSuccess({ investors })),
+        catchError(err => of(InvestorActions.loadInvestorsFailure({ error: err })))
+      )
+    )
+  )
+);
+
+// Selectors (Store emits as Observable — RxJS again)
+this.investors$ = this.store.select(selectAllInvestors); // Observable<Investor[]>
+```
+
+**Capital Access pattern:**
+- **RxJS everywhere** — HttpClient calls, FormControl.valueChanges, Router events, BehaviorSubject for tenant context
+- **NgRx on top** — investor targeting state specifically, because multiple feature modules share it and it changes from multiple sources
+
+**Interview line:** "RxJS is the stream tool, NgRx is the state management framework that uses RxJS streams internally. You need RxJS to use NgRx, but you don't need NgRx to use RxJS."
+
+---
+
 ## Jasmine Unit Testing (Angular)
 
 ```typescript
