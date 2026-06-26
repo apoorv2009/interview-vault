@@ -50,6 +50,9 @@ Monolith:                          Microservices:
 - Domain boundaries not yet clear — start with modular monolith first
 - Simple CRUD application — no need for distributed complexity
 
+> 🗣️ **Capital Access — How to explain in interview:**
+> "Capital Access is decomposed into six microservices — Ownership, Profiles, Targeting, Contacts, Notifications, and Reports. Each owns a distinct business capability and its own database. For example, the Ownership Service is completely independent of the Notifications Service — if Notifications goes down, ownership data still works perfectly. Each service deploys independently, scales independently, and can be built with the most appropriate technology for its domain. That's the core benefit we get from microservices in Capital Access."
+
 ---
 
 ## 2. Service Decomposition Strategies
@@ -124,6 +127,9 @@ For decomposing existing monoliths. Put an API Gateway in front. Extract one ser
 ---
 
 ## 3. Communication Patterns — Overview
+
+> 🗣️ **Capital Access — How to explain in interview:**
+> "In Capital Access we have three distinct communication patterns and we chose each one deliberately. When the Angular SPA needs data to render a page — like loading investor targeting scores — it makes a synchronous REST call through APIM to the Targeting Service and waits for the response. When ownership data changes and multiple services need to react — Targeting needs to recalculate scores and Notifications needs to send alerts — we publish an OwnershipChanged event to Azure Service Bus Topics. Both services get their own independent copy and react without knowing about each other. And for report generation — which is a long-running job meant for exactly one worker — we use a Service Bus Queue. One message, one Azure Function picks it up, generates the PDF. The question I always ask to choose the pattern is: does the caller need the result right now? If yes, REST. If no, queue or pub/sub. And if multiple services react to the same event, pub/sub. If only one should handle it, queue."
 
 ### The Three-Question Decision Framework
 
@@ -506,6 +512,9 @@ A broker supporting multiple patterns via exchanges. Smart routing — reads mes
 
 ## 9. API Gateway & Bypass Security
 
+> 🗣️ **Capital Access — How to explain in interview:**
+> "In Capital Access, Azure API Management is our single entry point for all SPA traffic. The Angular app never talks directly to any microservice — every request goes through APIM. The gateway does three things: it validates the JWT token against Okta's public keys cached from the JWKS endpoint, it checks the tenant ID and role claims so one client can never access another client's data, and it applies rate limiting per tenant. Then it routes the request to the correct downstream microservice. The microservices themselves are in a private subnet with no public IP — they cannot be reached from the internet directly. So even if someone knew the internal URL of the Targeting Service, they couldn't hit it. Network isolation is the first and most important layer of gateway bypass protection."
+
 ### What API Gateway Does
 
 - **Authentication** — validate JWT once, not in every service
@@ -531,6 +540,9 @@ A broker supporting multiple patterns via exchanges. Smart routing — reads mes
 ---
 
 ## 10. Circuit Breaker Pattern
+
+> 🗣️ **Capital Access — How to explain in interview:**
+> "In Capital Access, the Report Worker is an Azure Function that calls four microservices synchronously — Ownership, Profiles, Targeting, and Contacts — to aggregate data for a report. If the Targeting Service is slow or down, without a circuit breaker the Report Worker would keep sending requests and waiting, eventually exhausting its connections and failing all reports. We wrap each service client with Polly's circuit breaker — after five consecutive failures, the circuit opens and we instantly return a cached fallback or a partial report rather than waiting. After 30 seconds the circuit goes half-open, sends one test request, and if it succeeds the circuit closes again. This protects the report pipeline from a single slow downstream service bringing down the entire flow."
 
 ### The Problem — Cascading Failure
 
@@ -629,6 +641,9 @@ CORRECT: Circuit Breaker wraps Retry  (outermost = evaluated first)
 ---
 
 ## 11. SAGA Pattern
+
+> 🗣️ **Capital Access — How to explain in interview:**
+> "Report generation in Capital Access is a classic Saga scenario — it spans four services, each with its own database, and there's no single transaction that can cover all of them. The steps are: create the report job record, fetch ownership data, fetch targeting data, generate the PDF and store it in Blob Storage. We use Azure Durable Functions as the Saga orchestrator — it coordinates each step and if anything fails it runs compensating transactions in reverse order. For example if PDF generation fails after ownership and targeting data were already fetched, the orchestrator deletes the report job record so the user doesn't see a permanently stuck job. The reason we chose orchestration over choreography here is that the flow has four steps with complex failure handling — having one place where you can see the full state of any report job is essential for debugging and support."
 
 ### The Problem
 
@@ -775,6 +790,9 @@ Central Saga Orchestrator directs every step and handles all failures.
 ---
 
 ## 13. CQRS Pattern
+
+> 🗣️ **Capital Access — How to explain in interview:**
+> "We use CQRS in the Engagement Service in Capital Access. The write side handles commands like creating an engagement, completing it, or rescheduling it — with full business rule validation and ACID transactions in Azure SQL. When a command succeeds, it publishes a domain event. The read side has a separate denormalized database view — the EngagementSummaries table — which the event handler keeps up to date. When the Angular dashboard loads, it hits the read side, which returns pre-shaped data with company names already joined in, no complex queries needed. The benefit is that our dashboard reads are extremely fast because the read model is already shaped exactly for what the UI needs. The trade-off is eventual consistency — there's a very short window, typically milliseconds, where the write is committed but the read model hasn't updated yet. For an investor relations dashboard that's completely acceptable."
 
 ### The Problem
 
@@ -985,6 +1003,9 @@ Read DB:  EngagementSummaries  (denormalized view, AsNoTracking, fast SELECT)
 ---
 
 ## 14. BFF — Backend for Frontend
+
+> 🗣️ **Capital Access — How to explain in interview:**
+> "The Angular dashboard in Capital Access needs data from three different services — recent engagements, summary metrics, and active alerts — all in one page load. Without a BFF, the Angular app would make three separate HTTP calls, the user would see the page loading in chunks, and we'd have three round trips instead of one. Our BFF endpoint aggregates all three in parallel on the server side — calls Engagement, Metrics, and Alerts services simultaneously using Task.WhenAll — then shapes the combined response exactly for what the Angular dashboard template needs. The Angular app makes one call and gets everything. It's also important to distinguish this from the API Gateway — APIM handles infrastructure concerns like auth, rate limiting, and routing. The BFF handles product concerns — it knows the exact shape of data the dashboard needs. These are two different layers solving two different problems."
 
 ### The Problem
 
