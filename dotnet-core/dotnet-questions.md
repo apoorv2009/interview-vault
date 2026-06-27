@@ -1,4 +1,4 @@
-# .NET Backend — Interview Preparation
+﻿# .NET Backend — Interview Preparation
 
 **Project Context**: Capital Access, S&P Global — Azure microservices, .NET 8, C# 12, EF Core 8
 **Audience Level**: Senior Developer (5+ years)
@@ -13,7 +13,7 @@
 1. [OOP Fundamentals](#1-oop-fundamentals)
 2. [C# Language Features](#2-c-language-features)
 3. [SOLID Principles](#3-solid-principles)
-4. [Garbage Collection Deep Dive (Q127–Q150)](#4-garbage-collection-deep-dive)
+4. [Garbage Collection Deep Dive (Q31–Q54)](#4-garbage-collection-deep-dive)
 5. [.NET Core & ASP.NET Core](#5-net-core--aspnet-core)
 6. [Entity Framework Core](#6-entity-framework-core)
 7. [LINQ](#7-linq)
@@ -1959,7 +1959,7 @@ public interface IExportable
 
 ---
 
-### Q127. Explain Garbage Collector (GC)?
+### Q31. Explain Garbage Collector (GC)?
 
 The **Garbage Collector** is a part of the .NET CLR (Common Language Runtime) that automatically manages memory on the **managed heap**. It allocates memory when you create objects and reclaims memory when objects are no longer needed — freeing you from manual `malloc`/`free` calls (like C/C++).
 
@@ -1984,7 +1984,7 @@ delete a;                                          // manual cleanup — forget 
 
 ---
 
-### Q128. How Does the GC Know When to Clean Objects?
+### Q32. How Does the GC Know When to Clean Objects?
 
 The GC uses **reachability analysis** — not reference counting. It traces from **GC Roots** and marks every object it can reach. Anything NOT reachable = garbage = collected.
 
@@ -2020,7 +2020,7 @@ public static class Cache
 
 ---
 
-### Q129. Is There a Way to See the Heap Memory?
+### Q33. Is There a Way to See the Heap Memory?
 
 Yes — multiple tools at different levels:
 
@@ -2065,7 +2065,7 @@ int gen2Collections = GC.CollectionCount(2); // if this is high → memory press
 
 ---
 
-### Q130. Does GC Clean Primitive Types?
+### Q34. Does GC Clean Primitive Types?
 
 **It depends on where they live:**
 
@@ -2097,7 +2097,7 @@ object boxed = 42;  // int boxed → on heap → GC manages this
 
 ---
 
-### Q131. Managed vs Unmanaged Code/Objects/Resources?
+### Q35. Managed vs Unmanaged Code/Objects/Resources?
 
 ```
 MANAGED CODE / OBJECTS
@@ -2134,7 +2134,7 @@ var connection = new SqlConnection(connectionString); // wraps OS connection han
 
 ---
 
-### Q132. Can GC Clean Unmanaged Code?
+### Q36. Can GC Clean Unmanaged Code?
 
 **No — GC cannot clean unmanaged resources.** GC only manages the managed heap. It has no visibility into OS handles, file descriptors, or native memory.
 
@@ -2157,7 +2157,7 @@ public class SqlEngagementRepository
 
 ---
 
-### Q133. Explain Generations?
+### Q37. Explain Generations?
 
 The managed heap is divided into **generations** based on the **Generational Hypothesis**: *most objects die young*.
 
@@ -2174,7 +2174,7 @@ Large Object Heap     → objects > 85KB, collected with Gen 2
 
 ---
 
-### Q134. What is GC0, GC1, and GC2?
+### Q38. What is GC0, GC1, and GC2?
 
 ```
 GEN 0
@@ -2215,7 +2215,7 @@ finally { ArrayPool<byte>.Shared.Return(buffer); } // no GC cycle needed
 
 ---
 
-### Q135. Why Do We Need Generations?
+### Q39. Why Do We Need Generations?
 
 **Without generations — one big heap, one expensive GC:**
 ```
@@ -2238,7 +2238,7 @@ Medium-lived objects (live a few hundred ms, then die) would skip straight to Ge
 
 ---
 
-### Q136. Which Is the Best Place to Clean Unmanaged Objects?
+### Q40. Which Is the Best Place to Clean Unmanaged Objects?
 
 **The `Dispose()` method via the IDisposable pattern — always.**
 
@@ -2268,7 +2268,7 @@ using var context = new EngagementDbContext(options);       // released immediat
 
 ---
 
-### Q137. How Does GC Behave When We Have a Destructor?
+### Q41. How Does GC Behave When We Have a Destructor?
 
 Objects with a destructor (finalizer) go through a **two-step collection process**:
 
@@ -2309,7 +2309,7 @@ public class ExpensiveResource : IDisposable
 
 ---
 
-### Q138. What Do You Think About an Empty Destructor?
+### Q42. What Do You Think About an Empty Destructor?
 
 **An empty destructor is actively harmful — never write one.**
 
@@ -2337,7 +2337,7 @@ With empty destructor:
 
 ---
 
-### Q139. Explain the Dispose Pattern?
+### Q43. Explain the Dispose Pattern?
 
 The full Dispose pattern safely handles both managed and unmanaged resource cleanup, with a finalizer as a safety net:
 
@@ -2392,7 +2392,7 @@ public class EngagementExporter : IDisposable
 
 ---
 
-### Q140. Finalize vs Destructor?
+### Q44. Finalize vs Destructor?
 
 They are the **same thing** in C# — different names for the same mechanism.
 
@@ -2431,7 +2431,7 @@ protected override void Finalize()
 
 ---
 
-### Q141. What Is the Use of the `using` Keyword?
+### Q45. What Is the Use of the `using` Keyword?
 
 ```csharp
 // USING STATEMENT — ensures Dispose() is called even if exception occurs
@@ -2467,7 +2467,7 @@ using Microsoft.EntityFrameworkCore;
 
 ---
 
-### Q142. Can You Force the Garbage Collector?
+### Q46. Can You Force the Garbage Collector?
 
 Yes — `GC.Collect()`:
 
@@ -2499,7 +2499,7 @@ GC.Collect(); // second collect picks up objects whose finalizers just ran
 
 ---
 
-### Q143. Is It a Good Practice to Force GC?
+### Q47. Is It a Good Practice to Force GC?
 
 **Almost never — and definitely not in production request handling.**
 
@@ -2533,7 +2533,7 @@ var snapshot = TakeHeapSnapshot(); // now snapshot reflects true live objects
 
 ---
 
-### Q144. How Can We Detect Memory Issues?
+### Q48. How Can We Detect Memory Issues?
 
 ```csharp
 // 1. From within the app — basic monitoring
@@ -2573,7 +2573,7 @@ public class MemoryHealthCheck : IHealthCheck
 
 ---
 
-### Q145. How Can We Know the Exact Source of Memory Issues?
+### Q49. How Can We Know the Exact Source of Memory Issues?
 
 **The dotnet-dump workflow — most powerful:**
 
@@ -2617,7 +2617,7 @@ dotnet-dump analyze engagement-service.dmp
 
 ---
 
-### Q146. What Is a Memory Leak?
+### Q50. What Is a Memory Leak?
 
 A **memory leak** occurs when memory is allocated but never freed, and the amount grows over time — eventually exhausting available memory and crashing the process.
 
@@ -2651,7 +2651,7 @@ public class NotificationPanel
 
 ---
 
-### Q147. Can a .NET Application Have Memory Leaks Even With GC?
+### Q51. Can a .NET Application Have Memory Leaks Even With GC?
 
 **Yes — absolutely.** GC only collects objects with **no references**. If your code accidentally keeps references to objects it no longer needs, GC cannot help.
 
@@ -2680,7 +2680,7 @@ private static Dictionary<string, CompanyData> _cache = new();
 
 ---
 
-### Q148. How to Detect Memory Leaks in .NET Applications?
+### Q52. How to Detect Memory Leaks in .NET Applications?
 
 ```
 STEP 1 — CONFIRM it is a leak (not just expected growth)
@@ -2718,7 +2718,7 @@ STEP 5 — FIX and VERIFY
 
 ---
 
-### Q149. Explain Weak and Strong References?
+### Q53. Explain Weak and Strong References?
 
 ```csharp
 // STRONG REFERENCE — normal reference. Keeps object alive. GC will NOT collect.
@@ -2761,7 +2761,7 @@ Weak Reference:
 
 ---
 
-### Q150. When Will You Use Weak References?
+### Q54. When Will You Use Weak References?
 
 **Scenario 1 — Memory-sensitive cache (most common):**
 ```csharp
@@ -2832,7 +2832,7 @@ Do NOT use WeakReference for:
 
 ---
 
-### Q31. [Topic: ASP.NET Core] [EPAM] What is the request lifecycle in ASP.NET Core?
+### Q55. [Topic: ASP.NET Core] [EPAM] What is the request lifecycle in ASP.NET Core?
 
 Every HTTP request travels through this exact pipeline — order matters:
 
@@ -2911,7 +2911,7 @@ public async Task<IActionResult> Get(
 
 ---
 
-### Q32. [Topic: ASP.NET Core] [EPAM] What is middleware? List all built-in middleware.
+### Q56. [Topic: ASP.NET Core] [EPAM] What is middleware? List all built-in middleware.
 
 Middleware is a component in the request pipeline that processes requests and responses. Each middleware calls the next one, forming a chain.
 
@@ -2938,7 +2938,7 @@ app.MapHealthChecks("/health")  // health check endpoint
 
 ---
 
-### Q33. [Topic: ASP.NET Core] [EPAM] How do you create custom middleware? Give a real example.
+### Q57. [Topic: ASP.NET Core] [EPAM] How do you create custom middleware? Give a real example.
 
 ```csharp
 // Capital Access — Correlation ID middleware
@@ -2999,7 +2999,7 @@ public class CorrelationIdDelegatingHandler : DelegatingHandler
 
 ---
 
-### Q34. [Topic: ASP.NET Core] [EPAM] Middleware vs Action Filters — difference and when to use each?
+### Q58. [Topic: ASP.NET Core] [EPAM] Middleware vs Action Filters — difference and when to use each?
 
 | | Middleware | Action Filter |
 |---|---|---|
@@ -3051,7 +3051,7 @@ public class EngagementController : ControllerBase { }
 
 ---
 
-### Q35. [Topic: ASP.NET Core] [EPAM] What is DI? What are service lifetimes? What is the captive dependency trap?
+### Q59. [Topic: ASP.NET Core] [EPAM] What is DI? What are service lifetimes? What is the captive dependency trap?
 
 **Dependency Injection** — the framework creates and injects dependencies; classes don't create their own. Wired in Program.cs.
 
@@ -3110,7 +3110,7 @@ public class ReportOrchestrator
 
 ---
 
-### Q36. [Topic: ASP.NET Core] [EPAM] What is JWT authentication? Explain the full validation flow.
+### Q60. [Topic: ASP.NET Core] [EPAM] What is JWT authentication? Explain the full validation flow.
 
 ```
 1. User logs in → Angular calls Okta /authorize
@@ -3160,7 +3160,7 @@ public async Task<IActionResult> CreateEngagement([FromBody] CreateEngagementDto
 
 ---
 
-### Q37. [Topic: ASP.NET Core] [EPAM] What is CORS and how do you configure it?
+### Q61. [Topic: ASP.NET Core] [EPAM] What is CORS and how do you configure it?
 
 CORS = Cross-Origin Resource Sharing. A **browser** security mechanism that prevents JavaScript from calling a different domain than the page was served from.
 
@@ -3189,7 +3189,7 @@ app.UseCors("CapitalAccessPolicy"); // before UseAuthentication
 
 ---
 
-### Q38. [Topic: ASP.NET Core] [EPAM] What is your error handling strategy in .NET Core?
+### Q62. [Topic: ASP.NET Core] [EPAM] What is your error handling strategy in .NET Core?
 
 ```csharp
 // Global exception handler — registered FIRST in pipeline
@@ -3232,7 +3232,7 @@ public class EngagementNotFoundException : NotFoundException
 
 ---
 
-### Q39. [Topic: ASP.NET Core] [EPAM] How do you validate models in ASP.NET Core?
+### Q63. [Topic: ASP.NET Core] [EPAM] How do you validate models in ASP.NET Core?
 
 ```csharp
 // Data annotations on DTO
@@ -3285,7 +3285,7 @@ public class CreateEngagementValidator : AbstractValidator<CreateEngagementDto>
 
 ---
 
-### Q40. [Topic: ASP.NET Core] [EPAM] How do you manage configuration in .NET Core? What is IOptionsMonitor vs IOptionsSnapshot?
+### Q64. [Topic: ASP.NET Core] [EPAM] How do you manage configuration in .NET Core? What is IOptionsMonitor vs IOptionsSnapshot?
 
 **Configuration priority (highest overrides lowest):**
 ```
@@ -3343,7 +3343,7 @@ public class FeatureFlagService(IOptionsMonitor<FeatureFlagOptions> monitor)
 
 ---
 
-### Q41. [Topic: ASP.NET Core] [EPAM] What is Azure Key Vault and why use Managed Identity instead of credentials?
+### Q65. [Topic: ASP.NET Core] [EPAM] What is Azure Key Vault and why use Managed Identity instead of credentials?
 
 **The bootstrap problem:** If you need credentials to access Key Vault, where do you safely store those credentials?
 
@@ -3406,7 +3406,7 @@ Code
 
 ---
 
-### Q42. [Topic: ASP.NET Core] [EPAM] What is REST? What are the key principles?
+### Q66. [Topic: ASP.NET Core] [EPAM] What is REST? What are the key principles?
 
 REST = Representational State Transfer. Six constraints:
 
@@ -3445,7 +3445,7 @@ DELETE /api/engagements/{id}     → delete
 
 ---
 
-### Q43. [Topic: ASP.NET Core] [EPAM] How do you achieve API versioning?
+### Q67. [Topic: ASP.NET Core] [EPAM] How do you achieve API versioning?
 
 ```csharp
 // Install: Microsoft.AspNetCore.Mvc.Versioning
@@ -3485,7 +3485,7 @@ public class EngagementV2Controller : ControllerBase
 
 ---
 
-### Q44. [Topic: ASP.NET Core] Content Negotiation — how does it work?
+### Q68. [Topic: ASP.NET Core] Content Negotiation — how does it work?
 
 Client declares what format it accepts via `Accept` header. Server responds in best matching format.
 
@@ -3517,7 +3517,7 @@ public async Task<IActionResult> DownloadReport(Guid id)
 
 ---
 
-### Q45. [Topic: ASP.NET Core] How do you secure a Web API endpoint? Name all best practices.
+### Q69. [Topic: ASP.NET Core] How do you secure a Web API endpoint? Name all best practices.
 
 ```
 1.  Authentication       → JWT (Okta) — every request needs valid token
@@ -3545,7 +3545,7 @@ app.Use(async (ctx, next) =>
 
 ---
 
-### Q46. [Topic: ASP.NET Core] SQL Injection — what is it and how do you prevent it?
+### Q70. [Topic: ASP.NET Core] SQL Injection — what is it and how do you prevent it?
 
 ```csharp
 // WHAT IT IS: attacker injects SQL code via user input
@@ -3570,7 +3570,7 @@ await _context.Database.ExecuteSqlRawAsync(
 
 ---
 
-### Q47. [Topic: ASP.NET Core] How do you debug a slow API response?
+### Q71. [Topic: ASP.NET Core] How do you debug a slow API response?
 
 ```
 Step 1 — REPRODUCE: exact endpoint, payload, tenant, time of day
@@ -3611,7 +3611,7 @@ var dtos = await _context.EngagementActivities
 
 ---
 
-### Q48. [Topic: ASP.NET Core] What is Clean Architecture and what are its benefits?
+### Q72. [Topic: ASP.NET Core] What is Clean Architecture and what are its benefits?
 
 ```
 Domain Layer      → entities, value objects, domain events, repository INTERFACES
@@ -3667,7 +3667,7 @@ public class SqlEngagementRepository : IEngagementRepository
 
 ---
 
-### Q49. [Topic: ASP.NET Core] What is your approach to migrate from .NET Framework 4.7 to .NET 8?
+### Q73. [Topic: ASP.NET Core] What is your approach to migrate from .NET Framework 4.7 to .NET 8?
 
 **Strangler Fig Pattern — don't rewrite all at once:**
 
@@ -3733,7 +3733,7 @@ public class EngagementController : ControllerBase { }
 
 ---
 
-### Q50. [Topic: ASP.NET Core] Rate Limiting — Middleware vs Infrastructure Layer
+### Q74. [Topic: ASP.NET Core] Rate Limiting — Middleware vs Infrastructure Layer
 
 Both layers serve DIFFERENT purposes — they are complementary, not redundant.
 
