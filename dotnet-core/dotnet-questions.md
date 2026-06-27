@@ -2,7 +2,7 @@
 
 **Project Context**: Capital Access, S&P Global — Azure microservices, .NET 8, C# 12, EF Core 8
 **Audience Level**: Senior Developer (5+ years)
-**Last Updated**: June 24, 2026
+**Last Updated**: June 27, 2026
 
 > Every answer is framed through the Capital Access project so you can tell real stories in the interview, not recite textbook definitions.
 
@@ -18,6 +18,7 @@
 6. [Entity Framework Core (Q75–Q79)](#6-entity-framework-core)
 7. [LINQ (Q80–Q83)](#7-linq)
 8. [Additional Topics (Q84–Q89)](#8-additional-topics)
+9. [Platform, DI & Caching Deep Dive (Q90–Q96)](#9-platform-di--caching-deep-dive)
 
 ---
 
@@ -4267,4 +4268,321 @@ app.MapHealthChecks("/health");
 // 5. Memory/performance counters
 dotnet-counters monitor --process-id <pid> System.Runtime
 // Watch: GC heap size, thread pool queue, exception rate
+```
+
+---
+
+## 9. Platform, DI & Caching Deep Dive
+
+### Q90. What is .NET Standard? When and why would you use it?
+
+.NET Standard is a formal API specification — a contract — that all .NET implementations agree to support. Writing a library that targets .NET Standard means it can run on .NET Framework 4.7+, .NET Core, .NET 5/6/7/8, Xamarin, and UWP without change.
+
+Before .NET Standard, a library written for .NET Framework couldn't run in Xamarin or UWP. .NET Standard solved this by defining a common API surface. The higher the version number, the more APIs but the fewer platforms support it. .NET Standard 2.0 is the sweet spot — broad compatibility with a rich API surface.
+
+In Capital Access, when migrating from .NET Framework 4.7 to .NET 8, we first extracted shared domain models and business rules into .NET Standard 2.0 libraries. This let the old monolith and the new microservices share the same code during the transition period.
+
+Today, if all your targets are .NET 5+, you can target `net8.0` directly. .NET Standard is mainly relevant for backwards compatibility or publishing NuGet packages for the whole ecosystem.
+
+```xml
+<!-- Shared domain library — works on Framework 4.7+ AND .NET 8 -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+  </PropertyGroup>
+</Project>
+
+<!-- Modern-only library — .NET 5+ only, more APIs available -->
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+</Project>
+
+<!-- NuGet package for everyone — multi-target -->
+<TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
+
+// Rule of thumb:
+// Shared lib used by old Framework + new .NET  →  netstandard2.0
+// Library only for .NET 5+ projects            →  net8.0
+// Public NuGet package for whole ecosystem     →  multi-target both
+```
+
+---
+
+### Q91. Explicit interface implementation — what happens when two interfaces have the same method signature?
+
+When two interfaces declare a method with the same name and signature, a class cannot implement both with a single method — the compiler cannot tell which interface contract you are satisfying. C# solves this with explicit interface implementation: you prefix the method name with the interface name. The method has no access modifier and is only callable through a typed interface reference, not through the class reference directly.
+
+```csharp
+public interface IPdfExporter  { string Export(); }
+public interface IExcelExporter{ string Export(); }
+
+public class ReportExporter : IPdfExporter, IExcelExporter
+{
+    // Explicit — no 'public', prefixed with interface name
+    string IPdfExporter.Export()    => "PDF report content";
+    string IExcelExporter.Export()  => "Excel report content";
+}
+
+// Usage:
+var exporter = new ReportExporter();
+// exporter.Export(); ← compile error — not accessible directly
+
+IPdfExporter   pdf   = exporter;
+IExcelExporter excel = exporter;
+
+pdf.Export();    // "PDF report content"   ✅
+excel.Export();  // "Excel report content" ✅
+
+// Also used when you want to HIDE an interface method from the public API:
+public class SecureService : IDisposable
+{
+    // Don't want callers calling Dispose() directly — hide it
+    void IDisposable.Dispose() => Cleanup();
+
+    private void Cleanup() { /* close connections */ }
+}
+// Only callable via: using (IDisposable s = new SecureService()) { }
+```
+
+---
+
+### Q92. What is Lazy<T>? How does lazy initialization work?
+
+`Lazy<T>` defers creation of an expensive object until the first time `.Value` is accessed. After the first access, the same instance is returned on every subsequent call. By default it is thread-safe — only one thread creates the object even if multiple threads access `.Value` simultaneously.
+
+Use `Lazy<T>` for objects that are: expensive to create, might never be needed in some code paths, or must be created exactly once.
+
+```csharp
+// WITHOUT Lazy — heavyweight object created on class construction even if never used
+private readonly HeavyReportEngine _engine = new HeavyReportEngine();
+
+// WITH Lazy — only created on first .Value access
+private readonly Lazy<HeavyReportEngine> _lazyEngine =
+    new Lazy<HeavyReportEngine>(() => new HeavyReportEngine());
+
+public string Generate(string reportId)
+{
+    // First call → creates HeavyReportEngine; subsequent calls → reuses same instance
+    return _lazyEngine.Value.GenerateReport(reportId);
+}
+
+// Check if already created without triggering creation:
+if (_lazyEngine.IsValueCreated)
+    Console.WriteLine("Engine already initialized");
+
+// Thread safety modes:
+// LazyThreadSafetyMode.ExecutionAndPublication (default)
+//   → only one thread creates, others wait — safest
+// LazyThreadSafetyMode.PublicationOnly
+//   → multiple threads may create, first one to publish wins — good for idempotent creation
+// LazyThreadSafetyMode.None
+//   → no thread safety — fastest, only for single-threaded scenarios
+
+var safeLazy   = new Lazy<Engine>(() => new Engine());                              // default safe
+var fastLazy   = new Lazy<Engine>(() => new Engine(), LazyThreadSafetyMode.None);  // no lock overhead
+```
+
+---
+
+### Q93. What is the difference between Mutex, Semaphore, and SemaphoreSlim?
+
+All three prevent concurrent access to a shared resource, but they differ in scope, capacity, and overhead.
+
+**Mutex** — OS-level, allows exactly one thread at a time, works across processes. Use it to prevent two separate applications from running at the same time (singleton process guard). Heaviest option.
+
+**Semaphore** — OS-level, allows N threads at a time (you set the count). Works cross-process but carries OS overhead. Rarely used in modern .NET code.
+
+**SemaphoreSlim** — .NET-managed (no OS object), allows N threads at a time, async-compatible via `WaitAsync()`. Lightweight. This is the right choice for in-process async throttling.
+
+```csharp
+// MUTEX — singleton process guard (cross-process, one thread at a time)
+using var mutex = new Mutex(initiallyOwned: false, name: "Global\\CapitalAccess");
+if (!mutex.WaitOne(TimeSpan.Zero))
+{
+    Console.WriteLine("Another instance is already running. Exiting.");
+    return;
+}
+// ... only one process gets past here
+
+// SEMAPHORE — N threads at a time, OS-level (rarely needed in .NET today)
+var semaphore = new Semaphore(initialCount: 3, maximumCount: 3);
+semaphore.WaitOne();
+try { /* max 3 threads simultaneously */ }
+finally { semaphore.Release(); }
+
+// SEMAPHORESLIM — N concurrent async operations, in-process ✅ USE THIS
+private static readonly SemaphoreSlim _throttle = new SemaphoreSlim(3, 3); // max 3 concurrent
+
+public async Task<ReportDto> FetchReportAsync(string reportId)
+{
+    await _throttle.WaitAsync();        // async wait — does NOT block a thread pool thread
+    try
+    {
+        return await _reportRepo.GetAsync(reportId);
+    }
+    finally
+    {
+        _throttle.Release();            // ALWAYS release in finally
+    }
+}
+
+// Quick reference:
+// Async in-process throttling     → SemaphoreSlim  ✅
+// Cross-process single-instance   → Mutex
+// OS-level N-count cross-process  → Semaphore (rare)
+```
+
+---
+
+### Q94. If a struct has a string property, where is the string stored in memory?
+
+The **struct** is a value type — it lives on the stack (when declared as a local variable). But **string** is a reference type — it always lives on the heap.
+
+So the struct on the stack contains an 8-byte reference (a pointer) to the string data on the heap. The struct does NOT contain the character data inline — it contains the memory address that points to it. The GC traces through the struct's reference fields to reach the heap string and keep it alive.
+
+Important edge case: if the struct is **boxed** (stored in an `object`, `IEnumerable`, or `List<object>`), the entire struct moves to the heap — but the string reference inside it still points to the string data elsewhere on the heap.
+
+```csharp
+struct ReportHeader
+{
+    public int    Id;     // value type — stored inline in the struct (4 bytes)
+    public string Title;  // reference type — struct stores an 8-byte pointer; string data is on heap
+}
+
+// Memory layout when declared as a local variable:
+//
+// STACK:
+// [ ReportHeader ]
+//   Id    : [4 bytes → value: 42          ]
+//   Title : [8 bytes → pointer ───────────]────────┐
+//                                                   ↓
+// HEAP:
+//                                        [ "Capital Access Q2 Report" ]
+//                                          (char array + length + hash)
+
+ReportHeader h = new ReportHeader { Id = 42, Title = "Capital Access Q2 Report" };
+
+// BOXING — whole struct copied to heap
+object boxed = h;
+// Now [ ReportHeader ] is on the heap, still contains a pointer to the string on the heap
+
+// INTERVIEW LINE:
+// "The struct sits on the stack but its string field is just an 8-byte reference.
+// The actual string characters are on the heap. The GC traces through the struct's
+// reference fields so the string stays alive as long as the struct is reachable."
+```
+
+---
+
+### Q95. Why must DbContext be Scoped and NOT Singleton? What breaks if you use Singleton?
+
+DbContext implements the **Unit of Work** pattern. It holds a change tracker that records which entities were added, modified, or deleted within a single logical operation (one HTTP request). The design contract is: create → use → SaveChanges → dispose — all within one request.
+
+If you register DbContext as **Singleton**, one instance is shared across ALL requests for the entire application lifetime. Three things break immediately:
+
+1. **Thread safety** — DbContext is NOT thread-safe. Concurrent requests sharing one instance corrupt the change tracker.
+2. **Stale data** — Entity state from Request A bleeds into Request B. You see phantom data from previous requests.
+3. **Connection leak** — The database connection is held open forever instead of being returned to the pool after each request.
+
+**Scoped** means one DbContext per HTTP request — created at the start, disposed at the end. This is exactly what Unit of Work requires.
+
+```csharp
+// ✅ CORRECT — Scoped: one DbContext per HTTP request
+builder.Services.AddDbContext<EngagementDbContext>(options =>
+    options.UseSqlServer(connectionString));
+// AddDbContext registers as Scoped by default ✅
+
+// Equivalent explicit form:
+builder.Services.AddScoped<EngagementDbContext>();
+
+// ❌ WRONG — Singleton: shared across all requests
+builder.Services.AddSingleton<EngagementDbContext>();
+// → Thread safety violations
+// → Stale cached entities bleed between requests
+// → Database connection held open forever
+
+// ❌ WRONG — Transient: new instance for every injection within the same request
+builder.Services.AddTransient<EngagementDbContext>();
+// → Two services in the same request each get a DIFFERENT DbContext
+// → SaveChanges in Service A doesn't save Service B's tracked changes
+// → Unit of Work is broken
+
+// CAPTIVE DEPENDENCY TRAP — most common mistake:
+builder.Services.AddSingleton<IReportOrchestrator, ReportOrchestrator>();
+// If ReportOrchestrator takes EngagementDbContext in constructor,
+// the Scoped DbContext is captured by a Singleton → effectively becomes Singleton ❌
+// .NET DI throws InvalidOperationException at runtime for this exact scenario.
+
+// INTERVIEW LINE:
+// "DbContext is Scoped because it is a Unit of Work — it tracks all entity changes
+// for one request and should SaveChanges and Dispose together at request end.
+// Singleton breaks thread safety and leaks entity state between requests."
+```
+
+---
+
+### Q96. What is distributed caching? How does Redis work? When do you choose Redis over IMemoryCache?
+
+**IMemoryCache** stores data in the process's own memory — fast, but local to that one instance. If you have three pods running your API, each has its own separate cache. Pod A caches a company report; Pods B and C don't know about it.
+
+**Distributed caching** stores data in an external, shared store that all service instances can access. **Redis** is the standard choice. Redis is an in-memory key-value store running as a separate service. It supports strings, hashes, lists, sets, and sorted sets. It supports native key expiry (TTL). It can optionally persist to disk (RDB snapshots or AOF). It scales horizontally via Redis Cluster.
+
+The trade-off vs IMemoryCache: Redis adds a network round-trip per cache read/write (typically 1–5ms). For read-heavy, low-latency paths, IMemoryCache is faster. For anything that needs to be consistent across instances or survive restarts, use Redis.
+
+```csharp
+// 1. Install: Microsoft.Extensions.Caching.StackExchangeRedis
+// 2. Register
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = builder.Configuration["Redis:ConnectionString"]; // "localhost:6379"
+    options.InstanceName  = "CapitalAccess_";  // prefix on every key
+});
+
+// 3. Inject IDistributedCache — same interface, Redis is the backing store
+public class ReportCacheService(IDistributedCache cache, IReportRepository repo)
+{
+    public async Task<ReportDto?> GetAsync(string reportId, CancellationToken ct = default)
+    {
+        string key    = $"report:{reportId}";
+        var    cached = await cache.GetStringAsync(key, ct);
+
+        if (cached is not null)
+            return JsonSerializer.Deserialize<ReportDto>(cached);
+
+        // Cache miss — fetch from database
+        var report = await repo.GetByIdAsync(reportId, ct);
+        if (report is null) return null;
+
+        await cache.SetStringAsync(key, JsonSerializer.Serialize(report),
+            new DistributedCacheEntryOptions
+            {
+                AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15)
+            }, ct);
+
+        return report;
+    }
+
+    public async Task InvalidateAsync(string reportId, CancellationToken ct = default)
+        => await cache.RemoveAsync($"report:{reportId}", ct);
+}
+
+// IMemoryCache vs IDistributedCache (Redis):
+// ┌──────────────────┬────────────────────────┬──────────────────────────────┐
+// │                  │ IMemoryCache           │ IDistributedCache (Redis)    │
+// ├──────────────────┼────────────────────────┼──────────────────────────────┤
+// │ Location         │ In-process memory      │ External Redis server        │
+// │ Scope            │ Single instance only   │ Shared across all instances  │
+// │ Survives restart │ No                     │ Yes                          │
+// │ Serialization    │ Not needed             │ Required (JSON / protobuf)   │
+// │ Latency          │ Sub-microsecond        │ 1–5ms network hop            │
+// │ When to use      │ Single instance, hot   │ Scale-out, session state,    │
+// │                  │ lookup data            │ large cache, cross-pod share │
+// └──────────────────┴────────────────────────┴──────────────────────────────┘
+
+// Capital Access uses Redis for:
+// - Company ownership snapshots (shared across 3 pods)
+// - Targeting list results (expensive DB query, 15-min TTL)
+// - Rate limiting counters (atomic Redis INCR)
 ```
