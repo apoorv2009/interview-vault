@@ -4,9 +4,11 @@
 
 ## 1. How does the YouTube transcript extraction work?
 
-Aagam Mitra supports sharing YouTube pravachan/shanka-samadhan videos directly in chat. The system extracts the transcript using a **dual-layer strategy**:
+> **Why asked:** Building something on top of YouTube's transcript system is a real engineering challenge because it can fail in many ways — no captions, live stream, private video, language not available. Having a fallback strategy (Layer 2 with Whisper) shows you thought about reliability, not just the happy path. The dual-layer approach is the most interesting architectural decision here and should be the centrepiece of your answer.
 
-### Layer 1 — Native Captions (fast, ~200–500ms)
+The system uses a **dual-layer strategy** — Layer 1 is fast, Layer 2 is the fallback:
+
+### Layer 1 — Native YouTube Captions (200–500ms)
 ```python
 from youtube_transcript_api import YouTubeTranscriptApi
 
@@ -18,71 +20,66 @@ raw_data = transcript.to_raw_data()
 raw_text = " ".join(item["text"] for item in raw_data)
 ```
 
-**Works when:** Creator uploaded subtitles, or YouTube auto-generated captions exist.  
-**Fails when:** Private video, no captions, live stream.
+**Works when:** Creator uploaded subtitles, or YouTube auto-generated captions exist.
+**Fails when:** Private video, no captions, or live stream.
 
-### Layer 2 — yt-dlp + Whisper ASR (slower, 30–120s)
+### Layer 2 — yt-dlp + Whisper ASR (30–120 seconds)
 ```python
 import yt_dlp, whisper
 
-# Download audio only (no video download)
+# Download audio only — no video, much smaller file
 ydl_opts = {"format": "bestaudio/best", "outtmpl": "/tmp/audio_{id}.%(ext)s"}
 with yt_dlp.YoutubeDL(ydl_opts) as ydl:
     ydl.download([youtube_url])
-# Saves: /tmp/audio_abc123.webm or .m4a
 
-# Transcribe with OpenAI Whisper (local model, no API cost)
+# Transcribe with local Whisper model (no API call, no cost)
 model = whisper.load_model("base")
 result = model.transcribe(audio_file_path, language="hi", task="transcribe")
 raw_text = result["text"]
 ```
 
-**Why Whisper "base" model?**
-- Runs on CPU (no GPU required on the server)
-- ~150MB model size — practical to load per request
-- Good Hindi accuracy for pravachans
-- 5–10x faster than "large" model
+**Works on:** Any video with audio, even with no captions at all.
+**Limitations:** Needs FFmpeg installed on the server, takes 30–120s depending on video length.
 
 ---
 
 ## 2. What is the LLM formatting layer and why temperature=0.2?
 
-After extracting `raw_text` via Layer 1 or 2, we pass it through Groq for cleanup:
+> **Why asked:** The raw transcript from either layer (especially Whisper) is messy — repeated words, filler sounds, no paragraph breaks, wrong spellings of Jain Prakrit terms. Passing it through a low-temperature LLM is an elegant solution that cleans the text without losing meaning. The temperature choice (0.2 — the lowest in the system) is what shows you understand the difference between generation tasks and transcription tasks.
+
+After extracting `raw_text`, we pass it through Groq for cleanup:
 
 ```python
 async def _llm_format_transcript(raw_text: str, system_prompt: str) -> str:
-    sample = raw_text[:8000]  # cap input — RAG uses full raw_text separately
-    async with httpx.AsyncClient(timeout=60) as client:
-        resp = await client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {settings.groq_api_key}"},
-            json={
-                "model": settings.groq_model,
-                "temperature": 0.2,       # ← lowest in the system
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user",   "content": sample},
-                ],
-            },
-        )
-        return resp.json()["choices"][0]["message"]["content"]
-    # On any failure: return raw_text unchanged
+    sample = raw_text[:8000]  # cap — RAG uses the full raw_text separately
+    resp = await groq_client.post(
+        GROQ_CHAT_URL,
+        json={
+            "model":       settings.groq_model,
+            "temperature": 0.2,   # ← lowest temperature in the whole system
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user",   "content": sample},
+            ],
+        },
+    )
+    return resp.json()["choices"][0]["message"]["content"]
+    # On any failure: return raw_text unchanged — graceful degradation
 ```
 
-**Why 0.2 (not 0)?**
-- 0.0 = completely deterministic, sometimes repetitive
-- 0.2 = near-deterministic but with slight flexibility for formatting decisions
-- This is a **transcription task** — the LLM must stay faithful to the source, not paraphrase
+**Why 0.2?** This is a **transcription task**, not a generation task. The LLM must:
+- Stay faithful to what was actually said
+- Fix Jain Prakrit spellings (णमो अरिहंताणं, not नमो अरिहंतों)
+- Remove filler words (अं, हं, तो) without adding anything new
+- Never paraphrase or summarise
 
-**What the formatting does:**
-- Removes filler sounds (अं…, हं…, तो…)
-- Collapses mechanical repetitions (chanting echoes)
-- Corrects Jain Prakrit spellings (णमो अरिहंताणं not नमो अरिहंतों)
-- For Shanka Samadhan: adds शंका: / समाधान: labels
+Higher temperature would introduce creative variation — exactly what we don't want here.
 
 ---
 
 ## 3. How do you detect whether a video is a Shanka Samadhan vs Pravachan?
+
+> **Why asked:** This is a domain-specific design decision. The interviewer wants to see that you've understood the actual use case well enough to implement type detection. The key insight: we detect from the *user's message text* (not the video title or content) — because the user tells us what kind of video it is when they share it. This is simpler and more reliable than trying to analyse the video.
 
 ```python
 _SHANKA_KEYWORDS = re.compile(
@@ -91,78 +88,95 @@ _SHANKA_KEYWORDS = re.compile(
     re.IGNORECASE,
 )
 
-# Detection from user's MESSAGE (not the video title)
+# Detection is from the user's chat message — not the video title
 is_shanka = bool(_SHANKA_KEYWORDS.search(user_message))
 format_prompt = _SHANKA_SAMADHAN_PROMPT if is_shanka else _PRAVACHAN_PROMPT
+video_type   = "Shanka Samadhan" if is_shanka else "Pravachan"
 ```
 
-**The user has to tell us the type** by including keywords like "shanka samadhan" in their message alongside the YouTube URL. We don't analyze the video title automatically.
+**Example:**
+```
+User: "Please transcribe this shanka samadhan video: https://youtu.be/abc123"
+→ is_shanka = True  →  uses SHANKA_SAMADHAN_PROMPT
+→ output has शंका: / समाधान: labels
+
+User: "Can you get the transcript of this: https://youtu.be/xyz789"
+→ is_shanka = False  →  uses PRAVACHAN_PROMPT
+→ output is clean verbatim Hindi
+```
 
 ---
 
 ## 4. What are the two system prompts for transcript formatting?
 
-### SHANKA_SAMADHAN_PROMPT (9 rules)
-Critical rules for Q&A format pravachans:
-1. Label every question: `शंका:`
-2. Label every answer: `समाधान:`
-3. Never invent or restructure questions
-4. Preserve interrogative structure exactly (क्यों, कैसे, क्या)
-5. Normalize Jain mantras to canonical Prakrit forms
-6. **Anti-repetition rule:** Never output same word/sentence >2 times in a row
-7. Remove filler sounds (अं, हं, तो) unless they change meaning
-8. Preserve oral teaching style — no summarizing
-9. FAIL-SAFE: Never return empty response; output at least one clean occurrence
+> **Why asked:** Having type-specific prompts instead of one generic prompt is good design — different content types need different formatting rules. Interviewers asking this want to see that you've thought carefully about what rules matter for each type. The anti-repetition rule in the Shanka Samadhan prompt is particularly worth mentioning — Whisper often repeats words when audio quality is poor, and you need to explicitly tell the LLM to collapse those.
 
-### PRAVACHAN_PROMPT
-Simpler rules for single-speaker discourse:
-1. Verbatim Hindi transcription
-2. Correct Jain Prakrit spellings (`णमो अरिहंताणं` not `नमो अरिहंतों`)
+### SHANKA_SAMADHAN_PROMPT — Key rules:
+1. Label every question as `शंका:` — label every answer as `समाधान:`
+2. Never invent or restructure questions — preserve interrogative structure exactly
+3. Normalize Jain mantras to canonical Prakrit forms
+4. **Anti-repetition rule:** Never output the same word or sentence more than twice in a row — if Whisper produced echo/repetition, collapse to one occurrence
+5. Remove filler sounds (अं, हं, तो) unless they change meaning
+6. Preserve oral teaching style — no summarising, no editorialising
+7. **Fail-safe:** Never return empty — output at least one clean occurrence even if content was collapsed
+
+### PRAVACHAN_PROMPT — Key rules:
+1. Verbatim Hindi transcription — word for word
+2. Correct Jain Prakrit spellings: `णमो अरिहंताणं` not `नमो अरिहंतों`
 3. Correct terminology: विषापहार, अतिशय, जिन शासन, तीर्थंकर, समवशरण
-4. Preserve original Sanskrit/Prakrit/Hindi mix — do not translate
-5. Output clean structured Devanagari
+4. Preserve original Sanskrit/Prakrit/Hindi mix — do not translate any word
+5. Output clean structured Devanagari only — no English, no markdown
 
 ---
 
-## 5. How does the transcript get stored for follow-up RAG queries?
+## 5. Why is the raw transcript stored separately from the formatted transcript?
+
+> **Why asked:** This data storage decision shows you understand the difference between "display data" and "retrieval data." The formatted text is good for reading — filler words removed, labels added — but it has less information than the raw text. For follow-up RAG queries ("what did he say about karma at the 10-minute mark?"), the raw text is better. Mentioning this tradeoff signals you think about downstream uses, not just the immediate task.
 
 ```python
-# After extraction and formatting:
-context.context["youtube_transcript"] = transcript_text   # full raw text
-context.context["youtube_video_id"]  = video_id
-context.context["youtube_url"]       = youtube_url
-context.context["transcript_extracted_at"] = datetime.now().isoformat()
+# After extraction:
+formatted_text = await self._llm_format_transcript(transcript_text, format_prompt)
+
+# Show formatted version in UI (clean, labelled)
+response = self._format_response(formatted_text, ...)
+
+# Store RAW version for follow-up RAG queries
+context.context["youtube_transcript"] = transcript_text   # ← full original
+context.context["youtube_video_id"]   = video_id
+context.context["youtube_url"]        = youtube_url
 ```
 
-**Why store full `transcript_text` (not `formatted_text`)?**
-
-The formatted text has filler words removed and Prakrit corrected. For RAG follow-up queries ("What did he say about karma in this video?"), we want the full original text — no information loss.
-
-If the user later asks a question about the video, the orchestrator detects that context has a `youtube_transcript` and uses it as additional context for the answer.
+**Why raw, not formatted?**
+- Formatted text has filler words removed — loses temporal markers ("uh, at this point...")
+- Formatted text collapsed repetitions — loses exact phrasing for quote matching
+- RAG works better with more text — raw has 100% of the original content
+- If the user asks "what did he say about karma?" we want to search the complete transcript
 
 ---
 
 ## 6. How do you extract video IDs from different YouTube URL formats?
 
+> **Why asked:** Users paste URLs in many formats — short links, shorts, embeds, standard watch URLs. If you only handle `youtube.com/watch?v=`, you'll break on `youtu.be/` links. Interviewers use this to check whether you handled edge cases. The key fact: YouTube video IDs are always exactly 11 characters (alphanumeric + `-` and `_`).
+
 ```python
 @staticmethod
 def _extract_youtube_url(text: str) -> str | None:
-    # youtube.com/watch?v=ID
+    # Standard: youtube.com/watch?v=ID
     match = re.search(r"youtube\.com/watch\?v=([a-zA-Z0-9_-]{11})", text)
     if match:
         return f"https://www.youtube.com/watch?v={match.group(1)}"
 
-    # youtu.be/ID (short URL)
+    # Short: youtu.be/ID
     match = re.search(r"youtu\.be/([a-zA-Z0-9_-]{11})", text)
     if match:
         return f"https://youtu.be/{match.group(1)}"
 
-    # youtube.com/shorts/ID
+    # Shorts: youtube.com/shorts/ID
     match = re.search(r"youtube\.com/shorts/([a-zA-Z0-9_-]{11})", text)
     if match:
         return f"https://www.youtube.com/shorts/{match.group(1)}"
 
-    # youtube.com/embed/ID
+    # Embedded: youtube.com/embed/ID
     match = re.search(r"youtube\.com/embed/([a-zA-Z0-9_-]{11})", text)
     if match:
         return f"https://www.youtube.com/embed/{match.group(1)}"
@@ -170,45 +184,62 @@ def _extract_youtube_url(text: str) -> str | None:
     return None
 ```
 
-YouTube video IDs are always exactly **11 characters** — alphanumeric plus `-` and `_`.
+**YouTube video ID format:** Always exactly 11 characters — `[a-zA-Z0-9_-]`. This is used as part of the Pinecone vector ID and the saved transcript filename.
 
 ---
 
 ## 7. What happens when the video is a live stream?
 
+> **Why asked:** Error handling quality separates good engineers from great ones. The interviewer is checking whether you return a generic "error occurred" or an actually helpful message. The live stream case is interesting because it's a *predictable* failure — we know exactly what it means and can give the user a specific time estimate and action to take.
+
 ```python
 except Exception as e:
     error_msg = str(e)
+
+    # Specific, predictable failure — give actionable guidance
     if "live or archived live stream" in error_msg.lower():
         return AgentResult(
             response=(
                 "**This is a live or archived live stream.**\n\n"
-                "Live videos don't have transcripts until after the stream ends. "
+                "Live videos don't have transcripts until the stream ends. "
                 "Please share the video link again after YouTube processes the "
                 "recording (usually within a few hours)."
             ),
-            agent_name=self.name,
         )
+
+    # Generic failure — list possible causes
+    return AgentResult(
+        response=(
+            "Could not extract the transcript. Possible reasons:\n"
+            "- Video has disabled subtitles/captions\n"
+            "- Currently live stream (wait for it to finish)\n"
+            "- System lacks FFmpeg for audio extraction\n\n"
+            f"Details: {error_msg}"
+        ),
+    )
 ```
 
-Both Layer 1 (youtube-transcript-api raises `TranscriptsDisabled`) and Layer 2 (yt-dlp fails on incomplete live stream) would fail. We catch the specific error message and return a helpful, actionable response.
+Both Layer 1 (youtube-transcript-api) and Layer 2 (yt-dlp) fail on live streams — Layer 1 raises `TranscriptsDisabled`, Layer 2 can't get a complete audio file. We detect the specific error string and return an appropriate message.
 
 ---
 
-## 8. Where are transcripts saved?
+## 8. Where are transcripts saved and why?
+
+> **Why asked:** Persistence decisions show you think about performance and reuse. If someone sends the same YouTube URL twice, re-downloading and re-transcribing wastes 30–120 seconds and bandwidth. Saving to disk with a predictable filename (by video ID) means you can check if it already exists before re-processing. Mentioning the Docker volume means you know data persists across container restarts.
 
 ```python
-# YouTubeTranscriptAgent saves to disk:
-output_dir = "/data/youtube_transcripts"  # Docker volume mount
+# Saved to Docker volume:
+output_dir = "/data/youtube_transcripts"   # maps to ./docker-data/youtube-transcripts
 
-# Files created:
-transcript_{video_id}.txt   # raw text
-transcript_{video_id}.pdf   # formatted PDF (via reportlab)
+# Files created per video:
+transcript_{video_id}.txt   # raw text — used for RAG
+transcript_{video_id}.pdf   # formatted PDF — can be downloaded from app
 ```
 
-This allows:
-- Re-serving the transcript without re-extracting (cache)
-- Downloading the formatted PDF from the app
-- Admin review of past transcripts
+**Why save to disk?**
+- **Cache:** Same video URL shared twice → serve from disk, skip re-extraction
+- **Download:** Admin or devotee can download the formatted PDF
+- **Audit:** Temple can review past transcripts
+- **Persistence:** Docker volume survives container restarts — data is not lost on redeploy
 
-The Docker volume `./docker-data/youtube-transcripts` maps to `/data/youtube_transcripts` inside the container — persists across container restarts.
+**File naming by video ID** (not URL) ensures a canonical, collision-free filename regardless of which URL format was used to share the video.

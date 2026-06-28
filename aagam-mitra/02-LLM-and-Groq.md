@@ -6,7 +6,9 @@
 
 ## 1. What LLM does Aagam Mitra use and why Groq?
 
-**Model:** `meta-llama/llama-4-scout-17b-16e-instruct`  
+> **Why asked:** Provider choice signals whether you evaluated options or just used the default. Interviewers want to hear a cost + performance justification. The key numbers to remember: Groq is ~45x cheaper than GPT-4o and 5–10x faster because it uses custom LPU chips. Also important: Groq's API is OpenAI-compatible, so switching providers requires changing one line, not rewriting code.
+
+**Model:** `meta-llama/llama-4-scout-17b-16e-instruct`
 **Provider:** Groq (not OpenAI, not self-hosted)
 
 **Why Groq:**
@@ -25,6 +27,8 @@ Authorization: Bearer {groq_api_key}
 
 ## 2. What is temperature and what values do you use where?
 
+> **Why asked:** Anyone can say "temperature controls randomness." The impressive answer is knowing *why different parts of your system use different values*. YouTube transcript formatting uses 0.2 because you need faithfulness to the source — the LLM must not add or paraphrase. Scripture answers use 0.5 because the LLM needs some creative latitude to synthesise multiple passages into a coherent response. Be ready to justify each value.
+
 Temperature controls how **random** the model's token selection is:
 - `0.0` = always pick the highest-probability token (deterministic, repetitive)
 - `0.5` = balanced randomness
@@ -40,11 +44,11 @@ Temperature controls how **random** the model's token selection is:
 | `orchestrator.py` (synthesis) | 0.4 | Slightly creative — combining multiple outputs |
 | `youtube.py` (transcript formatting) | 0.2 | Most conservative — must stay faithful to source text |
 
-**Key insight for interview:** Why 0.2 for YouTube? Because the formatting step must not paraphrase or add words — it's a transcription task, not a generation task. Lower temperature = more faithful to input.
-
 ---
 
 ## 3. Explain the full Groq API call structure used in agents.
+
+> **Why asked:** Many developers use LangChain and never see the raw API call. If you can show the exact JSON payload including the `tools` array, `tool_choice`, and both possible response shapes (`"stop"` vs `"tool_calls"`), you demonstrate you understand the protocol at a level most candidates don't. This comes up especially in senior roles where you may need to debug why the LLM called the wrong tool.
 
 ```python
 # From BaseAgent._call_groq()
@@ -62,10 +66,6 @@ async with httpx.AsyncClient(timeout=60.0) as client:
         headers={"Authorization": f"Bearer {settings.groq_api_key}"},
         json=payload,
     )
-
-data = response.json()
-choice = data["choices"][0]
-finish_reason = choice["finish_reason"]  # "stop" or "tool_calls"
 ```
 
 **Response when Groq wants to call a tool:**
@@ -101,7 +101,7 @@ finish_reason = choice["finish_reason"]  # "stop" or "tool_calls"
 
 ## 4. What is the tool-call loop and how many iterations does it support?
 
-The tool-call loop is a multi-round conversation where the LLM alternates between deciding what to do and receiving tool results:
+> **Why asked:** The tool-call loop is the heart of how agents work. Interviewers want to know you understand it's not magic — it's a `for` loop that keeps calling the LLM until it says `"stop"`. Understanding `max_iterations` shows you know agents can get stuck in loops (e.g., tool keeps failing, LLM keeps retrying), and you've set a guard against infinite cycles.
 
 ```python
 async def run(self, user_message, history, context) -> AgentResult:
@@ -131,29 +131,23 @@ async def run(self, user_message, history, context) -> AgentResult:
                     "content": json.dumps(result)
                 })
             # Loop again — Groq now sees the tool results
-
-    return AgentResult(response="Could not complete in max iterations")
 ```
 
 **Max iterations by agent:**
 - ScriptureAgent: 4
-- TempleOpsAgent: 5 (more complex — may need to check slots, then book)
+- TempleOpsAgent: 5 (most complex — may need to check slots, then book)
 - CommunityAgent: 4
-- YouTubeAgent: 1 (overrides run() entirely — no tool loop)
+- YouTubeAgent: 1 (overrides `run()` entirely — no tool loop)
 
 ---
 
 ## 5. How do you inject chat history into agent calls? Why only 8 turns?
 
-```python
-# chat_history.py
-async def get_history_for_agent(user_id, temple_id, n_turns=8):
-    messages = await get_last_n_messages(user_id, temple_id, limit=n_turns*2)
-    # Returns list of {role, content} dicts
-    return messages
+> **Why asked:** History management is a real engineering problem in chat applications — too little and the AI forgets context, too much and you blow your token budget or slow down every response. Interviewers want to see that you made a deliberate choice based on tradeoffs, not just picked a number. The answer "8 turns captures 95% of real conversations" shows you actually thought about this.
 
+```python
 # In agent.run():
-last_8_turns = await get_history_for_agent(context.user_id, context.temple_id)
+last_8_turns = await get_history_for_agent(context.user_id, context.temple_id, n_turns=8)
 messages = [{"role": "system", "content": system_prompt}] + last_8_turns + [user_msg]
 ```
 
@@ -161,39 +155,43 @@ messages = [{"role": "system", "content": system_prompt}] + last_8_turns + [user
 
 | Turns | Context quality | Token cost | Latency |
 |---|---|---|---|
-| 4 | Loses thread | Low | Fast |
+| 4 | Loses thread quickly | Low | Fast |
 | **8** | **Captures most conversations** | **Moderate** | **~1.5s** |
 | 20 | Best | High ($0.003/query) | Slow |
 
 8 turns captures ~95% of real conversational context. Most human conversations stay on topic for fewer than 8 exchanges before the subject changes.
 
-**Storage:** Last 100 messages stored per (user_id, temple_id). 100 is hard-trimmed after every new message pair is inserted.
+**Storage:** Last 100 messages stored per (user_id, temple_id). Trimmed automatically after every new message pair is saved.
 
 ---
 
 ## 6. What is `tool_choice: "auto"` and when would you use `"required"` or a specific tool name?
 
+> **Why asked:** This is a nuance most people miss. `"auto"` means the LLM decides when to use tools — sometimes it will answer directly from training data without calling any tool. `"required"` forces at least one tool call. Knowing when to use each one shows you understand that blindly forcing tool calls can actually hurt response quality.
+
 ```python
 # "auto" — Groq decides whether to call a tool or answer directly
 "tool_choice": "auto"
 
-# "required" — Groq MUST call at least one tool (useful when you always need data)
+# "required" — Groq MUST call at least one tool
 "tool_choice": "required"
 
-# Specific tool — force Groq to call this exact tool
+# Specific tool — force Groq to call exactly this tool
 "tool_choice": {"type": "function", "function": {"name": "search_jain_texts"}}
 ```
 
 **In Aagam Mitra we use `"auto"` because:**
-- Sometimes the answer is in chat history (no tool needed)
-- Sometimes a direct question about Jain philosophy can be answered from training data
-- Groq is good at deciding when retrieval adds value
+- Sometimes the answer is already in chat history (no tool needed)
+- Sometimes a Jain philosophy question can be answered from training data
+- Groq is good at deciding when retrieval adds real value
 
-**When you'd use `"required"`:** If you're building a booking agent that should *always* check availability before confirming — you'd force the tool call to prevent the LLM from guessing.
+**When you'd use `"required"`:** If building a booking agent that should *always* check live availability before confirming — you'd force the tool call to prevent the LLM from making up slot availability.
 
 ---
 
 ## 7. How do you define tools for Groq? Show the schema for one tool.
+
+> **Why asked:** Tool definitions are where agent quality lives or dies. A vague `description` field causes the LLM to call the wrong tool or pass wrong arguments. Interviewers want to see that you treat these definitions carefully — the `description` on a tool is essentially a prompt that tells the LLM *when* and *how* to use it.
 
 Tools follow the OpenAI function-calling JSON schema format:
 
@@ -225,13 +223,15 @@ Tools follow the OpenAI function-calling JSON schema format:
 
 **Key design tips:**
 - `description` on the function tells Groq *when* to call it — this is critical
-- `description` on each parameter tells Groq *what to put in it*
-- `required` list controls what Groq must always provide
+- `description` on each parameter tells Groq *what format to use*
+- `required` array controls what Groq must always provide
 - Bad descriptions = Groq calls wrong tool or passes wrong arguments
 
 ---
 
 ## 8. How does parallel tool execution work?
+
+> **Why asked:** Most agent tutorials show sequential tool execution. If you mention `asyncio.gather` to run multiple tool calls simultaneously, it signals you've thought about performance. This question often leads to a follow-up about "what happens if one tool fails?" — make sure you know the answer (individual errors are caught per tool, others still complete).
 
 When Groq returns multiple `tool_calls` in one response, we execute them all simultaneously:
 
@@ -244,8 +244,8 @@ results = await asyncio.gather(*[
 ])
 ```
 
-**Real example:** User asks "Show me temple info and available slots"  
-Groq might return:
+**Real example:** User asks "Show me temple info and available slots"
+Groq returns:
 ```json
 "tool_calls": [
     {"function": {"name": "get_temple_info", "arguments": "..."}},
@@ -267,6 +267,8 @@ So a single user question can trigger up to 4 simultaneous HTTP calls.
 
 ## 9. What retry logic does the service use for downstream HTTP calls?
 
+> **Why asked:** In microservice architectures, downstream services fail. An interviewer asking this wants to know you've handled partial failures — not just the happy path. The specific formula `min(8.0, 1 + attempt)` shows you understand exponential-style backoff with a cap, which prevents a single failed call from blocking a user for too long.
+
 ```python
 def _retry_delay(attempt: int) -> float:
     return min(8.0, float(1 + attempt))
@@ -278,7 +280,7 @@ async def _get_json(url: str) -> dict:
             response = await client.get(url, timeout=45.0)
             if response.status_code < 500:
                 return response.json()
-            # 5xx → retry
+            # 5xx → retry (server error, may recover)
         except httpx.HTTPError:
             pass
         if attempt < settings.upstream_retry_attempts - 1:
@@ -295,8 +297,10 @@ async def _get_json(url: str) -> dict:
 
 ## 10. How does the orchestrator route to multiple agents in parallel?
 
+> **Why asked:** The orchestrator is the "brain" that decides which specialist to invoke. Questions about it reveal whether you understand intent classification, routing logic, and what happens when intents overlap. The key insight here is that we use pre-compiled regex (not another LLM call) for routing — this makes routing nearly instant (~1ms) and deterministic.
+
 ```python
-# orchestrator.py — module-level compiled patterns (compiled once at import time)
+# Compiled once at module load time (not per request)
 INTENT_PATTERNS = {
     "scripture":  re.compile(r"\b(sutra|mantra|karma|dharma|moksha|आगम|...)\b", re.IGNORECASE),
     "temple_ops": re.compile(r"\b(book|slot|shantidhara|membership|...)\b", re.IGNORECASE),
@@ -304,27 +308,17 @@ INTENT_PATTERNS = {
     "youtube":    re.compile(r"https?://(?:www\.)?youtu(?:be\.com|\.be)/...", re.IGNORECASE),
 }
 
-# Agent singletons (created once at startup)
-_AGENTS = {
-    "scripture":  ScriptureAgent(),
-    "temple_ops": TempleOpsAgent(),
-    "community":  CommunityAgent(),
-    "youtube":    YouTubeAgent(),
-}
-
 async def route(message, history, context):
     matched = [k for k, p in INTENT_PATTERNS.items() if p.search(message)]
     if not matched:
-        matched = ["temple_ops"]  # default
+        matched = ["temple_ops"]  # default for unrecognised queries
 
     if len(matched) == 1:
         return await _AGENTS[matched[0]].run(message, history, context)
 
-    # Multiple intents → parallel
+    # Multiple intents → parallel execution, then synthesise
     results = await asyncio.gather(*[
         _AGENTS[k].run(message, history, context) for k in matched
     ])
-
-    # Synthesise with Groq (temperature=0.4)
-    return await _synthesise(results, context)
+    return await _synthesise(results, context)  # Groq, temperature=0.4
 ```
