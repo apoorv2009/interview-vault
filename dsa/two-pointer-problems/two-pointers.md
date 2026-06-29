@@ -17,6 +17,7 @@
 | # | Problem | Difficulty | Date Solved |
 |---|---------|------------|-------------|
 | 1 | [Valid Palindrome — LC 125](#1-valid-palindrome--lc-125) | Easy | 2026-06-29 |
+| 2 | [Two Sum II — LC 167](#2-two-sum-ii--lc-167) | Medium | - |
 
 ---
 
@@ -90,5 +91,38 @@ Think of it this way — each character is visited **at most once** by left poin
 ### Key Takeaway
 
 Skip non-alphanumeric chars with inner while loops before comparing. Always normalize case with `ToLower()` before comparison.
+
+---
+
+## 2. Two Sum II — LC 167
+
+**LeetCode:** https://leetcode.com/problems/two-sum-ii-input-array-is-sorted/
+**Difficulty:** Medium
+**Date:** -
+
+### Problem Statement
+
+Given a sorted array of integers in non-decreasing order, return the 1-indexed indices `[index1, index2]` of two numbers that add up to a given target. index1 < index2 and the same element cannot be used twice. There is always exactly one valid solution. Solution must use O(1) additional space.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+### Why O(n) and not O(n²)?
+
+_To be added_
+
+### Key Takeaway
+
+_To be added_
 
 ---
