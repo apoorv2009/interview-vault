@@ -18,6 +18,7 @@
 |---|---------|------------|-------------|
 | 1 | [Valid Palindrome — LC 125](#1-valid-palindrome--lc-125) | Easy | 2026-06-29 |
 | 2 | [Two Sum II — LC 167](#2-two-sum-ii--lc-167) | Medium | 2026-06-29 |
+| 3 | [3Sum — LC 15](#3-3sum--lc-15) | Medium | - |
 
 ---
 
@@ -149,5 +150,50 @@ Each iteration moves either `left` forward or `right` backward — never both st
 ### Key Takeaway
 
 Sorted array + pair sum = Two Pointers. Move the pointer that pushes sum in the right direction. `while(left < right)` is safer than `while(true)` even when a solution is guaranteed — it makes termination condition explicit.
+
+---
+
+## 3. 3Sum — LC 15
+
+**LeetCode:** https://leetcode.com/problems/3sum/
+**Difficulty:** Medium
+**Date:** -
+
+### Problem Statement
+
+Given an integer array `nums`, return all the triplets `[nums[i], nums[j], nums[k]]` such that `nums[i] + nums[j] + nums[k] == 0` and all indices i, j, k are distinct. The output must not contain duplicate triplets.
+
+**Examples:**
+```
+Input:  nums = [-1,0,1,2,-1,-4]
+Output: [[-1,-1,2],[-1,0,1]]
+
+Input:  nums = [0,1,1]
+Output: []
+
+Input:  nums = [0,0,0]
+Output: [[0,0,0]]
+```
+
+**Constraints:**
+- 3 <= nums.length <= 1000
+- -10⁵ <= nums[i] <= 10⁵
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+### Key Takeaway
+
+_To be added_
 
 ---
