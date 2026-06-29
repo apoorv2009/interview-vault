@@ -17,7 +17,7 @@
 | # | Problem | Difficulty | Date Solved |
 |---|---------|------------|-------------|
 | 1 | [Valid Palindrome — LC 125](#1-valid-palindrome--lc-125) | Easy | 2026-06-29 |
-| 2 | [Two Sum II — LC 167](#2-two-sum-ii--lc-167) | Medium | - |
+| 2 | [Two Sum II — LC 167](#2-two-sum-ii--lc-167) | Medium | 2026-06-29 |
 
 ---
 
@@ -98,7 +98,7 @@ Skip non-alphanumeric chars with inner while loops before comparing. Always norm
 
 **LeetCode:** https://leetcode.com/problems/two-sum-ii-input-array-is-sorted/
 **Difficulty:** Medium
-**Date:** -
+**Date:** 2026-06-29
 
 ### Problem Statement
 
@@ -106,23 +106,48 @@ Given a sorted array of integers in non-decreasing order, return the 1-indexed i
 
 ### Approach
 
-_To be added_
+Use two pointers from both ends. Compute sum of both elements. If sum equals target return indices (1-indexed). If sum is greater move right pointer left, if smaller move left pointer right. Array being sorted guarantees this converges to the answer.
 
 ### Solution
 
-_To be added_
+```csharp
+public class Solution {
+    public int[] TwoSum(int[] numbers, int target) {
+        var left = 0;
+        var right = numbers.Length - 1;
+
+        while (left < right)
+        {
+            var sum = numbers[left] + numbers[right];
+            if (sum == target)
+            {
+                return new int[] { left + 1, right + 1 };
+            }
+            if (sum > target)
+            {
+                right--;
+            }
+            else
+            {
+                left++;
+            }
+        }
+        return null; // never reached, problem guarantees exactly one solution
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n)
+- **Space:** O(1) ✓ meets problem constraint
 
 ### Why O(n) and not O(n²)?
 
-_To be added_
+Each iteration moves either `left` forward or `right` backward — never both stay still and never reset. So across the entire execution left and right together make at most `n` moves total, giving O(n).
 
 ### Key Takeaway
 
-_To be added_
+Sorted array + pair sum = Two Pointers. Move the pointer that pushes sum in the right direction. `while(left < right)` is safer than `while(true)` even when a solution is guaranteed — it makes termination condition explicit.
 
 ---
