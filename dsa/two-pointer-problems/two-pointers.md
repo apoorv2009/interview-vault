@@ -69,6 +69,24 @@ public class Solution {
 - **Time:** O(n)
 - **Space:** O(1)
 
+### Why O(n) and not O(n²)?
+
+At first glance the nested while loops look like O(n²) but they are not.
+
+The key insight is that `left` and `right` are **shared across all loops** — they never reset.
+
+```
+left starts at 0, right starts at n-1
+Every iteration of any loop moves left++ or right--
+So across the entire execution, left moves at most n times total
+And right moves at most n times total
+Combined = 2n moves = O(n)
+```
+
+Think of it this way — each character is visited **at most once** by left pointer and **at most once** by right pointer. The inner while loops don't restart from 0, they just continue from wherever left/right currently are.
+
+**Contrast with O(n²):** that would happen if left or right **reset** inside the outer loop, causing re-scanning of already visited characters.
+
 ### Key Takeaway
 
 Skip non-alphanumeric chars with inner while loops before comparing. Always normalize case with `ToLower()` before comparison.
