@@ -19,6 +19,7 @@
 | 1 | [Valid Palindrome — LC 125](#1-valid-palindrome--lc-125) | Easy | 2026-06-29 |
 | 2 | [Two Sum II — LC 167](#2-two-sum-ii--lc-167) | Medium | 2026-06-29 |
 | 3 | [3Sum — LC 15](#3-3sum--lc-15) | Medium | 2026-06-29 |
+| 4 | [Container With Most Water — LC 11](#4-container-with-most-water--lc-11) | Medium | - |
 
 ---
 
@@ -246,5 +247,44 @@ Sorting is O(n log n). The outer `for` loop runs O(n) times. For each `i`, the i
 ### Key Takeaway
 
 3Sum = Sort + fix one element + Two Sum II on the rest. Three places to skip duplicates: after `i`, after `left`, after `right`. Always compare total sum against 0, not individual elements against each other.
+
+---
+
+## 4. Container With Most Water — LC 11
+
+**LeetCode:** https://leetcode.com/problems/container-with-most-water/
+**Difficulty:** Medium
+**Date:** -
+
+### Problem Statement
+
+Given an integer array `heights` where `heights[i]` represents the height of the ith bar, choose any two bars to form a container. Return the maximum amount of water a container can store.
+
+**Example:**
+```
+Input:  heights = [1,8,6,2,5,4,8,3,7]
+Output: 49
+```
+
+**Constraints:**
+- Water = min(heights[left], heights[right]) × (right - left)
+- Maximize this value
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+### Key Takeaway
+
+_To be added_
 
 ---
