@@ -18,7 +18,7 @@
 |---|---------|------------|-------------|
 | 1 | [Valid Palindrome — LC 125](#1-valid-palindrome--lc-125) | Easy | 2026-06-29 |
 | 2 | [Two Sum II — LC 167](#2-two-sum-ii--lc-167) | Medium | 2026-06-29 |
-| 3 | [3Sum — LC 15](#3-3sum--lc-15) | Medium | - |
+| 3 | [3Sum — LC 15](#3-3sum--lc-15) | Medium | 2026-06-29 |
 
 ---
 
@@ -157,7 +157,7 @@ Sorted array + pair sum = Two Pointers. Move the pointer that pushes sum in the 
 
 **LeetCode:** https://leetcode.com/problems/3sum/
 **Difficulty:** Medium
-**Date:** -
+**Date:** 2026-06-29
 
 ### Problem Statement
 
@@ -181,19 +181,70 @@ Output: [[0,0,0]]
 
 ### Approach
 
-_To be added_
+Sort the array first. Fix one element at index `i` and run Two Sum II on the remaining subarray `[i+1, n-1]` with target `-nums[i]`. Skip duplicate values of `i` to avoid duplicate triplets. After finding a triplet, skip duplicate values of `left` and `right` as well.
 
 ### Solution
 
-_To be added_
+```csharp
+public class Solution {
+    public List<List<int>> ThreeSum(int[] nums) 
+    {   
+        var result = new List<List<int>>();    
+        Array.Sort(nums);
+
+        for (int i = 0; i < nums.Length - 1; i++)
+        {   
+            // skip duplicate i values
+            if (i > 0 && nums[i] == nums[i - 1])
+                continue;
+
+            int left = i + 1;
+            int right = nums.Length - 1;    
+           
+            while (left < right)
+            {
+                int sum = nums[i] + nums[left] + nums[right];
+
+                if (sum == 0)
+                {
+                    result.Add(new List<int>() { nums[i], nums[left], nums[right] });
+                    left++;
+                    right--;
+
+                    // skip duplicate left values
+                    while (left < right && nums[left] == nums[left - 1])
+                        left++;
+
+                    // skip duplicate right values
+                    while (left < right && nums[right] == nums[right + 1])
+                        right--;
+                }
+                else if (sum > 0)
+                {
+                    right--;
+                }
+                else
+                {
+                    left++;
+                }
+            }
+        }
+        return result;
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²) — outer loop O(n) × inner two pointer O(n)
+- **Space:** O(1) extra space (output list not counted)
+
+### Why O(n²) and not O(n³)?
+
+Sorting is O(n log n). The outer `for` loop runs O(n) times. For each `i`, the inner `while(left < right)` is a single linear scan — left and right together make at most `n` moves total without resetting. So it's O(n) × O(n) = O(n²), not O(n³) which would happen if we used three nested independent loops.
 
 ### Key Takeaway
 
-_To be added_
+3Sum = Sort + fix one element + Two Sum II on the rest. Three places to skip duplicates: after `i`, after `left`, after `right`. Always compare total sum against 0, not individual elements against each other.
 
 ---
