@@ -19,7 +19,7 @@
 | 1 | [Valid Palindrome — LC 125](#1-valid-palindrome--lc-125) | Easy | 2026-06-29 |
 | 2 | [Two Sum II — LC 167](#2-two-sum-ii--lc-167) | Medium | 2026-06-29 |
 | 3 | [3Sum — LC 15](#3-3sum--lc-15) | Medium | 2026-06-29 |
-| 4 | [Container With Most Water — LC 11](#4-container-with-most-water--lc-11) | Medium | - |
+| 4 | [Container With Most Water — LC 11](#4-container-with-most-water--lc-11) | Medium | 2026-06-29 |
 
 ---
 
@@ -254,7 +254,7 @@ Sorting is O(n log n). The outer `for` loop runs O(n) times. For each `i`, the i
 
 **LeetCode:** https://leetcode.com/problems/container-with-most-water/
 **Difficulty:** Medium
-**Date:** -
+**Date:** 2026-06-29
 
 ### Problem Statement
 
@@ -266,25 +266,50 @@ Input:  heights = [1,8,6,2,5,4,8,3,7]
 Output: 49
 ```
 
-**Constraints:**
-- Water = min(heights[left], heights[right]) × (right - left)
-- Maximize this value
+**Note:** Index = horizontal position of bar, Value = height of bar. Width between two bars = difference of their indices, not their values.
 
 ### Approach
 
-_To be added_
+Start pointers at both ends (maximum width). At each step calculate area using `min(heights[left], heights[right]) × (right - left)`. Always move the shorter wall inward — moving the taller wall can never improve the area since the shorter wall still limits height and width is also decreasing.
 
 ### Solution
 
-_To be added_
+```csharp
+public class Solution {
+    public int MaxArea(int[] heights) 
+    {
+        var left = 0;
+        var right = heights.Length - 1;
+        int maxArea = 0;
+
+        while (left < right)
+        {
+            int area = Math.Min(heights[left], heights[right]) * (right - left);
+            if (area > maxArea)
+            {
+                maxArea = area;           
+            }
+            if (heights[left] < heights[right])
+            {
+                left++;
+            }
+            else
+            {
+                right--;
+            }          
+        }
+        return maxArea;
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n)
+- **Space:** O(1)
 
 ### Key Takeaway
 
-_To be added_
+Always move the **shorter** pointer inward. Moving the taller pointer can never improve the answer — shorter wall limits height AND width is shrinking. Index difference = width, not value difference.
 
 ---
