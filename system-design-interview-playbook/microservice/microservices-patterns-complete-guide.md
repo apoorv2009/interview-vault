@@ -1074,6 +1074,8 @@ Read DB:  EngagementSummaries  (denormalized view, AsNoTracking, fast SELECT)
 > 🗣️ **How to explain in interview (AWS diagram → Azure redesign):**
 > "If someone shows me a CQRS diagram built on AWS — Kafka, SQS, Lambda — I can map it directly to Azure. Azure Event Hubs is Kafka-compatible, Azure Service Bus replaces SQS, Azure Functions replace Lambda, and Cosmos DB gives us the schemaless, regionally-distributed Read DB. The pattern is identical; the services are Azure-native."
 
+![CQRS Azure Architecture](./cqrs-azure-architecture.svg)
+
 #### The Problem CQRS Solves in Capital Access — Ownership Data
 
 At quarter-end, Capital Access ingests bulk ownership data from regulatory filings (13-F, EDGAR). This produces a write storm — thousands of `UpdateOwnership` commands per minute. Meanwhile, institutional clients are hitting the Ownership Dashboard for real-time reads.

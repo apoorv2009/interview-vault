@@ -1,0 +1,152 @@
+<svg viewBox="0 0 780 570" xmlns="http://www.w3.org/2000/svg" style="width:100%;font-family:Arial,sans-serif;background:#fff">
+<title>CQRS Pattern — Azure Architecture</title>
+<desc>CQRS diagram: command side (left) uses AKS pods, Azure Event Hubs, Azure SQL Write DB; connected via Azure Functions and Azure Service Bus to query side (right) using AKS pods, MediatR Query Handler, and Azure Cosmos DB Read DB.</desc>
+
+<defs>
+  <marker id="ar" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+    <path d="M1,1 L7,4 L1,7 Z" fill="#555"/>
+  </marker>
+  <marker id="ard" markerWidth="8" markerHeight="8" refX="6" refY="4" orient="auto">
+    <path d="M1,1 L7,4 L1,7 Z" fill="#999"/>
+  </marker>
+</defs>
+
+<!-- Section backgrounds -->
+<rect x="1" y="40" width="386" height="528" fill="#EEF4FF" rx="2"/>
+<rect x="393" y="40" width="386" height="528" fill="#EDFAF7" rx="2"/>
+<line x1="390" y1="40" x2="390" y2="568" stroke="#D0D0D0" stroke-width="1"/>
+
+<!-- Title -->
+<text x="390" y="24" text-anchor="middle" font-size="14" font-weight="bold" fill="#1a1a1a">CQRS Pattern — Azure Architecture</text>
+
+<!-- Section labels -->
+<text x="194" y="58" text-anchor="middle" font-size="10" font-weight="bold" fill="#0078D4" letter-spacing="1.2">COMMAND SIDE</text>
+<text x="586" y="58" text-anchor="middle" font-size="10" font-weight="bold" fill="#107C10" letter-spacing="1.2">QUERY SIDE</text>
+
+<!-- === LEFT: Authorization/Validation pods (top) === -->
+<rect x="50"  y="68" width="52" height="52" rx="6" fill="#0078D4"/>
+<rect x="112" y="68" width="52" height="52" rx="6" fill="#0078D4"/>
+<rect x="174" y="68" width="52" height="52" rx="6" fill="#0078D4"/>
+<rect x="236" y="68" width="52" height="52" rx="6" fill="#0078D4"/>
+<!-- icon overlays -->
+<rect x="60"  y="78" width="32" height="32" rx="3" fill="white" opacity="0.15"/>
+<rect x="122" y="78" width="32" height="32" rx="3" fill="white" opacity="0.15"/>
+<rect x="184" y="78" width="32" height="32" rx="3" fill="white" opacity="0.15"/>
+<rect x="246" y="78" width="32" height="32" rx="3" fill="white" opacity="0.15"/>
+<text x="194" y="133" text-anchor="middle" font-size="10" fill="#333">Authorization · Validation</text>
+<text x="194" y="147" text-anchor="middle" font-size="9" fill="#555">AKS microservice pods</text>
+
+<!-- ↓ -->
+<line x1="194" y1="151" x2="194" y2="171" stroke="#555" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<!-- Azure Event Hubs -->
+<rect x="62" y="173" width="264" height="60" rx="8" fill="#7B2FBE"/>
+<text x="194" y="199" text-anchor="middle" font-size="12" font-weight="bold" fill="white">Azure Event Hubs</text>
+<text x="194" y="217" text-anchor="middle" font-size="10" fill="#D4BFFF">Event Message Broker  (Kafka-compatible)</text>
+
+<!-- ↓ -->
+<line x1="194" y1="235" x2="194" y2="255" stroke="#555" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<!-- Command Handler pods (middle-left) -->
+<rect x="70"  y="257" width="52" height="52" rx="6" fill="#0078D4"/>
+<rect x="132" y="257" width="52" height="52" rx="6" fill="#0078D4"/>
+<rect x="194" y="257" width="52" height="52" rx="6" fill="#0078D4"/>
+<rect x="256" y="257" width="52" height="52" rx="6" fill="#0078D4"/>
+<rect x="80"  y="267" width="32" height="32" rx="3" fill="white" opacity="0.15"/>
+<rect x="142" y="267" width="32" height="32" rx="3" fill="white" opacity="0.15"/>
+<rect x="204" y="267" width="32" height="32" rx="3" fill="white" opacity="0.15"/>
+<rect x="266" y="267" width="32" height="32" rx="3" fill="white" opacity="0.15"/>
+<text x="194" y="323" text-anchor="middle" font-size="10" fill="#333">Command Handlers (MediatR)</text>
+<text x="194" y="337" text-anchor="middle" font-size="9" fill="#555">validate · write · publish event</text>
+
+<!-- ↓ -->
+<line x1="194" y1="341" x2="194" y2="361" stroke="#555" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<!-- Write DB -->
+<rect x="62" y="363" width="264" height="60" rx="8" fill="#003087"/>
+<text x="194" y="389" text-anchor="middle" font-size="12" font-weight="bold" fill="white">Azure SQL</text>
+<text x="194" y="407" text-anchor="middle" font-size="10" fill="#85AEDB">Write DB — Normalized · ACID · Event Store</text>
+
+<!-- === RIGHT: Query pods (top) === -->
+<rect x="426" y="68" width="52" height="52" rx="6" fill="#107C10"/>
+<rect x="488" y="68" width="52" height="52" rx="6" fill="#107C10"/>
+<rect x="550" y="68" width="52" height="52" rx="6" fill="#107C10"/>
+<rect x="612" y="68" width="52" height="52" rx="6" fill="#107C10"/>
+<rect x="436" y="78" width="32" height="32" rx="3" fill="white" opacity="0.15"/>
+<rect x="498" y="78" width="32" height="32" rx="3" fill="white" opacity="0.15"/>
+<rect x="560" y="78" width="32" height="32" rx="3" fill="white" opacity="0.15"/>
+<rect x="622" y="78" width="32" height="32" rx="3" fill="white" opacity="0.15"/>
+<text x="556" y="133" text-anchor="middle" font-size="10" fill="#333">Query Handlers (MediatR)</text>
+<text x="556" y="147" text-anchor="middle" font-size="9" fill="#555">AKS microservice pods</text>
+
+<!-- ↓ -->
+<line x1="556" y1="151" x2="556" y2="171" stroke="#555" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<!-- Query Handler box -->
+<rect x="436" y="173" width="240" height="60" rx="8" fill="#107C10"/>
+<text x="556" y="199" text-anchor="middle" font-size="12" font-weight="bold" fill="white">Query Handler</text>
+<text x="556" y="217" text-anchor="middle" font-size="10" fill="#C0F0C8">MediatR IRequestHandler</text>
+
+<!-- ↓ -->
+<line x1="556" y1="235" x2="556" y2="255" stroke="#555" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<!-- Cosmos DB Read -->
+<rect x="420" y="257" width="272" height="60" rx="8" fill="#0089D6"/>
+<text x="556" y="283" text-anchor="middle" font-size="12" font-weight="bold" fill="white">Azure Cosmos DB</text>
+<text x="556" y="301" text-anchor="middle" font-size="10" fill="#B8E4FF">Read DB — Denormalized Views · Sub-10ms</text>
+
+<!-- === BOTTOM PIPELINE === -->
+
+<!-- Write DB → Azure Functions (Event Processor) -->
+<line x1="194" y1="423" x2="194" y2="449" stroke="#555" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<!-- Azure Functions — Event Processor -->
+<rect x="55" y="451" width="180" height="54" rx="8" fill="#FFB900"/>
+<text x="145" y="474" text-anchor="middle" font-size="12" font-weight="bold" fill="#1a1a1a">Azure Functions</text>
+<text x="145" y="491" text-anchor="middle" font-size="10" fill="#5a3a00">Event Processor</text>
+
+<!-- → Azure Service Bus -->
+<line x1="238" y1="478" x2="266" y2="478" stroke="#555" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<!-- Azure Service Bus Queue -->
+<rect x="268" y="451" width="210" height="54" rx="8" fill="#00B7C3"/>
+<text x="373" y="474" text-anchor="middle" font-size="12" font-weight="bold" fill="white">Azure Service Bus</text>
+<text x="373" y="491" text-anchor="middle" font-size="10" fill="#D5F6F8">UpdateReadDB Queue</text>
+
+<!-- → Azure Functions (Read DB Updater) -->
+<line x1="481" y1="478" x2="509" y2="478" stroke="#555" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<!-- Azure Functions — Read DB Updater -->
+<rect x="511" y="451" width="200" height="54" rx="8" fill="#FFB900"/>
+<text x="611" y="474" text-anchor="middle" font-size="12" font-weight="bold" fill="#1a1a1a">Azure Functions</text>
+<text x="611" y="491" text-anchor="middle" font-size="10" fill="#5a3a00">Read DB Updater</text>
+
+<!-- ↑ from Read DB Updater → Cosmos DB (right side vertical) -->
+<line x1="686" y1="451" x2="686" y2="320" stroke="#555" stroke-width="1.5"/>
+<line x1="686" y1="320" x2="692" y2="320" stroke="#555" stroke-width="1.5"/>
+<line x1="686" y1="320" x2="556" y2="320" stroke="#555" stroke-width="1.5" marker-end="url(#ar)"/>
+
+<!-- Recreate Read DB (dashed) — from Write DB to Cosmos DB -->
+<line x1="328" y1="393" x2="421" y2="290" stroke="#999" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#ard)"/>
+<text x="400" y="356" text-anchor="middle" font-size="9" fill="#888" transform="rotate(-34,400,356)">Recreate Read DB</text>
+<text x="400" y="368" text-anchor="middle" font-size="9" fill="#888" transform="rotate(-34,400,368)">(event replay)</text>
+
+<!-- Legend -->
+<rect x="8"   y="522" width="12" height="12" rx="2" fill="#0078D4"/>
+<text x="25"  y="532" font-size="9" fill="#444">AKS pod</text>
+<rect x="76"  y="522" width="12" height="12" rx="2" fill="#7B2FBE"/>
+<text x="93"  y="532" font-size="9" fill="#444">Event Hubs</text>
+<rect x="168" y="522" width="12" height="12" rx="2" fill="#FFB900"/>
+<text x="185" y="532" font-size="9" fill="#444">Azure Functions</text>
+<rect x="282" y="522" width="12" height="12" rx="2" fill="#00B7C3"/>
+<text x="299" y="532" font-size="9" fill="#444">Service Bus</text>
+<rect x="368" y="522" width="12" height="12" rx="2" fill="#0089D6"/>
+<text x="385" y="532" font-size="9" fill="#444">Cosmos DB (Read)</text>
+<rect x="488" y="522" width="12" height="12" rx="2" fill="#003087"/>
+<text x="505" y="532" font-size="9" fill="#444">Azure SQL (Write)</text>
+<line x1="584" y1="528" x2="608" y2="528" stroke="#999" stroke-width="1.5" stroke-dasharray="4,3"/>
+<text x="614" y="532" font-size="9" fill="#888">Disaster recovery</text>
+
+<!-- Bottom label -->
+<text x="390" y="558" text-anchor="middle" font-size="9" fill="#aaa">Capital Access — Ownership Data CQRS · Azure Architecture</text>
+</svg>
