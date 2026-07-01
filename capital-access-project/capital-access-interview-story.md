@@ -208,6 +208,63 @@ The architecture diagram shows the SPA → Gateway → services path and the Ser
 > ℹ️
 > **Why direct REST for the Report Worker specifically:** by the time the Function runs, it already has the full request context (tenant, jobId, which company) and needs synchronous answers right now to assemble one report — there's no "event" to publish, just data it needs to fetch immediately from four different owners. Pub/sub is reserved for the opposite case: multiple independent consumers reacting to a state change without being coupled to the producer or to each other.
 
+## CQRS Pattern — Ownership Data
+
+Capital Access uses CQRS (Command Query Responsibility Segregation) in the Ownership and Engagement services to solve a concrete read/write contention problem.
+
+![CQRS Azure Architecture](../system-design-interview-playbook/microservice/cqrs-azure-architecture.svg)
+
+### The Problem
+
+At quarter-end, regulatory filings (13-F, EDGAR) are ingested in bulk — thousands of `UpdateOwnership` commands per minute. At the same time, institutional clients are actively reading the Ownership Dashboard. Without CQRS, both workloads hit the same Azure SQL database: write lock contention makes every dashboard read slow or time out exactly when clients need the data most.
+
+### The Solution — Two Models, Two Databases
+
+```
+WRITE SIDE (Azure SQL):
+  Commands → Command Handler (MediatR) → validates → writes to Azure SQL
+  → publishes OwnershipUpdatedEvent to Azure Service Bus
+
+EVENT PIPELINE (async, ~100–500ms lag):
+  Azure Service Bus Queue → Azure Functions (Read DB Updater)
+  → projects to Cosmos DB in UI-optimized document shape
+
+READ SIDE (Cosmos DB):
+  Query Handler (MediatR) → point-read from Cosmos DB by tenantId partition key
+  → sub-10ms response, zero joins, no contention with write side
+```
+
+### Commands and Queries
+
+| Side | Examples |
+|------|----------|
+| Commands → Azure SQL | `UpdateOwnership`, `CreateEngagement`, `AddToTargetingList` |
+| Queries → Cosmos DB | `GetOwnershipDashboard`, `GetEngagementReport`, `GetTargetingList` |
+
+### AWS → Azure Service Mapping
+
+| AWS (original diagram) | Azure equivalent |
+|------------------------|-----------------|
+| Apache Kafka | Azure Event Hubs (Kafka-compatible) |
+| Lambda (Event Processor) | Azure Functions |
+| SQS Queue | Azure Service Bus Queue |
+| Lambda (Read DB Updater) | Azure Functions (Service Bus trigger) |
+| Read DB (DynamoDB) | Azure Cosmos DB |
+| Write DB | Azure SQL |
+| Microservice pods | AKS pods |
+
+### Eventual Consistency — How We Handle It
+
+The Cosmos DB read model is typically 100–500ms behind the write side. The UI shows a **"Last updated: 10:00:00"** timestamp on the dashboard so clients know the data age — it's a transparency feature, not a bug. For compliance or audit use cases where strong consistency is required, we read directly from Azure SQL.
+
+If Cosmos DB is ever corrupted or needs rebuilding, we replay all events from the Azure SQL event store — the dashed "Recreate Read DB" flow in the diagram.
+
+### Interview Line
+
+> "We use CQRS in Capital Access specifically because of quarter-end bulk ingestion from regulatory filings. At quarter-end we're processing thousands of ownership updates per minute. If reads and writes shared the same Azure SQL database, lock contention would kill dashboard performance exactly when institutional clients need it most. So the write side commits to Azure SQL and publishes a domain event. An Azure Function picks that event off a Service Bus queue and projects it into a Cosmos DB document — pre-shaped with company names already joined in, sorted shareholders, everything the dashboard needs. When the Angular dashboard loads, it hits Cosmos DB via a partition-key point read — sub-10 milliseconds, completely isolated from the write storm happening on Azure SQL. The trade-off is eventual consistency — typically a few hundred milliseconds. We surface that as a 'last updated' timestamp on the UI."
+
+---
+
 ## Logging & Observability — App Insights + Splunk
 
 Two tools, two different jobs, tied together by one Correlation ID.
