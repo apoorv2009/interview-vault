@@ -15,7 +15,7 @@ Example: (150M × 20) ÷ 86,400 × 4 = **138,889 QPS peak**
 ## All Systems — QPS Calculations in One Table
 
 | System | DAU (M) | Req/day | Calculation | Mental Math QPS | Exact QPS | Peak Mult | Peak QPS | Servers* | Design Notes |
-|---|---:|---:|---|---:|---:|---:|---:|---|
+|---|---:|---:|---|---:|---:|---:|---:|---:|---|
 | **Twitter** | 150 | 20 | (150M×20)÷100K | 30,000 | 34,722 | 4X | 138,889 | 140 | Cache feed, write sharding |
 | **YouTube** | 200 | 50 | (200M×50)÷100K | 100,000 | 115,740 | 5X | 578,700 | 580 | CDN videos, metadata replicas |
 | **Instagram** | 300 | 100 | (300M×100)÷100K | 300,000 | 347,222 | 4X | 1,388,889 | 1,389 | Photo CDN, like sharding |
