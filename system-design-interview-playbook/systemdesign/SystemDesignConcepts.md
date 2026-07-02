@@ -1,18 +1,10 @@
-# System Design Concepts
+# System Design Concepts — Availability
 
 *Last updated: July 2026*
 
 ---
 
-## Table of Contents
-
-1. [Availability](#1-availability)
-
----
-
-## 1. Availability
-
-### What is Availability?
+## What is Availability?
 
 Availability is percentage of time system is operational and able to serve requests.
 
@@ -22,143 +14,47 @@ Goal is never 100% — physically impossible. Goal is close enough that downtime
 
 ---
 
-### The Nines — Complete Reference Table
+## The Nines — Complete Reference Table
 
-| Metric | **99.9%** | **99.99%** | **99.999%** |
-|---|---|---|---|
-| **Downtime / Year** | 8.7 hours | 52 minutes | 5.26 minutes |
-| **Downtime / Month** | 43 minutes | 4 minutes | 26 seconds |
-| **Downtime / Week** | 10 minutes | 1 minute | 6 seconds |
-| **Downtime / Day** | 1.4 minutes | 8.6 seconds | 0.86 seconds |
-| **Downtime / Hour** | 3.6 seconds | 0.36 seconds | 0.036 seconds |
-| | | | |
-| **Infrastructure & Failover** | 2 instances per service in 1 region (multi-AZ). Standby waits idle. One fails → failover 30–60 sec. Health checks every 30 sec. | 2+ active instances in 1 region, both serving. One fails → instant reroute <10 sec. Health checks every 5–10 sec. Auto-failover. | 3+ active instances across 2–3 regions, all serving simultaneously. One region fails → DNS reroutes 30–60 sec, others absorb instantly. Sub-second detection. |
-| **Data Replication (RPO/RTO)** | Primary + 1 standby replica. Async replication. RTO: 30–120 sec. RPO: lose last 5–10 min data. Manual failover acceptable. | Primary + 1 replica. Sync replication (zero data loss). RTO: 5 min. RPO: lose <1 min unacceptable. Automatic failover. | Primary + replicas in 2–3 regions. Fully synchronous (all regions confirm). RTO: <30 sec. RPO: zero loss everywhere. Multi-region auto-failover. Accept 50–150ms write latency. |
-| **Deployment & Recovery** | Rolling deployments OK (gradual). MTTR: 15–20 min. Blue-green preferred. Manual recovery acceptable. No scheduled maintenance window required but downtime acceptable. | Blue-green mandatory (zero downtime). Deploy → test idle env → flip load balancer (1 sec). MTTR: 2–5 min. Automatic recovery, no manual intervention. Monthly testing. | Continuous deployment + canary (auto-deploy 5% traffic). Feature flags decouple deploy from release. MTTR: <5 sec (auto-recovery). Sub-minute on-call response. Monthly DR drills. Chaos engineering daily. |
-| **On-Call / Response** | Business hours or partial 24/7. 15–20 min response acceptable. | 24/7 required. <5 min response SLA. | 24/7/365 + backup on-call. <1 min response required. War room culture for critical alerts. |
-| **Monitoring** | Daily dashboard checks. Alert at 100% error budget. | Real-time SLI tracking. Alert at 50% error budget consumed. | Real-time SLI tracking. Alert at 10% error budget consumed. Auto-freeze deployments if budget threatened. |
-| **Cost** | ~$2.5k/month | ~$15k/month | ~$38k/month |
-
-Most production SaaS targets **99.9% to 99.99%**. Five nines reserved for air traffic control, financial settlement. Going from three nines to four nines is not twice as hard — order of magnitude harder and costlier.
-
-> Capital Access is not five nines. Investor relations data unavailable for 4 minutes a month is acceptable. Trading system down 4 minutes can cost millions — that warrants five nines.
+| Availability | Downtime/Year | Downtime/Month | Infrastructure | Data Replication | Deployment | On-Call |
+|---|---|---|---|---|---|---|
+| **99%** | 3.6 days | ~7 hours | Single instance or minimal redundancy. No standby. One fails → full outage until manual fix. | No replication. Single DB. Data loss if DB dies. | Big-bang deploys. Downtime acceptable. MTTR: hours. | Not required. Manual fix when issue reported. |
+| **99.9%** | 8.7 hours | 43 minutes | 2 instances (1 region, multi-AZ). Standby idle. Failover 30–60 sec. | Async. Primary + 1 standby. RTO: 30–120 sec. RPO: lose 5–10 min. | Rolling deploys. MTTR: 15–20 min. | Business hours. 15–20 min response. |
+| **99.99%** | 52 minutes | 4 minutes | 2+ active instances (1 region). Both serving. Failover <10 sec. | Sync. Primary + 1 replica. RTO: 5 min. RPO: zero loss. Auto-failover. | Blue-green. MTTR: 2–5 min. Zero downtime. | 24/7. <5 min response. |
+| **99.999%** | 5.26 minutes | 26 seconds | 3+ active (2–3 regions). All serving. DNS reroutes 30–60 sec. | Fully sync (all regions). RTO: <30 sec. RPO: zero everywhere. Multi-region failover. | Continuous + canary. MTTR: <5 sec. Feature flags. | 24/7/365 + backup. <1 min response. |
 
 ---
 
-### Availability Compounds — The Trap
+## What Causes Downtime?
 
-Multiple services in chain? Multiply their availabilities.
-
-Three services each at 99.9% = 99.9% × 99.9% × 99.9% = **99.7%**
-
-Down almost 3× more than each individual service. More dependencies → lower overall availability. Design matters.
-
----
-
-### SLI / SLO / SLA
-
-| Term | Meaning | Example |
-|------|---------|---------|
-| **SLI** (Indicator) | Actual measured metric | "Our p99 latency is 120ms. Error rate 0.05%." |
-| **SLO** (Objective) | Internal target team owns | "We want 99.9% uptime." Not a contract. |
-| **SLA** (Agreement) | Contract with customer. Breach → penalty/refund | Always weaker than SLO — buffer between them. |
+1. **Hardware failures** — Server crashes, power loss, disk dies. *Prevention: redundant instances.*
+2. **Bad deployments** — Buggy code pushed → app crashes. *Prevention: blue-green, canary, rollback.*
+3. **Database problems** — Replication lag, corruption, migration failure. *Prevention: sync replication, auto-failover.*
+4. **Network failures** — Link cut, DNS down. *Prevention: multi-region, auto-reroute.*
+5. **Cascading failures** — Service A slow → B waits → B dies → C dies. *Prevention: circuit breaker, timeout, bulkhead.*
+6. **Resource exhaustion** — Out of memory, disk full, CPU maxed. *Prevention: monitoring, auto-scaling.*
+7. **External dependency failures** — Third-party API down. *Prevention: timeout, circuit breaker.*
+8. **Human error** — Operator deletes DB, misconfigures. *Prevention: automation, runbooks, staging.*
 
 ---
 
-### How to Achieve High Availability
+## How to Achieve Each Tier
 
-**Layer 1 — Eliminate single points of failure**
+**99%**: Single or minimal redundancy. Manual recovery. Downtime acceptable.
 
-Every component with one instance is a single point of failure. Run minimum two instances of everything critical: app servers, load balancers, DB nodes, cache, message broker, DNS. Map architecture, circle everything with one instance — each circle is a risk.
+**99.9%**: 2 instances in multi-AZ. Async replication. Rolling deploys. 15–20 min recovery. Business hours support.
 
-**Layer 2 — Active-Active vs Active-Passive**
+**99.99%**: 2+ active instances, sync replication, blue-green deploys, 2–5 min recovery. 24/7 on-call.
 
-- **Active-Passive**: one node serves, standby waits. Failover takes 30–120 seconds. At five nines, 120 seconds = 4% of annual budget gone in one failover.
-- **Active-Active**: both nodes serve traffic simultaneously. One dies → load balancer reroutes in under a second. No promotion delay.
-
-Stateless services: active-active trivial. Databases: multi-master or synchronous replication with automatic failover (Azure SQL Hyperscale, Cosmos DB multi-region write).
-
-**Layer 3 — Multi-AZ mandatory, Multi-Region for five nines**
-
-- **Multi-AZ**: replicas in different physical buildings, same region. Protects against single building failure.
-- **Multi-Region**: replicas in different geographic regions. Azure Traffic Manager detects region failure, reroutes DNS in 30–60 seconds. Cosmos DB does this natively.
-
-Five nines requires multi-region. Multi-AZ alone not enough.
-
-**Layer 4 — Zero-downtime deployments**
-
-Deployments are planned downtime. Eliminate them:
-
-- **Rolling deploy**: replace instances one at a time. No downtime but brief version mismatch in flight.
-- **Blue-green**: two identical environments. Deploy to idle one, test, flip load balancer in one second. Rollback = flip back.
-- **Canary**: route 1–5% traffic to new version. Watch error rates. Problem → kill canary, 95% of users never saw it.
-- **Feature flags**: ship code dark, enable per tenant. Decouple deploy from release.
-
-**Layer 5 — Failure isolation (Bulkhead + Circuit Breaker)**
-
-*Bulkhead*: separate thread pools per downstream service. Report service misbehaves → exhausts its 10 threads → dashboard threads unaffected on their 50. One compartment floods, others stay dry.
-
-*Circuit Breaker* — three states:
-- **Closed** (normal): calls pass through
-- **Open** (failure detected): calls fail immediately, no attempt. Fail fast.
-- **Half-open** (probe): after timeout, let one call through. Succeeds → close. Fails → open again.
-
-Without circuit breaker: Service A waits on slow Service B → A's threads pile up → A runs out of threads → A goes down → cascades to everything. Fail fast beats fail slow.
-
-Timeout on every network call. No timeout = thread waits forever = thread pool exhausted = outage.
-
-**Layer 6 — Health checks + auto-healing**
-
-System must self-detect failure, self-recover, not wait for human.
-
-- **Liveness probe**: is process alive? Fail → kill container, restart.
-- **Readiness probe**: is service ready to serve? Fail → remove from load balancer rotation, keep alive.
-
-Kubernetes does both natively. Auto-restart on crash. HPA auto-scales on CPU/memory/custom metrics.
-
-**Layer 7 — Data durability**
-
-- **Synchronous replication**: primary waits for replica to confirm write before ack to client. Zero data loss. Adds ~5ms latency per write.
-- **Asynchronous replication**: primary acks immediately, replicates in background. Fast. Risk: failover loses last few seconds of writes (RPO > 0).
-
-Five nines requires synchronous replication for writes. Accept the latency cost.
-
-**Layer 8 — Observability + SLO alerting**
-
-Can't protect budget you can't see.
-
-Track SLI in real time: error rate, p99 latency, uptime per service. Alert at 50% of error budget consumed — not at 100%. By 100%, SLO already breached.
-
-Error budget = (1 − availability target) × time period.
-Five nines over 30 days = 26 seconds budget. Alert fires when 13 seconds downtime consumed in a month.
+**99.999%**: 3+ active regions, fully sync replication, continuous deployment, <5 sec recovery. 24/7/365 on-call with <1 min response.
 
 ---
 
-### Designing for Five Nines — Checklist
+## Key Terms
 
-| Requirement | What to do |
-|-------------|-----------|
-| No SPOF | Min 2 instances of every component |
-| Fast failover | Active-Active, not Active-Passive |
-| Infra failure | Multi-AZ (building) + Multi-Region (geographic) |
-| Deployments | Blue-green or canary, never big-bang |
-| Cascade prevention | Circuit breaker + bulkhead + timeouts on every call |
-| Self-healing | Liveness + readiness probes, HPA |
-| Data safety | Synchronous replication |
-| Budget tracking | SLI dashboards, alert at 50% error budget consumed |
-
----
-
-### Availability vs Consistency Trade-off (CAP Theorem)
-
-Highly available system may serve slightly stale data during partition. CQRS with eventually consistent read model is concrete example: trade few hundred milliseconds of consistency for read side always available regardless of write side state.
-
----
-
-### Honest Cost Reality
-
-Five nines requires: multi-region active-active, synchronous replication, blue-green deploys, full circuit breaker mesh, 24/7 on-call with sub-5-minute response. Costs 3–5× more than three nines infra.
-
-**Right interview answer**: "Five nines is a cost decision, not just a tech decision. I'd push back and ask what downtime actually costs the business per minute. Then pick cheapest architecture that keeps us inside that budget."
-
----
+- **AZ (Availability Zone)**: Different physical building in same region. Protects against single-building failure.
+- **RTO (Recovery Time Objective)**: Max time acceptable to recover from failure.
+- **RPO (Recovery Point Objective)**: Max data loss acceptable. How far back can you lose?
+- **MTTR (Mean Time To Recovery)**: Actual average time to restore service after failure.
+- **Sync replication**: Wait for all replicas to confirm before acking write. Zero data loss. Slower writes.
+- **Async replication**: Ack immediately, replicate in background. Fast writes. Risk: data loss on failover.
