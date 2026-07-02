@@ -23,36 +23,36 @@ Example: (150M × 20) ÷ 86,400 × 4 = **138,889 QPS peak**
 
 ## All Systems — QPS Calculations in One Table
 
-<table style="font-size: 12px; width: 100%; border-collapse: collapse;">
+<table style="font-size: 10px; width: 100%; border-collapse: collapse; table-layout: fixed;">
 <tr style="background-color: #f0f0f0;">
-<td style="border: 1px solid #ddd; padding: 4px;"><b>System</b></td>
-<td style="border: 1px solid #ddd; padding: 4px; text-align: right;"><b>DAU(M)</b></td>
-<td style="border: 1px solid #ddd; padding: 4px; text-align: right;"><b>Req/day</b></td>
-<td style="border: 1px solid #ddd; padding: 4px;"><b>Formula</b></td>
-<td style="border: 1px solid #ddd; padding: 4px; text-align: right;"><b>Avg QPS (MM)</b></td>
-<td style="border: 1px solid #ddd; padding: 4px; text-align: right;"><b>Avg QPS (Ex)</b></td>
-<td style="border: 1px solid #ddd; padding: 4px;"><b>Peak×</b></td>
-<td style="border: 1px solid #ddd; padding: 4px; text-align: right;"><b>Peak QPS (MM)</b></td>
-<td style="border: 1px solid #ddd; padding: 4px; text-align: right;"><b>Peak QPS (Ex)</b></td>
-<td style="border: 1px solid #ddd; padding: 4px;"><b>Servers Calc</b></td>
-<td style="border: 1px solid #ddd; padding: 4px; text-align: right;"><b>Servers</b></td>
-<td style="border: 1px solid #ddd; padding: 4px;"><b>Design Notes</b></td>
+<td style="border: 1px solid #ddd; padding: 2px; width: 12%;"><b>System</b></td>
+<td style="border: 1px solid #ddd; padding: 2px; width: 5%; text-align: right;"><b>DAU</b></td>
+<td style="border: 1px solid #ddd; padding: 2px; width: 5%; text-align: right;"><b>Req</b></td>
+<td style="border: 1px solid #ddd; padding: 2px; width: 8%;"><b>Formula</b></td>
+<td style="border: 1px solid #ddd; padding: 2px; width: 7%; text-align: right;"><b>Avg MM</b></td>
+<td style="border: 1px solid #ddd; padding: 2px; width: 7%; text-align: right;"><b>Avg Ex</b></td>
+<td style="border: 1px solid #ddd; padding: 2px; width: 4%; text-align: center;"><b>×</b></td>
+<td style="border: 1px solid #ddd; padding: 2px; width: 7%; text-align: right;"><b>Peak MM</b></td>
+<td style="border: 1px solid #ddd; padding: 2px; width: 7%; text-align: right;"><b>Peak Ex</b></td>
+<td style="border: 1px solid #ddd; padding: 2px; width: 6%; text-align: center;"><b>÷1K</b></td>
+<td style="border: 1px solid #ddd; padding: 2px; width: 5%; text-align: right;"><b>Srv</b></td>
+<td style="border: 1px solid #ddd; padding: 2px; width: 10%;"><b>Notes</b></td>
 </tr>
-<tr>
-<td style="border: 1px solid #ddd; padding: 4px;">Twitter</td>
-<td style="border: 1px solid #ddd; padding: 4px; text-align: right;">150</td>
-<td style="border: 1px solid #ddd; padding: 4px; text-align: right;">20</td>
-<td style="border: 1px solid #ddd; padding: 4px;">(150M×20)÷100K</td>
-<td style="border: 1px solid #ddd; padding: 4px; text-align: right;">30K</td>
-<td style="border: 1px solid #ddd; padding: 4px; text-align: right;">34.7K</td>
-<td style="border: 1px solid #ddd; padding: 4px;">4X</td>
-<td style="border: 1px solid #ddd; padding: 4px; text-align: right;">120K</td>
-<td style="border: 1px solid #ddd; padding: 4px; text-align: right;">138.9K</td>
-<td style="border: 1px solid #ddd; padding: 4px;">÷1,000</td>
-<td style="border: 1px solid #ddd; padding: 4px; text-align: right;">140</td>
-<td style="border: 1px solid #ddd; padding: 4px;">Cache feed</td>
+<tr style="font-size: 9px;">
+<td style="border: 1px solid #ddd; padding: 2px;">Twitter</td>
+<td style="border: 1px solid #ddd; padding: 2px; text-align: right;">150</td>
+<td style="border: 1px solid #ddd; padding: 2px; text-align: right;">20</td>
+<td style="border: 1px solid #ddd; padding: 2px;">÷100K</td>
+<td style="border: 1px solid #ddd; padding: 2px; text-align: right;">30K</td>
+<td style="border: 1px solid #ddd; padding: 2px; text-align: right;">34.7K</td>
+<td style="border: 1px solid #ddd; padding: 2px; text-align: center;">4</td>
+<td style="border: 1px solid #ddd; padding: 2px; text-align: right;">120K</td>
+<td style="border: 1px solid #ddd; padding: 2px; text-align: right;">138.9K</td>
+<td style="border: 1px solid #ddd; padding: 2px; text-align: center;">✓</td>
+<td style="border: 1px solid #ddd; padding: 2px; text-align: right;">140</td>
+<td style="border: 1px solid #ddd; padding: 2px;">Cache</td>
 </tr>
-<tr><td style="border: 1px solid #ddd; padding: 4px;">YouTube</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">200</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">50</td><td style="border: 1px solid #ddd; padding: 4px;">(200M×50)÷100K</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">100K</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">115.7K</td><td style="border: 1px solid #ddd; padding: 4px;">5X</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">500K</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">578.7K</td><td style="border: 1px solid #ddd; padding: 4px;">÷1,000</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">580</td><td style="border: 1px solid #ddd; padding: 4px;">CDN videos</td></tr>
+<tr style="font-size: 9px;"><td style="border: 1px solid #ddd; padding: 2px;">YouTube</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">200</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">50</td><td style="border: 1px solid #ddd; padding: 4px;">(200M×50)÷100K</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">100K</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">115.7K</td><td style="border: 1px solid #ddd; padding: 4px;">5X</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">500K</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">578.7K</td><td style="border: 1px solid #ddd; padding: 4px;">÷1,000</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">580</td><td style="border: 1px solid #ddd; padding: 4px;">CDN videos</td></tr>
 <tr><td style="border: 1px solid #ddd; padding: 4px;">Instagram</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">300</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">100</td><td style="border: 1px solid #ddd; padding: 4px;">(300M×100)÷100K</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">300K</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">347.2K</td><td style="border: 1px solid #ddd; padding: 4px;">4X</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">1.2M</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">1.4M</td><td style="border: 1px solid #ddd; padding: 4px;">÷1,000</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">1389</td><td style="border: 1px solid #ddd; padding: 4px;">Photo CDN</td></tr>
 <tr><td style="border: 1px solid #ddd; padding: 4px;">WhatsApp</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">500</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">100</td><td style="border: 1px solid #ddd; padding: 4px;">(500M×100)÷100K</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">500K</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">578.7K</td><td style="border: 1px solid #ddd; padding: 4px;">5X</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">2.5M</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">2.9M</td><td style="border: 1px solid #ddd; padding: 4px;">÷1,000</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">2894</td><td style="border: 1px solid #ddd; padding: 4px;">Messaging</td></tr>
 <tr><td style="border: 1px solid #ddd; padding: 4px;">Facebook</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">400</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">150</td><td style="border: 1px solid #ddd; padding: 4px;">(400M×150)÷100K</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">600K</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">694.4K</td><td style="border: 1px solid #ddd; padding: 4px;">4X</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">2.4M</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">2.8M</td><td style="border: 1px solid #ddd; padding: 4px;">÷1,000</td><td style="border: 1px solid #ddd; padding: 4px; text-align: right;">2778</td><td style="border: 1px solid #ddd; padding: 4px;">Feed ranking</td></tr>
