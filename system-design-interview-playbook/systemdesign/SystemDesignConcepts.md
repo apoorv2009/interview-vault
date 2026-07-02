@@ -4,6 +4,16 @@
 
 ---
 
+## Table of Contents
+
+1. [What is Availability?](#what-is-availability)
+2. [The Nines — Complete Reference Table](#the-nines--complete-reference-table)
+3. [What Causes Downtime?](#what-causes-downtime)
+4. [How to Achieve Each Tier](#how-to-achieve-each-tier)
+5. [Key Terms](#key-terms)
+
+---
+
 ## What is Availability?
 
 Availability is percentage of time system is operational and able to serve requests.
