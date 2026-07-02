@@ -14,8 +14,8 @@ Example: (150M × 20) ÷ 86,400 × 4 = **138,889 QPS peak**
 
 ## All Systems — QPS Calculations in One Table
 
-| System | DAU (M) | Req/day | Calculation | Mental Math Avg QPS | Exact Avg QPS | Peak Mult | Mental Math Peak QPS | Exact Peak QPS | Servers* | Design Notes |
-|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---|
+| System | DAU (M) | Req/day | Calculation | Mental Math Avg QPS | Exact Avg QPS | Peak Mult | Mental Math Peak QPS | Exact Peak QPS | Server Calculation | Servers* | Design Notes |
+|---|---:|---:|---|---:|---:|---:|---:|---:|---|---:|---|
 | **Twitter** | 150 | 20 | (150M×20)÷100K | 30,000 | 34,722 | 4X | 120,000 | 138,889 | 140 | Cache feed, write sharding |
 | **YouTube** | 200 | 50 | (200M×50)÷100K | 100,000 | 115,740 | 5X | 500,000 | 578,700 | 580 | CDN videos, metadata replicas |
 | **Instagram** | 300 | 100 | (300M×100)÷100K | 300,000 | 347,222 | 4X | 1,200,000 | 1,388,889 | 1,389 | Photo CDN, like sharding |
@@ -57,7 +57,14 @@ Example: (150M × 20) ÷ 86,400 × 4 = **138,889 QPS peak**
 - **Servers\*** = Exact Peak QPS ÷ 1,000 (typical server capacity per QPS)
 - **Design Notes** = Key architectural choices at this QPS
 
-**\* Server count assumes 1,000 QPS capacity per server (typical). Add 2X for redundancy.**
+**\* Server Assumption:**
+- **1,000 QPS per server** = typical capacity for a modern web server with database queries, logging, serialization
+- Varies by: server specs (CPU/RAM), app complexity, DB queries per request, caching strategy
+- For interviews: use 1,000 as baseline unless specified otherwise
+- Real-world range: 500–5,000 QPS per server depending on above factors
+- Server Calculation = Exact Peak QPS ÷ 1,000
+- **With 2X redundancy** (1 active, 1 backup) = Servers × 2
+
 **\*\* Stripe DAU = business accounts, not end users**
 
 ---
