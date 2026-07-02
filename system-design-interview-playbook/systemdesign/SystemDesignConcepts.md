@@ -22,14 +22,22 @@ Goal is never 100% — physically impossible. Goal is close enough that downtime
 
 ---
 
-### The Nines
+### The Nines — Complete Reference Table
 
-| Tier | Availability | Downtime / year | Downtime / month |
-|------|-------------|-----------------|------------------|
-| Two nines | 99% | ~3.6 days | ~7 hours |
-| Three nines | 99.9% | ~8.7 hours | ~43 minutes |
-| Four nines | 99.99% | ~52 minutes | ~4 minutes |
-| Five nines | 99.999% | ~5.26 minutes | ~26 seconds |
+| Metric | **99.9%** | **99.99%** | **99.999%** |
+|---|---|---|---|
+| **Downtime / Year** | 8.7 hours | 52 minutes | 5.26 minutes |
+| **Downtime / Month** | 43 minutes | 4 minutes | 26 seconds |
+| **Downtime / Week** | 10 minutes | 1 minute | 6 seconds |
+| **Downtime / Day** | 1.4 minutes | 8.6 seconds | 0.86 seconds |
+| **Downtime / Hour** | 3.6 seconds | 0.36 seconds | 0.036 seconds |
+| | | | |
+| **Infrastructure & Failover** | 2 instances per service in 1 region (multi-AZ). Standby waits idle. One fails → failover 30–60 sec. Health checks every 30 sec. | 2+ active instances in 1 region, both serving. One fails → instant reroute <10 sec. Health checks every 5–10 sec. Auto-failover. | 3+ active instances across 2–3 regions, all serving simultaneously. One region fails → DNS reroutes 30–60 sec, others absorb instantly. Sub-second detection. |
+| **Data Replication (RPO/RTO)** | Primary + 1 standby replica. Async replication. RTO: 30–120 sec. RPO: lose last 5–10 min data. Manual failover acceptable. | Primary + 1 replica. Sync replication (zero data loss). RTO: 5 min. RPO: lose <1 min unacceptable. Automatic failover. | Primary + replicas in 2–3 regions. Fully synchronous (all regions confirm). RTO: <30 sec. RPO: zero loss everywhere. Multi-region auto-failover. Accept 50–150ms write latency. |
+| **Deployment & Recovery** | Rolling deployments OK (gradual). MTTR: 15–20 min. Blue-green preferred. Manual recovery acceptable. No scheduled maintenance window required but downtime acceptable. | Blue-green mandatory (zero downtime). Deploy → test idle env → flip load balancer (1 sec). MTTR: 2–5 min. Automatic recovery, no manual intervention. Monthly testing. | Continuous deployment + canary (auto-deploy 5% traffic). Feature flags decouple deploy from release. MTTR: <5 sec (auto-recovery). Sub-minute on-call response. Monthly DR drills. Chaos engineering daily. |
+| **On-Call / Response** | Business hours or partial 24/7. 15–20 min response acceptable. | 24/7 required. <5 min response SLA. | 24/7/365 + backup on-call. <1 min response required. War room culture for critical alerts. |
+| **Monitoring** | Daily dashboard checks. Alert at 100% error budget. | Real-time SLI tracking. Alert at 50% error budget consumed. | Real-time SLI tracking. Alert at 10% error budget consumed. Auto-freeze deployments if budget threatened. |
+| **Cost** | ~$2.5k/month | ~$15k/month | ~$38k/month |
 
 Most production SaaS targets **99.9% to 99.99%**. Five nines reserved for air traffic control, financial settlement. Going from three nines to four nines is not twice as hard — order of magnitude harder and costlier.
 
