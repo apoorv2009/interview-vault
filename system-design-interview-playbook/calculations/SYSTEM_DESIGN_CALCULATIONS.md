@@ -16,21 +16,21 @@ Example: (150M × 20) ÷ 86,400 × 4 = **138,889 QPS peak**
 
 | System | DAU (M) | Req/day | Calculation | Avg QPS | Peak Mult | Peak QPS | Servers* | Design Notes |
 |---|---:|---:|---|---:|---:|---:|---:|---|
-| **Twitter** | 150 | 20 | 150M×20=3B / 86400=34,722 | 34,722 | 4X | 138,889 | 140 | Cache feed, write sharding |
-| **YouTube** | 200 | 50 | 200M×50=10B / 86400=115,740 | 115,740 | 5X | 578,700 | 580 | CDN videos, metadata replicas |
-| **Instagram** | 300 | 100 | 300M×100=30B / 86400=347,222 | 347,222 | 4X | 1,388,889 | 1,389 | Photo CDN, like sharding |
-| **WhatsApp** | 500 | 100 | 500M×100=50B / 86400=578,704 | 578,704 | 5X | 2,893,519 | 2,894 | Message queue, async |
-| **Facebook** | 400 | 150 | 400M×150=60B / 86400=694,444 | 694,444 | 4X | 2,777,778 | 2,778 | Graph DB, feed ranking |
-| **Uber** | 50 | 100 | 50M×100=5B / 86400=57,870 | 57,870 | 3X | 173,611 | 174 | Real-time location, events |
-| **LinkedIn** | 300 | 50 | 300M×50=15B / 86400=173,611 | 173,611 | 4X | 694,444 | 694 | Connection graph, ranking |
-| **Slack** | 5 | 500 | 5M×500=2.5B / 86400=289,352 | 289,352 | 5X | 1,446,759 | 1,447 | WebSocket, message queue |
-| **Netflix** | 100 | 30 | 100M×30=3B / 86400=34,722 | 34,722 | 5X | 173,611 | 174 | CDN edges, streaming data |
-| **E-commerce** | 100 | 200 | 100M×200=20B / 86400=231,481 | 231,481 | 4X | 925,926 | 926 | Search indexing, CDN |
-| **Google Search** | 1000 | 3 | 1000M×3=3B / 86400=34,722 | 34,722 | 2X | 69,444 | 70 | Distributed index, cache |
-| **Banking App** | 5 | 100 | 5M×100=500M / 86400=5,787 | 5,787 | 6X | 34,722 | 35 | Multi-region, 99.99% HA |
-| **Notification** | 50 | 5 | 50M×5=250M / 86400=2,894 | 2,894 | 3X | 8,681 | 9 | Simple queue, reliable |
-| **Weather App** | 300 | 10 | 300M×10=3B / 86400=34,722 | 34,722 | 3X | 104,167 | 104 | Heavy cache, CDN |
-| **Stripe** | 1** | 1000 | 1M×1000=1B / 86400=11,574 | 11,574 | 2X | 23,148 | 23 | Payment, high consistency |
+| **Twitter** | 150 | 20 | (150M×20)÷100K = 30K | 34,722 | 4X | 138,889 | 140 | Cache feed, write sharding |
+| **YouTube** | 200 | 50 | (200M×50)÷100K = 100K | 115,740 | 5X | 578,700 | 580 | CDN videos, metadata replicas |
+| **Instagram** | 300 | 100 | (300M×100)÷100K = 300K | 347,222 | 4X | 1,388,889 | 1,389 | Photo CDN, like sharding |
+| **WhatsApp** | 500 | 100 | (500M×100)÷100K = 500K | 578,704 | 5X | 2,893,519 | 2,894 | Message queue, async |
+| **Facebook** | 400 | 150 | (400M×150)÷100K = 600K | 694,444 | 4X | 2,777,778 | 2,778 | Graph DB, feed ranking |
+| **Uber** | 50 | 100 | (50M×100)÷100K = 50K | 57,870 | 3X | 173,611 | 174 | Real-time location, events |
+| **LinkedIn** | 300 | 50 | (300M×50)÷100K = 150K | 173,611 | 4X | 694,444 | 694 | Connection graph, ranking |
+| **Slack** | 5 | 500 | (5M×500)÷100K = 25K | 289,352 | 5X | 1,446,759 | 1,447 | WebSocket, message queue |
+| **Netflix** | 100 | 30 | (100M×30)÷100K = 30K | 34,722 | 5X | 173,611 | 174 | CDN edges, streaming data |
+| **E-commerce** | 100 | 200 | (100M×200)÷100K = 200K | 231,481 | 4X | 925,926 | 926 | Search indexing, CDN |
+| **Google Search** | 1000 | 3 | (1000M×3)÷100K = 30K | 34,722 | 2X | 69,444 | 70 | Distributed index, cache |
+| **Banking App** | 5 | 100 | (5M×100)÷100K = 5K | 5,787 | 6X | 34,722 | 35 | Multi-region, 99.99% HA |
+| **Notification** | 50 | 5 | (50M×5)÷100K = 2.5K | 2,894 | 3X | 8,681 | 9 | Simple queue, reliable |
+| **Weather App** | 300 | 10 | (300M×10)÷100K = 30K | 34,722 | 3X | 104,167 | 104 | Heavy cache, CDN |
+| **Stripe** | 1** | 1000 | (1M×1000)÷100K = 10K | 11,574 | 2X | 23,148 | 23 | Payment, high consistency |
 
 **Column Explanations:**
 - **DAU (M)** = Daily Active Users in millions
