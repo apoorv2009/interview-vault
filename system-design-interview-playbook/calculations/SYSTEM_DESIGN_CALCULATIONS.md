@@ -12,6 +12,15 @@ Example: (150M × 20) ÷ 86,400 × 4 = **138,889 QPS peak**
 
 ---
 
+## Key Assumptions
+
+⚠️ **Server Capacity = 1,000 QPS per server**
+- This is a typical baseline for a modern web server with DB queries, logging, serialization
+- Real-world range: 500–5,000 QPS per server (varies by specs, app complexity, caching)
+- For all calculations below: **Server Count = Exact Peak QPS ÷ 1,000**
+
+---
+
 ## All Systems — QPS Calculations in One Table
 
 | System | DAU (M) | Req/day | Calculation | Mental Math Avg QPS | Exact Avg QPS | Peak Mult | Mental Math Peak QPS | Exact Peak QPS | Server Calculation | Servers* | Design Notes |
