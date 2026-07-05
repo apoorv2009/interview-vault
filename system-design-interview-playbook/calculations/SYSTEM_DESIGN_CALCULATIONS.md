@@ -26,13 +26,22 @@
 
 ### QPS Reference Table
 
+**Formula Breakdown:**
+```
+Column: Formula              | Calculation
+(DAU × Req/day) ÷ 100K       | Mental math average QPS
+(DAU × Req/day) ÷ 86,400     | Exact average QPS
+Peak Avg × Peak Multiplier   | Peak QPS (mental math or exact)
+Peak QPS ÷ 1,000 QPS/server  | Number of servers needed
+```
+
 <table style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 10px;">
 <thead style="background-color: #f0f0f0; font-weight: bold; border-bottom: 2px solid #333;">
 <tr>
 <th style="border: 1px solid #ddd; padding: 2px; width: 12%;">System</th>
 <th style="border: 1px solid #ddd; padding: 2px; width: 5%;">DAU(M)</th>
 <th style="border: 1px solid #ddd; padding: 2px; width: 5%;">Req/day</th>
-<th style="border: 1px solid #ddd; padding: 2px; width: 8%;">Formula</th>
+<th style="border: 1px solid #ddd; padding: 2px; width: 8%; background-color: #fff3cd; font-weight: bold;">Formula</th>
 <th style="border: 1px solid #ddd; padding: 2px; width: 7%;">Avg MM</th>
 <th style="border: 1px solid #ddd; padding: 2px; width: 7%;">Avg Exact</th>
 <th style="border: 1px solid #ddd; padding: 2px; width: 4%;">×</th>
@@ -48,13 +57,13 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Twitter</td>
 <td style="border: 1px solid #ddd; padding: 2px;">150</td>
 <td style="border: 1px solid #ddd; padding: 2px;">100</td>
-<td style="border: 1px solid #ddd; padding: 2px;">(150×100)÷100K</td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(150×100)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">150K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">174K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">4</td>
 <td style="border: 1px solid #ddd; padding: 2px;">600K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">696K</td>
-<td style="border: 1px solid #ddd; padding: 2px;">696÷1K</td>
+<td style="border: 1px solid #ddd; padding: 2px;"><strong>696÷1K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">696</td>
 <td style="border: 1px solid #ddd; padding: 2px;">High write: tweets, RTs, favorites</td>
 </tr>
@@ -62,7 +71,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">YouTube</td>
 <td style="border: 1px solid #ddd; padding: 2px;">500</td>
 <td style="border: 1px solid #ddd; padding: 2px;">50</td>
-<td style="border: 1px solid #ddd; padding: 2px;">(500×50)÷100K</td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(500×50)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">250K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">289K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">5</td>
@@ -451,6 +460,17 @@ Annual Cost = Tiered cost breakdown (Hot + Warm + Cold)
 - **COLD** (365+ days): $4/TB/year — Glacier/Tape, hours to retrieve
 
 ### Storage Reference Table
+
+**Formula Breakdown:**
+```
+Daily Data = Avg QPS × Write% × 86,400 sec/day × Bytes/Write
+Formula    = (Daily Data × Retention Days × Redundancy) ÷ Compression Ratio
+             where Compression 1.5× = 33% reduction, 1.1× = 9% reduction, etc.
+
+Example: Twitter
+Daily Data = 174K QPS × 15% writes × 86,400 × 1KB = 2.3 PB/day
+Formula    = (2.3 PB × 1825 days × 3× redundancy) ÷ 1.5× compression = 6.8 EB total
+```
 
 <table style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 9px;">
 <thead style="background-color: #f0f0f0; font-weight: bold; border-bottom: 2px solid #333;">
