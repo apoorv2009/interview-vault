@@ -73,7 +73,6 @@
 <td style="border: 1px solid #ddd; padding: 2px;">5</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1.25M</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1.45M</td>
-<td style="border: 1px solid #ddd; padding: 2px;">1.45M÷1K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1450</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Read-heavy: cache critical</td>
 </tr>
@@ -227,7 +226,6 @@
 <td style="border: 1px solid #ddd; padding: 2px;">5</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1.25M</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1.45M</td>
-<td style="border: 1px solid #ddd; padding: 2px;">1.45M÷1K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1450</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Push service: bursty</td>
 </tr>
