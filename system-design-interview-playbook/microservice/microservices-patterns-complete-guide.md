@@ -22,6 +22,7 @@
 13. [CQRS Pattern](#13-cqrs-pattern)
 14. [BFF — Backend for Frontend](#14-bff--backend-for-frontend)
 15. [Interview Strategy](#15-interview-strategy)
+16. [Real Interview Stories — Decomposition Decisions](#16-real-interview-stories--decomposition-decisions)
 
 ---
 
@@ -1395,6 +1396,66 @@ BFF:          product concern — aggregate, filter, shape data for ONE specific
 > It is the one where every component exists for a clear reason you can explain in plain English.
 >
 > Start from one user. Scale up. Explain the why. Discuss trade-offs. The interviewer wants to see your thinking — not a memorised architecture.
+
+---
+
+## 16. Real Interview Stories — Decomposition Decisions
+
+*Sourced from live interview rounds: HCL (R1), Virtusa (R1). Framed through the Entity Management System project (Grant Thornton, healthcare domain) — cross-references the pattern sections above rather than re-explaining them.*
+
+### Have you actually done monolith → microservices migration?
+
+Starting point: one .NET Core Web API with 40+ controllers spanning entities, shareholding, documents, notifications, and user management. Applied the **Strangler Fig** pattern (see [Strategy 6](#strategy-6--strangler-fig-legacy-only) above):
+
+1. **Identify seams** — modules with clear bounded contexts and minimal cross-cutting DB joins.
+2. **Extract lowest-coupling first** — Notification Service went first: no synchronous dependency on core domain state, consumes events only.
+3. **Route via gateway** — Azure API Management routed `/api/notifications` to the new service while every other route stayed on the monolith.
+4. **Migrate data** — a dedicated notification schema, one-time migration script, then cut over.
+5. **Remove from monolith** — deleted the old notification module after a 2-week parallel run to confirm parity.
+
+Biggest learning: don't extract a service that shares a DB table heavily with the monolith — data coupling is harder to break than code coupling. The reporting module was deliberately **not** extracted early because it joined 12 tables across domains; extracting it first would have created a distributed monolith (see [The Distributed Monolith Anti-Pattern](#the-distributed-monolith-anti-pattern)).
+
+Result of the eventual split: Entity Service (CRUD), Shareholding Service (ownership % + audit), Notification Service (threshold-breach alerts), Document Service (Azure Blob upload/download for legal docs) — each independently deployable, each owning its own schema.
+
+---
+
+### How do you decide what to extract, and what's the first boundary you'd pick under a fixed deadline?
+
+Three signals, applied in order (same hierarchy as [Service Decomposition Strategies](#2-service-decomposition-strategies) above):
+
+1. **Business capability / bounded context** — group by what the business *does*, not by technical layer.
+2. **Rate of change** — a module that changes every sprint (notification rules) shouldn't force redeployment of a module that's been stable for months (entity schema).
+3. **Data ownership** — if two modules both write to the same table, splitting them creates a distributed-transaction problem before you've gained anything.
+
+**Red flags that mean "don't extract yet"**: high join dependency across many tables, shared mutable state, or going so fine-grained (nano-services) that network hops outweigh any operational benefit.
+
+**First boundary under a fixed launch date**: Notification/Alerting. It has no synchronous dependency on core domain state — it consumes events and sends emails/SMS, so if it goes down the core app keeps working, with zero distributed-transaction risk. Kept *inside* the monolith for the same launch: anything writing to core domain tables (entity CRUD, shareholding computation — transactional integrity too valuable to distribute early), auth/authorization (too much security surface to re-engineer mid-project), and reporting/aggregation (premature extraction just creates sync call-chains back to the monolith).
+
+**Decision framework when two teams disagree and the date is fixed**: apply the "deploy independently" test first — does either team need its own deploy cadence or scaling profile, without coordinating with the other? If not, splitting adds coordination overhead with no operational payoff. Then map the coupling surface — if the proposed boundary needs synchronous calls back to the monolith for more than ~2 data entities, it's not really independent, it's a distributed monolith. Given 3 months and a hard date, the call is usually: ship as a well-bounded module *inside* the monolith with clean interfaces now, extract to a real microservice after launch once real traffic data justifies the operational cost — the [Strangler Fig](#strategy-6--strangler-fig-legacy-only) approach makes that extraction incremental and reversible later.
+
+---
+
+### What was the hardest decomposition decision, and what made it hard?
+
+Whether to split the shareholding recalculation engine into its own service — it was CPU-intensive, which argued for independent scaling, but it read from 4 tables (Entities, Shareholders, Ownership, CorporateActions) and wrote back to `EntitySummary` all within a single EF Core transaction.
+
+Extracting it cleanly meant either a distributed transaction (2PC — rejected as operationally fragile) or eventual consistency (rejected by the business — a stale shareholding % is unacceptable for compliance audit purposes, even for seconds).
+
+**Resolution**: kept it inside the monolith's transactional boundary, but extracted the *execution* into an Azure Function triggered by a Service Bus message — async decoupling without a distributed transaction. This still required an idempotency key (`RecalculationRequestId` stored in the DB) to handle the "what if the Function fires twice" failure mode from Service Bus's at-least-once delivery guarantee.
+
+Takeaway stated in the interview: the harder a transactional boundary is to preserve, the stronger the case for keeping that capability co-located rather than splitting it — this is the same reasoning behind the [Outbox Pattern](#outbox-pattern) covered above, just applied one level up at the "should this even be a separate service" decision instead of the "how do I publish the event reliably" implementation detail.
+
+---
+
+### Advantages of microservices over a monolith — with concrete, not textbook, examples?
+
+- **Independent deployability** — the Notification Service shipped a fix without touching Entity or Shareholding; in the monolith, any change meant full regression + full redeploy.
+- **Right tool per domain** — Document Service used Azure Blob + a lightweight minimal API; Shareholding Service used SQL Server with heavy stored procedures.
+- **Independent scalability** — shareholding recalculation batch jobs only needed to scale the Shareholding Service, not the whole monolith.
+- **Fault isolation** — a Notification Service bug didn't take down Entity Service; in the monolith, one unhandled exception could crash the whole app pool.
+- **Team autonomy** — smaller codebases, less cognitive load, parallel development.
+
+Trade-offs always worth naming unprompted: operational complexity (service discovery, distributed tracing, inter-service auth), network latency between services, and the fact that distributed transactions are genuinely hard — solved here with the Saga pattern (compensating transactions) for cross-service workflows, not with 2PC.
 
 ---
 

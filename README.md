@@ -1,21 +1,23 @@
 # interview-vault
 
-My interview prep notes, organized by topic. All answers are framed around the **Capital Access** project at S&P Global.
+My interview prep notes, organized by topic. Most answers are framed around the **Capital Access** project at S&P Global; a subset (clearly labeled "Interview Rounds" / "Other Company Rounds" sections) is sourced from live interview rounds at other companies and framed around the **Entity Management System** project instead — kept separate rather than blended since the two report different tenure and a different most-recent project.
 
 ## Structure
 
 | Folder | Description | Coverage |
 |--------|-------------|----------|
-| [dotnet-core](https://github.com/apoorv2009/interview-vault/tree/main/dotnet-core) | .NET 8 & C# 12 interview Q&A | 96 questions |
-| [angular](https://github.com/apoorv2009/interview-vault/tree/main/angular) | Angular 19 & TypeScript interview Q&A | 72 questions |
+| [dotnet-core](https://github.com/apoorv2009/interview-vault/tree/main/dotnet-core) | .NET 8 & C# 12 interview Q&A | 134 questions |
+| [angular](https://github.com/apoorv2009/interview-vault/tree/main/angular) | Angular 19 & TypeScript interview Q&A | 82 questions |
+| [react](https://github.com/apoorv2009/interview-vault/tree/main/react) | React hooks, state management interview Q&A | 4 questions |
 | [design-patterns](https://github.com/apoorv2009/interview-vault/tree/main/design-patterns) | GoF design patterns with real .NET examples | 17 questions |
 | [unit-testing](https://github.com/apoorv2009/interview-vault/tree/main/unit-testing) | Unit & integration testing — NUnit, xUnit, Moq | Reference |
 | [coding-tasks](https://github.com/apoorv2009/interview-vault/tree/main/coding-tasks) | C# and SQL live coding challenges | 55+ tasks |
 | [ai-llm](https://github.com/apoorv2009/interview-vault/tree/main/ai-llm) | AI/LLM concepts — context window, RAG, agents, prompting | 5 questions |
-| [SQL&Postgres](https://github.com/apoorv2009/interview-vault/tree/main/SQL%26Postgres) | SQL & PostgreSQL interview prep | Reference |
+| [SQL&Postgres](https://github.com/apoorv2009/interview-vault/tree/main/SQL%26Postgres) | SQL & PostgreSQL interview prep | 35 questions |
 | [agile](https://github.com/apoorv2009/interview-vault/tree/main/agile) | Agile methodology interview Q&A | Reference |
 | [azure-revision-notes](https://github.com/apoorv2009/interview-vault/tree/main/azure-revision-notes) | Azure services revision — Service Bus, Functions, Redis, Key Vault | Reference |
-| [behavioural](https://github.com/apoorv2009/interview-vault/tree/main/behavioural) | Behavioural interview STAR answers | Reference |
+| [devops](https://github.com/apoorv2009/interview-vault/tree/main/devops) | Docker, container deployment interview Q&A | Reference |
+| [behavioural](https://github.com/apoorv2009/interview-vault/tree/main/behavioural) | Behavioural interview STAR answers (two tracks: EPAM/Architect + other-company Full Stack) | Reference |
 | [capital-access-project](https://github.com/apoorv2009/interview-vault/tree/main/capital-access-project) | Real-project deep dive: S&P Global, Capital Access | Reference |
 | [system-design-interview-playbook](https://github.com/apoorv2009/interview-vault/tree/main/system-design-interview-playbook) | System design Q&A at Staff/Principal depth | 24+ questions |
 | [angular-interview-prep-app](https://github.com/apoorv2009/interview-vault/tree/main/angular-interview-prep-app) | Hands-on Angular 19 app for practising concepts | App |
@@ -24,7 +26,7 @@ My interview prep notes, organized by topic. All answers are framed around the *
 
 ## dotnet-core
 
-96 Q&As covering .NET 8 and C# 12 at Senior/Architect depth. Organized across 9 sections:
+134 Q&As covering .NET 8 and C# 12 at Senior/Architect depth. Organized across 10 sections:
 
 1. **OOP Fundamentals** (Q1–Q9) — four pillars, interface vs abstract class, SOLID
 2. **C# Language Features** (Q10–Q30) — generics, async/await, threading, IDisposable, records, delegates, Lazy\<T\>
@@ -35,6 +37,7 @@ My interview prep notes, organized by topic. All answers are framed around the *
 7. **LINQ** (Q80–Q83) — deferred execution, IQueryable vs IEnumerable, key operators
 8. **Additional Topics** (Q84–Q89) — correlation IDs, SQL views, scaling, MCP, observability, production debugging
 9. **Platform, DI & Caching** (Q90–Q96) — .NET Standard, explicit interface impl, Lazy\<T\>, Mutex vs SemaphoreSlim, struct memory layout, DbContext lifetime, Redis vs IMemoryCache
+10. **Interview Rounds — Additional Q&A** (Q97–Q134) — sourced from live Wipro/Decos Global/HCL/Infosys/Virtusa rounds: architecture styles, middleware, collections/boxing, EF Code First vs DB First, N+1 diagnosis story, JWT auth, performance methodology
 
 All answers tagged `[EPAM]` where the question is a known past EPAM interview question.
 
@@ -42,9 +45,15 @@ All answers tagged `[EPAM]` where the question is a known past EPAM interview qu
 
 ## angular
 
-72 Q&As covering Angular 19 and TypeScript at Senior Developer depth. Organized across 15 topic sections: Compilation & Build, Change Detection, Components & Lifecycle Hooks, Angular 19 Features (Signals, `@defer`, built-in control flow), Directives & Pipes, Dependency Injection, Forms, Routing, HTTP & Interceptors, RxJS & Reactivity, State Management, Performance Optimization, Testing, TypeScript Deep Dive, and SSR & Hydration.
+82 Q&As covering Angular 19 and TypeScript at Senior Developer depth. Organized across 15 topic sections: Compilation & Build, Change Detection, Components & Lifecycle Hooks, Angular 19 Features (Signals, `@defer`, built-in control flow), Directives & Pipes, Dependency Injection, Forms, Routing, HTTP & Interceptors, RxJS & Reactivity, State Management, Performance Optimization, Testing, TypeScript Deep Dive, and SSR & Hydration — plus an "Interview Rounds" section (Q73–Q82) sourced from live Wipro/Decos Global/Infosys rounds: JWT-refresh interceptors, data binding, DI singletons, service integration patterns.
 
 Questions tagged `[EPAM]` / `[Infosys]` / `[Capgemini]` / `[TCS]` where applicable.
+
+---
+
+## react
+
+4 Q&As covering React hooks and state management, from ~9–10 months hands-on experience layered on top of Angular: `useState`/`useEffect`/`useContext`, component vs global state, Redux vs Context API, `useMemo` vs `useCallback`.
 
 ---
 
@@ -92,7 +101,7 @@ Answers include real examples from a personal RAG knowledge-base app built with 
 
 ## SQL&Postgres
 
-SQL and PostgreSQL interview prep covering query fundamentals, window functions, indexing, transactions, and PostgreSQL-specific features (JSONB, CTEs, partitioning). Each topic includes a SQL vs PostgreSQL comparison section.
+35 Q&As covering query fundamentals, window functions, indexing, transactions, and PostgreSQL-specific features (JSONB, CTEs, partitioning), plus a live-interview-sourced block (Q25–Q35: index design strategy, execution plan red flags, temp tables, Profiler/Query Store, a full N+1 diagnosis war story). **Every** question includes a SQL Server vs PostgreSQL comparison table.
 
 ---
 
@@ -114,11 +123,19 @@ Revision notes for Azure services used in Capital Access:
 - Azure SQL & PostgreSQL
 - Azure Blob Storage
 
+Plus an "Interview Rounds — Additional Q&A" section sourced from live Wipro/Decos Global/HCL/Virtusa rounds: Functions vs Web API trade-offs, Function deployment pipelines, Cosmos DB vs SQL Server, and a full cascading-failure incident-response war story.
+
+---
+
+## devops
+
+Docker and container deployment Q&A — multi-stage Dockerfile for a .NET microservice, and a full build → ACR → Azure Container Apps deployment pipeline with zero-downtime rollout. Sourced from the Virtusa round.
+
 ---
 
 ## behavioural
 
-STAR-format answers for behavioural interview questions — leadership, conflict resolution, dealing with ambiguity, most challenging project, stakeholder management. All tied to real Capital Access and previous role experiences.
+STAR-format answers for behavioural interview questions — leadership, conflict resolution, dealing with ambiguity, most challenging project, stakeholder management. Two tracks kept clearly separate since they report different tenure/most-recent-project: the **EPAM/Architect track** (16 yrs, Capital Access) and the **Other Company Rounds track** (9 yrs Senior Full Stack, Entity Management System — Wipro/Decos Global/Infosys/Virtusa), including a full production-incident (OOM) triage story.
 
 ---
 

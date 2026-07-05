@@ -2,6 +2,12 @@
 
 ---
 
+## EPAM / Architect Track (16 yrs, Capital Access)
+
+*Framing for the EPAM Application Architect role at S&P Global — 16-year Application Architect narrative, most recent project Capital Access.*
+
+---
+
 ## Q: Tell me about yourself / Walk me through your career journey
 
 "Hi, I'm Apoorv Jain — Application Architect with 16 years of experience, based in Hyderabad. My expertise is in Azure cloud architecture, full-stack .NET and Angular development, and more recently AI and GenAI systems.
@@ -144,3 +150,63 @@ Concrete example: used Claude to scaffold the initial Durable Functions orchestr
 **Phase 5 — Decommission**: Once all traffic routes to the new system and monitoring is stable for 2 weeks, retire the old system.
 
 Why this approach? Because a big-bang rewrite has a high failure rate — you're essentially rebuilding the entire system, introducing new bugs, without the safety net of the running production system. The strangler fig lets you validate each piece independently."
+
+---
+
+## Other Company Rounds — Senior Full Stack Track (9 yrs, Entity Management System)
+
+*Sourced from live interview rounds: Wipro (R1, R2), Decos Global (R1), Infosys (R1), Virtusa (R1). This is a distinct framing from the EPAM/Architect track above — 9-year Senior Full Stack Developer, most recent project the Entity Management System (Grant Thornton, healthcare domain). Kept separate rather than blended with the Capital Access narrative, since the two tracks report different tenure and a different most-recent project.*
+
+### Q: Introduce yourself (Virtusa)
+
+"I'm Ankit, a Senior Full Stack Developer with 9 years of experience specialising in C# .NET Core, Angular, and Azure. My most recent engagement was with Grant Thornton, where I built an Entity Management System for the healthcare domain — tracking business entities, shareholding percentages, and partnerships.
+
+On the tech side: .NET Core Web API with Clean Architecture, Angular (standalone components), SQL Server with optimised stored procedures, and Azure (App Service, Functions, Blob Storage, DevOps CI/CD, Application Insights).
+
+One example of impact: our dashboard was timing out at ~8 seconds due to N+1 queries. I rewrote the logic into a single CTE-based stored procedure, cutting response time to 420ms — a ~95% improvement.
+
+I've also worked on monolith-to-microservices migration, Docker containerisation, and Azure Function-based event-driven pipelines. I'm comfortable across the full delivery lifecycle — design, development, code review, deployment, and production triage."
+
+Keep it under 90 seconds: name, years, specialisation, last project, one measurable win — in that order.
+
+---
+
+### Q: Technologies and projects worked on / Entity Management System — role and description
+
+Full stack: Angular (5+ years), React (~10 months), C# .NET Core, SQL Server, Azure; also Azure Functions and Cosmos DB.
+
+The Entity Management System (Grant Thornton, healthcare) tracked businesses and entities to compute partnerships and shareholding percentages — an enterprise app on layered architecture. Role: Full Stack Developer across Angular/React front end, .NET Core Web APIs, SQL Server, and Azure backend, delivered against Agile user stories.
+
+---
+
+### Q: Rate yourself 1–5 in your core stack
+
+| Skill | Rating | Backing evidence |
+|---|---|---|
+| .NET Core | 4/5 | 9 years, Clean Architecture, Web API design |
+| Angular | 4/5 | 5+ years, standalone components, NgRx-adjacent state patterns |
+| Web API | 4/5 | Auth, versioning, middleware, performance tuning |
+| Entity Framework | 3.5/5 | Code First migrations, N+1 diagnosis and fixes, Eager/Lazy/Explicit loading |
+| React | 3/5 | ~9–10 months hands-on, hooks, state management, component lifecycle |
+
+Always back a number with a concrete example rather than leaving it as a bare rating — the number invites a follow-up question, so have the story ready before you say it.
+
+---
+
+### Q: Describe a production incident you triaged, end to end
+
+Framework: **Detect → Contain → Diagnose → Fix → Post-Mortem.**
+
+**Incident**: the dashboard API started returning `503`s for ~20 minutes on a Monday morning; clients reported the page not loading.
+
+**Detect**: an Application Insights alert fired on error rate > 5%, paging via an Azure Monitor action group.
+
+**Contain (first 2 minutes)**: App Service → Scale Out showed 2 instances at 95% CPU; manually scaled to 4 instances for immediate partial relief. App Service logs showed an `OutOfMemoryException` in the worker process.
+
+**Diagnose**: pulled a memory dump from the App Service Diagnose blade. Root cause: a background job deployed the previous Friday loaded 50,000 entity records into memory with no pagination, running every 5 minutes — each run grew memory further until OOM. The specific bug: `.ToList()` on an unbounded EF Core query.
+
+**Fix**: hotfix added `.Take(500)` pagination to the job and deployed via the Azure DevOps pipeline (~15 minutes). Permanent fix replaced the background job with a SQL-aggregated stored procedure — zero in-memory object graphs.
+
+**Post-mortem**: added a memory-usage alert (>80% for 3 minutes) to Azure Monitor, added a code-review checklist item ("all EF Core queries must have pagination or an explicit count justification"), and documented the timeline/root cause/fix/prevention in Confluence.
+
+**Guiding principle to state out loud**: fix availability first (scale out), diagnose second, fix root cause third — never debug directly in a live, still-failing production system.

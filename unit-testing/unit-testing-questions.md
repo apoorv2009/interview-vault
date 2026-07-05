@@ -231,3 +231,31 @@ Error handling / exceptions       Framework code (EF Core internals)
 Service interactions via mocks    Trivial one-liners (return x + y)
 Validation rules                  Third-party library behaviour
 ```
+
+---
+
+## How Do You Test/Debug Backend API Endpoints? (Interview Round — Infosys)
+
+A layered approach — unit tests first, then integration tests, then manual tool-based exploration.
+
+**1. Unit tests (xUnit + Moq)** — test service logic in isolation; mock `IRepository`, inject into the service, assert return values and exception paths. Fast, no database required.
+
+```csharp
+[Fact]
+public async Task GetEntity_ReturnsNotFound_WhenMissing()
+{
+    _mockRepo.Setup(r => r.GetByIdAsync(99)).ReturnsAsync((Entity)null);
+    var result = await _service.GetEntityAsync(99);
+    Assert.IsType<NotFoundResult>(result);
+}
+```
+
+**2. Integration tests (`WebApplicationFactory`)** — spins up the real ASP.NET Core app in-memory against a test database (SQLite or SQL Server LocalDB), sending real HTTP requests through the actual pipeline — this is the only layer that exercises middleware, auth, and model binding end-to-end.
+
+**3. Postman / Thunder Client** — for manual exploration; set up Collections with environment variables (dev/staging URLs, JWT tokens) and use Postman's "Tests" tab for lightweight automated assertions on response status/body.
+
+**4. Swagger (Swashbuckle)** — built-in UI for API exploration; decorate actions with `[ProducesResponseType]` so Swagger documents the full response contract, not just the happy path.
+
+**5. Debugging** — breakpoints in Visual Studio, attached to IIS Express/Kestrel; the Immediate Window to inspect live objects mid-request; Application Insights for correlating a specific failure back to a production trace.
+
+Why all three layers (unit → integration → manual) rather than just one: unit tests are fast but can't catch a misconfigured middleware pipeline; integration tests catch that but are slower and don't replace exploratory manual testing during active development; Postman/Swagger close that last gap.
