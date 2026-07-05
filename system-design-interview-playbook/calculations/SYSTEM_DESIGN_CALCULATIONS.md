@@ -39,7 +39,8 @@
 <th style="border: 1px solid #ddd; padding: 1px; width: 11%;">System</th>
 <th style="border: 1px solid #ddd; padding: 1px; width: 6%;">DAU(M)</th>
 <th style="border: 1px solid #ddd; padding: 1px; width: 5%;">Req/day</th>
-<th style="border: 1px solid #ddd; padding: 1px; width: 7%;">Avg MM</th>
+<th style="border: 1px solid #ddd; padding: 1px; width: 7%; font-weight: bold;">Formula</th>
+<th style="border: 1px solid #ddd; padding: 1px; width: 6%;">Avg MM</th>
 <th style="border: 1px solid #ddd; padding: 1px; width: 6%;">Avg Exact</th>
 <th style="border: 1px solid #ddd; padding: 1px; width: 3%;">×</th>
 <th style="border: 1px solid #ddd; padding: 1px; width: 6%;">Peak MM</th>
