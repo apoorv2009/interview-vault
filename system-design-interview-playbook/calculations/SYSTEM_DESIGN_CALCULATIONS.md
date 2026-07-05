@@ -26,14 +26,12 @@
 
 ### QPS Reference Table
 
-**Formula Breakdown:**
-```
-Column: Formula              | Calculation
-(DAU × Req/day) ÷ 100K       | Mental math average QPS
-(DAU × Req/day) ÷ 86,400     | Exact average QPS
-Peak Avg × Peak Multiplier   | Peak QPS (mental math or exact)
-Peak QPS ÷ 1,000 QPS/server  | Number of servers needed
-```
+**FORMULA BREAKDOWN — QPS CALCULATIONS:**
+
+### **Avg QPS (Mental Math): (DAU × Req/day) ÷ 100K**
+### **Avg QPS (Exact): (DAU × Req/day) ÷ 86,400**
+### **Peak QPS: Avg QPS × Peak Multiplier**
+### **Servers Needed: Peak QPS ÷ 1,000 QPS/server**
 
 <table style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 10px;">
 <thead style="background-color: #f0f0f0; font-weight: bold; border-bottom: 2px solid #333;">
@@ -461,16 +459,20 @@ Annual Cost = Tiered cost breakdown (Hot + Warm + Cold)
 
 ### Storage Reference Table
 
-**Formula Breakdown:**
-```
-Daily Data = Avg QPS × Write% × 86,400 sec/day × Bytes/Write
-Formula    = (Daily Data × Retention Days × Redundancy) ÷ Compression Ratio
-             where Compression 1.5× = 33% reduction, 1.1× = 9% reduction, etc.
+**FORMULA BREAKDOWN — STORAGE CALCULATIONS:**
 
-Example: Twitter
-Daily Data = 174K QPS × 15% writes × 86,400 × 1KB = 2.3 PB/day
-Formula    = (2.3 PB × 1825 days × 3× redundancy) ÷ 1.5× compression = 6.8 EB total
-```
+### **Daily Data Volume: Avg QPS × Write% × 86,400 × Bytes/Write**
+### **Total Storage: (Daily Data × Retention Days × Redundancy) ÷ Compression Ratio**
+
+**Compression Ratio Guide:**
+- **1.5× compression** = 33% size reduction (text/JSON)
+- **1.2× compression** = 17% size reduction (database exports)
+- **1.1× compression** = 9% size reduction (video/audio, already compressed)
+- **1.05× compression** = 5% size reduction (streaming media)
+
+**Example (Twitter):**
+- **Daily Data** = 174K QPS × 15% writes × 86,400 × 1KB = **2.3 PB/day**
+- **Total Storage** = (2.3 PB × 1825 days × 3) ÷ 1.5 = **6.8 EB**
 
 <table style="border-collapse: collapse; width: 100%; font-family: Arial, sans-serif; font-size: 9px;">
 <thead style="background-color: #f0f0f0; font-weight: bold; border-bottom: 2px solid #333;">
