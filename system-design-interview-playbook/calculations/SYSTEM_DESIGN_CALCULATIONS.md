@@ -86,7 +86,6 @@
 <td style="border: 1px solid #ddd; padding: 2px;">5</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1.6M</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1.85M</td>
-<td style="border: 1px solid #ddd; padding: 2px;">1.85M÷1K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1850</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Photo upload + feed reads</td>
 </tr>
@@ -100,7 +99,6 @@
 <td style="border: 1px solid #ddd; padding: 2px;">6</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1.8M</td>
 <td style="border: 1px solid #ddd; padding: 2px;">2.08M</td>
-<td style="border: 1px solid #ddd; padding: 2px;">2.08M÷1K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">2080</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Message broker: high throughput</td>
 </tr>
@@ -114,7 +112,6 @@
 <td style="border: 1px solid #ddd; padding: 2px;">4</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1.44M</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1.67M</td>
-<td style="border: 1px solid #ddd; padding: 2px;">1.67M÷1K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1670</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Social feed: complex DAG</td>
 </tr>
@@ -128,7 +125,6 @@
 <td style="border: 1px solid #ddd; padding: 2px;">8</td>
 <td style="border: 1px solid #ddd; padding: 2px;">2M</td>
 <td style="border: 1px solid #ddd; padding: 2px;">2.31M</td>
-<td style="border: 1px solid #ddd; padding: 2px;">2.31M÷1K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">2310</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Geo-location: real-time tracking</td>
 </tr>
@@ -309,7 +305,6 @@
 <td style="border: 1px solid #ddd; padding: 2px;">4</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1.2M</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1.39M</td>
-<td style="border: 1px solid #ddd; padding: 2px;"><strong>1.39M÷1K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">1390</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Personalization: complex ranking</td>
 </tr>
@@ -323,7 +318,6 @@
 <td style="border: 1px solid #ddd; padding: 2px;">5</td>
 <td style="border: 1px solid #ddd; padding: 2px;">2M</td>
 <td style="border: 1px solid #ddd; padding: 2px;">2.31M</td>
-<td style="border: 1px solid #ddd; padding: 2px;">2.31M÷1K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">2310</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Trading: real-time updates</td>
 </tr>
@@ -365,7 +359,6 @@
 <td style="border: 1px solid #ddd; padding: 2px;">4</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1.2M</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1.39M</td>
-<td style="border: 1px solid #ddd; padding: 2px;"><strong>1.39M÷1K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">1390</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Geo: location updates + routing</td>
 </tr>
@@ -407,7 +400,6 @@
 <td style="border: 1px solid #ddd; padding: 2px;">8</td>
 <td style="border: 1px solid #ddd; padding: 2px;">1.8M</td>
 <td style="border: 1px solid #ddd; padding: 2px;">2.08M</td>
-<td style="border: 1px solid #ddd; padding: 2px;"><strong>2.08M÷1K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">2080</td>
 <td style="border: 1px solid #ddd; padding: 2px;">E-commerce: inventory + search</td>
 </tr>
