@@ -5321,6 +5321,207 @@ Normally every `ngModel` field in a template-driven form registers itself with t
 
 ---
 
+## Interview Rounds — Additional Q&A
+
+*Sourced from live interview rounds: Wipro (R1, R2), Decos Global (R1), Infosys (R1).*
+
+### Q73. Share data between non-parent-child (unrelated) components?
+
+Use a shared service holding a `Subject`/`BehaviorSubject`; unrelated components inject the same singleton service and communicate through it instead of through `@Input`/`@Output` chains.
+
+```typescript
+@Injectable({ providedIn: 'root' })
+export class EntitySelectionService {
+  private selected$ = new BehaviorSubject<Entity | null>(null);
+  readonly selectedEntity$ = this.selected$.asObservable();
+
+  select(entity: Entity) { this.selected$.next(entity); }
+}
+
+// Component A (sidebar list) — publishes
+this.selectionService.select(entity);
+
+// Component B (unrelated detail panel) — subscribes
+this.selectionService.selectedEntity$.subscribe(entity => this.current = entity);
+```
+
+For more complex, multi-slice shared state (many actions, time-travel debugging, middleware), reach for **NgRx** instead of hand-rolled services.
+
+---
+
+### Q74. Subject vs BehaviorSubject vs ReplaySubject?
+
+| | Initial value | New subscriber gets | Use case |
+|---|---|---|---|
+| `Subject` | None | Only future emissions | Fire-and-forget events (button clicks, notifications) |
+| `BehaviorSubject` | Required at construction | The **current** value immediately | State that always has a "latest value" — auth state, selected entity |
+| `ReplaySubject(n)` | None | The last `n` emitted values | Late subscribers need recent history (e.g., last 5 log lines) |
+
+`BehaviorSubject` is the default choice for shared app state, precisely because a component mounting late (e.g., a guard checking auth on route change) still gets the current value instead of nothing.
+
+---
+
+### Q75. HTTP Interceptors — use cases, and refreshing an expired JWT
+
+An interceptor sits in front of every outgoing request / incoming response. Common uses: attach the `Authorization` header, handle `401` by refreshing the token, global error handling, loading spinners.
+
+```typescript
+@Injectable()
+export class AuthInterceptor implements HttpInterceptor {
+  private refreshInProgress = false;
+  private refreshedToken$ = new BehaviorSubject<string | null>(null);
+
+  constructor(private auth: AuthService) {}
+
+  intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    const authReq = this.addToken(req, this.auth.getToken());
+
+    return next.handle(authReq).pipe(
+      catchError(err => {
+        if (err instanceof HttpErrorResponse && err.status === 401) {
+          return this.handle401(req, next);
+        }
+        return throwError(() => err);
+      })
+    );
+  }
+
+  private handle401(req: HttpRequest<any>, next: HttpHandler) {
+    if (!this.refreshInProgress) {
+      this.refreshInProgress = true;
+      this.refreshedToken$.next(null);
+
+      return this.auth.refreshToken().pipe(
+        switchMap(newToken => {
+          this.refreshInProgress = false;
+          this.refreshedToken$.next(newToken);
+          return next.handle(this.addToken(req, newToken)); // retry original request
+        }),
+        catchError(err => {
+          this.refreshInProgress = false;
+          this.auth.logout();                                // refresh failed — force logout
+          return throwError(() => err);
+        })
+      );
+    }
+
+    // A refresh is already in flight — queue this request until it completes
+    return this.refreshedToken$.pipe(
+      filter(token => token !== null),
+      take(1),
+      switchMap(token => next.handle(this.addToken(req, token!)))
+    );
+  }
+
+  private addToken(req: HttpRequest<any>, token: string | null) {
+    return token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req;
+  }
+}
+```
+
+`catchError` catches the `401`; `switchMap` cancels/switches to the `refreshToken()` observable, then retries the original cloned request with the new header. The `BehaviorSubject(null)` queue prevents multiple concurrent requests from each triggering their own refresh call — only the first 401 starts a refresh, the rest wait for it.
+
+---
+
+### Q76. Storing JWT in Angular?
+
+Prefer an `HttpOnly` cookie set by the server — JavaScript (and therefore XSS payloads) cannot read it. If the token must be accessible to client code, an in-memory variable (a service property, not `localStorage`) is the next safest option — it's lost on a hard refresh, which is an acceptable trade-off for the security gain. `localStorage`/`sessionStorage` are readable by any injected script, so avoid them when XSS is a real threat model concern (e.g., an app rendering any user-generated HTML).
+
+---
+
+### Q77. `standalone: true` on components?
+
+Introduced in Angular 14, stabilized in v15+. A standalone component imports its own dependencies (`CommonModule`, `RouterModule`, etc.) directly and does **not** need to be declared in an `NgModule`.
+
+```typescript
+@Component({
+  selector: 'app-entity-list',
+  standalone: true,
+  imports: [CommonModule, RouterModule],
+  templateUrl: './entity-list.component.html'
+})
+export class EntityListComponent {}
+```
+
+Benefits: better tree-shaking (unused imports are trivially detectable), simpler lazy-loading (`loadComponent` instead of `loadChildren` + a whole module), and less NgModule boilerplate for new features.
+
+---
+
+### Q78. How do you improve Angular app performance?
+
+Lazy-load feature modules/routes; use `OnPush` change detection so components only re-render when their `@Input` references change; `trackBy` in every `*ngFor` over a list that can reorder/update (prevents full DOM re-creation); the `async` pipe for observables (auto-subscribes/unsubscribes, avoids memory leaks); route preloading strategies for perceived speed; bundle optimization (esbuild-based builder); and Signals (v17+) for fine-grained reactivity that updates only the DOM nodes that actually depend on a changed value.
+
+---
+
+### Q79. Observable vs Promise?
+
+| | Observable (RxJS) | Promise |
+|---|---|---|
+| Execution | Lazy — nothing runs until `.subscribe()` | Eager — starts immediately on creation |
+| Values | Can emit multiple values over time | Resolves/rejects exactly once |
+| Cancellation | Cancellable via `unsubscribe()` | Cannot be cancelled once started |
+| Composition | Rich operator set (`map`, `switchMap`, `debounceTime`, retry logic) | `.then()`/`.catch()`/`.finally()` chaining only |
+
+Use Observables for anything that can produce more than one value over time — HTTP requests you might cancel (e.g., a component destroyed mid-request), WebSocket streams, form value changes, router events. Promises are fine for a genuine one-shot async operation where RxJS's extra machinery would be overkill.
+
+---
+
+### Q80. Global singleton service — `@Injectable({ providedIn: 'root' })`?
+
+`@Injectable()` marks a class as available to Angular's DI system. `providedIn: 'root'` registers it in the **root injector**, so Angular creates exactly one instance for the entire application's lifetime, shared by every component/service that injects it — this is how a `UserService` holding the current logged-in user stays consistent app-wide.
+
+```typescript
+@Injectable({ providedIn: 'root' })
+export class UserService {
+  private currentUser$ = new BehaviorSubject<User | null>(null);
+  readonly user$ = this.currentUser$.asObservable();
+}
+```
+
+Avoid also listing the same service in a feature module's `providers` array — that creates a **second**, module-scoped instance, silently breaking the "one shared instance" assumption (e.g., login state visible in one lazy-loaded module but not another).
+
+---
+
+### Q81. Integrating API endpoints in Angular — service pattern?
+
+Never call `HttpClient` directly from a component — wrap each domain's HTTP calls in a dedicated service.
+
+```typescript
+@Injectable({ providedIn: 'root' })
+export class EntityService {
+  private readonly api = `${environment.apiBaseUrl}/entities`;
+  constructor(private http: HttpClient) {}
+
+  getAll(page: number, size: number): Observable<PagedResult<EntityDto>> {
+    return this.http.get<PagedResult<EntityDto>>(`${this.api}?page=${page}&size=${size}`);
+  }
+
+  create(payload: CreateEntityRequest): Observable<EntityDto> {
+    return this.http.post<EntityDto>(this.api, payload);
+  }
+}
+
+// Component
+this.entityService.getAll(1, 20)
+  .pipe(takeUntil(this.destroy$))
+  .subscribe({ next: data => this.entities = data.items, error: err => this.handleError(err) });
+```
+
+Key patterns: an `HttpInterceptor` adds the `Authorization` header automatically (no manual headers per call); `environment.ts` centralizes the base URL; typed DTOs matching the API contract catch breaking changes at compile time; `takeUntil(this.destroy$)` unsubscribes on component destroy to prevent memory leaks.
+
+---
+
+### Q82. The four data-binding techniques in Angular?
+
+1. **Interpolation `{{ }}`** — one-way, component → template. `<h1>{{ entity.name }}</h1>`. Best for read-only text/computed expressions.
+2. **Property binding `[ ]`** — one-way, component → DOM property/child `@Input`. `<input [disabled]="isLoading">`, `<app-entity [entity]="selected">`.
+3. **Event binding `( )`** — one-way, DOM event → component method. `<button (click)="save()">`.
+4. **Two-way binding `[( )]`** ("banana in a box") — combines property + event binding. `<input [(ngModel)]="entity.name">`, equivalent to `[value]="entity.name" (input)="entity.name = $event.target.value"`. Requires `FormsModule`.
+
+For anything beyond a trivial single field, prefer Reactive Forms (`FormControl`/`FormGroup`) over `[(ngModel)]` — better validation, testability, and no `FormsModule` dependency.
+
+---
+
 ## Jasmine Unit Testing (Angular)
 
 ```typescript

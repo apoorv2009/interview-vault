@@ -1685,6 +1685,284 @@ SELECT Level, Path, Name FROM OrgChart ORDER BY Level, Name;
 
 ---
 
+### Q25 — Improve Query Performance (Checklist + Real Diagnosis Story)
+
+**Checklist**: analyze the execution plan first; add covering indexes for hot WHERE/JOIN/ORDER BY columns; avoid `SELECT *`; keep WHERE clauses SARGable (no function wrapping an indexed column); eliminate N+1 via JOINs/eager loading; paginate large result sets (`OFFSET`/`FETCH`); consider indexed views or CTEs for repeated aggregation.
+
+**Real diagnosis** (Entity Management System dashboard, ~8s → ~420ms): Application Insights showed 92% of request time inside the SQL dependency. SQL Server Profiler confirmed the app was issuing ~100 individual `SELECT`s per page load — one per entity to compute shareholding % (classic N+1), each fast (<50ms) but summing to several seconds plus network round-trip overhead.
+
+```sql
+-- BEFORE — one query per entity, called in a loop from the app (N+1)
+SELECT SUM(SharePercent) FROM ShareholderMap WHERE EntityID = @entityId;  -- × ~100
+
+-- AFTER — one CTE pre-aggregates, then a single join back to the entity list
+WITH EntityShareholding AS (
+    SELECT EntityID, SUM(SharePercent) AS TotalShare
+    FROM   ShareholderMap
+    GROUP BY EntityID
+)
+SELECT e.EntityID, e.Name, es.TotalShare
+FROM   Entity e
+JOIN   EntityShareholding es ON es.EntityID = e.EntityID;
+```
+
+Execution plan changed from ~100× Index Seek + Key Lookup to a single Hash Match (Aggregate) + Clustered Index Scan. Verified before/after with `SET STATISTICS TIME ON` and cross-checked against Application Insights response time — ~95% improvement.
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| Pagination | `OFFSET x ROWS FETCH NEXT y ROWS ONLY` | `LIMIT y OFFSET x` |
+| Query timing | `SET STATISTICS TIME ON` | `EXPLAIN ANALYZE` reports planning/execution time directly |
+| Stats refresh | `UPDATE STATISTICS table` | `ANALYZE table` |
+
+---
+
+### Q26 — Clustered vs Non-Clustered Index
+
+**Clustered**: physically sorts and stores the table's rows by the index key — the table *is* the index. Only one per table (usually the PK). Range scans are fast because data is already in order.
+
+**Non-Clustered**: a separate B-tree of key columns + a pointer back to the base row (RID or clustered key). Multiple allowed per table — ideal for columns frequently used in `WHERE`/`JOIN`/`ORDER BY` that aren't the clustering key.
+
+```sql
+CREATE CLUSTERED INDEX PK_Entity ON Entity(EntityId);           -- usually the PK
+CREATE NONCLUSTERED INDEX IX_Entity_Status ON Entity(Status);   -- search column
+```
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| Clustered index | Explicit `CLUSTERED` keyword; table storage order = index order, kept in sync automatically | No true clustered index — `CLUSTER table USING index` physically reorders rows **once**; new inserts do NOT stay clustered |
+| Default index type | B-tree, clustered or non-clustered | B-tree only by default (also supports Hash, GiST, GIN, BRIN) |
+| One-per-table rule | Only 1 clustered index per table | N/A — no clustered concept, `CLUSTER` can target any index |
+
+---
+
+### Q27 — Covering Index
+
+A non-clustered index that includes **every** column a query needs, via the `INCLUDE` clause, so SQL Server never has to jump back to the base table (a "Key Lookup") to fetch the remaining columns — the query is fully satisfied from the index itself.
+
+```sql
+CREATE NONCLUSTERED INDEX IX_Entity_Status
+ON Entity(Status)
+INCLUDE (Name, CreatedAt);
+
+-- This query never touches the base table — Status is the seek key,
+-- Name/CreatedAt come straight from the index leaf pages
+SELECT Name, CreatedAt FROM Entity WHERE Status = 'Active';
+```
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| Covering index syntax | `INCLUDE (col1, col2)` on a non-clustered index | `INCLUDE (col1, col2)` on a B-tree index (PG 11+) — same idea |
+| Equivalent without INCLUDE | Key Lookup back to clustered index | Heap fetch back to the table (unless using an Index-Only Scan) |
+| Visibility check | N/A | Index-Only Scan still needs the visibility map to be up to date (`VACUUM`) to fully avoid heap access |
+
+---
+
+### Q28 — CTE Inside a Stored Procedure
+
+A Common Table Expression is a named, temporary result set scoped to a single query — yes, it's routinely used inside stored procedures for recursive hierarchies, ranking, and readability (breaking a complex query into named steps).
+
+```sql
+CREATE PROCEDURE GetSecondHighestSalaryPerDept
+AS
+BEGIN
+    WITH RankedEmp AS (
+        SELECT e.EmployeeID, e.Salary, d.DepartmentName,
+               DENSE_RANK() OVER (PARTITION BY e.DepartmentID ORDER BY e.Salary DESC) AS rnk
+        FROM Employee e
+        JOIN Department d ON e.DepartmentID = d.DepartmentID
+    )
+    SELECT EmployeeID, Salary, DepartmentName
+    FROM RankedEmp
+    WHERE rnk = 2;
+END
+```
+
+Important caveat for large data (1M+ rows) inside a stored procedure: a CTE is **inlined** and re-evaluated each time it's referenced, not materialized. For heavy multi-step calculations, a `#temp` table (materialized once, indexable, reusable across multiple steps) usually outperforms a CTE referenced multiple times.
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| CTE materialization | Always inlined/re-evaluated (pre-2022); SQL Server 2022+ can also inline more aggressively | PG ≤11 always materializes a CTE (like an optimization fence); PG 12+ defaults to inlining unless `MATERIALIZED` is specified |
+| Force materialization | No direct hint; use `#temp` instead | `WITH cte AS MATERIALIZED (...)` |
+| Recursive CTE syntax | `WITH cte AS (... UNION ALL ...)` | Identical, `WITH RECURSIVE cte AS (...)` required keyword differs |
+
+---
+
+### Q29 — Temp Table vs Table Variable vs Global Temp Table (1M+ Row Stored Procedures)
+
+| | `#temp` (local temp table) | `@table` (table variable) | `##temp` (global temp) |
+|---|---|---|---|
+| Storage | tempdb | tempdb (but simpler) | tempdb, session-shared |
+| Statistics | Yes — optimizer can use them | No — optimizer assumes ~1 row | Yes |
+| Indexable | Yes, including non-clustered | Only PK/unique constraints (pre-2014); limited | Yes |
+| Scope | Current session + child scopes (nested SPs) | Current batch only | **All** sessions until creator disconnects |
+| Best for | Large datasets, multi-step SPs needing indexes | Small lookup sets, table-valued params | Rare — concurrency risk in multi-user SPs, generally avoided |
+
+For a 1M+ row stored procedure doing multi-step calculations, prefer `#temp` — it gets real statistics, can be indexed mid-procedure, and is visible to nested procedure calls. `@table` variables silently degrade the optimizer's row estimates on large data.
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| Local temp table | `#temp` (session-scoped, in tempdb) | `CREATE TEMP TABLE temp (...)` (session-scoped by default) |
+| Global temp | `##temp` (visible to all sessions) | No true equivalent — PG temp tables are always session-local; use `UNLOGGED` regular tables for a cross-session scratch table instead |
+| Table variable | `@table` (no real stats) | No direct equivalent — PL/pgSQL uses arrays/records or a regular temp table |
+
+---
+
+### Q30 — ROW_NUMBER vs RANK vs DENSE_RANK
+
+```
+Data: AttendeeCount = 50, 40, 40, 30
+ROW_NUMBER: 1, 2, 3, 4   ← always unique, ignores ties entirely
+RANK:       1, 2, 2, 4   ← ties share a rank, but a gap follows (3 is skipped)
+DENSE_RANK: 1, 2, 2, 3   ← ties share a rank, NO gap
+```
+
+For any "Nth highest" query, use `DENSE_RANK` — because it never skips a rank, the Nth rank is guaranteed to exist even when ties occur above it. `RANK` can make "Nth highest" return zero rows if enough ties pushed the target rank number past the end of the gapped sequence.
+
+```sql
+WITH Ranked AS (
+    SELECT *, DENSE_RANK() OVER (ORDER BY Salary DESC) AS Rnk FROM Employees
+)
+SELECT * FROM Ranked WHERE Rnk = 2;  -- 2nd highest, all ties included
+```
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| `ROW_NUMBER`/`RANK`/`DENSE_RANK` | ✅ Identical syntax | ✅ Identical syntax |
+| `OVER (PARTITION BY ... ORDER BY ...)` | ✅ | ✅ Identical |
+| `DISTINCT ON` shortcut for "top-1 per group" | ❌ Not supported — must use a ranking CTE | ✅ `SELECT DISTINCT ON (dept_id) * FROM employees ORDER BY dept_id, salary DESC` |
+
+---
+
+### Q31 — 2nd / Nth Highest Salary, Department-Wise
+
+```sql
+WITH RankedEmp AS (
+    SELECT e.EmployeeID, e.Salary, d.DepartmentName,
+           DENSE_RANK() OVER (PARTITION BY e.DepartmentID ORDER BY e.Salary DESC) AS rnk
+    FROM Employee e
+    JOIN Department d ON e.DepartmentID = d.DepartmentID
+)
+SELECT EmployeeID, Salary, DepartmentName
+FROM RankedEmp
+WHERE rnk = 2;   -- change to N for Nth highest
+```
+
+`PARTITION BY DepartmentID` resets the ranking per department, so "2nd highest" is evaluated independently within each department rather than across the whole company.
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| Query | Identical | Identical — window functions are ANSI-standard here |
+| Performance note | Add a composite index `(DepartmentID, Salary DESC)` to avoid a sort | Same — a matching B-tree index avoids the `Sort` node in `EXPLAIN` |
+
+---
+
+### Q32 — Index Design Strategy on a Wide (30+ Column) Table
+
+Approach: analyze actual `WHERE`, `JOIN`, and `ORDER BY` columns from real query patterns (not every column). Prioritize **high-selectivity** columns (many distinct values) — indexing a boolean or a 3-value status column rarely helps and adds write overhead for little benefit. Build composite indexes matching the query's column order (leftmost-prefix rule), and add non-key columns via `INCLUDE` to create covering indexes. Continuously monitor with DMVs rather than guessing.
+
+```sql
+-- Composite index — column order matches typical filter+sort pattern
+CREATE INDEX IX_Emp_Dept_Salary ON Employee(DeptId, Salary DESC);
+
+-- Find missing indexes SQL Server has detected from actual query workload
+SELECT * FROM sys.dm_db_missing_index_details;
+
+-- Find indexes that exist but are never used (candidates for removal)
+SELECT * FROM sys.dm_db_index_usage_stats WHERE user_seeks = 0 AND user_scans = 0;
+```
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| Missing index suggestions | `sys.dm_db_missing_index_details` (built-in) | No built-in equivalent — use `pg_stat_statements` + manual analysis, or third-party tools |
+| Unused index detection | `sys.dm_db_index_usage_stats` | `pg_stat_user_indexes` (`idx_scan = 0`) |
+| Leftmost-prefix rule for composite index | Same | Same — identical B-tree behaviour |
+
+---
+
+### Q33 — Types of Indexes in SQL Server
+
+Clustered, Non-Clustered, Unique (auto-created by a `UNIQUE` constraint), Full-Text (text search), Spatial (geography/geometry), XML, Filtered (partial index with a `WHERE` clause), Columnstore (clustered or non-clustered — column-oriented, for analytics/reporting), and Hash (In-Memory OLTP tables only). Most production OLTP schemas mainly use Clustered + Non-Clustered; Columnstore shows up specifically for reporting/analytics tables.
+
+```sql
+CREATE UNIQUE INDEX UX_User_Email ON [User](Email);
+CREATE INDEX IX_Active_Entities ON Entity(Name) WHERE IsDeleted = 0;   -- filtered index
+CREATE COLUMNSTORE INDEX CX_Sales ON SalesFact(...);                   -- analytics
+```
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| Default index type | B-tree | B-tree |
+| Filtered/partial index | `CREATE INDEX ... WHERE condition` | Identical syntax — `CREATE INDEX ... WHERE condition` |
+| Full-text | Full-Text Index + `CONTAINS`/`FREETEXT` | GIN/GiST index + `tsvector`/`tsquery` |
+| Columnstore (analytics) | Native Columnstore index | No native columnstore — use extensions (Citus/columnar) or a separate OLAP store |
+| Spatial | Spatial index (geography/geometry types) | PostGIS extension + GiST index |
+| Hash index | Only for In-Memory OLTP tables | Native `HASH` index type (general purpose, though B-tree usually still preferred) |
+
+---
+
+### Q34 — Reading an Execution Plan: Red Flags
+
+1. **Table Scan / Index Scan instead of Index Seek** — reading every row instead of jumping straight to matches. Usually means a missing index, or a non-SARGable predicate (e.g., `WHERE LOWER(Name) = 'x'` prevents seeking on an index over `Name`).
+2. **Key Lookup (Nested Loop)** — the non-clustered index found the row pointer but had to go back to the clustered index for extra columns. Fix: add those columns via `INCLUDE` (covering index).
+3. **Thick arrows** between operators — the estimated row count is large; often caused by stale statistics. Fix: `UPDATE STATISTICS table`.
+4. **High-cost Sort operator** — usually a missing index aligned with the query's `ORDER BY`.
+5. **Nested Loops with a large outer input** — O(N×M) cost; consider whether a Hash Match/Merge Join would be cheaper (usually resolved by an index change, not a query hint).
+6. **Estimated vs actual row counts diverging by >10×** — stale statistics or a parameter-sniffing issue; fix with `UPDATE STATISTICS` or `OPTION (OPTIMIZE FOR UNKNOWN)`.
+
+```sql
+SET STATISTICS TIME ON; SET STATISTICS IO ON;
+-- run the query, then read:
+-- CPU time = 1234 ms, elapsed time = 1456 ms
+-- Table 'Entity'. Scan count 1, logical reads 8   (vs. logical reads 8000 before an index fix)
+```
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| View plan | `Ctrl+M` (Actual Plan) in SSMS, or `SET SHOWPLAN_XML ON` | `EXPLAIN ANALYZE` |
+| Row estimate vs actual | Shown in plan tooltip (Estimated/Actual rows) | `EXPLAIN ANALYZE` prints both directly in the text output |
+| Stats refresh | `UPDATE STATISTICS table` | `ANALYZE table` |
+| I/O detail | `SET STATISTICS IO ON` (logical reads) | `EXPLAIN (ANALYZE, BUFFERS)` (shared hit/read blocks) |
+
+---
+
+### Q35 — SQL Server Profiler, Extended Events, and Query Store
+
+**Profiler**: legacy GUI trace tool. Use the "Tuning" template (captures `SQL:BatchCompleted`/`RPC:Completed` with Duration/Reads/Writes/CPU), filtered to `Duration > 1000ms` to avoid noise, then reproduce the slow operation in the app to capture the exact SQL with parameter values. Discouraged in production due to overhead.
+
+**What to look for**: high logical reads → full scans, needs an index; high duration with low CPU → I/O-bound (missing index/scan); high CPU with moderate reads → expensive computation (sort/hash join/bad plan); the *same* query repeated in a tight loop → classic N+1, fix at the application/ORM level, not the database.
+
+**Extended Events / Query Store** (modern, low-overhead alternatives): Query Store (SQL Server 2016+) tracks query performance over time and flags plan regressions with no Profiler-style overhead; `sys.dm_exec_query_stats` gives top CPU/IO consumers via a plain query, no tool setup required.
+
+**SQL vs PostgreSQL:**
+
+| Behaviour | SQL Server | PostgreSQL |
+|-----------|-----------|------------|
+| Live trace tool | SQL Server Profiler (legacy) / Extended Events (modern) | `pg_stat_activity` (live) + `log_min_duration_statement` (logs slow queries) |
+| Historical plan/performance tracking | Query Store | `pg_stat_statements` extension (aggregated stats, no plan history built in) |
+| Low-overhead production monitoring | Extended Events | `pg_stat_statements` (low overhead) or `auto_explain` module for periodic plan capture |
+
+---
+
 *(Further questions will be appended as new topics are covered.)*
 
 ---

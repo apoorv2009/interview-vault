@@ -19,6 +19,7 @@
 7. [LINQ (Q80–Q83)](#7-linq)
 8. [Additional Topics (Q84–Q89)](#8-additional-topics)
 9. [Platform, DI & Caching Deep Dive (Q90–Q96)](#9-platform-di--caching-deep-dive)
+10. [Interview Rounds — Additional Q&A (Q97–Q135)](#10-interview-rounds--additional-qa)
 
 ---
 
@@ -4586,3 +4587,774 @@ public class ReportCacheService(IDistributedCache cache, IReportRepository repo)
 // - Targeting list results (expensive DB query, 15-min TTL)
 // - Rate limiting counters (atomic Redis INCR)
 ```
+
+---
+
+## 10. Interview Rounds — Additional Q&A
+
+*Sourced from live interview rounds: Wipro (R1, R2), Decos Global (R1), HCL (R1), Infosys (R1), Virtusa (R1). Framed through the Entity Management System project (Grant Thornton, healthcare domain) — tracking business entities, shareholding %, and partnerships.*
+
+### Q97. [Topic: OOP] Abstract class vs Interface — real-time scenario?
+
+**Abstract class**: partial implementation + shared state. Use when subclasses share common behaviour/fields and you want to avoid duplication.
+
+**Interface**: pure contract, no implementation (default interface methods aside). Use to define a capability multiple unrelated classes can implement.
+
+```csharp
+// Abstract class — shared state + partial implementation
+public abstract class RepositoryBase<T> where T : class
+{
+    protected readonly AppDbContext Db;
+    protected RepositoryBase(AppDbContext db) => Db = db;
+
+    // Shared logic — every repository gets this for free
+    public async Task<int> SaveChangesAsync() => await Db.SaveChangesAsync();
+
+    public abstract Task<T?> GetByIdAsync(int id); // subclass must implement
+}
+
+// Interface — pure contract, unrelated implementations
+public interface IPaymentProcessor
+{
+    Task<PaymentResult> ProcessAsync(PaymentRequest request);
+}
+public class CreditCardProcessor : IPaymentProcessor { /* ... */ }
+public class VoucherProcessor : IPaymentProcessor { /* ... */ }
+```
+
+I used an abstract `RepositoryBase` to avoid duplicating `SaveChanges`/transaction logic across every repository, while `IPaymentProcessor` defines a contract for otherwise-unrelated payment strategies.
+
+---
+
+### Q98. [Topic: C# Language] Delegates — real-time scenario?
+
+A delegate is a type-safe function pointer — it holds a reference to a method matching its signature and can invoke it indirectly. Used for event callbacks and as the foundation of LINQ predicates.
+
+```csharp
+// Action<T> — no return value
+Action<EntityDto> onEntityCreated = entity => _logger.LogInformation("Created {Id}", entity.Id);
+
+// Func<T, TResult> — used as a generic filter predicate
+public List<T> Filter<T>(List<T> items, Func<T, bool> predicate) =>
+    items.Where(predicate).ToList();
+
+var activeEntities = Filter(allEntities, e => e.IsActive); // Func<Entity, bool> passed in
+
+// Custom delegate — event callback
+public delegate void ShareholdingChangedHandler(int entityId, decimal newPercentage);
+public event ShareholdingChangedHandler? OnShareholdingChanged;
+```
+
+`Func`/`Action`/`Predicate` are built-in generic delegates that cover almost every case; a custom named delegate is only needed for a self-documenting public event signature.
+
+---
+
+### Q99. [Topic: LINQ] First vs FirstOrDefault vs Single vs SingleOrDefault?
+
+| Method | Empty sequence | >1 match | Use when |
+|---|---|---|---|
+| `First()` | Throws | Returns 1st | You know at least one exists |
+| `FirstOrDefault()` | Returns `default` | Returns 1st | Zero-or-more is a valid state |
+| `Single()` | Throws | Throws | Exactly one is a **business rule** (e.g., lookup by unique key) |
+| `SingleOrDefault()` | Returns `default` | Throws | Zero-or-one is valid, but more than one is a bug |
+
+```csharp
+var entity = await _db.Entities.SingleOrDefaultAsync(e => e.TaxId == taxId);
+// TaxId is unique by schema — if >1 row matches, that's a data integrity bug
+// we WANT the exception, not a silently wrong "first" result.
+```
+
+I use `Single`/`SingleOrDefault` whenever uniqueness is a schema/business invariant — it turns a silent data bug into a loud exception instead of quietly returning the wrong row.
+
+---
+
+### Q100. [Topic: C# Language] readonly vs const vs static?
+
+- **`const`** — compile-time constant, baked into IL at every call site, implicitly `static`. Only primitives/strings.
+- **`readonly`** — assigned only in the constructor (or field initializer), evaluated at runtime. Can differ per instance.
+- **`static`** — belongs to the type, not an instance; one shared value across all instances.
+
+```csharp
+public class ShareholdingConfig
+{
+    public const decimal DefaultThreshold = 0.05m;      // truly fixed, known at compile time
+    public readonly decimal TenantThreshold;            // set once per instance via DI-injected config
+    public static int ActiveCalculationCount;           // shared counter across all instances
+
+    public ShareholdingConfig(IOptions<TenantSettings> options)
+        => TenantThreshold = options.Value.ShareholdingThreshold; // runtime value, ctor-only
+}
+```
+
+Rule of thumb: `const` for values that will **never** change even across recompiles (e.g., `Math.PI`-style constants); `readonly` for DI-injected/config-driven values fixed per instance.
+
+---
+
+### Q101. [Topic: C# Language] String vs StringBuilder?
+
+`string` is immutable — every concatenation allocates a **new** string object and copies both operands. In a loop, this is O(n²) and creates heavy GC pressure. `StringBuilder` uses a mutable internal buffer — appends are amortized O(1).
+
+```csharp
+// ❌ BAD — 10,000 allocations for 10,000 entities
+string csv = "";
+foreach (var e in entities) csv += $"{e.Id},{e.Name}\n";
+
+// ✅ GOOD — one buffer, resized geometrically as needed
+var sb = new StringBuilder();
+foreach (var e in entities) sb.Append(e.Id).Append(',').Append(e.Name).Append('\n');
+string csv = sb.ToString();
+```
+
+Use `StringBuilder` for loops, large/unknown-size concatenation, or building CSV/report output; plain `string`/interpolation is fine for a fixed, small number of concatenations.
+
+---
+
+### Q102. [Topic: ASP.NET Core] Middleware, custom middleware, and global exception handling?
+
+Middleware is a pipeline component: each one can inspect/modify the request, call `next()` to continue, or short-circuit the response. Order in `Program.cs` is critical — exception handling must be **outermost** (registered first) so it can catch everything downstream, including auth failures.
+
+```csharp
+public class GlobalExceptionMiddleware
+{
+    private readonly RequestDelegate _next;
+    private readonly ILogger<GlobalExceptionMiddleware> _logger;
+
+    public GlobalExceptionMiddleware(RequestDelegate next, ILogger<GlobalExceptionMiddleware> logger)
+    {
+        _next = next; _logger = logger;
+    }
+
+    public async Task InvokeAsync(HttpContext context)
+    {
+        try { await _next(context); }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Unhandled exception for {Path}", context.Request.Path);
+            await HandleExceptionAsync(context, ex);
+        }
+    }
+
+    private static Task HandleExceptionAsync(HttpContext ctx, Exception ex)
+    {
+        var (status, code) = ex switch
+        {
+            KeyNotFoundException => (404, "NOT_FOUND"),
+            UnauthorizedAccessException => (401, "UNAUTHORIZED"),
+            ArgumentException => (400, "BAD_REQUEST"),
+            _ => (500, "INTERNAL_ERROR")
+        };
+        ctx.Response.ContentType = "application/json";
+        ctx.Response.StatusCode = status;
+        return ctx.Response.WriteAsJsonAsync(new { code, message = ex.Message });
+    }
+}
+
+// Program.cs — MUST be first in the pipeline
+app.UseMiddleware<GlobalExceptionMiddleware>();
+app.UseAuthentication();
+app.UseAuthorization();
+```
+
+Centralising exception handling in one middleware means no controller needs try/catch, every error response has the same JSON shape, and nothing is silently missed.
+
+---
+
+### Q103. [Topic: ASP.NET Core] What is the Kestrel server?
+
+Kestrel is the cross-platform HTTP server built into .NET Core — it can serve requests directly (edge deployment) or sit behind a reverse proxy (Nginx, IIS, Azure App Service's front end) which adds TLS termination, request buffering, and additional hardening.
+
+```csharp
+// Program.cs
+var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.Limits.MaxConcurrentConnections = 1000;
+    options.Limits.MaxRequestBodySize = 10 * 1024 * 1024; // 10 MB
+});
+```
+
+In Azure App Service, Kestrel runs behind the platform's front-end proxy — I still configure request size/connection limits explicitly since defaults are conservative.
+
+---
+
+### Q104. [Topic: ASP.NET Core] Session handling in .NET Core?
+
+```csharp
+// Program.cs
+builder.Services.AddDistributedMemoryCache(); // or AddStackExchangeRedisCache for distributed
+builder.Services.AddSession(options =>
+{
+    options.IdleTimeout = TimeSpan.FromMinutes(20);
+    options.Cookie.HttpOnly = true;
+});
+// ...
+app.UseSession();
+
+// Usage in a controller/endpoint
+HttpContext.Session.SetString("TenantId", tenantId);
+var tenantId = HttpContext.Session.GetString("TenantId");
+```
+
+For a single instance, in-memory session is fine. For a scaled-out API (multiple pods), session state must be Redis-backed (`AddStackExchangeRedisCache`) — otherwise a request landing on a different pod loses the session.
+
+---
+
+### Q105. [Topic: ASP.NET Core] API Versioning?
+
+```csharp
+builder.Services.AddApiVersioning(options =>
+{
+    options.DefaultApiVersion = new ApiVersion(1, 0);
+    options.AssumeDefaultVersionWhenUnspecified = true;
+    options.ReportApiVersions = true;
+});
+
+[ApiVersion("1.0")]
+[ApiVersion("2.0")]
+[Route("api/v{version:apiVersion}/[controller]")]
+public class EntitiesController : ControllerBase
+{
+    [HttpGet, MapToApiVersion("2.0")]
+    public IActionResult GetV2() => Ok(new { schema = "v2" });
+}
+```
+
+Three strategies: URL segment (`/api/v1/`), query string (`?api-version=1.0`), or header (`X-Api-Version`). URL segment is the most discoverable and cache-friendly; I default to it unless a client contract dictates otherwise.
+
+---
+
+### Q106. [Topic: ASP.NET Core] Content Negotiation?
+
+Content negotiation is the process by which client and server agree on a response representation — the client sends an `Accept` header (e.g., `application/json`, `application/xml`), and ASP.NET Core's **output formatters** pick a matching serializer.
+
+```csharp
+builder.Services.AddControllers()
+    .AddXmlSerializerFormatters(); // adds XML alongside default JSON
+
+// Client requests XML:
+// GET /api/entities/5
+// Accept: application/xml
+```
+
+JSON is the default and only formatter unless you explicitly add others — most APIs I've built only ever needed JSON, but the mechanism is the same one ASP.NET Core uses internally for `[Produces]`/`[Consumes]` attributes.
+
+---
+
+### Q107. [Topic: SOLID] Single Responsibility Principle — real example?
+
+A class should have only one reason to change. In the Entity Management System: `EntityService` holds business rules (validation, shareholding computation triggers), `EntityRepository` holds only data access (EF queries), and `EntitiesController` holds only HTTP concerns (model binding, status codes). A schema change touches only the repository; a validation-rule change touches only the service.
+
+---
+
+### Q108. [Topic: SOLID] Liskov Substitution Principle — real example?
+
+Subtypes must be substitutable for their base type without breaking correctness. Classic violation: if `Square` extends `Rectangle` and overrides the `Width` setter to also change `Height` (to stay square), any code that does `rect.Width = 5; Assert(rect.Area == 5 * rect.Height_before)` breaks for a `Square` instance — the subtype silently changed the contract's behaviour.
+
+```csharp
+// ❌ Violates LSP — Width setter has a hidden side effect for Square
+public class Square : Rectangle
+{
+    public override int Width
+    {
+        set { base.Width = value; base.Height = value; } // surprises callers of Rectangle
+    }
+}
+// ✅ Fix: don't model Square as a Rectangle subtype; use a shared IShape interface instead
+```
+
+---
+
+### Q109. [Topic: SOLID] Dependency Injection — why constructor injection?
+
+Inject dependencies via the constructor rather than `new`-ing them up inside the class. This enables unit testing (mock injection), loose coupling to concrete implementations, and centralised lifetime management.
+
+```csharp
+public class EntityService
+{
+    private readonly IEntityRepository _repo;
+    private readonly ILogger<EntityService> _logger;
+
+    public EntityService(IEntityRepository repo, ILogger<EntityService> logger)
+    {
+        _repo = repo; _logger = logger; // both are mockable in unit tests
+    }
+}
+```
+
+---
+
+### Q110. [Topic: SOLID] Transient vs Scoped vs Singleton — and the captive dependency bug?
+
+- **Transient** — new instance every time it's requested.
+- **Scoped** — one instance per HTTP request (ideal for `DbContext`).
+- **Singleton** — one instance for the app's entire lifetime (caches, config objects).
+
+**Never inject a Scoped service into a Singleton** — the Scoped instance gets captured and effectively lives as long as the Singleton, defeating its per-request purpose (the "captive dependency" bug). .NET's DI container throws `InvalidOperationException` at runtime for exactly this case when validation is enabled.
+
+```csharp
+// ❌ Captive dependency
+builder.Services.AddSingleton<IReportOrchestrator, ReportOrchestrator>();
+// If ReportOrchestrator's ctor takes EngagementDbContext (Scoped) → bug
+
+// ✅ Fix: resolve a fresh scope manually when a Singleton truly needs a Scoped service
+public class ReportOrchestrator(IServiceScopeFactory scopeFactory)
+{
+    public async Task RunAsync()
+    {
+        using var scope = scopeFactory.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<EngagementDbContext>();
+        // use db, then scope disposes it correctly
+    }
+}
+```
+
+---
+
+### Q111. [Topic: SOLID] Open/Closed Principle — payment options design?
+
+Open for extension, closed for modification. Define an `IPaymentProcessor` interface with a `Process(PaymentRequest)` method; concrete classes (`CreditCardProcessor`, `DebitCardProcessor`, `VoucherProcessor`) each implement it, and a `PaymentFactory` maps a payment-type enum to the right implementation.
+
+```csharp
+public interface IPaymentProcessor { Task<PaymentResult> ProcessAsync(PaymentRequest request); }
+
+public class PaymentFactory
+{
+    private readonly IEnumerable<IPaymentProcessor> _processors;
+    public IPaymentProcessor Resolve(PaymentType type) =>
+        _processors.Single(p => p.SupportedType == type);
+}
+
+// Adding "Cash" support later = one new class + one factory registration.
+// Zero changes to PaymentFactory, PaymentController, or any existing processor. ✅
+public class CashProcessor : IPaymentProcessor { public PaymentType SupportedType => PaymentType.Cash; /*...*/ }
+```
+
+---
+
+### Q112. [Topic: Security] Authentication & Authorization mechanism (JWT)?
+
+JWT Bearer tokens. On login, the server issues a signed JWT (`header.payload.signature`). The Angular client attaches it as `Authorization: Bearer <token>` on every request; the API validates it via `AddAuthentication().AddJwtBearer(...)`.
+
+```csharp
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true, ValidIssuer = config["Jwt:Issuer"],
+            ValidateAudience = true, ValidAudience = config["Jwt:Audience"],
+            ValidateLifetime = true,
+            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(config["Jwt:Key"]))
+        };
+    });
+
+// Secure by default at controller level, open specific actions explicitly
+[Authorize]
+[ApiController]
+public class EntitiesController : ControllerBase
+{
+    [AllowAnonymous]
+    [HttpGet("public-summary")]
+    public IActionResult PublicSummary() => Ok(...);
+
+    [Authorize(Roles = "Admin")]
+    [HttpDelete("{id}")]
+    public IActionResult Delete(int id) => Ok(...);
+
+    [Authorize(Policy = "CanEditEntities")] // policy-based for complex rules
+    [HttpPut("{id}")]
+    public IActionResult Update(int id, EntityDto dto) => Ok(...);
+}
+```
+
+"Secure by default" — apply `[Authorize]` at the controller level so any new action is protected unless explicitly opened with `[AllowAnonymous]`.
+
+---
+
+### Q113. [Topic: Security] How do you generate a JWT?
+
+```csharp
+public string GenerateToken(User user)
+{
+    var claims = new[]
+    {
+        new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+        new Claim(ClaimTypes.Role, user.Role),
+        new Claim("tenantId", user.TenantId.ToString())
+    };
+
+    var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_config["Jwt:Key"]!));
+    var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+    var token = new JwtSecurityToken(
+        issuer: _config["Jwt:Issuer"],
+        audience: _config["Jwt:Audience"],
+        claims: claims,
+        expires: DateTime.UtcNow.AddHours(1),
+        signingCredentials: creds);
+
+    return new JwtSecurityTokenHandler().WriteToken(token);
+}
+```
+
+Uses `System.IdentityModel.Tokens.Jwt` — build a `SecurityTokenDescriptor`/`JwtSecurityToken` with claims, expiry, and HMAC-SHA256 signing credentials, then `WriteToken()` serialises it to the `header.payload.signature` string.
+
+---
+
+### Q114. [Topic: EF Core] Eager vs Explicit vs Lazy Loading?
+
+- **Eager** — `.Include()`; loads related data in a single JOIN query. Preferred default.
+- **Lazy** — related data loads automatically on property access; requires `virtual` navigation properties + proxies. Easy to trigger accidental N+1.
+- **Explicit** — manually call `.Load()` when you need related data on demand, without lazy-loading side effects everywhere else.
+
+```csharp
+// Eager — one query, one round trip
+var entities = await _db.Entities.Include(e => e.Shareholders).ToListAsync();
+```
+
+---
+
+### Q115. [Topic: EF Core] N+1 query problem — how do you find and fix it?
+
+One query fetches N parent rows, then N more queries each fetch a child — typically from lazy loading or looping and querying per item. On the Entity Management System, a dashboard was firing ~100 individual `SELECT`s per page load (one per entity to compute shareholding %), each fast (<50ms) but summing to ~5–8 seconds.
+
+**Diagnosis**: SQL Server Profiler + Application Insights showed the dashboard's SQL dependency time dominated the request, and Profiler showed the same query shape repeated ~100 times with only the parameter changing.
+
+**Fix**: replaced the per-entity loop with either EF Core `.Include()` (single JOIN) or, for the heaviest case, a stored procedure using a CTE that pre-aggregates with `SUM() ... GROUP BY` before joining back to the entity list once.
+
+```sql
+WITH EntityShareholding AS (
+    SELECT EntityID, SUM(SharePercent) AS TotalShare
+    FROM ShareholderMap
+    GROUP BY EntityID
+)
+SELECT e.EntityID, e.Name, es.TotalShare
+FROM Entity e
+JOIN EntityShareholding es ON es.EntityID = e.EntityID;
+```
+
+Result: execution plan went from ~100× Index Seek + Key Lookup to a single Hash Match + Clustered Index Scan; dashboard load time dropped from ~8s to ~420ms (~95% improvement), verified with `SET STATISTICS TIME ON` before/after.
+
+---
+
+### Q116. [Topic: Architecture] Clean Architecture vs Layered vs Traditional Three-Layer?
+
+**Traditional Three-Layer**: Presentation → Business → Data, dependencies flow strictly downward; the business layer knows about the data layer directly.
+
+**Layered Architecture**: stricter version — each layer only talks to the layer directly below it (Presentation → Application → Domain → Infrastructure). Simpler than Clean Architecture but still separates concerns.
+
+**Clean Architecture**: concentric circles with domain entities at the center, having **no** external dependencies. Outer layers (API, EF Core, Azure services) depend inward on interfaces defined by the domain — never the reverse. This makes domain/business logic fully unit-testable without a database or UI.
+
+```
+Clean Architecture dependency direction:
+┌─────────────────────────────────────┐
+│  Infrastructure (EF Core, Azure)     │  ──┐
+│  ┌─────────────────────────────┐    │    │ depends inward
+│  │  Application (Services)      │    │  ──┤
+│  │  ┌───────────────────────┐  │    │    │
+│  │  │  Domain (Entities)     │  │    │  ◄─┘  never depends outward
+│  │  └───────────────────────┘  │    │
+│  └─────────────────────────────┘    │
+└─────────────────────────────────────┘
+```
+
+For the Entity Management System's Web API: Angular SPA → Controllers → Services → Repositories → EF Core → SQL Server, with middleware (auth, exception handling, logging) wrapping the whole pipeline, hosted on Azure App Service.
+
+---
+
+### Q117. [Topic: Architecture] Creating a new module (e.g., Customer) — what files/layers do you create?
+
+```
+Controller:       CustomerController.cs           (HTTP endpoints)
+DTOs:             CustomerDto, CreateCustomerRequest
+Service:          ICustomerService, CustomerService (business logic)
+Repository:       ICustomerRepository, CustomerRepository (data access)
+Entity:           Customer.cs                      (EF Core entity)
+Migration:        dotnet ef migrations add AddCustomer
+DI registration:  builder.Services.AddScoped<ICustomerService, CustomerService>();
+                  builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+```
+
+Each new business capability follows the same Controller → Service → Repository → Entity shape, keeping the codebase predictable across modules.
+
+---
+
+### Q118. [Topic: ASP.NET Core] Where do connection strings and secrets live?
+
+Non-secret config lives in `appsettings.json` under `ConnectionStrings`, read via `IConfiguration`/`IOptions<T>`. Secrets never go in source control:
+
+```csharp
+// appsettings.json — structure only, no real secrets committed
+{ "ConnectionStrings": { "Default": "" } }
+
+// Dev — User Secrets (dotnet user-secrets set "ConnectionStrings:Default" "...")
+// Prod — Azure Key Vault via Managed Identity, or environment variables injected by the pipeline
+builder.Configuration.AddAzureKeyVault(keyVaultUri, new DefaultAzureCredential());
+```
+
+---
+
+### Q119. [Topic: LINQ] 3rd highest salary — LINQ, and how do you handle ties?
+
+```csharp
+var thirdHighest = employees
+    .OrderByDescending(e => e.Salary)
+    .Select(e => e.Salary)
+    .Distinct()   // ← critical: distinct SALARY LEVELS, not distinct rows
+    .Skip(2)
+    .FirstOrDefault();
+```
+
+Without `.Distinct()`, if two employees share the 3rd salary, `Skip(2)` lands on what is actually the 4th distinct salary level — always dedupe the ranking column before `Skip`/`Take` for "Nth highest" queries.
+
+---
+
+### Q120. [Topic: LINQ] IEnumerable vs IQueryable?
+
+`IQueryable` builds an expression tree — filters/sorts/projections are translated to SQL and executed on the database server; execution is deferred until enumeration. `IEnumerable` executes immediately and operates on data already loaded into memory (LINQ-to-Objects).
+
+```csharp
+// IQueryable — WHERE clause runs in SQL Server, only matching rows come over the wire
+IQueryable<Entity> query = _db.Entities.Where(e => e.IsActive);
+
+// ❌ Common mistake — materializing too early forces filtering in memory
+IEnumerable<Entity> all = _db.Entities.ToList();       // pulls EVERYTHING
+var active = all.Where(e => e.IsActive);               // filters in .NET memory
+
+// ✅ Keep it IQueryable through the repository; materialize (.ToListAsync()) only at the boundary
+```
+
+Rule: return/compose `IQueryable` inside repositories and only call `.ToListAsync()` at the very last step, so filters/paging are pushed down to SQL.
+
+---
+
+### Q121. [Topic: C# Language] Generics — why prefer them over arrays/ArrayList?
+
+Generics (`List<T>`, `Dictionary<K,V>`) give compile-time type safety and avoid boxing/unboxing for value types. A non-generic `ArrayList` stores `object`, so every `int` added is boxed (heap-allocated) and every read is unboxed (cast).
+
+```csharp
+ArrayList list = new ArrayList();
+list.Add(42);          // boxing: int → object, heap allocation
+int x = (int)list[0];  // unboxing: cast + copy
+
+List<int> typed = new List<int>();
+typed.Add(42);          // no boxing — int stored directly
+int y = typed[0];       // no cast needed, compiler-verified type
+```
+
+In production I profiled an old report service using `ArrayList` for numeric aggregation — switching to `List<decimal>` cut Gen0 GC collections by roughly 60% under load.
+
+---
+
+### Q122. [Topic: C# Language] Generic vs Non-Generic Collections?
+
+| | Non-Generic (`System.Collections`) | Generic (`System.Collections.Generic`) |
+|---|---|---|
+| Examples | `ArrayList`, `Hashtable` | `List<T>`, `Dictionary<K,V>`, `HashSet<T>` |
+| Type safety | None — stores `object`, needs casts | Compile-time checked |
+| Boxing | Yes, for value types | No |
+| When to use | Legacy API interop only | Always, in modern code |
+
+In the Entity Management System: `List<EntityDto>` for in-memory collections, `Dictionary<int,string>` for lookup maps, `HashSet<int>` for O(1) duplicate-entity-ID checks before bulk insert.
+
+`IEnumerable<T>` vs `ICollection<T>` vs `IList<T>`: `IEnumerable` is read-only/forward-only; `ICollection` adds `Count`/`Add`/`Remove`; `IList` adds index access. Return `IEnumerable<T>` from a service layer to keep the contract as flexible as possible for the caller.
+
+---
+
+### Q123. [Topic: C# Language] Boxing and unboxing — cost, and how to avoid it?
+
+**Boxing**: converting a value type to `object` — allocates on the heap, adds GC pressure. **Unboxing**: casting back to the value type — a runtime type-check plus copy.
+
+```csharp
+ArrayList list = new ArrayList();
+list.Add(42);          // Boxing: int → object (heap alloc)
+int x = (int)list[0];  // Unboxing: object → int (cast + copy)
+```
+
+Avoidance checklist: (1) use generics — `T` is resolved at compile time so no boxing occurs; (2) avoid passing value types into APIs typed as `object`; (3) watch for hidden boxing through non-generic interfaces (`IComparable` vs `IComparable<T>`); (4) implement `IEquatable<T>` on structs to avoid boxing during `.Equals()` comparisons.
+
+---
+
+### Q124. [Topic: C# Language] ref vs out parameters?
+
+Both pass by reference, but with different contracts:
+
+| | `ref` | `out` |
+|---|---|---|
+| Caller must initialize before call | Yes | No |
+| Method must assign before returning | No | Yes |
+| Data flow | Two-way | One-way (method → caller) |
+
+```csharp
+// ref — modifies an existing value
+void ApplyDiscount(ref decimal price, decimal pct) => price -= price * pct;
+
+// out — the "Try" pattern, avoids exceptions as control flow
+if (int.TryParse(input, out int entityId))
+    return GetEntityById(entityId);
+// A bad ID returns a clean 400, not an unhandled parse exception → 500
+```
+
+`out` is the idiomatic choice for `TryXxx` methods (`TryParse`, `Dictionary.TryGetValue`) — no exception/stack-trace cost on the common "not found" path.
+
+---
+
+### Q125. [Topic: C# Language] Swap two objects — without a third variable?
+
+```csharp
+// Tuple deconstruction (C# 7+) — no temp variable needed
+var a = new Entity { Id = 1, Name = "Alpha" };
+var b = new Entity { Id = 2, Name = "Beta" };
+(a, b) = (b, a);
+
+// Generic reusable swap
+static void Swap<T>(ref T x, ref T y) => (x, y) = (y, x);
+Swap(ref a, ref b);
+```
+
+For reference types, the swap exchanges which variable *points to* which object — the objects on the heap don't move. Worth clarifying in an interview: "swap the references, or swap property values between the same two instances?" — the question alone signals you understand the distinction.
+
+---
+
+### Q126. [Topic: ASP.NET Core] What does WebApplicationBuilder / the generic host set up?
+
+`WebApplicationBuilder` (via `WebApplication.CreateBuilder(args)`) wires up: the Kestrel server, the DI container, the middleware pipeline, configuration sources (`appsettings.json`, environment variables, user secrets, Key Vault), logging providers, and app lifecycle management.
+
+```csharp
+var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddControllers();               // DI registrations
+builder.Services.AddDbContext<AppDbContext>(...);
+
+var app = builder.Build();
+app.UseMiddleware<GlobalExceptionMiddleware>();   // middleware pipeline
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
+app.Run();                                        // starts listening
+```
+
+---
+
+### Q127. [Topic: Design Patterns] Which design patterns have you used in a real project?
+
+- **Repository** — abstracts EF Core/DbContext access behind `IRepository<T>`, so services depend on an interface, not `DbContext` directly.
+- **Singleton** — shared, stateless services (config accessors, in-memory cache wrappers) registered once for the app's lifetime.
+- **Factory** — resolves the correct concrete implementation at runtime, e.g. a `PaymentFactory` mapping a payment-type enum to an `IPaymentProcessor`.
+- **Strategy** — swappable algorithms behind a common interface, e.g. `IShareholdingCalculator` with `DirectHoldingCalculator` and `IndirectHoldingCalculator`, resolved by entity type. Adding a new calculation type is a new class only — zero changes to existing callers (this is also the Open/Closed Principle in practice).
+
+---
+
+### Q128. [Topic: C# Language] async/await — how does it keep an API responsive?
+
+`async` marks a method as asynchronous; `await` suspends the method at that point without blocking the calling thread — the thread is released back to the thread pool to do other work while the awaited `Task` (typically I/O: DB call, HTTP call) completes. Critical for API throughput under load, since blocking threads on I/O starves the thread pool.
+
+```csharp
+// ✅ Non-blocking — thread freed during the DB round trip
+public async Task<Entity?> GetByIdAsync(int id, CancellationToken ct) =>
+    await _db.Entities.FirstOrDefaultAsync(e => e.Id == id, ct);
+
+// ❌ Blocking — ties up a thread pool thread doing nothing while waiting
+public Entity? GetByIdSync(int id) =>
+    _db.Entities.FirstOrDefault(e => e.Id == id); // synchronous EF call under an async API = bad
+```
+
+---
+
+### Q129. [Topic: EF Core] Code First vs DB First — which is more efficient, and why?
+
+**Code First**: define C# entities + `DbContext`, EF Core generates migrations that create/update the schema. **DB First**: the schema already exists; `Scaffold-DbContext` reverse-engineers entities from it.
+
+**Code First advantages** (my default for greenfield work): schema is versioned in source control — migrations *are* the Git history of DB changes; schema changes are reviewable in PRs; no manual code/DB sync; easy to spin up fresh environments with `Update-Database`, which fits CI/CD well.
+
+**DB First advantages**: faster onboarding onto an existing, DBA-owned legacy schema; you must reflect their design rather than lead it; pre-optimized stored procedures/views can be scaffolded directly.
+
+On the Entity Management System: Code First with migrations — every sprint's schema change was a migration file, reviewed in PR, applied automatically by the deployment pipeline. Zero manual SQL scripts in source control.
+
+---
+
+### Q130. [Topic: Performance] How do you identify and resolve a performance issue, end to end?
+
+I follow **Identify → Isolate → Fix → Verify** across every layer:
+
+- **Identify** — Frontend: Chrome DevTools Performance tab for long tasks/re-renders. Backend: Application Insights → slowest requests, correlated with SQL dependency duration. Database: Profiler/Extended Events, `sys.dm_exec_query_stats` for top CPU/IO consumers.
+- **Isolate** — reproduce with a known input and confirm where the time actually goes (e.g., 92% of a slow request's time was in the SQL dependency, not app code).
+- **Fix (tiered)** — query fix first (consolidate N+1 into one CTE/stored proc); then EF Core (Lazy → Eager loading, `AsNoTracking()` for read-only queries); then caching (`IMemoryCache`/Redis for semi-static data); then frontend (`trackBy`, `OnPush`, async pipe); then transport (response compression, server-side pagination).
+- **Verify** — `SET STATISTICS TIME ON`/`IO ON` before/after, and Application Insights response-time comparison, so the improvement is measured, not assumed.
+
+---
+
+### Q131. [Topic: C# Runtime] Why does .NET Core/.NET run faster than .NET Framework?
+
+- **Modular, lean runtime** — Framework shipped everything (WCF, WebForms); .NET Core only deploys what you reference, reducing startup time and memory.
+- **RyuJIT compiler** — replaced the old 64-bit JIT; better codegen, SIMD intrinsics, improved throughput.
+- **`Span<T>`/`Memory<T>`** — slice arrays/strings without heap allocation; e.g. CSV parsing with `Span<T>` eliminated thousands of intermediate string allocations per request.
+- **Redesigned thread pool/async** — better work-stealing, lower thread-switch overhead for `async`/`await`-heavy APIs.
+- **Kestrel** — built from scratch for throughput, vs the IIS-pipeline-bound Framework hosting model.
+- **AOT/ReadyToRun (.NET 6+)** — pre-JITted code cuts cold-start time, which matters a lot for Azure Functions.
+
+Real observation: migrating a service from .NET Framework 4.6 to .NET 6 dropped average API response time ~30% with **zero code changes** — purely from the runtime upgrade.
+
+---
+
+### Q132. [Topic: OOP] Four pillars of OOP — an alternate real-project example
+
+*(See also Q1 for the Capital Access framing — same concepts, different project story for interview variety.)*
+
+- **Encapsulation** — `Entity` exposes properties via controlled getters/setters; the shareholding computation formula (`CalculatePercentage()`) is private, invoked only through a service method. Changed the formula once without touching any consumer.
+- **Abstraction** — `IEntityRepository` declares `GetByIdAsync()`/`CreateAsync()`; the service depends on the interface, not the EF Core implementation, so unit tests inject a mock with no DB needed.
+- **Inheritance** — `BaseApiController` gives every controller standardized response helpers; a `BaseEntity` class with `CreatedAt`/`UpdatedAt`/`IsDeleted` is inherited by every domain entity so audit fields populate automatically in a `SaveChangesAsync()` override.
+- **Polymorphism** — `IShareholdingCalculator` has `DirectHoldingCalculator` and `IndirectHoldingCalculator` implementations; a factory resolves the right one at runtime. Adding a new calculation type is a new class only (OCP again).
+
+---
+
+### Q133. [Topic: Security] How do you secure some API endpoints while keeping others open?
+
+`[Authorize]` at the controller level (secure by default), with `[AllowAnonymous]` on specific public actions, plus role- or policy-based authorization for finer-grained rules:
+
+```csharp
+[Authorize] // secure by default for the whole controller
+[ApiController]
+public class EntitiesController : ControllerBase
+{
+    [AllowAnonymous]
+    [HttpGet("public/entities")]
+    public IActionResult GetPublicEntities() => Ok(...);
+
+    [Authorize(Roles = "Admin")]
+    [HttpDelete("{id}")]
+    public IActionResult Delete(int id) => Ok(...);
+
+    [Authorize(Policy = "CanEditEntities")] // policy-based, for rules more complex than a role name
+    [HttpPut("{id}")]
+    public IActionResult Update(int id, EntityDto dto) => Ok(...);
+}
+```
+
+Applying `[Authorize]` at the controller level means a newly-added action is automatically protected unless a developer *explicitly* opts it out with `[AllowAnonymous]` — the safe default is "protected."
+
+---
+
+### Q134. [Topic: ASP.NET Core] How do you document API endpoints?
+
+Three layers: **Swagger/OpenAPI** (primary, auto-generated) via Swashbuckle, **XML doc comments** on controllers/DTOs that Swagger surfaces in its UI, and **README/Confluence** for cross-cutting context (auth flow, rate limits, pagination conventions) that Swagger can't express.
+
+```csharp
+builder.Services.AddSwaggerGen(c =>
+{
+    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Entity API", Version = "v1" });
+    c.IncludeXmlComments(xmlPath);
+});
+
+/// <summary>Get entity by ID</summary>
+/// <param name="id">Entity identifier</param>
+/// <response code="200">Entity found</response>
+/// <response code="404">Entity not found</response>
+[ProducesResponseType(typeof(EntityDto), 200)]
+[ProducesResponseType(404)]
+[HttpGet("{id}")]
+public async Task<IActionResult> GetById(int id) { /* ... */ }
+```
+
+Senior point worth stating out loud: Swagger UI should be disabled or locked behind auth in production — left open, it's a live map of your attack surface.
+
+---

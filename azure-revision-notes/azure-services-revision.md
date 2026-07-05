@@ -237,6 +237,126 @@ The story in one breath: a user logs in through **Okta**, hits the SPA through *
 
 ---
 
+## Interview Rounds — Additional Q&A
+
+*Sourced from live interview rounds: Wipro (R1, R2), Decos Global (R1), HCL (R1), Virtusa (R1). Framed through the Entity Management System project (Grant Thornton, healthcare domain).*
+
+### Which Azure services have you used, hands-on?
+
+- **Azure App Service** — hosts the .NET Core Web API; deployment slots (staging → production swap) for zero-downtime releases.
+- **Azure Static Web Apps** — hosts the Angular SPA.
+- **Azure SQL Database** — managed SQL Server, with geo-redundant backups, long-term retention, and Query Performance Insight.
+- **Azure Functions** — serverless event-driven background processing (Timer trigger for scheduled recalculations, HTTP trigger for lightweight webhook endpoints, Service Bus trigger for async event processing).
+- **Azure Service Bus** — async messaging between services; Topics + Subscriptions for fan-out (one event → multiple subscribers, e.g. Notification + Audit).
+- **Azure Blob Storage** — document storage (PDFs, Excel uploads); SAS tokens for time-limited client-direct upload URLs.
+- **Azure Cosmos DB** — semi-structured/unstructured JSON data where schema flexibility and low-latency global reads mattered more than relational integrity.
+- **Azure Key Vault** — connection strings and JWT signing keys, retrieved via Managed Identity — no secrets in code or pipeline variables.
+- **Azure DevOps** — CI/CD: build → unit test → publish artifact → deploy to staging → smoke test → swap to production.
+- **Application Insights** — distributed tracing, custom events, performance counters, availability (ping) tests, alert rules on P95 latency.
+- **Azure API Management** — gateway for microservices: auth, rate limiting, routing.
+- **Azure Container Registry / Container Apps** — Docker image storage and serverless container hosting (an alternative to full AKS when you don't need Kubernetes-level control).
+
+---
+
+### Azure Functions vs Web API — when do you choose which, and HTTP vs Timer trigger?
+
+**Web API**: always-on, synchronous, zero cold start — best for real-time, user-facing requests.
+
+**Azure Functions**: serverless, event-triggered, auto-scales for bursty workloads, lower infrastructure overhead — ideal for background/async work. Trade-off: cold-start latency on the first invocation after idle.
+
+What introduced the need for Functions on the Entity Management System: shareholding recalculation was CPU-intensive and needed to run **without** blocking the main upload API's response — Functions decoupled that background work and triggered it automatically on a data event, instead of tying up a Web API request thread.
+
+- **HTTP Trigger** — invoked by an HTTP request; behaves like a lightweight serverless endpoint (webhooks, on-demand actions).
+- **Timer Trigger** — runs on a CRON schedule (e.g., `0 */5 * * * *` = every 5 minutes); used for scheduled jobs like cleanup or report generation.
+- **Service Bus Trigger** — fires when a message lands on a queue/topic; the main pattern used for the recalculation pipeline below.
+
+```csharp
+// Service Bus-triggered Function — decouples recalculation from the upload API
+[FunctionName("RecalculateShareholding")]
+public async Task Run(
+    [ServiceBusTrigger("shareholding-events", Connection = "ServiceBusConn")]
+    ShareholdingEventMessage message,
+    ILogger log)
+{
+    log.LogInformation($"Processing batch {message.BatchId} for {message.EntityIds.Count} entities");
+
+    var results = await _shareholdingService.RecalculateAsync(message.EntityIds);
+    await _auditService.LogBatchAsync(message.BatchId, results);
+
+    var breaches = results.Where(r => r.ExceedsThreshold);
+    if (breaches.Any())
+        await _notificationService.SendBreachAlertsAsync(breaches);
+}
+
+// Simpler HTTP-triggered Function — add-customer webhook style endpoint
+[FunctionName("AddCustomer")]
+public static async Task<IActionResult> Run(
+    [HttpTrigger(AuthorizationLevel.Function, "post", Route = "customers")] HttpRequest req,
+    ILogger log)
+{
+    string body = await new StreamReader(req.Body).ReadToEndAsync();
+    var customer = JsonConvert.DeserializeObject<Customer>(body);
+    // save logic here
+    return new OkObjectResult(customer);
+}
+```
+
+Why a Function over a background thread inside the API: it auto-scales with queue depth (10 queued uploads → 10 parallel Function instances), gets Service Bus's built-in retry policy (exponential backoff, dead-letter after N attempts) for free, fully decouples the upload API (which can return `202 Accepted` immediately), and is billed only for actual execution time.
+
+---
+
+### How do you deploy an Azure Function?
+
+Two paths depending on stage: an Azure DevOps YAML pipeline for production, and Azure Functions Core Tools for local/dev quick fixes.
+
+```yaml
+# azure-pipelines.yml (simplified)
+- task: DotNetCoreCLI@2
+  inputs:
+    command: publish
+    projects: '**/ShareholdingFunction.csproj'
+    arguments: '--configuration Release --output $(Build.ArtifactStagingDirectory)'
+
+- task: AzureFunctionApp@1
+  inputs:
+    azureSubscription: 'Prod-Service-Connection'
+    appType: functionApp
+    appName: 'shareholding-func-prod'
+    package: '$(Build.ArtifactStagingDirectory)/**/*.zip'
+```
+
+Non-secret config lives in the Function App's Configuration blade; secrets (Service Bus connection string, SQL connection) live in Azure Key Vault, retrieved via Managed Identity — never in code or pipeline variables. Post-deploy, verify with the Application Insights Live Metrics stream (invocations firing correctly) and an alert rule (failure rate > 5% in 5 minutes → email).
+
+---
+
+### Cosmos DB vs SQL Server — when do you pick which?
+
+*(See the [Azure Cosmos DB](#5-azure-cosmos-db) section above for the full Capital Access ownership-data deep dive — this is the condensed interview-answer version.)*
+
+**SQL Server**: relational, structured schema, ACID transactions, vertical scaling — the right default for anything with strong relational integrity requirements (financial transactions, entity/shareholding core data).
+
+**Cosmos DB**: NoSQL, schema-less JSON documents, global distribution, horizontal auto-scaling, multi-model, extremely low latency at global scale — used where schema flexibility and low-latency reads mattered more than relational joins (e.g., denormalized read models, activity feeds).
+
+---
+
+### A deploy causes cascading failures across dependent services, and rolling back isn't safe because the DB schema already moved forward — what do you do?
+
+**First action: contain the blast radius, not fix the root cause.**
+
+**Minute 0–2 — stop the bleeding**: swap the App Service deployment slot back to the previous stable slot. This only works if the schema migration was **additive** (new columns with defaults, nothing dropped/renamed) — the old code can tolerate additive changes. If slot swap isn't viable, scale instance count down to reduce concurrent failures and free DB connections.
+
+**Minute 2–4 — find the cascade source**: Application Insights → Failures blade, sorted by exception count, to find the *first* exception in the chain (the root cause) rather than chasing the downstream 503s it caused. Check the Service Bus dead-letter queue separately if async consumers are also failing.
+
+**Minute 4–7 — schema compatibility check**: confirm new columns have defaults so old code reads don't fail; if a column was renamed/dropped, a compatibility view (`CREATE VIEW v_OldName AS SELECT new_col AS old_col ...`) lets old code keep working.
+
+**Minute 7–10 — stabilize and communicate**: monitor the error rate after the slot swap; if it's dropping, hold and apply the real hotfix in the new slot; post a timestamped status update to the incident channel.
+
+**Why App Insights Live Metrics first, not Azure Monitor**: App Insights gives request-level detail with stack traces and a dependency map in one blade — in a cascading failure you need to know *where in the call chain it broke first*, which is exactly what the Dependencies view shows (e.g., 100% failing SQL calls vs a healthy Service Bus, pointing straight at the DB layer).
+
+**The underlying principle this all rests on**: schema migrations should be backward-compatible by design — "expand" in one deploy (add the column, keep the old one working), "contract" in a later deploy (remove the old column) once nothing depends on it anymore. This exact incident is the reason that pattern exists.
+
+---
+
 ## How we're working through each topic (the pattern so far)
 
 1. **Explain** — the concept, framed entirely through the Capital Access problem it solves, not in the abstract.
