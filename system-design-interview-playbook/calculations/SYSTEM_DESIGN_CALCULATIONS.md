@@ -55,7 +55,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Twitter</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>150M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">100</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(150M×100)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(150M×100)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">150K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">174K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">4</td>
@@ -69,7 +69,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">YouTube</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>500M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">50</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(500M×50)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(500M×50)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">250K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">289K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">5</td>
@@ -83,7 +83,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Instagram</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>400M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">80</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(400M×80)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(400M×80)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">320K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">370K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">5</td>
@@ -97,7 +97,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">WhatsApp</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>200M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">150</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(200M×150)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(200M×150)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">300K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">347K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">6</td>
@@ -111,7 +111,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Facebook</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>300M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">120</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(300M×120)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(300M×120)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">360K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">417K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">4</td>
@@ -125,7 +125,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Uber</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>50M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">500</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(50M×500)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(50M×500)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">250K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">289K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">8</td>
@@ -139,7 +139,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">LinkedIn</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>100M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">80</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(100M×80)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(100M×80)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">80K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">93K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">5</td>
@@ -153,7 +153,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Slack</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>10M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">200</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(10M×200)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(10M×200)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">20K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">23K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">10</td>
@@ -167,7 +167,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Netflix</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>200M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">20</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(200M×20)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(200M×20)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">40K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">46K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">3</td>
@@ -181,7 +181,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">E-commerce</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>50M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">100</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(50M×100)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(50M×100)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">50K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">58K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">10</td>
@@ -195,7 +195,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Google Search</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>1000M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">10</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(1000M×10)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(1000M×10)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">100K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">116K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">3</td>
@@ -209,7 +209,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Banking App</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>30M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">50</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(30M×50)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(30M×50)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">15K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">17K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">3</td>
@@ -223,7 +223,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Notification</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>500M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">50</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(500M×50)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(500M×50)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">250K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">289K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">5</td>
@@ -237,7 +237,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Weather App</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>100M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">30</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(100M×30)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(100M×30)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">30K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">35K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">2</td>
@@ -251,7 +251,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Stripe</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>10M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">1000</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(10M×1000)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(10M×1000)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">100K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">116K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">6</td>
@@ -265,7 +265,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Google Drive</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>200M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">30</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(200M×30)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(200M×30)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">60K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">69K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">4</td>
@@ -279,7 +279,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Dropbox</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>100M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">40</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(100M×40)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(100M×40)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">40K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">46K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">5</td>
@@ -293,7 +293,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">IRCTC</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>5M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">300</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(5M×300)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(5M×300)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">15K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">17K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">50</td>
@@ -307,7 +307,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Newsfeed</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>300M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">100</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(300M×100)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(300M×100)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">300K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">347K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">4</td>
@@ -321,7 +321,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Zerodha</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>20M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">2000</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(20M×2000)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(20M×2000)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">400K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">463K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">5</td>
@@ -335,7 +335,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">ICICI Bank</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>15M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">100</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(15M×100)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(15M×100)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">15K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">17K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">5</td>
@@ -349,7 +349,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">HDFC Bank</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>20M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">80</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(20M×80)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(20M×80)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">16K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">19K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">5</td>
@@ -363,7 +363,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Google Maps</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>150M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">200</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(150M×200)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(150M×200)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">300K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">347K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">4</td>
@@ -377,7 +377,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Spotify</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>400M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">60</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(400M×60)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(400M×60)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">240K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">278K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">3</td>
@@ -391,7 +391,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Gaana</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>150M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">70</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(150M×70)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(150M×70)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">105K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">122K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">3</td>
@@ -405,7 +405,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Amazon</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>150M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">150</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(150M×150)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(150M×150)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">225K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">260K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">8</td>
@@ -419,7 +419,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">Airbnb</td>
 <td style="border: 1px solid #ddd; padding: 2px;"><strong>50M</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">200</td>
-<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold; font-family: monospace;"><strong>(50M×200)÷100K</strong></td>
+<td style="border: 1px solid #ddd; padding: 2px; background-color: #fff3cd; font-weight: bold;"><strong>(50M×200)÷100K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">100K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">116K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">6</td>
