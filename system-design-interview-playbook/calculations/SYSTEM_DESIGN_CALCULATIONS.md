@@ -46,7 +46,6 @@
 <th style="border-right: 1px solid #ccc; padding: 0px;">PeakMM</th>
 <th style="border-right: 1px solid #ccc; padding: 0px;">PeakEx</th>
 <th style="border-right: 1px solid #ccc; padding: 0px;">Srv</th>
-<th style="padding: 0px;">Notes</th>
 </tr>
 </thead>
 <tbody style="font-size: 6px; line-height: 1;">
