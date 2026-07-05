@@ -1069,6 +1069,188 @@ Read DB:  EngagementSummaries  (denormalized view, AsNoTracking, fast SELECT)
 
 ---
 
+### CQRS on Azure — Capital Access Ownership Data Story
+
+> 🗣️ **How to explain in interview (AWS diagram → Azure redesign):**
+> "If someone shows me a CQRS diagram built on AWS — Kafka, SQS, Lambda — I can map it directly to Azure. Azure Event Hubs is Kafka-compatible, Azure Service Bus replaces SQS, Azure Functions replace Lambda, and Cosmos DB gives us the schemaless, regionally-distributed Read DB. The pattern is identical; the services are Azure-native."
+
+![CQRS Azure Architecture](./cqrs-azure-architecture.svg)
+
+#### The Problem CQRS Solves in Capital Access — Ownership Data
+
+At quarter-end, Capital Access ingests bulk ownership data from regulatory filings (13-F, EDGAR). This produces a write storm — thousands of `UpdateOwnership` commands per minute. Meanwhile, institutional clients are hitting the Ownership Dashboard for real-time reads.
+
+**Without CQRS:** both workloads hit the same Azure SQL database. Quarter-end bulk writes create lock contention that makes every dashboard read slow or timeout.
+
+**With CQRS:** the write side absorbs the ingestion burst into Azure SQL. Azure Functions project the changes asynchronously into Cosmos DB. Dashboard reads never touch Azure SQL.
+
+#### Azure Service Mapping (AWS → Azure)
+
+```
+AWS Service                   →  Azure Equivalent
+──────────────────────────────────────────────────────────────────
+Apache Kafka (Event Broker)   →  Azure Event Hubs  (Kafka-compatible)
+Command Handler pods          →  AKS microservice pods
+Write DB (event store)        →  Azure SQL  (normalized, ACID)
+Event Processor (Lambda)      →  Azure Functions  (event-triggered)
+SQS Queue (UpdateReadDB)      →  Azure Service Bus Queue
+Read DB Updater (Lambda)      →  Azure Functions  (Service Bus trigger)
+Read DB (denormalized)        →  Azure Cosmos DB  (NoSQL, sub-10ms reads)
+Query Handler pods            →  AKS microservice pods + MediatR
+```
+
+#### Architecture Flow — Capital Access Ownership
+
+```
+WRITE SIDE (quarter-end bulk ingestion):
+─────────────────────────────────────────────────────────────────────────
+  AKS pod (Ownership ingestor)
+    │
+    ├──▶ Command: UpdateOwnership { tenantId, companyId, shareholderData, filingDate }
+    │
+    │  [Azure Event Hubs — Kafka-compatible broker]
+    │       Partitioned by tenantId → ordered delivery per tenant
+    │
+    ▼
+  AKS pod (Command Handler)
+    │  ① Validates: is this filing date newer than what we have? (idempotency)
+    │  ② Writes to Azure SQL Write DB — append-only OwnershipEvents table
+    │  ③ Publishes OwnershipUpdatedEvent to Azure Service Bus Topic
+    │
+    └──▶ [Azure Service Bus Queue: UpdateReadDB-ownership]
+
+READ MODEL UPDATE (asynchronous, ~100–500ms lag):
+─────────────────────────────────────────────────────────────────────────
+  [Azure Functions — Service Bus trigger]
+    │  ① Reads OwnershipUpdatedEvent from queue
+    │  ② Fetches company profile from Companies service (cached)
+    │  ③ Projects into Cosmos DB document (UI-optimized shape):
+    │     {
+    │       id: "spg-001_AAPL",     // partitionKey: tenantId
+    │       tenantId: "SPG-001",
+    │       companyName: "Apple Inc.",
+    │       totalShares: 1_500_000,
+    │       topShareholders: [...], // pre-sorted
+    │       lastUpdated: "2026-03-31T10:45:00Z"
+    │     }
+    │
+    └──▶ [Azure Cosmos DB — Read DB]
+
+READ SIDE (real-time dashboard):
+─────────────────────────────────────────────────────────────────────────
+  Angular dashboard → HTTP → AKS pod (Query Handler)
+    │
+    └──▶ GetOwnershipDashboardQuery { tenantId: "SPG-001" }
+              │
+              └──▶ Cosmos DB point-read by partitionKey=tenantId
+                        → returns pre-shaped document instantly (sub-10ms)
+                        → no joins, no Azure SQL contention
+
+DISASTER RECOVERY — Recreate Read DB:
+─────────────────────────────────────────────────────────────────────────
+  If Cosmos DB is corrupted/lost → replay all events from Azure SQL OwnershipEvents
+  → Azure Function replays history → Cosmos DB rebuilt to current state
+  (This is the dashed "Recreate Read DB" arrow on the diagram)
+```
+
+#### Capital Access Commands and Queries
+
+```
+COMMANDS (write side → Azure SQL):
+  UpdateOwnership   { tenantId, companyId, shareholderData, filingDate }
+  CreateEngagement  { tenantId, companyId, type, scheduledAt }
+  AddToTargetingList{ tenantId, companyId, listId, addedBy }
+
+QUERIES (read side → Cosmos DB):
+  GetOwnershipDashboard { tenantId }            → pre-shaped ownership view
+  GetEngagementReport   { tenantId, dateRange } → engagement summary view
+  GetTargetingList      { tenantId, listId }    → targeting members view
+```
+
+#### Eventual Consistency — How We Handle It
+
+```
+Quarter-end scenario:
+  10:00:00 — UpdateOwnership command committed to Azure SQL ✅
+  10:00:00 — Event published to Service Bus
+  10:00:00.3 — Azure Function picks up event (~300ms lag)
+  10:00:00.8 — Cosmos DB document updated ✅
+
+  If dashboard is loaded at 10:00:00.2 → user sees previous ownership data
+  The UI shows a "Last updated: 10:00:00" timestamp → transparency, not a bug.
+  At 10:00:00.9 → UI auto-refreshes → correct data appears.
+
+For audit/compliance: always read from Azure SQL Write DB (strong consistency).
+For dashboard/reporting: read from Cosmos DB (eventual, fast).
+```
+
+#### Why Cosmos DB for the Read Side?
+
+```
+Azure SQL (Write DB):        Normalized, relational, ACID, EF Core change tracking
+Azure Cosmos DB (Read DB):   Document, schemaless, RU-based, 10ms p99 globally
+
+Cosmos DB partition key = tenantId → all reads for a tenant are one partition lookup.
+Pre-shaped documents mean zero joins at query time.
+Global replication → dashboard reads served from nearest region.
+```
+
+#### Full MediatR Flow (Azure Functions integration)
+
+```csharp
+// Azure Function — triggered by Service Bus message
+[FunctionName("UpdateOwnershipReadModel")]
+public async Task Run(
+    [ServiceBusTrigger("ownership-events", Connection = "ServiceBus")] string message,
+    ILogger log)
+{
+    var evt = JsonSerializer.Deserialize<OwnershipUpdatedEvent>(message);
+
+    // Build Cosmos DB document (UI-optimized shape)
+    var doc = new OwnershipView
+    {
+        Id             = $"{evt.TenantId}_{evt.CompanyId}",
+        TenantId       = evt.TenantId,  // partition key
+        CompanyName    = await _companyCache.GetNameAsync(evt.CompanyId),
+        TotalShares    = evt.TotalShares,
+        TopShareholders = evt.Shareholders
+                              .OrderByDescending(s => s.ShareCount)
+                              .Take(10)
+                              .ToList(),
+        LastUpdated    = evt.FilingDate
+    };
+
+    await _container.UpsertItemAsync(doc, new PartitionKey(evt.TenantId));
+}
+
+// MediatR Query Handler — reads from Cosmos DB
+public class GetOwnershipDashboardHandler
+    : IRequestHandler<GetOwnershipDashboardQuery, OwnershipDashboardDto>
+{
+    private readonly Container _container;
+
+    public async Task<OwnershipDashboardDto> Handle(
+        GetOwnershipDashboardQuery q, CancellationToken ct)
+    {
+        // Point read — O(1), ~5ms, no joins
+        var response = await _container.ReadItemAsync<OwnershipView>(
+            id           : $"{q.TenantId}_{q.CompanyId}",
+            partitionKey : new PartitionKey(q.TenantId),
+            cancellationToken: ct);
+
+        return new OwnershipDashboardDto
+        {
+            CompanyName     = response.Resource.CompanyName,
+            TotalShares     = response.Resource.TotalShares,
+            TopShareholders = response.Resource.TopShareholders,
+            LastUpdated     = response.Resource.LastUpdated
+        };
+    }
+}
+```
+
+---
+
 ## 14. BFF — Backend for Frontend
 
 > 🗣️ **Capital Access — How to explain in interview:**
