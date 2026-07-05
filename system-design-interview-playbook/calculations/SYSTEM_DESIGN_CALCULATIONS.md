@@ -37,16 +37,14 @@
 <thead style="background-color: #f0f0f0; font-weight: bold; border-bottom: 2px solid #333;">
 <tr>
 <th style="border: 1px solid #ddd; padding: 1px; width: 11%;">System</th>
-<th style="border: 1px solid #ddd; padding: 1px; width: 5%;">DAU(M)</th>
-<th style="border: 1px solid #ddd; padding: 1px; width: 4%;">Req/day</th>
-<th style="border: 1px solid #ddd; padding: 1px; width: 7%; font-weight: bold;">Formula</th>
-<th style="border: 1px solid #ddd; padding: 1px; width: 6%;">Avg MM</th>
+<th style="border: 1px solid #ddd; padding: 1px; width: 6%;">DAU(M)</th>
+<th style="border: 1px solid #ddd; padding: 1px; width: 5%;">Req/day</th>
+<th style="border: 1px solid #ddd; padding: 1px; width: 7%;">Avg MM</th>
 <th style="border: 1px solid #ddd; padding: 1px; width: 6%;">Avg Exact</th>
 <th style="border: 1px solid #ddd; padding: 1px; width: 3%;">×</th>
 <th style="border: 1px solid #ddd; padding: 1px; width: 6%;">Peak MM</th>
 <th style="border: 1px solid #ddd; padding: 1px; width: 6%;">Peak Exact</th>
-<th style="border: 1px solid #ddd; padding: 1px; width: 5%;">÷1K</th>
-<th style="border: 1px solid #ddd; padding: 1px; width: 4%;">Servers</th>
+<th style="border: 1px solid #ddd; padding: 1px; width: 5%;">Servers</th>
 <th style="border: 1px solid #ddd; padding: 1px; width: 9%;">Notes</th>
 </tr>
 </thead>
@@ -61,7 +59,6 @@
 <td style="border: 1px solid #ddd; padding: 2px;">4</td>
 <td style="border: 1px solid #ddd; padding: 2px;">600K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">696K</td>
-<td style="border: 1px solid #ddd; padding: 2px;"><strong>696÷1K</strong></td>
 <td style="border: 1px solid #ddd; padding: 2px;">696</td>
 <td style="border: 1px solid #ddd; padding: 2px;">High write: tweets, RTs, favorites</td>
 </tr>
@@ -145,7 +142,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">5</td>
 <td style="border: 1px solid #ddd; padding: 2px;">400K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">465K</td>
-<td style="border: 1px solid #ddd; padding: 2px;">465÷1K</td>
+
 <td style="border: 1px solid #ddd; padding: 2px;">465</td>
 <td style="border: 1px solid #ddd; padding: 2px;">B2B: less peak variance</td>
 </tr>
@@ -159,7 +156,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">10</td>
 <td style="border: 1px solid #ddd; padding: 2px;">200K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">231K</td>
-<td style="border: 1px solid #ddd; padding: 2px;">231÷1K</td>
+
 <td style="border: 1px solid #ddd; padding: 2px;">231</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Messaging: high peak during work hours</td>
 </tr>
@@ -173,7 +170,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">3</td>
 <td style="border: 1px solid #ddd; padding: 2px;">120K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">139K</td>
-<td style="border: 1px solid #ddd; padding: 2px;">139÷1K</td>
+
 <td style="border: 1px solid #ddd; padding: 2px;">139</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Streaming: metadata QPS low, bandwidth high</td>
 </tr>
@@ -187,7 +184,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">10</td>
 <td style="border: 1px solid #ddd; padding: 2px;">500K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">579K</td>
-<td style="border: 1px solid #ddd; padding: 2px;">579÷1K</td>
+
 <td style="border: 1px solid #ddd; padding: 2px;">579</td>
 <td style="border: 1px solid #ddd; padding: 2px;">High peak: holiday shopping</td>
 </tr>
@@ -201,7 +198,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">3</td>
 <td style="border: 1px solid #ddd; padding: 2px;">300K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">347K</td>
-<td style="border: 1px solid #ddd; padding: 2px;">347÷1K</td>
+
 <td style="border: 1px solid #ddd; padding: 2px;">347</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Distributed: federated queries</td>
 </tr>
@@ -215,7 +212,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">3</td>
 <td style="border: 1px solid #ddd; padding: 2px;">45K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">52K</td>
-<td style="border: 1px solid #ddd; padding: 2px;">52÷1K</td>
+
 <td style="border: 1px solid #ddd; padding: 2px;">52</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Low peak: predictable hours</td>
 </tr>
@@ -243,7 +240,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">2</td>
 <td style="border: 1px solid #ddd; padding: 2px;">60K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">69K</td>
-<td style="border: 1px solid #ddd; padding: 2px;">69÷1K</td>
+
 <td style="border: 1px solid #ddd; padding: 2px;">69</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Steady: low variance</td>
 </tr>
@@ -257,7 +254,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">6</td>
 <td style="border: 1px solid #ddd; padding: 2px;">600K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">694K</td>
-<td style="border: 1px solid #ddd; padding: 2px;">694÷1K</td>
+
 <td style="border: 1px solid #ddd; padding: 2px;">694</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Payment: complex validation</td>
 </tr>
@@ -271,7 +268,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">4</td>
 <td style="border: 1px solid #ddd; padding: 2px;">240K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">278K</td>
-<td style="border: 1px solid #ddd; padding: 2px;">278÷1K</td>
+
 <td style="border: 1px solid #ddd; padding: 2px;">278</td>
 <td style="border: 1px solid #ddd; padding: 2px;">File storage: read-heavy</td>
 </tr>
@@ -285,7 +282,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">5</td>
 <td style="border: 1px solid #ddd; padding: 2px;">200K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">231K</td>
-<td style="border: 1px solid #ddd; padding: 2px;">231÷1K</td>
+
 <td style="border: 1px solid #ddd; padding: 2px;">231</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Sync service: CDC patterns</td>
 </tr>
@@ -299,7 +296,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">50</td>
 <td style="border: 1px solid #ddd; padding: 2px;">750K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">868K</td>
-<td style="border: 1px solid #ddd; padding: 2px;"><strong>868÷1K</strong></td>
+
 <td style="border: 1px solid #ddd; padding: 2px;">868</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Extreme peak: ticket release</td>
 </tr>
@@ -341,7 +338,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">5</td>
 <td style="border: 1px solid #ddd; padding: 2px;">75K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">87K</td>
-<td style="border: 1px solid #ddd; padding: 2px;">87÷1K</td>
+
 <td style="border: 1px solid #ddd; padding: 2px;">87</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Banking: low DAU, steady</td>
 </tr>
@@ -355,7 +352,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">5</td>
 <td style="border: 1px solid #ddd; padding: 2px;">80K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">93K</td>
-<td style="border: 1px solid #ddd; padding: 2px;"><strong>93÷1K</strong></td>
+
 <td style="border: 1px solid #ddd; padding: 2px;">93</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Banking: steady + audit logs</td>
 </tr>
@@ -383,7 +380,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">3</td>
 <td style="border: 1px solid #ddd; padding: 2px;">720K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">833K</td>
-<td style="border: 1px solid #ddd; padding: 2px;"><strong>833÷1K</strong></td>
+
 <td style="border: 1px solid #ddd; padding: 2px;">833</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Streaming: metadata + playlist</td>
 </tr>
@@ -397,7 +394,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">3</td>
 <td style="border: 1px solid #ddd; padding: 2px;">315K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">365K</td>
-<td style="border: 1px solid #ddd; padding: 2px;"><strong>365÷1K</strong></td>
+
 <td style="border: 1px solid #ddd; padding: 2px;">365</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Music: India regional</td>
 </tr>
@@ -425,7 +422,7 @@
 <td style="border: 1px solid #ddd; padding: 2px;">6</td>
 <td style="border: 1px solid #ddd; padding: 2px;">600K</td>
 <td style="border: 1px solid #ddd; padding: 2px;">694K</td>
-<td style="border: 1px solid #ddd; padding: 2px;"><strong>694÷1K</strong></td>
+
 <td style="border: 1px solid #ddd; padding: 2px;">694</td>
 <td style="border: 1px solid #ddd; padding: 2px;">Booking: peak during holiday</td>
 </tr>
