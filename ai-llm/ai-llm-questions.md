@@ -15,6 +15,7 @@
 3. [What prompting techniques reduce token usage?](#q3-what-prompting-techniques-do-you-use-to-write-efficient-prompts)
 4. [What is an AI agent / agentic mode?](#q4-what-is-an-ai-agent-what-is-agentic-mode)
 5. [What is RAG?](#q5-what-is-rag-retrieval-augmented-generation-how-does-it-work)
+6. [How do you make RAG context-aware across conversation turns?](#q6-how-do-you-make-rag-context-aware-across-conversation-turns)
 
 ---
 
@@ -283,3 +284,184 @@ var answer = await kernel.InvokePromptAsync(prompt);
 ```
 
 > **Interview line**: "For our community knowledge app, I built a RAG pipeline in Python using Semantic Kernel. I chunked all our community PDFs and hard-copy guides into 500-token passages with 50-token overlap, embedded them with Gemini's embedding model, and stored them in a vector store. When a member asks a question, I embed the query, retrieve the top-5 chunks, and inject them into Claude's context. The model answers from the retrieved text — so it's always based on our actual documents, not Claude's training data."
+
+---
+
+### Q6. How do you make RAG context-aware across conversation turns?
+
+The naive trap: treat each query independently, retrieve fresh docs per turn, lose the conversation thread. When a user asks "How do I scale it?" in turn 2, the system has no idea what "it" was from turn 1.
+
+**The correct approach — a tiered strategy:**
+
+**1. Query Rewriting / Expansion** (simplest, highest ROI)
+
+Rewrite follow-up questions to include context from previous turns before retrieval:
+
+```
+User Turn 1: "What are microservices?"
+System: retrieves docs on microservices architecture
+
+User Turn 2: "How do I scale them?"
+❌ Naive: retrieve on "scale"
+✅ Correct: rewrite to "How do I scale microservices?" before retrieval
+```
+
+Use the LLM itself as a pre-processor:
+
+```python
+# Before retrieval, expand the query with context
+expansion_prompt = f"""
+Previous conversation:
+{format_recent_turns(conversation_history)}
+
+Current query: {current_query}
+
+Rewrite the current query to be standalone and include necessary context from the conversation.
+Return only the rewritten query, no explanation.
+"""
+
+expanded_query = llm.generate(expansion_prompt)
+retrieved_docs = vector_db.search(expanded_query, top_k=5)
+```
+
+---
+
+**2. Conversation State / Memory**
+
+Store what's been discussed to bias future retrievals:
+
+```python
+conversation_state = {
+    "discussed_topics": ["microservices", "scaling", "container orchestration"],
+    "retrieved_docs": {
+        "doc_id_1": 0.92,  # high relevance, already discussed
+        "doc_id_2": 0.88   # also retrieved earlier
+    },
+    "key_entities": {
+        "architecture": "microservices",
+        "deployment": "Kubernetes",
+        "concern": "auto-scaling"
+    }
+}
+
+# Future retrievals: de-prioritize already-discussed docs,
+# prioritize docs related to key entities
+retrieved = vector_db.search(
+    query, 
+    top_k=5,
+    bias_down=conversation_state["retrieved_docs"].keys(),  # avoid repetition
+    boost_entities=conversation_state["key_entities"]        # expand on related topics
+)
+```
+
+---
+
+**3. Context Injection Into Retrieval**
+
+Augment the retrieval query with conversation metadata:
+
+```
+Base query: "How do I monitor it?"
+Augmented query: "How do I monitor microservices that are auto-scaled in Kubernetes?
+Context from conversation: we discussed service discovery and container orchestration earlier."
+```
+
+This forces the retriever to see the full picture, not just "monitor" in isolation.
+
+---
+
+**4. Conversation Window in the LLM Prompt**
+
+Even if retrieval is per-turn, include the full conversation in the LLM context:
+
+```python
+final_prompt = f"""
+You are a helpful technical assistant. Here is the conversation so far:
+{format_conversation_history(limit=5)}
+
+Current question: {current_query}
+Retrieved documents: {format_retrieved_docs(retrieved_docs)}
+
+Answer the current question in the context of the full conversation.
+If the user is asking "more about X," resolve X to the topic from the previous turn.
+If the question is ambiguous, use the conversation history to clarify.
+"""
+
+answer = llm.generate(final_prompt)
+```
+
+The LLM can now resolve "What about X?" by looking back at what X was.
+
+---
+
+**5. Clarification on Ambiguous Follow-Ups**
+
+If a follow-up is ambiguous, resolve it or ask:
+
+```python
+# Detect ambiguous pronouns ("that", "it", "which one")
+if contains_ambiguous_pronoun(current_query):
+    # Extract the most-recent relevant noun from the conversation
+    most_likely_referent = extract_most_recent_entity(
+        conversation_history,
+        current_query
+    )
+    # Clarify: "Do you mean X?"
+    clarification = f"Did you mean more about {most_likely_referent}?"
+    # Or silently resolve and retrieve on that
+    resolved_query = current_query.replace("it", most_likely_referent)
+```
+
+---
+
+**Trade-offs & Comparison:**
+
+| Approach | Implementation Cost | Benefit | Best Used When |
+|----------|---|---|---|
+| Query rewriting | 1 LLM call per turn | Immediate improvement, no state | Always — cheap win |
+| Conversation state | Requires storage + bias logic | Prevents repetition, smart prioritization | Long conversations (5+ turns) |
+| Context injection | Augment retrieval query | Retriever sees full picture | Complex multi-document reasoning |
+| LLM prompt augmentation | Include conversation in system prompt | Resolves ambiguity, maintains coherence | All turns — foundational |
+| Clarification on ambiguity | Extract + resolve or ask | User explicitly confirms intent | When ambiguity is likely |
+
+---
+
+**Recommended hybrid approach (80/20):**
+
+1. **Always do query rewriting** — cheap, always helps
+2. **Always include conversation in LLM prompt** — the LLM can resolve ambiguity
+3. **Add conversation state tracking** if conversation is >5 turns or documents are being repeated
+4. **Add clarification prompting** only if you detect genuine ambiguity (pronouns without clear antecedent)
+
+```python
+def rag_conversation_turn(user_query, conversation_history, vector_db):
+    # Step 1: Rewrite query with context
+    expanded_query = rewrite_with_context(user_query, conversation_history)
+    
+    # Step 2: Retrieve on expanded query
+    retrieved_docs = vector_db.search(expanded_query, top_k=5)
+    
+    # Step 3: Build prompt with full conversation
+    prompt = f"""
+    {system_instructions}
+    
+    Conversation so far:
+    {format_conversation_history()}
+    
+    Retrieved documents: {format_docs(retrieved_docs)}
+    
+    Current question: {user_query}
+    
+    Answer based on the context and conversation history.
+    """
+    
+    # Step 4: Generate answer
+    answer = llm.generate(prompt)
+    
+    # Step 5: Store interaction for future turns
+    update_conversation_state(user_query, retrieved_docs, answer)
+    
+    return answer
+```
+
+> **Interview line**: "The key insight is that a follow-up like 'How do I scale it?' is meaningless without knowing what 'it' was. So before retrieval, I rewrite the query to include context from the conversation. Then I inject the full conversation history into the LLM prompt so it can resolve any remaining ambiguity. This way you get conversation continuity without needing a complex external memory system — the LLM itself is the state keeper. For long conversations, I'd add a conversation state tracker to de-prioritize already-retrieved documents and boost related entities."
