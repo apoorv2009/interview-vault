@@ -16,7 +16,7 @@
 
 | # | Problem | Difficulty | Date Solved |
 |---|---------|------------|-------------|
-| 1 | [Best Time to Buy and Sell Stock — LC 121](#1-best-time-to-buy-and-sell-stock--lc-121) | Easy | - |
+| 1 | [Best Time to Buy and Sell Stock — LC 121](#1-best-time-to-buy-and-sell-stock--lc-121) | Easy | 2026-07-06 |
 
 ---
 
@@ -24,7 +24,7 @@
 
 **LeetCode:** https://leetcode.com/problems/best-time-to-buy-and-sell-stock/
 **Difficulty:** Easy
-**Date:** -
+**Date:** 2026-07-06
 
 ### Problem Statement
 
@@ -41,19 +41,47 @@ Output: 0
 
 ### Approach
 
-_To be added_
+Walk forward once tracking two things — the cheapest price seen so far (buy day) and the max profit seen so far. At each day, if current price is cheaper than min, update the buy day. Otherwise calculate profit if sold today and update max profit. No need to go backwards or restart.
 
 ### Solution
 
-_To be added_
+```csharp
+public class Solution {
+    public int MaxProfit(int[] prices) {
+        int maxProfit = 0;
+        int minBuyingPrice = prices[0];
+
+        for (int i = 0; i < prices.Length; i++)
+        {
+            if (minBuyingPrice > prices[i])
+            {
+                minBuyingPrice = prices[i];  // found cheaper buy day
+            }
+            else
+            {
+                int profit = prices[i] - minBuyingPrice;
+                if (profit > maxProfit)
+                {
+                    maxProfit = profit;
+                }
+            }
+        }
+        return maxProfit;
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n) — single pass
+- **Space:** O(1)
+
+### Why O(n) and not O(n²)?
+
+Brute force fixes every buy day and checks all future sell days — two nested loops = O(n²). Sliding window walks forward once, always buying at the cheapest price seen so far. One loop, no restarts = O(n).
 
 ### Key Takeaway
 
-_To be added_
+You don't need to try every buy day. Just track `minPrice` as you go — the cheapest day seen so far is always the best buy day for any future sell day. Single pass is enough.
 
 ---
