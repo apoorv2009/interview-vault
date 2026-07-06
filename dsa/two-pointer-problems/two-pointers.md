@@ -20,6 +20,7 @@
 | 2 | [Two Sum II — LC 167](#2-two-sum-ii--lc-167) | Medium | 2026-06-29 |
 | 3 | [3Sum — LC 15](#3-3sum--lc-15) | Medium | 2026-06-29 |
 | 4 | [Container With Most Water — LC 11](#4-container-with-most-water--lc-11) | Medium | 2026-06-29 |
+| 5 | [Trapping Rain Water — LC 42](#5-trapping-rain-water--lc-42) | Hard | - |
 
 ---
 
@@ -311,5 +312,43 @@ public class Solution {
 ### Key Takeaway
 
 Always move the **shorter** pointer inward. Moving the taller pointer can never improve the answer — shorter wall limits height AND width is shrinking. Index difference = width, not value difference.
+
+---
+
+## 5. Trapping Rain Water — LC 42
+
+**LeetCode:** https://leetcode.com/problems/trapping-rain-water/
+**Difficulty:** Hard
+**Date:** -
+
+### Problem Statement
+
+Given an array `height` where `height[i]` represents the height of a bar, compute how much water can be trapped after raining.
+
+**Examples:**
+```
+Input:  height = [0,1,0,2,1,0,1,3,2,1,2,1]
+Output: 6
+
+Input:  height = [4,2,0,3,2,5]
+Output: 9
+```
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+### Key Takeaway
+
+_To be added_
 
 ---
