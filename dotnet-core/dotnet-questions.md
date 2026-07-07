@@ -19,7 +19,8 @@
 7. [LINQ (Q80–Q83)](#7-linq)
 8. [Additional Topics (Q84–Q89)](#8-additional-topics)
 9. [Platform, DI & Caching Deep Dive (Q90–Q96)](#9-platform-di--caching-deep-dive)
-10. [Interview Rounds — Additional Q&A (Q97–Q135)](#10-interview-rounds--additional-qa)
+10. [Interview Rounds — Additional Q&A (Q97–Q134)](#10-interview-rounds--additional-qa)
+11. [Core ASP.NET & Validation Topics (Q135–Q140)](#11-core-aspnet--validation-topics)
 
 ---
 
@@ -5356,5 +5357,317 @@ public async Task<IActionResult> GetById(int id) { /* ... */ }
 ```
 
 Senior point worth stating out loud: Swagger UI should be disabled or locked behind auth in production — left open, it's a live map of your attack surface.
+
+---
+
+### Q135. [Topic: Validation] Custom Validators — FluentValidation and DataAnnotations in C#?
+
+Two approaches: **Data Annotations** (built-in, simple) and **Fluent Validation** (expressive, complex rules).
+
+**Data Annotations** — declarative, on DTOs:
+
+```csharp
+public class CreateEntityRequest
+{
+    [Required(ErrorMessage = "Name is required")]
+    [StringLength(200, MinimumLength = 3)]
+    public string Name { get; set; }
+
+    [Range(0, 100)]
+    public decimal OwnershipPercent { get; set; }
+
+    [RegularExpression(@"^[A-Z]{2}[A-Z0-9]{9}[0-9]$", ErrorMessage = "Invalid ISIN")]
+    public string ISIN { get; set; }
+}
+
+// In controller — model binder validates automatically
+[HttpPost]
+public async Task<IActionResult> CreateEntity(CreateEntityRequest request)
+{
+    if (!ModelState.IsValid) return BadRequest(ModelState); // catches all annotation violations
+}
+```
+
+**Fluent Validation** — programmatic, reusable, complex multi-field rules:
+
+```csharp
+public class CreateEntityValidator : AbstractValidator<CreateEntityRequest>
+{
+    public CreateEntityValidator(IEntityRepository repo)
+    {
+        RuleFor(x => x.Name)
+            .NotEmpty()
+            .Length(3, 200)
+            .MustAsync(async (name, ct) => !await repo.ExistsByNameAsync(name, ct))
+            .WithMessage("Entity name must be unique");
+
+        RuleFor(x => x.OwnershipPercent)
+            .InclusiveBetween(0, 100);
+
+        RuleFor(x => x.ISIN)
+            .Matches(@"^[A-Z]{2}[A-Z0-9]{9}[0-9]$");
+
+        // Cross-field rule
+        RuleFor(x => x)
+            .Must(x => x.DirectOwnership + x.IndirectOwnership <= 100)
+            .WithMessage("Total ownership cannot exceed 100%");
+    }
+}
+
+// Register in DI
+builder.Services.AddValidatorsFromAssemblyContaining<CreateEntityValidator>();
+
+// In controller — automatically validated by MVC pipeline
+[HttpPost]
+public async Task<IActionResult> CreateEntity(CreateEntityRequest request)
+{
+    // If we get here, validation passed
+}
+```
+
+**When to use which:**
+- **Data Annotations** — simple, single-field rules (required, length, regex)
+- **Fluent Validation** — complex, multi-field rules, async validation, business logic (check DB for uniqueness), reusable validators across multiple DTOs
+
+I prefer Fluent Validation for production APIs — it keeps validation logic centralized and testable.
+
+---
+
+### Q136. [Topic: ASP.NET Core] What is CORS and what is its purpose?
+
+**CORS** (Cross-Origin Resource Sharing) is a security mechanism that controls which origins (domains) can make requests to your API from a browser. Without CORS, browsers block cross-origin requests by default (Same-Origin Policy).
+
+**Why it matters**: If your Angular SPA is on `https://app.example.com` and your API is on `https://api.example.com`, the browser blocks the request unless CORS explicitly allows it.
+
+```csharp
+// Program.cs
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowSpecificOrigins", policy =>
+    {
+        policy
+            .WithOrigins("https://app.example.com", "https://staging-app.example.com") // ✅ explicit allow list
+            .AllowAnyMethod()  // GET, POST, PUT, DELETE, PATCH all allowed
+            .AllowAnyHeader()  // Content-Type, Authorization, etc. all allowed
+            .AllowCredentials() // send cookies/auth headers
+            .WithExposedHeaders("X-Total-Count"); // client JS can read this custom header
+    });
+});
+
+app.UseCors("AllowSpecificOrigins");
+
+// In controller — can override per-action
+[HttpGet]
+[EnableCors("AllowSpecificOrigins")]
+public IActionResult GetEntity(int id) => Ok(...);
+
+[HttpPost]
+[DisableCors]  // this specific action requires same-origin
+public IActionResult CreateEntity() => Ok(...);
+```
+
+**❌ NEVER do this in production:**
+```csharp
+.AllowAnyOrigin()  // ← allows ANY domain to call your API — opens to CSRF attacks
+```
+
+**CORS flow:**
+1. Browser makes a request to the API from a different origin
+2. Browser sends an `Origin` header
+3. API responds with `Access-Control-Allow-Origin` header
+4. Browser checks if the header matches the request origin — if yes, allows the response
+
+---
+
+### Q137. [Topic: EF Core] What is Change Tracking in Entity Framework Core?
+
+Change tracking is EF Core's mechanism to monitor which entities have been added, modified, or deleted since they were loaded, so it knows which entities to insert/update/delete when `SaveChangesAsync()` is called.
+
+```csharp
+var entity = await _db.Entities.FirstOrDefaultAsync(e => e.Id == 1);
+entity.Name = "Updated Name";  // EF Core detects this change automatically
+
+// When you call SaveChangesAsync(), EF knows to execute UPDATE only for this entity
+await _db.SaveChangesAsync();  // ✅ generates UPDATE SQL
+```
+
+**Entity states** (tracked by EF Core):
+- **Detached** — not being tracked
+- **Added** — new entity, will INSERT on SaveChanges
+- **Unchanged** — loaded from DB, not modified
+- **Modified** — loaded from DB, has changes (will UPDATE)
+- **Deleted** — marked for deletion (will DELETE)
+
+**Controlling tracking:**
+
+```csharp
+// ✅ Track by default
+var entity = await _db.Entities.FirstOrDefaultAsync(e => e.Id == 1);
+
+// ❌ Don't track (read-only queries)
+var entity = await _db.Entities.AsNoTracking().FirstOrDefaultAsync(e => e.Id == 1);
+// entity.Name = "X"; // change won't be saved even if SaveChangesAsync() is called
+
+// Query tracking explicitly
+_db.Entities.Attach(entity); // start tracking a detached entity
+_db.Entities.Update(entity); // track as modified
+_db.Entities.Remove(entity); // track for deletion
+```
+
+**Performance note**: Tracking has overhead. For read-heavy queries (dashboards, reports), use `AsNoTracking()` to skip change tracking.
+
+---
+
+### Q138. [Topic: EF Core] What are Entity States in Entity Framework Core?
+
+Entity states represent the current lifecycle status of an entity in EF Core's change tracker:
+
+| State | Description | SaveChanges behavior |
+|---|---|---|
+| **Detached** | Not tracked by DbContext | Nothing happens |
+| **Added** | Newly created, not in DB | `INSERT` executed |
+| **Unchanged** | Loaded from DB, no changes | Nothing happens |
+| **Modified** | Loaded from DB, has changes | `UPDATE` executed |
+| **Deleted** | Marked for removal | `DELETE` executed |
+
+```csharp
+// ADDED state
+var newEntity = new Entity { Name = "New" };
+_db.Entities.Add(newEntity);
+Console.WriteLine(_db.Entry(newEntity).State);  // Added
+await _db.SaveChangesAsync(); // INSERT
+
+// UNCHANGED state
+var entity = await _db.Entities.FirstOrDefaultAsync(e => e.Id == 1);
+Console.WriteLine(_db.Entry(entity).State);  // Unchanged
+
+// MODIFIED state
+entity.Name = "Updated";
+Console.WriteLine(_db.Entry(entity).State);  // Modified
+await _db.SaveChangesAsync(); // UPDATE
+
+// DELETED state
+_db.Entities.Remove(entity);
+Console.WriteLine(_db.Entry(entity).State);  // Deleted
+await _db.SaveChangesAsync(); // DELETE
+
+// DETACHED state
+var detached = new Entity { Id = 999, Name = "Orphan" };
+Console.WriteLine(_db.Entry(detached).State);  // Detached (never added to context)
+```
+
+**Why it matters for interviews**: Understanding states helps explain why a change didn't save (entity was never attached) or why an entity appeared twice in the DB (was added instead of updated).
+
+---
+
+### Q139. [Topic: Performance] What are the different ways to optimize a Web API?
+
+A tiered approach across all layers:
+
+**1. Database layer:**
+- Use **indexes** on WHERE/JOIN/ORDER BY columns
+- Identify and fix **N+1 queries** (use `.Include()` or stored procedures)
+- Use **`AsNoTracking()`** for read-only queries
+- Use **pagination** (OFFSET/FETCH) for large result sets
+- Use **stored procedures** for complex aggregations instead of LINQ
+
+**2. ORM layer (EF Core):**
+- **Eager loading** (`.Include()`) instead of lazy loading
+- **Projection** (`.Select(e => new Dto { ... })`) instead of `SELECT *`
+- **Batch operations** instead of single-entity loops
+- **Connection pooling** (configured by default, tune if needed)
+
+**3. API layer:**
+- **Response compression** (`AddResponseCompression()`)
+- **Caching** (Redis for frequently-read data, in-memory for reference data)
+- **Rate limiting** to prevent abuse
+- **Pagination** in responses (50 items per page, not 50,000)
+- **Async/await** throughout (no blocking threads on I/O)
+
+**4. Client layer (Angular):**
+- **Server-side pagination** instead of loading all data
+- **Virtual scrolling** for long lists (render only visible rows)
+- **`OnPush` change detection** to reduce re-renders
+- **`trackBy` in `*ngFor`** to preserve DOM nodes on list updates
+- **Lazy loading routes** to defer bundle download
+
+**5. Infrastructure:**
+- **CDN** for static assets and API responses (Azure Front Door, CloudFlare)
+- **Load balancing** across multiple API instances
+- **Auto-scaling** based on CPU/memory (Azure App Service scale rules)
+- **Distributed caching** (Redis shared across instances)
+
+**Diagnostic approach** (before optimizing, measure):
+1. Identify slow layer using Application Insights (is it DB, API, network, client?)
+2. Profile that layer (SQL Profiler for DB, Chrome DevTools for client)
+3. Apply targeted fix
+4. Measure improvement with before/after metrics
+
+Example from production: dashboard took 8s → Profiler showed N+1 queries → rewrote as one CTE → 420ms ✅
+
+---
+
+### Q140. [Topic: ASP.NET Core] What is Dependency Injection (DI) and why is it important?
+
+**DI** is a pattern where a class receives its dependencies (collaborators) from the outside rather than creating them internally. Instead of `new`-ing up objects, you let a container construct and inject them.
+
+```csharp
+// ❌ WITHOUT DI — hard to test, tightly coupled
+public class EntityService
+{
+    private readonly DbContext _db = new AppDbContext(); // creates its own dependency
+    
+    public async Task<Entity> GetAsync(int id)
+    {
+        return await _db.Entities.FirstOrDefaultAsync(e => e.Id == id);
+    }
+}
+// In a unit test, you're forced to test against the real database ❌
+
+// ✅ WITH DI — loose coupling, testable
+public class EntityService
+{
+    private readonly IEntityRepository _repo;
+    
+    public EntityService(IEntityRepository repo)
+    {
+        _repo = repo;  // dependency is injected
+    }
+    
+    public async Task<Entity> GetAsync(int id)
+    {
+        return await _repo.GetByIdAsync(id);
+    }
+}
+// In a unit test, inject a mock IEntityRepository ✅
+var mockRepo = new Mock<IEntityRepository>();
+mockRepo.Setup(r => r.GetByIdAsync(1)).ReturnsAsync(new Entity { Id = 1 });
+var service = new EntityService(mockRepo.Object);
+await service.GetAsync(1); // tests the service logic, not the DB
+```
+
+**Registering dependencies in ASP.NET Core:**
+
+```csharp
+// Program.cs
+builder.Services.AddScoped<IEntityRepository, EntityRepository>();  // one per HTTP request
+builder.Services.AddSingleton<ICacheService, RedisCacheService>();  // one for app lifetime
+builder.Services.AddTransient<INotificationService, EmailNotificationService>(); // new instance per injection
+
+// DI container automatically injects dependencies
+public class EntityController
+{
+    public EntityController(IEntityRepository repo, ICacheService cache)
+    {
+        // repo and cache are automatically injected by the DI container
+    }
+}
+```
+
+**Benefits:**
+1. **Testability** — inject mocks in unit tests
+2. **Loose coupling** — swap implementations without changing dependent code
+3. **Lifecycle management** — container controls when objects are created/disposed
+4. **Single Responsibility** — classes focus on their job, not constructing dependencies
 
 ---
