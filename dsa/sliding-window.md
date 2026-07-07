@@ -12,6 +12,55 @@
 
 ---
 
+## Pseudo Code
+
+### Fixed Size Window (size K)
+
+```
+initialize window with first K elements
+result = compute(window)
+
+for right = K to n-1:
+    add s[right] to window
+    remove s[right - K] from window     ← element that fell out
+    result = max/min/sum(result, window)
+
+return result
+```
+
+**When to use:** Problem mentions a fixed size K
+
+---
+
+### Variable Size Window
+
+```
+left = 0
+result = 0
+
+for right = 0 to n-1:
+    add s[right] to window              ← always expand right
+
+    while window condition is violated:
+        remove s[left] from window      ← shrink from left
+        left++
+
+    result = max(result, right - left + 1)
+
+return result
+```
+
+**When to use:** Problem has a condition to satisfy (no repeats, at most K distinct, etc.)
+
+---
+
+### Why nested while loop is still O(n)?
+
+`left` and `right` never reset — they only move forward.
+Each element is added once and removed once = 2n operations = O(n).
+
+---
+
 ## Table of Contents
 
 | # | Problem | Difficulty | Date Solved |
