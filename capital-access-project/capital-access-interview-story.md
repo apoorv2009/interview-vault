@@ -1126,6 +1126,371 @@ Developer pushes to feature branch
 
 You worked with DevOps to define **deployment gates** — automated checks that must pass before a stage can proceed. The bundle size gate ensures no PR accidentally re-inflates the bundle after your 30% reduction. The accessibility scan runs axe-core automatically — accessibility regressions are caught in CI, not after release.
 
+---
+
+## Feature Toggles (Feature Flags) — Deployment Without Risk
+
+Feature toggles are not optional at Capital Access — they are **mandatory for every new feature.** The principle is simple: code ships to production disabled, gets tested against real data and real traffic, then is gradually enabled to users.
+
+### Why Feature Toggles Matter
+
+**Without feature toggles, you have two bad choices:**
+
+1. **Release to 100% of users immediately** — if there's a bug, all 2,500 clients are affected at once. Rollback means a new deployment + downtime.
+
+2. **Hold features in a branch until "perfect"** — branches live for weeks, diverge from main, merge conflicts explode, and you end up testing against stale code.
+
+**With feature toggles:**
+- Deploy features disabled → testing doesn't wait for "release day"
+- Gradually enable to 1% of users → catch bugs before they hit everyone
+- Rollback is instantaneous (change a config flag, not a deployment)
+- Production data validation happens before the feature is visible to users
+- New engineers can work on features without fear of breaking production
+
+### Implementation — Azure App Configuration
+
+Capital Access stores feature toggles in **Azure App Configuration** (cloud-native config service).
+
+```json
+// Capital Access feature toggles (Azure App Configuration)
+{
+  "FeatureManagement": {
+    "NewInvestorTargetingAlgorithm": {
+      "Enabled": true,
+      "Conditions": {
+        "ClientFilter": {
+          "Setting": {
+            "TargetingBeta": ["spg-enterprise-001", "spg-enterprise-002"]
+          }
+        }
+      }
+    },
+    "OwnershipChangeAlerts": {
+      "Enabled": true,
+      "Conditions": {
+        "TimeWindow": {
+          "Start": "2026-07-08T00:00:00Z",
+          "End": "2026-12-31T23:59:59Z"
+        }
+      }
+    },
+    "AITextualAnalyticsV2": {
+      "Enabled": false
+    },
+    "ESGDashboardRedesign": {
+      "Enabled": true,
+      "Conditions": {
+        "Percentage": {
+          "Value": 25
+        }
+      }
+    }
+  }
+}
+```
+
+**Conditions explained:**
+- `NewInvestorTargetingAlgorithm` — enabled only for 2 beta clients (by tenant ID)
+- `OwnershipChangeAlerts` — enabled during Q3–Q4 (seasonal feature)
+- `AITextualAnalyticsV2` — completely disabled, not rolled out yet
+- `ESGDashboardRedesign` — enabled for 25% of requests (gradual rollout)
+
+### Backend Implementation (C#)
+
+```csharp
+// Inject IFeatureManager into your service
+public class TargetingService
+{
+    private readonly IFeatureManager _featureManager;
+    private readonly ILogger<TargetingService> _logger;
+    
+    public TargetingService(IFeatureManager featureManager, ILogger<TargetingService> logger)
+    {
+        _featureManager = featureManager;
+        _logger = logger;
+    }
+    
+    public async Task<List<TargetScore>> CalculateScoresAsync(int companyId)
+    {
+        // Check if new algorithm is enabled for this company
+        if (await _featureManager.IsEnabledAsync("NewInvestorTargetingAlgorithm", new TargetingContext { CompanyId = companyId }))
+        {
+            _logger.LogInformation("Using new ML targeting algorithm for company {CompanyId}", companyId);
+            return await CalculateScoresAsync_MLBased(companyId);
+        }
+        else
+        {
+            _logger.LogInformation("Using legacy rules-based targeting for company {CompanyId}", companyId);
+            return await CalculateScoresAsync_RulesBased(companyId);
+        }
+    }
+}
+
+// Context object for feature evaluation (Azure App Configuration uses this)
+public class TargetingContext : IFeatureFilterMetadata
+{
+    public int CompanyId { get; set; }
+    public string TenantId { get; set; }
+}
+```
+
+### Frontend Implementation (Angular)
+
+```typescript
+// Angular service to check feature flags
+@Injectable({ providedIn: 'root' })
+export class FeatureToggleService {
+  constructor(private http: HttpClient) {}
+  
+  // Fetch all feature flags once at app startup
+  async getFeatureFlags(): Promise<Record<string, boolean>> {
+    return this.http.get<Record<string, boolean>>('/api/features')
+      .toPromise()
+      .then(flags => this.store.set('featureFlags', flags));
+  }
+  
+  isEnabled(featureName: string): boolean {
+    const flags = this.store.get('featureFlags');
+    return flags?.[featureName] ?? false;
+  }
+}
+
+// Use in components
+@Component({
+  selector: 'app-investor-targeting',
+  template: `
+    <div *ngIf="isESGDashboardEnabled" class="esg-section">
+      <app-esg-dashboard-redesigned></app-esg-dashboard-redesigned>
+    </div>
+    
+    <div *ngIf="!isESGDashboardEnabled" class="esg-section">
+      <app-esg-dashboard-legacy></app-esg-dashboard-legacy>
+    </div>
+  `
+})
+export class InvestorTargetingComponent implements OnInit {
+  isESGDashboardEnabled: boolean;
+  
+  constructor(private features: FeatureToggleService) {}
+  
+  ngOnInit() {
+    this.isESGDashboardEnabled = this.features.isEnabled('ESGDashboardRedesign');
+  }
+}
+```
+
+### Real Capital Access Example: "New Targeting Algorithm"
+
+**Step 1 — Development Phase (Toggles all `Enabled: false`)**
+```csharp
+// New ML-based targeting algorithm is ready
+public class NewTargetingAlgorithm
+{
+    private readonly IFeatureManager _featureManager;
+    
+    public async Task<List<InvestorScore>> ScoreAsync(Company company)
+    {
+        // Feature is disabled in production, so this code never runs
+        // But it's deployed and ready
+        return await _mlModel.PredictAsync(company);
+    }
+}
+```
+
+**Step 2 — Beta Testing (Enable for 2 internal clients)**
+```json
+"NewInvestorTargetingAlgorithm": {
+  "Enabled": true,
+  "Conditions": {
+    "ClientFilter": {
+      "Setting": {
+        "TargetingBeta": ["spg-enterprise-001", "spg-enterprise-002"]
+      }
+    }
+  }
+}
+```
+
+Capital Access QA and the 2 beta clients use the new algorithm. Engineers monitor:
+- Does the ML model produce reasonable scores?
+- Do scores correlate with actual investor engagement?
+- Is latency acceptable (ML inference is expensive)?
+- Do edge cases (no historical data, new companies) work?
+
+**Step 3 — Gradual Production Rollout (5% → 25% → 100%)**
+```json
+"NewInvestorTargetingAlgorithm": {
+  "Enabled": true,
+  "Conditions": {
+    "Percentage": { "Value": 5 }
+  }
+}
+```
+
+Monday: Deploy with 5% rollout. Monitor Application Insights:
+- Error rate for the 5% vs 95%?
+- Latency P95 for ML scoring vs rules-based?
+- User complaints/feedback?
+
+If all green:
+```json
+"Percentage": { "Value": 25 }  // Wednesday: 25%
+```
+
+If issues appear, rollback instantly (no deployment needed):
+```json
+"Enabled": false  // Friday: kill it
+```
+
+**Step 4 — Full Rollout (100%) and Clean Up**
+```json
+"NewInvestorTargetingAlgorithm": {
+  "Enabled": true
+  // No conditions = 100% of traffic
+}
+```
+
+Once fully rolled out and stable for 2+ weeks, remove the old code:
+```csharp
+// Delete the legacy ScoreAsync_RulesBased method
+// Rename ScoreAsync_MLBased to just ScoreAsync
+// Remove the feature flag check — ML is now the only way
+```
+
+### Managing Multiple Feature Toggles
+
+Capital Access has dozens of toggles in flight at any time:
+
+```json
+{
+  "Features": {
+    "NewInvestorTargetingAlgorithm": { "Enabled": true, "Percentage": 50 },
+    "OwnershipChangeAlerts": { "Enabled": true },
+    "AITextualAnalyticsV2": { "Enabled": false },
+    "ESGDashboardRedesign": { "Enabled": true, "Percentage": 25 },
+    "EmailIntegrationWithGmail": { "Enabled": true, "ClientFilter": ["spg-enterprise-001"] },
+    "ReportPdfExport": { "Enabled": true },
+    "SentimentAnalysisEnrichment": { "Enabled": false },
+    "CustomBrandingPerClient": { "Enabled": true },
+    "AdvancedFilteringInDashboard": { "Enabled": false },
+    "real-timeOwnershipNotifications": { "Enabled": true, "Percentage": 75 }
+  }
+}
+```
+
+**Dashboard for managing toggles:**
+Engineers access Azure App Configuration portal to:
+- View all flags and their current state
+- Change percentages on-the-fly (no deployment)
+- Add/remove client-specific enables
+- See who changed what, when (audit log)
+
+### Rollback Strategy
+
+If something goes wrong after enabling a feature:
+
+**Scenario: "New Targeting Algorithm at 25% is causing timeouts"**
+
+```
+Production Incident:
+  2026-07-08 14:30 — P95 latency spikes to 5 seconds
+  2026-07-08 14:31 — Oncall opens Application Insights
+  2026-07-08 14:32 — Traces show new ML scoring is timing out (15s, no timeout set)
+  2026-07-08 14:33 — Oncall disables feature in App Configuration
+
+Result:
+  No deployment needed
+  No code rollback
+  Zero-downtime rollback (seconds)
+  Only the 25% of traffic on the new algorithm is affected; they fall back to rules-based
+  
+Post-incident:
+  - Eng team adds timeout to ML model
+  - Eng team batches feature for 1% rollout next time, not 5%
+  - Toggle stays off until fix is validated
+```
+
+Without feature toggles, this would be:
+1. Identify the bad code
+2. Revert the commit / create a hotfix
+3. Rebuild, test, push to staging
+4. Deploy to production (5–10 minutes)
+5. Verify rollback worked
+6. Total time: 15–20 minutes of degraded service for all users
+
+**With feature toggles: 90 seconds.**
+
+### Best Practices
+
+**1. Feature toggles are temporary — don't let them accumulate**
+```csharp
+// BAD: Toggle that's been in code for 6 months
+if (await featureManager.IsEnabledAsync("NewDashboard")) { ... }
+
+// GOOD: Remove it once fully rolled out and stable
+// Just use the new code directly
+```
+
+Create a ticket to clean up toggles after 3–4 weeks of 100% rollout.
+
+**2. Use consistent naming conventions**
+```
+✅ NewInvestorTargetingAlgorithm (feature name, not "toggle1" or "feature_x")
+✅ EmailIntegrationWithGmail (descriptive)
+✅ SentimentAnalysisEnrichment (what it does)
+
+❌ test_feature
+❌ new_thing
+❌ temp_flag
+```
+
+**3. Log which branch was taken**
+```csharp
+if (await _featureManager.IsEnabledAsync("NewAlgorithm"))
+{
+    _logger.LogInformation("Using new ML targeting algorithm {TenantId}", tenantId);
+    // use new code
+}
+else
+{
+    _logger.LogInformation("Using legacy rules-based targeting {TenantId}", tenantId);
+    // use old code
+}
+```
+
+When an issue appears, logs tell you exactly which code path was executing.
+
+**4. Test both code paths**
+```csharp
+[Test]
+public async Task CalculateScores_WithNewAlgorithmEnabled()
+{
+    _mockFeatureManager.Setup(f => f.IsEnabledAsync("NewAlgorithm"))
+        .ReturnsAsync(true);
+    var result = await _service.CalculateScoresAsync(123);
+    Assert.That(result.Count, Is.GreaterThan(0));
+}
+
+[Test]
+public async Task CalculateScores_WithNewAlgorithmDisabled()
+{
+    _mockFeatureManager.Setup(f => f.IsEnabledAsync("NewAlgorithm"))
+        .ReturnsAsync(false);
+    var result = await _service.CalculateScoresAsync(123);
+    Assert.That(result.Count, Is.GreaterThan(0));
+}
+```
+
+Both code paths must be tested — you need confidence that the fallback works.
+
+### Interview Script
+
+When the interviewer asks about deployment strategy:
+
+> "Every new feature at Capital Access ships behind a feature toggle, disabled by default. The code is deployed to production running alongside existing code, but users never see it until it's been validated. We use Azure App Configuration to store toggles and can enable them gradually — start with 1% of requests, monitor Application Insights for errors and latency, then ramp to 5%, 25%, 100% as we gain confidence. If something breaks at any percentage, disabling the toggle takes seconds — no deployment, no downtime. This lets us deploy frequently and safely. We also test both code paths (toggle on/off) in unit tests, so we have confidence in the fallback."
+
+---
+
 ## The STAR Story — Say This in the Interview
 
 > ⚠️
