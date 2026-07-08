@@ -66,6 +66,7 @@ Each element is added once and removed once = 2n operations = O(n).
 | # | Problem | Difficulty | Date Solved |
 |---|---------|------------|-------------|
 | 1 | [Best Time to Buy and Sell Stock — LC 121](#1-best-time-to-buy-and-sell-stock--lc-121) | Easy | 2026-07-06 |
+| 2 | [Maximum Average Subarray I — LC 643](#2-maximum-average-subarray-i--lc-643) | Easy | 2026-07-08 |
 
 ---
 
@@ -132,5 +133,67 @@ Brute force fixes every buy day and checks all future sell days — two nested l
 ### Key Takeaway
 
 You don't need to try every buy day. Just track `minPrice` as you go — the cheapest day seen so far is always the best buy day for any future sell day. Single pass is enough.
+
+---
+
+## 2. Maximum Average Subarray I — LC 643
+
+**LeetCode:** https://leetcode.com/problems/maximum-average-subarray-i/
+**Difficulty:** Easy
+**Date:** 2026-07-08
+
+### Problem Statement
+
+Given an integer array `nums` and an integer `k`, find a contiguous subarray of length exactly `k` that has the maximum average value. Return that maximum average.
+
+**Examples:**
+```
+Input:  nums = [1,12,-5,-6,50,3], k = 4
+Output: 12.75  → [12,-5,-6,50] avg = 51/4 = 12.75
+
+Input:  nums = [5], k = 1
+Output: 5.0
+```
+
+### Approach
+
+Calculate sum of first `k` elements as the initial window. Then slide one step at a time — add the incoming right element and remove the outgoing left element using `nums[right] - nums[right - k]`. Track maximum sum and divide by `k` at the end.
+
+### Solution
+
+```csharp
+public class Solution {
+    public double FindMaxAverage(int[] nums, int k) {
+        int windowSum = 0;
+
+        for (int i = 0; i < k; i++)
+            windowSum += nums[i];
+
+        int maxSum = windowSum;
+
+        for (int right = k; right < nums.Length; right++)
+        {
+            windowSum += nums[right];
+            windowSum -= nums[right - k];
+            maxSum = Math.Max(maxSum, windowSum);
+        }
+
+        return (double)maxSum / k;
+    }
+}
+```
+
+### Complexity
+
+- **Time:** O(n)
+- **Space:** O(1)
+
+### Why O(n) and not O(n×k)?
+
+Brute force recalculates sum of k elements for every window = O(n×k). Sliding window reuses the previous sum — just adds one element and removes one = O(1) per slide = O(n) total.
+
+### Key Takeaway
+
+Fixed window = calculate first window once, then slide by adding `nums[right]` and removing `nums[right - k]`. No need to recompute the whole window each time.
 
 ---
