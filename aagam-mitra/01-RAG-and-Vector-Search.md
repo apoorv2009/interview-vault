@@ -130,7 +130,75 @@ flowchart TD
 
 ---
 
-## 1. What is RAG and why did you use it in Aagam Mitra?
+## 1. Which RAG architectural pattern are you using?
+
+> **Why asked:** This question separates candidates who built "a RAG" from candidates who know the RAG design space. The interviewer wants a named pattern, a reason for choosing it, and awareness of the alternatives you rejected. Lead with "Agentic RAG", explain that retrieval is a tool call the LLM chooses to make — not a hardcoded pipeline step — and then show you know the other patterns.
+
+**Answer: Agentic RAG** (combined with a two-tier storage strategy and multi-agent routing).
+
+In naive RAG, every question triggers a vector search whether it needs one or not. In Aagam Mitra, the **LLM decides when to retrieve**:
+
+```
+User: "What is Navakar Mantra?"
+→ Groq decides: scripture question → calls search_jain_texts() tool
+→ Gemini embed → Pinecone top-8 → synthesise answer
+
+User: "Book Shantidhara for January 15"
+→ Groq decides: live data needed → calls get_shantidhara_slots() tool
+→ No vector search at all — Pinecone never touched
+
+User: "Thank you, that was helpful"
+→ Groq decides: no tool needed → answers directly
+→ Zero retrieval cost
+```
+
+Retrieval is a **tool call inside the agent loop** (`tool_choice: "auto"`), not a fixed pipeline stage. That's the defining trait of Agentic RAG.
+
+**The three patterns we combine:**
+
+| Pattern | Where in Aagam Mitra |
+|---|---|
+| **Agentic RAG** | ScriptureAgent — Groq decides whether to call `search_jain_texts` |
+| **Multi-Agent RAG** | Orchestrator regex-routes to 4 specialist agents, runs them in parallel via `asyncio.gather` |
+| **Two-tier / Hybrid storage** | Pinecone for static scripture · PostgreSQL + in-memory cosine for live temple data (300s TTL) |
+
+---
+
+## 2. What RAG architecture patterns exist today, and why did you pick Agentic RAG?
+
+> **Why asked:** A follow-up to Q1 that tests breadth. You don't need to have built every pattern — you need to show you evaluated the design space and made a deliberate choice. Know one-line definitions, the tradeoff of each, and be able to say concretely why each rejected pattern didn't fit Aagam Mitra.
+
+### The RAG pattern landscape
+
+| # | Pattern | How it works | Strength | Weakness |
+|---|---|---|---|---|
+| 1 | **Naive RAG** | Fixed pipeline: embed query → retrieve top-k → stuff into prompt → generate. Retrieval always happens. | Simplest to build and debug | Retrieves even when unnecessary; one-shot — can't recover from bad retrieval |
+| 2 | **Advanced RAG** | Naive RAG + pre/post-retrieval steps: query rewriting, HyDE, reranking (cross-encoder), metadata filtering | Better retrieval precision | Still a fixed pipeline; extra latency + an extra model (reranker) to host |
+| 3 | **Modular RAG** | Pipeline decomposed into swappable modules (retriever, reranker, generator, memory) that can be rearranged | Flexible, testable components | Framework-heavy; architecture overhead for small teams |
+| 4 | **Agentic RAG** ✅ | Retrieval is a *tool*; the LLM decides if/when/what to retrieve inside a tool-call loop | Skips unnecessary retrieval; can re-query with better terms; mixes retrieval with actions (booking, APIs) | Depends on LLM tool-choice quality; slightly less predictable than a fixed pipeline |
+| 5 | **Multi-Agent RAG** | Router/orchestrator dispatches to specialist agents, each with its own retrieval strategy; results synthesised | Domain separation, parallelism | More moving parts; needs a synthesis step |
+| 6 | **Corrective RAG (CRAG)** | Grades retrieved docs; if relevance is low, triggers fallback (web search / re-retrieval) before generating | Self-healing on bad retrieval | Extra LLM grading call per query = latency + cost |
+| 7 | **Self-RAG** | Model emits reflection tokens: critiques its own retrieval and generation, retries if unsupported | Highest faithfulness | Needs a specially fine-tuned model; slow; research-grade |
+| 8 | **Graph RAG** | Knowledge graph built from corpus; retrieval traverses entities/relations, not just similar chunks | Multi-hop reasoning ("how is X related to Y?") | Expensive graph construction; overkill for passage lookup |
+| 9 | **Hybrid Search RAG** | Combines dense vectors + sparse keyword (BM25), merged with reciprocal rank fusion | Catches exact terms embeddings miss (IDs, names) | Two indexes to maintain; tuning fusion weights |
+| 10 | **RAG-Fusion** | Generates multiple query variants, retrieves for each, fuses ranked results | Robust to poorly-worded queries | N× embedding + retrieval cost per question |
+
+### Why Agentic RAG for Aagam Mitra — the elimination logic
+
+- **Not Naive RAG** — half our traffic isn't a knowledge question at all ("book a slot", "show my bookings"). A fixed always-retrieve pipeline would hit Pinecone pointlessly and couldn't take actions.
+- **Not Advanced RAG (reranking)** — our corpus is ~5,000 focused scripture chunks, not millions of noisy web pages. top-8 cosine on Gemini 2048-dim embeddings is already precise; a reranker adds latency and a second model for marginal gain.
+- **Not CRAG / Self-RAG** — an extra grading/reflection LLM call per query roughly doubles latency and Groq cost. Our mitigation is cheaper: the agent sees retrieval results and can re-query with better terms within its iteration budget (max 4).
+- **Not Graph RAG** — devotees ask "what does X mean", not multi-hop entity questions. Passage-level semantic search fits the workload.
+- **Not Hybrid/BM25** — cross-language matching (Hindi question → English passage, and vice versa) is our hardest requirement, and that's exactly where keyword search scores zero. Dense-only wins here.
+- **Agentic RAG fits because** the same loop that decides "search scripture" also decides "call the booking API" — retrieval and actions are unified in one tool-call protocol, which is what the product actually needs.
+
+### One-line interview summary
+
+> "We use Agentic RAG with multi-agent routing on top and a two-tier storage strategy underneath. Retrieval is a tool the LLM chooses to invoke, not a hardcoded step — because half our queries need live API actions instead of documents, and paying for retrieval on every message would be waste. We considered reranking, CRAG, and Graph RAG and rejected each for concrete cost/latency/fit reasons."
+
+---
+
+## 3. What is RAG and why did you use it in Aagam Mitra?
 
 > **Why asked:** This is the most fundamental question in any AI/LLM interview. The interviewer wants to know if you understand the *problem* RAG solves, not just the acronym. Always anchor your answer with a concrete reason — in our case, Jain scripture needs to be accurate and citable, so the AI can't just guess from training data.
 
@@ -150,7 +218,7 @@ flowchart TD
 
 ---
 
-## 2. Walk me through your complete RAG pipeline end-to-end.
+## 4. Walk me through your complete RAG pipeline end-to-end.
 
 > **Why asked:** Interviewers use this to separate people who have read about RAG from people who have actually built it. They want to hear specific steps, real library names, and actual config values — not a generic description. Mention pypdf, Gemini, Pinecone, chunk sizes, task types, and Groq in the right order.
 
@@ -211,7 +279,7 @@ flowchart TD
 
 ---
 
-## 3. Why chunk at 800 characters with 100 overlap? How did you choose these values?
+## 5. Why chunk at 800 characters with 100 overlap? How did you choose these values?
 
 > **Why asked:** Chunking parameters look like random numbers to someone who hasn't thought about them. The interviewer wants to know you understand *why* each value exists and what happens if you get it wrong. Always mention what you tested and what the tradeoff is — too small loses context, too large wastes tokens.
 
@@ -237,7 +305,7 @@ With 100 char overlap:
 
 ---
 
-## 4. What is an embedding? Explain it to a non-technical person.
+## 6. What is an embedding? Explain it to a non-technical person.
 
 > **Why asked:** This tests whether you truly understand the concept or just use the library. A good engineer can explain embedding to a product manager. Key insight to always mention: similar *meanings* produce similar numbers — this is what enables cross-language search (Hindi question finds English passage).
 
@@ -258,7 +326,7 @@ An embedding converts text into a list of numbers in a way that **similar meanin
 
 ---
 
-## 5. What is cosine similarity and how does Pinecone use it?
+## 7. What is cosine similarity and how does Pinecone use it?
 
 > **Why asked:** Every vector DB uses similarity scoring under the hood. The interviewer wants to know you understand *how* Pinecone decides which chunks are most relevant — not just that it does. The key point to hit: cosine measures angle (direction of meaning), not distance (length of vector), which is why it works well for text.
 
@@ -291,7 +359,7 @@ Pinecone uses HNSW graph indexing. Instead of comparing the query vector against
 
 ---
 
-## 6. What is the difference between `RETRIEVAL_DOCUMENT` and `RETRIEVAL_QUERY` task types in Gemini?
+## 8. What is the difference between `RETRIEVAL_DOCUMENT` and `RETRIEVAL_QUERY` task types in Gemini?
 
 > **Why asked:** Most people who use Gemini embeddings don't know this exists. If you mention it, it immediately signals you've actually read the API docs and thought carefully about your embedding pipeline. The interviewer is testing depth — many candidates use the same task type for both storage and querying, which silently hurts retrieval quality.
 
@@ -315,7 +383,7 @@ embed_texts([user_question], task_type="RETRIEVAL_QUERY")
 
 ---
 
-## 7. How do you handle temple live data that changes frequently (news, events, slots)?
+## 9. How do you handle temple live data that changes frequently (news, events, slots)?
 
 > **Why asked:** This is a classic production AI problem — your vector DB has static knowledge, but real-world data changes constantly. The interviewer wants to see that you thought about freshness, cost, and avoiding unnecessary re-embedding. SHA-256 deduplication and TTL-based sync are the two design decisions worth highlighting here.
 
@@ -357,7 +425,7 @@ async def sync_if_needed(temple_id: str):
 
 ---
 
-## 8. Why Pinecone for Jain texts but PostgreSQL for temple data?
+## 10. Why Pinecone for Jain texts but PostgreSQL for temple data?
 
 > **Why asked:** Architecture decisions like "why did you use two different storage systems for the same type of data?" reveal whether you made thoughtful tradeoffs or just used whatever was convenient. Be ready to explain cost, update frequency, scale, and privacy as the four reasons for this split. Also be ready to explain the SQLite → PostgreSQL migration path — this shows production awareness.
 
@@ -374,7 +442,7 @@ async def sync_if_needed(temple_id: str):
 
 ---
 
-## 9. What is semantic search and how is it different from keyword search?
+## 11. What is semantic search and how is it different from keyword search?
 
 > **Why asked:** This is often asked to test if you can articulate *why* you chose vector search over a simpler SQL LIKE query. The killer example is cross-language search — a Hindi question finding an English passage — because no keyword approach could ever do that. Lead with this example and the interviewer will be impressed.
 
@@ -400,7 +468,7 @@ Stored chunks:
 
 ---
 
-## 10. How does the temple knowledge sync handle content-addressed deduplication?
+## 12. How does the temple knowledge sync handle content-addressed deduplication?
 
 > **Why asked:** Deduplication in a sync pipeline is a senior-level concern. If you sync every 5 minutes but always re-embed everything, you'll burn your Gemini API quota for zero benefit. SHA-256 checksumming solves this elegantly — only changed content triggers the expensive embedding step. Mentioning this shows you think about API cost and efficiency, not just correctness.
 
@@ -423,69 +491,3 @@ await store_chunks(new_chunks, embeddings)
 This means even if the sync runs every 5 minutes, Gemini API is only called when content actually changes — not on every sync tick.
 
 ---
-
-## 11. Which RAG architectural pattern are you using?
-
-> **Why asked:** This question separates candidates who built "a RAG" from candidates who know the RAG design space. The interviewer wants a named pattern, a reason for choosing it, and awareness of the alternatives you rejected. Lead with "Agentic RAG", explain that retrieval is a tool call the LLM chooses to make — not a hardcoded pipeline step — and then show you know the other patterns.
-
-**Answer: Agentic RAG** (combined with a two-tier storage strategy and multi-agent routing).
-
-In naive RAG, every question triggers a vector search whether it needs one or not. In Aagam Mitra, the **LLM decides when to retrieve**:
-
-```
-User: "What is Navakar Mantra?"
-→ Groq decides: scripture question → calls search_jain_texts() tool
-→ Gemini embed → Pinecone top-8 → synthesise answer
-
-User: "Book Shantidhara for January 15"
-→ Groq decides: live data needed → calls get_shantidhara_slots() tool
-→ No vector search at all — Pinecone never touched
-
-User: "Thank you, that was helpful"
-→ Groq decides: no tool needed → answers directly
-→ Zero retrieval cost
-```
-
-Retrieval is a **tool call inside the agent loop** (`tool_choice: "auto"`), not a fixed pipeline stage. That's the defining trait of Agentic RAG.
-
-**The three patterns we combine:**
-
-| Pattern | Where in Aagam Mitra |
-|---|---|
-| **Agentic RAG** | ScriptureAgent — Groq decides whether to call `search_jain_texts` |
-| **Multi-Agent RAG** | Orchestrator regex-routes to 4 specialist agents, runs them in parallel via `asyncio.gather` |
-| **Two-tier / Hybrid storage** | Pinecone for static scripture · PostgreSQL + in-memory cosine for live temple data (300s TTL) |
-
----
-
-## 12. What RAG architecture patterns exist today, and why did you pick Agentic RAG?
-
-> **Why asked:** A follow-up to Q11 that tests breadth. You don't need to have built every pattern — you need to show you evaluated the design space and made a deliberate choice. Know one-line definitions, the tradeoff of each, and be able to say concretely why each rejected pattern didn't fit Aagam Mitra.
-
-### The RAG pattern landscape
-
-| # | Pattern | How it works | Strength | Weakness |
-|---|---|---|---|---|
-| 1 | **Naive RAG** | Fixed pipeline: embed query → retrieve top-k → stuff into prompt → generate. Retrieval always happens. | Simplest to build and debug | Retrieves even when unnecessary; one-shot — can't recover from bad retrieval |
-| 2 | **Advanced RAG** | Naive RAG + pre/post-retrieval steps: query rewriting, HyDE, reranking (cross-encoder), metadata filtering | Better retrieval precision | Still a fixed pipeline; extra latency + an extra model (reranker) to host |
-| 3 | **Modular RAG** | Pipeline decomposed into swappable modules (retriever, reranker, generator, memory) that can be rearranged | Flexible, testable components | Framework-heavy; architecture overhead for small teams |
-| 4 | **Agentic RAG** ✅ | Retrieval is a *tool*; the LLM decides if/when/what to retrieve inside a tool-call loop | Skips unnecessary retrieval; can re-query with better terms; mixes retrieval with actions (booking, APIs) | Depends on LLM tool-choice quality; slightly less predictable than a fixed pipeline |
-| 5 | **Multi-Agent RAG** | Router/orchestrator dispatches to specialist agents, each with its own retrieval strategy; results synthesised | Domain separation, parallelism | More moving parts; needs a synthesis step |
-| 6 | **Corrective RAG (CRAG)** | Grades retrieved docs; if relevance is low, triggers fallback (web search / re-retrieval) before generating | Self-healing on bad retrieval | Extra LLM grading call per query = latency + cost |
-| 7 | **Self-RAG** | Model emits reflection tokens: critiques its own retrieval and generation, retries if unsupported | Highest faithfulness | Needs a specially fine-tuned model; slow; research-grade |
-| 8 | **Graph RAG** | Knowledge graph built from corpus; retrieval traverses entities/relations, not just similar chunks | Multi-hop reasoning ("how is X related to Y?") | Expensive graph construction; overkill for passage lookup |
-| 9 | **Hybrid Search RAG** | Combines dense vectors + sparse keyword (BM25), merged with reciprocal rank fusion | Catches exact terms embeddings miss (IDs, names) | Two indexes to maintain; tuning fusion weights |
-| 10 | **RAG-Fusion** | Generates multiple query variants, retrieves for each, fuses ranked results | Robust to poorly-worded queries | N× embedding + retrieval cost per question |
-
-### Why Agentic RAG for Aagam Mitra — the elimination logic
-
-- **Not Naive RAG** — half our traffic isn't a knowledge question at all ("book a slot", "show my bookings"). A fixed always-retrieve pipeline would hit Pinecone pointlessly and couldn't take actions.
-- **Not Advanced RAG (reranking)** — our corpus is ~5,000 focused scripture chunks, not millions of noisy web pages. top-8 cosine on Gemini 2048-dim embeddings is already precise; a reranker adds latency and a second model for marginal gain.
-- **Not CRAG / Self-RAG** — an extra grading/reflection LLM call per query roughly doubles latency and Groq cost. Our mitigation is cheaper: the agent sees retrieval results and can re-query with better terms within its iteration budget (max 4).
-- **Not Graph RAG** — devotees ask "what does X mean", not multi-hop entity questions. Passage-level semantic search fits the workload.
-- **Not Hybrid/BM25** — cross-language matching (Hindi question → English passage, and vice versa) is our hardest requirement, and that's exactly where keyword search scores zero. Dense-only wins here.
-- **Agentic RAG fits because** the same loop that decides "search scripture" also decides "call the booking API" — retrieval and actions are unified in one tool-call protocol, which is what the product actually needs.
-
-### One-line interview summary
-
-> "We use Agentic RAG with multi-agent routing on top and a two-tier storage strategy underneath. Retrieval is a tool the LLM chooses to invoke, not a hardcoded step — because half our queries need live API actions instead of documents, and paying for retrieval on every message would be waste. We considered reranking, CRAG, and Graph RAG and rejected each for concrete cost/latency/fit reasons."
