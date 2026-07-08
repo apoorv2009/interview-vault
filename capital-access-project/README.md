@@ -6,6 +6,103 @@ This directory contains **complete, production-grade interview prep** for the Ca
 
 ---
 
+## 🗺️ Quick Navigation
+
+### **Which file should I read?**
+
+| Need | File | Time |
+|------|------|------|
+| **Interview narrative & architecture** | [capital-access-interview-story.md](capital-access-interview-story.md) ⭐ START HERE | 30 min |
+| **Technical patterns & services** | [capital-access-deep-dives.md](capital-access-deep-dives.md) | 2-3 hrs |
+| **Production operations & CI/CD** | [capital-access-operations.md](capital-access-operations.md) | 1-2 hrs |
+
+---
+
+## 📖 Complete Index by Topic
+
+**Architecture & Design:**
+- [Architecture Overview](capital-access-interview-story.md#architecture-overview)
+- [Service Decomposition Strategy](capital-access-deep-dives.md#service-decomposition-strategy)
+- [Database Per Service](capital-access-deep-dives.md#service-decomposition-strategy)
+
+**Authentication & Security:**
+- [OIDC Authentication](capital-access-interview-story.md#how-to-explain-the-full-project-flow-verbally-interview-script)
+- [Okta Deep Dive](capital-access-deep-dives.md#deep-dive--okta-identity--oidc)
+- [Multi-Tenancy Enforcement](capital-access-deep-dives.md#multitenant-on-app-service)
+- [Secrets Management](capital-access-operations.md#securing-key-vault-without-secrets-in-code)
+
+**Microservices Patterns:**
+- [Communication Patterns](capital-access-interview-story.md#service-to-service-communication-patterns)
+- [SAGA Pattern (Distributed Transactions)](capital-access-deep-dives.md#saga-pattern--distributed-transactions-across-services)
+- [Orchestration vs Choreography](capital-access-deep-dives.md#orchestration-vs-choreography--which-does-capital-access-use)
+- [Idempotency & Eventual Consistency](capital-access-deep-dives.md#idempotency--eventual-consistency)
+- [Circuit Breaker Pattern](capital-access-deep-dives.md#circuit-breaker-pattern--cascading-failures)
+
+**Azure Services Deep Dives:**
+- [Azure App Service](capital-access-deep-dives.md#deep-dive--azure-app-service-microservices-hosting)
+- [Azure Service Bus](capital-access-deep-dives.md#deep-dive--azure-service-bus)
+- [Azure Functions](capital-access-deep-dives.md#deep-dive--azure-functions-triggers-bindings-hosting)
+- [Durable Functions](capital-access-deep-dives.md#deep-dive--durable-functions)
+- [Azure Cosmos DB](capital-access-deep-dives.md#deep-dive--azure-cosmos-db)
+- [EF Core 8](capital-access-deep-dives.md#deep-dive--ef-core-8-ir-engagement--activity-service)
+
+**CQRS & Data Patterns:**
+- [CQRS Pattern](capital-access-deep-dives.md#cqrs-pattern--ownership-data)
+
+**Operations & Deployment:**
+- [Logging & Observability](capital-access-operations.md#logging--observability--app-insights--splunk)
+- [Report Generation](capital-access-operations.md#report-generation-architecture)
+- [Feature Toggles](capital-access-operations.md#feature-toggles-feature-flags--deployment-without-risk)
+- [CI/CD Pipeline Architecture](capital-access-operations.md#deep-dive--cicd-pipeline-architecture)
+- [Advanced Operations FAQ](capital-access-operations.md#advanced-operations--production-scenarios--interview-faq)
+
+**Interview Content:**
+- [Interview Script](capital-access-interview-story.md#how-to-explain-the-full-project-flow-verbally-interview-script)
+- [STAR Story](capital-access-interview-story.md#the-star-story--say-this-in-the-interview)
+- [Follow-Up Q&A](capital-access-interview-story.md#follow-up-questions--answers)
+
+---
+
+## 🎯 Index by Interview Question Type
+
+**"What is Capital Access?" / "Explain the system"**
+→ [Interview Script](capital-access-interview-story.md#how-to-explain-the-full-project-flow-verbally-interview-script)
+
+**"What's your role?"**
+→ [Your Role & Ownership](capital-access-interview-story.md#your-role--ownership)
+
+**"Walk me through the architecture"**
+→ [Architecture Overview](capital-access-interview-story.md#architecture-overview)
+
+**"Why microservices?"**
+→ [Service Decomposition Strategy](capital-access-deep-dives.md#service-decomposition-strategy)
+
+**"How do you handle distributed transactions?"**
+→ [SAGA Pattern](capital-access-deep-dives.md#saga-pattern--distributed-transactions-across-services)
+
+**"How do you ensure data isolation in multi-tenancy?"**
+→ [Multi-Tenancy Enforcement](capital-access-deep-dives.md#multitenant-on-app-service)
+
+**"Describe your authentication flow"**
+→ [Okta Deep Dive](capital-access-deep-dives.md#deep-dive--okta-identity--oidc)
+
+**"How do services communicate?"**
+→ [Service-to-Service Communication](capital-access-interview-story.md#service-to-service-communication-patterns)
+
+**"Explain your CI/CD pipeline"**
+→ [CI/CD Pipeline Architecture](capital-access-operations.md#deep-dive--cicd-pipeline-architecture)
+
+**"How do you deploy safely?"**
+→ [Feature Toggles](capital-access-operations.md#feature-toggles-feature-flags--deployment-without-risk)
+
+**"How do you handle failures?"**
+→ [Circuit Breaker Pattern](capital-access-deep-dives.md#circuit-breaker-pattern--cascading-failures)
+
+**"Describe your STAR story / most impactful project"**
+→ [STAR Story](capital-access-interview-story.md#the-star-story--say-this-in-the-interview)
+
+---
+
 ## 📚 Documentation Structure
 
 The Capital Access documentation is organized into **3 focused files** for efficient interview prep:
@@ -183,91 +280,6 @@ For each: understand WHY, remember the example, explain the code.
    - "How do you ensure data isolation?"
    - "Handle failures in distributed systems?"
    - "Describe your CI/CD pipeline"
-
----
-
-## 📖 Complete Index
-
-### By Topic
-
-**Architecture & Design:**
-- [Architecture Overview](capital-access-interview-story.md#architecture-overview)
-- [Service Decomposition Strategy](capital-access-deep-dives.md#service-decomposition-strategy)
-- [Database Per Service](capital-access-deep-dives.md#service-decomposition-strategy)
-
-**Authentication & Security:**
-- [OIDC Authentication](capital-access-interview-story.md#how-to-explain-the-full-project-flow-verbally-interview-script)
-- [Okta Deep Dive](capital-access-deep-dives.md#deep-dive--okta-identity--oidc)
-- [Multi-Tenancy Enforcement](capital-access-deep-dives.md#multitenant-on-app-service)
-- [Secrets Management](capital-access-operations.md#securing-key-vault-without-secrets-in-code)
-
-**Microservices Patterns:**
-- [Communication Patterns](capital-access-interview-story.md#service-to-service-communication-patterns)
-- [SAGA Pattern (Distributed Transactions)](capital-access-deep-dives.md#saga-pattern--distributed-transactions-across-services)
-- [Orchestration vs Choreography](capital-access-deep-dives.md#orchestration-vs-choreography--which-does-capital-access-use)
-- [Idempotency & Eventual Consistency](capital-access-deep-dives.md#idempotency--eventual-consistency)
-- [Circuit Breaker Pattern](capital-access-deep-dives.md#circuit-breaker-pattern--cascading-failures)
-
-**Azure Services Deep Dives:**
-- [Azure App Service](capital-access-deep-dives.md#deep-dive--azure-app-service-microservices-hosting)
-- [Azure Service Bus](capital-access-deep-dives.md#deep-dive--azure-service-bus)
-- [Azure Functions](capital-access-deep-dives.md#deep-dive--azure-functions-triggers-bindings-hosting)
-- [Durable Functions](capital-access-deep-dives.md#deep-dive--durable-functions)
-- [Azure Cosmos DB](capital-access-deep-dives.md#deep-dive--azure-cosmos-db)
-- [EF Core 8](capital-access-deep-dives.md#deep-dive--ef-core-8-ir-engagement--activity-service)
-
-**CQRS & Data Patterns:**
-- [CQRS Pattern](capital-access-deep-dives.md#cqrs-pattern--ownership-data)
-
-**Operations & Deployment:**
-- [Logging & Observability](capital-access-operations.md#logging--observability--app-insights--splunk)
-- [Report Generation](capital-access-operations.md#report-generation-architecture)
-- [Feature Toggles](capital-access-operations.md#feature-toggles-feature-flags--deployment-without-risk)
-- [CI/CD Pipeline Architecture](capital-access-operations.md#deep-dive--cicd-pipeline-architecture)
-- [Advanced Operations FAQ](capital-access-operations.md#advanced-operations--production-scenarios--interview-faq)
-
-**Interview Content:**
-- [Interview Script](capital-access-interview-story.md#how-to-explain-the-full-project-flow-verbally-interview-script)
-- [STAR Story](capital-access-interview-story.md#the-star-story--say-this-in-the-interview)
-- [Follow-Up Q&A](capital-access-interview-story.md#follow-up-questions--answers)
-
-### By Interview Question Type
-
-**"What is Capital Access?" / "Explain the system"**
-→ [Interview Script](capital-access-interview-story.md#how-to-explain-the-full-project-flow-verbally-interview-script)
-
-**"What's your role?"**
-→ [Your Role & Ownership](capital-access-interview-story.md#your-role--ownership)
-
-**"Walk me through the architecture"**
-→ [Architecture Overview](capital-access-interview-story.md#architecture-overview)
-
-**"Why microservices?"**
-→ [Service Decomposition Strategy](capital-access-deep-dives.md#service-decomposition-strategy)
-
-**"How do you handle distributed transactions?"**
-→ [SAGA Pattern](capital-access-deep-dives.md#saga-pattern--distributed-transactions-across-services)
-
-**"How do you ensure data isolation in multi-tenancy?"**
-→ [Multi-Tenancy Enforcement](capital-access-deep-dives.md#multitenant-on-app-service)
-
-**"Describe your authentication flow"**
-→ [Okta Deep Dive](capital-access-deep-dives.md#deep-dive--okta-identity--oidc)
-
-**"How do services communicate?"**
-→ [Service-to-Service Communication](capital-access-interview-story.md#service-to-service-communication-patterns)
-
-**"Explain your CI/CD pipeline"**
-→ [CI/CD Pipeline Architecture](capital-access-operations.md#deep-dive--cicd-pipeline-architecture)
-
-**"How do you deploy safely?"**
-→ [Feature Toggles](capital-access-operations.md#feature-toggles-feature-flags--deployment-without-risk)
-
-**"How do you handle failures?"**
-→ [Circuit Breaker Pattern](capital-access-deep-dives.md#circuit-breaker-pattern--cascading-failures)
-
-**"Describe your STAR story / most impactful project"**
-→ [STAR Story](capital-access-interview-story.md#the-star-story--say-this-in-the-interview)
 
 ---
 
