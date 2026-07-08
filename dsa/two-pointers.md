@@ -12,6 +12,53 @@
 
 ---
 
+## Pseudo Code
+
+### Opposite Ends (sorted array / palindrome)
+
+```
+left = 0
+right = n - 1
+
+while left < right:
+    if condition met:
+        return or record result
+    else if need bigger value:
+        left++
+    else:
+        right--
+
+return result
+```
+
+**When to use:** Sorted array, pair sum, palindrome check
+
+---
+
+### Same Direction (fast/slow or partition)
+
+```
+left = 0
+
+for right = 0 to n-1:
+    if condition met:
+        do something with s[left] and s[right]
+        left++
+
+return result
+```
+
+**When to use:** Remove duplicates, partition array, move zeroes
+
+---
+
+### Why O(n) even with nested loops?
+
+`left` and `right` never reset — each moves forward at most n times total.
+Combined moves = 2n = O(n).
+
+---
+
 ## Table of Contents
 
 | # | Problem | Difficulty | Date Solved |
