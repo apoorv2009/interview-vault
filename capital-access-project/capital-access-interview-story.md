@@ -261,6 +261,45 @@ From APIM's perspective, each microservice is a single endpoint (e.g., `ownershi
 
 ---
 
+### Security Considerations — Why App Service Over VMs or AKS?
+
+**The common interview question: "Why didn't you choose VMs or Kubernetes for more control?"**
+
+For a multi-tenant SaaS platform like Capital Access serving 2,500 enterprises, **App Service is actually MORE secure than VMs, not less.**
+
+**Patch Management (Critical for SaaS):**
+- **App Service**: Microsoft patches the OS and runtime automatically. We never miss a patch.
+- **VMs**: We are responsible for patching. One missed patch = potential exploit. For a platform serving regulated enterprises, this is an unacceptable liability.
+- **AKS**: Microsoft manages the control plane, but node OS patching is a shared responsibility. More complex operationally.
+
+**Multi-tenant Data Isolation:**
+This isn't an infrastructure concern — it's handled at the application layer (JWT tenant claims, database row-level security, APIM's tenant validation). All three platforms handle this identically if the application layer is correct.
+
+**Secrets Management:**
+All three integrate with Azure Key Vault via Managed Identity. No security difference. Our connection strings, API keys, and signing certificates are encrypted in Key Vault, not in code or environment variables.
+
+**Network Isolation & DDoS:**
+- **App Service**: Private endpoints (zero internet exposure) + Azure Front Door's WAF + built-in DDoS protection.
+- **VMs**: Requires manual setup of network security groups, firewall rules. Higher chance of misconfiguration.
+- **AKS**: Network policies and service mesh options (Istio), but requires Kubernetes security expertise.
+
+**Compliance & Audit (SOC2, ISO):**
+- **App Service**: Easier to audit because it's managed. Microsoft publishes compliance certifications and security posture management reports. Auditors see a simpler attack surface.
+- **VMs**: We're responsible for OS-level hardening, patching history, security baselines. Auditors dig deep into OS configs, patch records, and access controls. Much heavier lift.
+- **AKS**: Complex audit surface — more APIs, more control-plane access patterns, more things auditors need to review.
+
+**The Real Risk with VMs:**
+Operational burden becomes a security liability. Someone has to own patch Tuesday every month. Someone has to monitor CVE feeds. If that person is on vacation when a critical CVE (CVSS 9.0) drops, we're exposed for days. For a regulated SaaS, this is unacceptable risk. App Service eliminates this operational risk entirely.
+
+**When I'd reconsider this decision:**
+- **VMs**: If we needed OS-level customization (running legacy Windows Services, custom kernel modules, specialized drivers). We don't — our services are standard .NET Core microservices.
+- **AKS**: If we were running 50+ microservices where container density and fine-grained network policies matter, OR if we needed a service mesh for complex traffic management. For 6 services, Kubernetes adds complexity without security benefit.
+
+**Interview line to use:**
+> "App Service reduces security risk by removing operational burden. Fewer moving parts means fewer things to misconfigure, fewer patch management cycles to miss, and a smaller audit surface. For a multi-tenant SaaS, operational simplicity IS security."
+
+---
+
 ### Eventual Consistency — How We Handle It
 
 The Cosmos DB read model is typically 100–500ms behind the write side. The UI shows a **"Last updated: 10:00:00"** timestamp on the dashboard so clients know the data age — it's a transparency feature, not a bug. For compliance or audit use cases where strong consistency is required, we read directly from Azure SQL.
