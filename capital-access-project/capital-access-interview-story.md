@@ -1790,7 +1790,801 @@ Answer:
 
 ---
 
-## Questions to Ask the Interviewer
+## Advanced Operations & Production Scenarios — Interview FAQ
+
+These are the questions that separate senior engineers from mid-level: not just *building* the system, but *operating* it at scale under real conditions.
+
+### Q1. How do you manage traffic while keeping costs efficient, and monitor/troubleshoot failures?
+
+**The Problem:**
+Capital Access sees bursty traffic — quiet all day, then 9:00 AM (market open) all 2,500 IR teams hit the platform simultaneously to check overnight ownership changes. At 3:00 PM, traffic drops to 10% of peak. If we provision for peak, we waste 90% of infrastructure costs during off-peak. If we provision for average, we fail at 9 AM.
+
+**The Solution — Auto-scaling + Reserved Capacity:**
+
+We use Azure App Service auto-scaling rules:
+```
+Scale-out trigger: CPU > 70% for 5 minutes → add 1 instance (max 10)
+Scale-in trigger: CPU < 30% for 10 minutes → remove 1 instance (min 2)
+```
+
+Baseline: 2-3 instances (covers off-peak and provides HA). During peak: scales to 8-10 instances. This costs 60% less than provisioning for peak 24/7.
+
+**Cost Monitoring:**
+- Set up Azure Cost Management alerts: notify if monthly spend exceeds budget
+- Azure Advisor recommends rightsizing unused instances
+- Log auto-scale events to Application Insights: track when scaling happened and why
+
+**Failure Troubleshooting:**
+- **Instance down**: App Service health probe (GET /health endpoint) detects and routes traffic around it
+- **Slow response**: Application Insights shows which dependency is slow (DB, external API, cache miss)
+- **High error rate**: Set alert in Azure Monitor: if error rate > 5% for 5 minutes, page oncall
+
+**Interview line:**
+> "We auto-scale based on CPU thresholds, which keeps costs low during off-peak and handles unpredictable spikes. We monitor with Application Insights — if a dependency times out, we see it immediately. Failed instances are automatically removed from the load balancer via health probes."
+
+---
+
+### Q2. How do you ensure success in high-traffic scenarios without overprovisioning? How do you pinpoint root cause?
+
+**The Challenge:**
+During a regulatory filing season quarter-end, ownership data updates surge. Without careful tuning, we'd over-scale and waste millions. With poor observability, root cause investigation takes hours.
+
+**Pre-Production Load Testing:**
+Before quarter-end, we load-test with a realistic spike:
+```
+Baseline: 1,000 QPS
+Spike: 10,000 QPS for 30 minutes
+Goal: P95 latency < 2s, no errors
+```
+
+We run this against production-like infrastructure and watch:
+- **DB CPU**: Are queries efficient enough to handle 10× load?
+- **Cache hit rate**: Does Redis cache hit 95%? If not, increase TTL or add more keys
+- **Connection pool**: Does EF Core connection pooling hold steady, or are we exhausting the pool?
+
+If something breaks, we fix it (add index, optimize query, increase cache) before the real spike hits.
+
+**Application Site Configuration for Root Cause:**
+Azure Application Insights gives us a distributed trace timeline:
+```
+Request: /api/targeting/scores?investors=500
+├─ ASP.NET (50ms) ← controller execution
+├─ Redis (5ms) ← cache hit, fast
+├─ Azure SQL (1500ms) ← slow! Here's your bottleneck
+└─ Service Bus (10ms)
+```
+
+We can see exactly which hop is slow. If it's the database, we check the execution plan. If it's an external API, we check if that service is degraded.
+
+**Dynamic Threshold Adjustment:**
+During actual traffic spikes, we don't use static thresholds. We use:
+- **Predictive scaling**: Azure App Service can predict load based on historical patterns and scale *preemptively* before the spike hits
+- **Custom metrics**: Log a metric `OutstandingOrdersInQueue` and scale when it exceeds 500 (don't wait for CPU to spike)
+
+**Interview line:**
+> "We load-test before known traffic spikes to find bottlenecks proactively. In production, Application Insights shows us exactly which dependency is slow — database, cache, or external call. We use custom metrics and historical patterns to scale preemptively, not reactively on CPU."
+
+---
+
+### Q3. How do you find the tracecode for scaling decisions? How do you set up distributed tracing?
+
+**The Problem:**
+A request from one Angular user flows through APIM → Ownership Service → Cosmos DB → Targeting Service → Azure SQL → back to the user. If it's slow, which hop took the time? With 2,500 tenants making requests, how do you find the slow one?
+
+**The Solution — Correlation ID:**
+
+At the Azure Front Door level, we generate or passthrough a `X-Correlation-ID` header:
+```
+Request: GET /api/targeting/scores
+Headers: X-Correlation-ID: 550e8400-e29b-41d4-a716-446655440000
+```
+
+This ID flows through **every** service call, **every** database query, **every** Service Bus message:
+
+```csharp
+// In APIM, set the correlation ID
+context.Request.Headers.Add("X-Correlation-ID", Guid.NewGuid().ToString());
+
+// In each microservice, extract it and log it
+public class CorrelationIdMiddleware
+{
+    public async Task InvokeAsync(HttpContext ctx)
+    {
+        var correlationId = ctx.Request.Headers["X-Correlation-ID"].ToString();
+        ctx.Items["CorrelationId"] = correlationId;
+        
+        // All logs from this point forward include the correlation ID
+        _logger.LogInformation("Processing request {CorrelationId}", correlationId);
+        
+        await _next(ctx);
+    }
+}
+
+// In EF Core, log the correlation ID with the query
+var query = _db.TargetingScores
+    .Where(t => t.InvestorIds.Contains(investorId))
+    .WithCorrelationId(correlationId)  // custom extension
+    .ToListAsync();
+```
+
+**Application Insights Integration:**
+```
+Application Insights Dashboard:
+Search by Correlation ID: 550e8400-e29b-41d4-a716-446655440000
+
+Results:
+├─ 2026-07-08 09:15:22.001 APIM [GET /api/targeting/scores] (50ms)
+├─ 2026-07-08 09:15:22.051 Targeting Service [Call Ownership Service] (100ms)
+├─ 2026-07-08 09:15:22.151 Ownership Service [Query Cosmos DB] (800ms) ← SLOW
+├─ 2026-07-08 09:15:23.001 Targeting Service [Local calculation] (200ms)
+└─ 2026-07-08 09:15:23.201 APIM [Response sent] (1,150ms total)
+```
+
+One search finds the entire request journey across all services.
+
+**Interview line:**
+> "We use a correlation ID that flows through the entire request — every service logs it, every database query tags it. In Application Insights, we search by correlation ID and see a timeline of every hop. This tells us exactly which service or database took the time. Without it, debugging distributed systems is guesswork."
+
+---
+
+### Q4. How do you adjust CPU thresholds dynamically during traffic spikes?
+
+**The Challenge:**
+Static thresholds break under stress. If we set "scale when CPU > 70%", at 9 AM when CPU jumps to 80% instantly, auto-scale reacts *after* the spike has already caused latency.
+
+**The Solution — Predictive + Custom Metrics:**
+
+**Azure App Service Predictive Scaling:**
+```
+Enable: App Service Plan → Scale out → Predictive scaling
+Logic: "Based on historical usage at this day/time, scale to N instances 10 minutes early"
+
+Example:
+Every Tuesday at 8:50 AM, scale to 8 instances (peak is at 9:00 AM)
+Every day at 6:00 PM, scale down to 2 instances
+```
+
+**Custom Metrics for Precise Trigger:**
+Instead of watching generic CPU, watch what actually matters:
+```csharp
+// In Ownership Service: log a metric on how many pending recalculations we have
+public class OwnershipService
+{
+    public async Task RecalculateAsync()
+    {
+        var pending = await _queue.GetApproximateCountAsync();
+        _telemetryClient.GetMetric("PendingRecalculationQueue").TrackValue(pending);
+        
+        // Scale rule: if PendingRecalculationQueue > 500, add instances
+        // This scales BEFORE latency appears, not after
+    }
+}
+```
+
+**Real-Time Threshold Adjustment:**
+```
+OnCall Engineer (9:00 AM on quarter-end)
+  1. Sees PendingRecalculationQueue growing to 200 → 300 → 400
+  2. Preemptively increases CPU scale-out threshold from 70% to 80% (gives App Service more headroom)
+  3. Increases custom metric threshold: PendingRecalculationQueue from 500 to 800 (allows queue to buffer more)
+  4. Monitors Application Insights for P95 latency
+  5. If P95 latency stays < 2s, we're good
+  6. If P95 latency creeps to 3s, roll back thresholds and call for more investigation
+```
+
+**Telemetry for Deeper Insight:**
+```csharp
+// Log not just CPU, but: queue depth, cache hit rate, DB connections in use
+_telemetryClient.GetMetric("TargetingServiceCacheHitRate").TrackValue(0.96);
+_telemetryClient.GetMetric("DbConnectionPoolUtilization").TrackValue(0.72);
+_telemetryClient.GetMetric("OutstandingApiCalls").TrackValue(1200);
+
+// These metrics tell us:
+// - Cache is healthy (96% hit rate, no need to evict)
+// - DB connections aren't exhausted (72% used, 28% headroom)
+// - We have 1,200 requests in flight (is that normal for this load?)
+```
+
+**Interview line:**
+> "We don't rely on static CPU thresholds. We use predictive scaling to preemptively scale before known traffic spikes, and custom metrics to scale on what matters (queue depth, connection pool usage) not generic CPU. During unexpected spikes, we monitor Application Insights telemetry and adjust thresholds on the fly if needed."
+
+---
+
+### Q5. How do you implement authentication and security across microservices? How do you manage secrets?
+
+**The Challenge:**
+6 microservices, each needs to authenticate API calls. Each needs database credentials, API keys, certificates. If we hardcode secrets in code, we fail every security audit. If we hardcode them in config files, we risk accidental commits to GitHub.
+
+**The Solution — Managed Identity + Key Vault:**
+
+**Service-to-Service Auth:**
+```csharp
+// Ownership Service needs to call Targeting Service
+// Both services are registered as Managed Identities in Azure AD
+
+// Ownership Service (caller)
+var credential = new DefaultAzureCredential();
+var client = new HttpClient();
+var token = await credential.GetTokenAsync(
+    new TokenRequestContext(new[] { "https://targetingservice.azurewebsites.net/.default" })
+);
+client.DefaultRequestHeaders.Authorization = 
+    new AuthenticationHeaderValue("Bearer", token.Token);
+
+var response = await client.GetAsync("https://targetingservice.azurewebsites.net/api/scores");
+
+// Targeting Service (receiver)
+// Middleware validates the JWT: issuer must be https://sts.windows.net/{tenantId}/
+// aud (audience) must be our app's ID
+// If valid, trust the claims and process the request
+```
+
+**Database Access:**
+```csharp
+// Instead of storing "password" in Key Vault:
+var connectionString = await _keyVaultClient.GetSecretAsync("Ownership-DB-Connection");
+
+// We use Managed Identity:
+builder.Services.AddDbContext<OwnershipDbContext>(options =>
+{
+    var connection = new SqlConnection()
+    {
+        ConnectionString = "Server=ownership-sql.database.windows.net;Database=OwnershipDb;",
+        AccessToken = await new DefaultAzureCredential().GetTokenAsync(
+            new TokenRequestContext(new[] { "https://database.windows.net/.default" })
+        ).Result.Token
+    };
+    options.UseSqlServer(connection);
+});
+```
+
+**Secrets Management:**
+```
+Azure Key Vault stores only:
+- Non-rotatable config (environment URLs, tenant IDs)
+- Certificates for TLS
+- API keys for third-party services (S&P Capital IQ)
+
+NOT stored:
+- Database passwords (use Managed Identity instead)
+- JWT signing keys for our own tokens (certificates are stored, but keys are generated once and kept in-memory)
+- Connection strings (constructed dynamically with Managed Identity token)
+```
+
+**Secret Rotation (Automatic):**
+```
+Third-party API keys (e.g., S&P Capital IQ, Okta):
+1. Admin rotates key in the third-party service
+2. Admin updates the secret in Key Vault
+3. App Service automatically reloads the secret on next restart or via Key Vault refresh
+4. No downtime, no manual intervention
+
+Database passwords:
+Not needed — Managed Identity tokens refresh automatically
+```
+
+**Interview line:**
+> "We use Azure Managed Identity for database and service-to-service authentication — no passwords to manage. Third-party API keys are stored in Key Vault and rotated by updating the vault, not redeploying code. This keeps secrets out of the codebase entirely and makes rotation frictionless."
+
+---
+
+### Q6. How do you secure Key Vault and Azure without adding secrets to code?
+
+**The Problem:**
+To access Key Vault, you need credentials. But where do those credentials live? If you put them in code, you've just moved the problem.
+
+**The Solution — Managed Identity:**
+
+```csharp
+// NO credentials needed. App Service has an identity assigned by Azure AD.
+var credential = new DefaultAzureCredential();
+var client = new SecretClient(new Uri("https://capital-access-kv.vault.azure.net/"), credential);
+
+// This works because:
+// 1. App Service has an identity (managed by Azure)
+// 2. That identity has a role assignment in Key Vault: "Key Vault Secrets User"
+// 3. Azure AD verifies the identity and grants access automatically
+// 4. No credentials in code, config, or environment variables
+```
+
+**Setting up the permissions (one-time):**
+```bash
+# Create Managed Identity for the Ownership Service
+az identity create --name OwnershipServiceIdentity --resource-group capital-access
+
+# Assign the identity to the App Service
+az webapp identity assign --resource-group capital-access --name ownership-service-app \
+  --identities OwnershipServiceIdentity
+
+# Grant the identity access to Key Vault
+az keyvault set-policy --name capital-access-kv \
+  --object-id $(az identity show --name OwnershipServiceIdentity -g capital-access --query principalId -o tsv) \
+  --secret-permissions get
+
+# Grant the identity access to Blob Storage
+az role assignment create --assignee $(az identity show --name OwnershipServiceIdentity -g capital-access --query principalId -o tsv) \
+  --role "Storage Blob Data Reader" \
+  --scope /subscriptions/{subscriptionId}/resourceGroups/capital-access/providers/Microsoft.Storage/storageAccounts/reportblobs
+```
+
+**Certificate Rotation (automated):**
+```csharp
+// Certificates in Key Vault auto-renew 30 days before expiry
+// App Service pulls the new cert on next restart
+// No manual intervention needed
+
+// For custom rotation:
+public class CertificateRotationService : BackgroundService
+{
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            var cert = await _keyVaultClient.GetCertificateAsync("app-signing-cert");
+            if (cert.Properties.ExpiresOn < DateTimeOffset.UtcNow.AddDays(30))
+            {
+                _logger.LogWarning("Certificate expires soon, alert oncall");
+                // Send alert to monitoring
+            }
+            await Task.Delay(TimeSpan.FromDays(1), stoppingToken);
+        }
+    }
+}
+```
+
+**Interview line:**
+> "We use Managed Identity so credentials never leave Azure. Each microservice has an identity, which gets role assignments in Key Vault and Storage. The app calls DefaultAzureCredential() and Azure AD handles authentication behind the scenes. Certificates auto-renew in Key Vault without code changes."
+
+---
+
+### Q7. How do you integrate new features into existing systems with agile/DevOps practices?
+
+**The Scenario:**
+New feature: "Investor Alerts" — notify IR teams when a new investor opens a position. Spans multiple services: Ownership (detects change), Notifications (sends alert), Contacts (looks up email).
+
+**The Approach:**
+
+**Step 1 — Feature flags (not hard deployments):**
+```csharp
+[HttpPost("entities/{id}/alerts/subscribe")]
+public async Task<IActionResult> SubscribeToAlerts(int id)
+{
+    if (!_featureManager.IsEnabledAsync("InvestorAlerts").Result)
+        return StatusCode(501, "Feature not yet enabled");
+    
+    // Subscribe logic here
+}
+
+// In Azure App Configuration:
+InvestorAlerts = false (in Prod) → true (in Dev) → true (in Staging after validation)
+```
+
+**Step 2 — Database migration (backward-compatible):**
+```csharp
+// Migration 1: Add the table (doesn't break existing code)
+migrationBuilder.CreateTable(
+    name: "InvestorAlerts",
+    columns: new {
+        Id = migrationBuilder.Column<int>(),
+        InvestorId = migrationBuilder.Column<int>(),
+        AlertType = migrationBuilder.Column<string>()
+    }
+);
+
+// No code changes yet — the new table exists but isn't used
+// Previous version of the app still runs fine
+```
+
+**Step 3 — Service logic (feature-flagged):**
+```csharp
+// Ownership Service publishes a new event type (only if flag is on)
+public async Task RecalculateAsync()
+{
+    if (await _featureManager.IsEnabledAsync("InvestorAlerts"))
+    {
+        var message = new InvestorPositionOpened { InvestorId = 123, Date = now };
+        await _serviceBus.PublishAsync(message);
+    }
+}
+```
+
+**Step 4 — Notifications Service subscribes (feature-flagged):**
+```csharp
+// Only process the event if the flag is on
+public async Task Handle(InvestorPositionOpened @event)
+{
+    if (!await _featureManager.IsEnabledAsync("InvestorAlerts"))
+        return;
+    
+    var alert = new Alert { InvestorId = @event.InvestorId };
+    await _alertService.SendAsync(alert);
+}
+```
+
+**Step 5 — Deploy without risk:**
+```
+Monday: Deploy all services with InvestorAlerts = false in Prod
+        Run smoke tests (code is deployed, feature is off, no impact)
+Tuesday: Enable in Staging, test with real data
+Wednesday: Gradually enable in Prod (start at 10% of traffic via feature flag gradual rollout)
+Thursday: 100% enabled if no issues
+```
+
+**Interview line:**
+> "We use feature flags to decouple deployment from feature enablement. We deploy the code disabled, test it in staging, then gradually enable it in production. This lets us roll back with a config change (not a deployment) if something breaks, and it keeps deployments small and low-risk."
+
+---
+
+### Q8. How do you grant microservices access to Key Vault and Storage securely?
+
+**Step-by-step walkthrough for "Ownership Service needs to read a secret from Key Vault":**
+
+```bash
+# Step 1: Create a Managed Identity for the service
+az identity create \
+  --resource-group capital-access \
+  --name OwnershipServiceIdentity
+
+# Step 2: Get the identity's object ID (used for role assignments)
+IDENTITY_ID=$(az identity show \
+  --name OwnershipServiceIdentity \
+  --resource-group capital-access \
+  --query principalId -o tsv)
+
+# Step 3: Assign the identity to the App Service instance
+az webapp identity assign \
+  --resource-group capital-access \
+  --name ownership-service-app \
+  --identities OwnershipServiceIdentity
+
+# Step 4: Grant the identity "Key Vault Secrets User" role (can read, cannot write)
+az keyvault set-policy \
+  --name capital-access-kv \
+  --object-id $IDENTITY_ID \
+  --secret-permissions get list
+
+# Step 5: Grant the identity "Storage Blob Data Reader" role for backup files
+az role assignment create \
+  --assignee $IDENTITY_ID \
+  --role "Storage Blob Data Reader" \
+  --scope /subscriptions/$SUBSCRIPTION_ID/resourceGroups/capital-access/providers/Microsoft.Storage/storageAccounts/capitalaccessblobs
+
+# Verify permissions
+az identity show-msi-details --id $IDENTITY_ID
+
+# Test from the app
+# var secret = await keyVaultClient.GetSecretAsync("ownership-s2s-key");
+# If this works, the identity is properly configured ✅
+```
+
+**Why this is secure:**
+- No credentials in code
+- Identity is scoped to one service (Ownership Service can't access Targeting Service's secrets)
+- Role is scoped to one permission ("Secrets User" = read-only, can't rotate or delete)
+- Auditable: every access is logged in Azure AD audit logs with the service identity, timestamp, and resource
+
+**Interview line:**
+> "We assign each microservice a Managed Identity and grant it the minimal role (read-only for secrets, read-only for storage blobs). This is configured once in Azure CLI. The app uses DefaultAzureCredential() and Azure handles the authentication. Every access is auditable."
+
+---
+
+### Q9. How would you configure Managed Identity in code to securely access Key Vault and Blob Storage?
+
+**Code walkthrough:**
+
+```csharp
+// Program.cs
+var builder = WebApplication.CreateBuilder(args);
+
+// 1. Managed Identity for Key Vault
+var credential = new DefaultAzureCredential();
+var secretClient = new SecretClient(
+    new Uri("https://capital-access-kv.vault.azure.net/"),
+    credential
+);
+
+// 2. Load secrets at startup (once)
+var dbConnectionString = await secretClient.GetSecretAsync("OwnershipDb-ConnectionString");
+var jwtKey = await secretClient.GetSecretAsync("JWT-SigningKey");
+
+// 3. Add DbContext with the retrieved connection string
+builder.Services.AddDbContext<OwnershipDbContext>(options =>
+{
+    options.UseSqlServer(dbConnectionString.Value.Value);
+});
+
+// 4. Add Blob Storage client with Managed Identity
+builder.Services.AddSingleton(
+    new BlobContainerClient(
+        new Uri("https://capitalaccess.blob.core.windows.net/ownership-backups"),
+        credential
+    )
+);
+
+var app = builder.Build();
+
+// 5. Test that permissions work (fails fast if identity is misconfigured)
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<OwnershipDbContext>();
+    await dbContext.Database.ExecuteSqlAsync($"SELECT 1");
+    Console.WriteLine("✅ Database connection successful");
+}
+
+app.Run();
+```
+
+**Handling secret expiration / rotation:**
+
+```csharp
+public class SecretRefreshService : BackgroundService
+{
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly SecretClient _keyVaultClient;
+    
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                // Every 24 hours, check if secrets are about to expire
+                var jwtSecret = await _keyVaultClient.GetSecretAsync("JWT-SigningKey");
+                var expiresIn = (jwtSecret.Properties.ExpiresOn ?? DateTimeOffset.MaxValue) - DateTimeOffset.UtcNow;
+                
+                if (expiresIn < TimeSpan.FromDays(7))
+                {
+                    // Alert oncall 7 days before expiry
+                    _logger.LogWarning("JWT-SigningKey expires in {Days} days", expiresIn.Days);
+                    // Send PagerDuty alert or Slack notification
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Secret refresh check failed");
+            }
+            
+            await Task.Delay(TimeSpan.FromHours(24), stoppingToken);
+        }
+    }
+}
+```
+
+**Blob Storage upload with Managed Identity:**
+
+```csharp
+public class OwnershipBackupService
+{
+    private readonly BlobContainerClient _containerClient;
+    
+    public async Task BackupAsync(OwnershipData data)
+    {
+        var blobName = $"ownership-{DateTime.UtcNow:yyyy-MM-dd-HH-mm-ss}.json";
+        var blobClient = _containerClient.GetBlobClient(blobName);
+        
+        // Serialize and upload
+        var json = JsonSerializer.Serialize(data);
+        var stream = new MemoryStream(Encoding.UTF8.GetBytes(json));
+        
+        // This uses Managed Identity — no connection string needed
+        await blobClient.UploadAsync(stream, overwrite: true);
+        
+        // Set retention: delete after 90 days
+        var blobProperties = await blobClient.GetPropertiesAsync();
+        // Azure Blob lifecycle policy handles cleanup (configured at container level)
+    }
+}
+```
+
+**Interview line:**
+> "I use DefaultAzureCredential() to get an identity token at startup, then pass it to SecretClient, DbContext, and BlobContainerClient. Secrets are loaded once from Key Vault. I monitor secret expiry and alert 7 days before. Blob Storage uploads use the same identity. No connection strings or passwords ever touch the code."
+
+---
+
+### Q10. How do you configure CI/CD for secure, environment-specific deployments with post-deployment validation?
+
+**The Pipeline (Azure DevOps):**
+
+```yaml
+# azure-pipelines.yml
+trigger:
+  - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+  # Stage 1: Build & Test
+  - stage: BuildTest
+    jobs:
+      - job: Build
+        steps:
+          - task: UseDotNet@2
+            inputs:
+              version: '8.0.x'
+          
+          - task: DotNetCoreCLI@2
+            displayName: 'Restore packages'
+            inputs:
+              command: 'restore'
+              projects: '**/*.csproj'
+          
+          - task: DotNetCoreCLI@2
+            displayName: 'Build'
+            inputs:
+              command: 'build'
+              arguments: '--configuration Release'
+          
+          - task: DotNetCoreCLI@2
+            displayName: 'Run unit tests'
+            inputs:
+              command: 'test'
+              arguments: '--configuration Release /p:CollectCoverage=true'
+          
+          - task: DotNetCoreCLI@2
+            displayName: 'Publish'
+            inputs:
+              command: 'publish'
+              publishWebProjects: true
+              arguments: '--configuration Release --output $(Build.ArtifactStagingDirectory)'
+          
+          - task: PublishBuildArtifacts@1
+            inputs:
+              artifactName: 'drop'
+
+  # Stage 2: Deploy to Staging
+  - stage: DeployStaging
+    dependsOn: BuildTest
+    condition: succeeded()
+    jobs:
+      - deployment: Deploy
+        displayName: 'Deploy to Staging'
+        environment: 'Staging'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureWebApp@1
+                  displayName: 'Deploy App Service'
+                  inputs:
+                    azureSubscription: 'Capital-Access-Staging'
+                    appType: 'webAppLinux'
+                    appName: 'ownership-service-staging'
+                    package: '$(Pipeline.Workspace)/drop/**/*.zip'
+                
+                - task: AzureAppServiceManage@0
+                  displayName: 'Swap slots (blue-green)'
+                  inputs:
+                    azureSubscription: 'Capital-Access-Staging'
+                    action: 'Swap Slots'
+                    appName: 'ownership-service-staging'
+                    resourceGroupName: 'capital-access-staging'
+                    sourceSlot: 'staging'
+                    targetSlot: 'production'
+
+  # Stage 3: Smoke Tests (Post-Deploy Validation)
+  - stage: SmokeTests
+    dependsOn: DeployStaging
+    condition: succeeded()
+    jobs:
+      - job: PostDeployValidation
+        displayName: 'Post-Deployment Smoke Tests'
+        steps:
+          - task: UseDotNet@2
+            inputs:
+              version: '8.0.x'
+          
+          - script: |
+              echo "Testing /api/health endpoint..."
+              curl -v https://ownership-service-staging.azurewebsites.net/api/health
+              
+              echo "Testing database connectivity..."
+              # Run a simple query against the DB
+              
+              echo "Testing Key Vault access..."
+              # Verify Managed Identity can read a test secret
+              
+              echo "Testing Service Bus connectivity..."
+              # Publish a test message to Service Bus
+            displayName: 'Run smoke tests'
+          
+          - script: |
+              echo "Checking Application Insights for errors..."
+              # Query App Insights: if error rate > 1% in last 5 min, fail
+              # az monitor metrics list --resource staging-app \
+              #   --metric ErrorPercentage --interval PT5M --aggregation Average
+            displayName: 'Check Application Insights'
+          
+          - task: PublishTestResults@2
+            displayName: 'Publish test results'
+            inputs:
+              testResultsFormat: 'NUnit'
+              testResultsFiles: '**/test-results.xml'
+
+  # Stage 4: Deploy to Production (Manual Approval)
+  - stage: DeployProduction
+    dependsOn: SmokeTests
+    condition: succeeded()
+    jobs:
+      - deployment: DeployProd
+        displayName: 'Deploy to Production'
+        environment: 'Production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureWebApp@1
+                  displayName: 'Deploy to Production'
+                  inputs:
+                    azureSubscription: 'Capital-Access-Production'
+                    appType: 'webAppLinux'
+                    appName: 'ownership-service-prod'
+                    package: '$(Pipeline.Workspace)/drop/**/*.zip'
+                
+                - script: |
+                    echo "Post-deployment validation..."
+                    curl -v https://ownership-service.azurewebsites.net/api/health
+                    
+                    # Rollback if health check fails
+                    if [ $? -ne 0 ]; then
+                      echo "Health check failed, rolling back..."
+                      az webapp deployment slot swap \
+                        --name ownership-service-prod \
+                        --resource-group capital-access \
+                        --slot staging
+                      exit 1
+                    fi
+                  displayName: 'Validate production deployment'
+
+  # Stage 5: Production Smoke Tests (Continuous Monitoring)
+  - stage: ProductionMonitoring
+    dependsOn: DeployProduction
+    condition: succeeded()
+    jobs:
+      - job: ContinuousMonitoring
+        displayName: 'Monitor production for 10 minutes'
+        steps:
+          - script: |
+              echo "Querying Application Insights for errors..."
+              # SELECT COUNT(*) FROM exceptions 
+              # WHERE timestamp > now - 10min
+              # If > 0, page oncall
+            displayName: 'Check for exceptions'
+```
+
+**Environment-Specific Configuration:**
+```
+# appsettings.staging.json
+{
+  "KeyVault": "https://capital-access-staging-kv.vault.azure.net/",
+  "Database": "Server=staging-sql.database.windows.net;Database=OwnershipDb;",
+  "ServiceBus": "https://capital-access-staging.servicebus.windows.net/",
+  "FeatureFlags": {
+    "InvestorAlerts": true,   // Test new features in staging
+    "AdvancedMetrics": true,
+    "RateLimiting": false     // Disabled in staging, enabled in prod
+  }
+}
+
+# appsettings.production.json
+{
+  "KeyVault": "https://capital-access-kv.vault.azure.net/",
+  "Database": "Server=prod-sql.database.windows.net;Database=OwnershipDb;",
+  "ServiceBus": "https://capital-access.servicebus.windows.net/",
+  "FeatureFlags": {
+    "InvestorAlerts": false,  // Disabled until fully validated
+    "AdvancedMetrics": false,
+    "RateLimiting": true      // Strict rate limiting in prod
+  }
+}
+```
+
+**Interview line:**
+> "We have a multi-stage pipeline: build/test → deploy to staging with blue-green swap → post-deploy smoke tests → manual approval → deploy to production → monitor for 10 minutes. Each environment has its own Key Vault and config. If health checks fail in production, we automatically rollback the slot swap."
+
+---
+
+
 
 > ℹ️
 > **Always ask 2–3 good questions.** It shows genuine interest. Pick ones relevant to what they've discussed.
