@@ -1491,6 +1491,614 @@ When the interviewer asks about deployment strategy:
 
 ---
 
+## Deep Dive — CI/CD Pipeline Architecture
+
+The CI/CD pipeline is the backbone of safe, frequent deployments at Capital Access. This section walks through exactly how code flows from a developer's laptop to production, what gates protect each stage, and what happens when things go wrong.
+
+### End-to-End Pipeline Overview
+
+```
+Developer's Laptop
+  │
+  ├─→ git push origin feature/investor-alerts
+  │
+  ▼
+[GITHUB / AZURE DEVOPS]
+  ├─→ Webhook triggers pipeline
+  │
+  ▼
+[STAGE 1: PR Validation Pipeline]
+  ├─→ Lint (ESLint, Stylelint, Prettier)
+  ├─→ Unit Tests (Jest coverage ≥ 80%)
+  ├─→ Build (esbuild bundle)
+  ├─→ Security scan (SonarQube, SAST)
+  ├─→ Accessibility scan (axe-core)
+  ├─→ Bundle size check (must not exceed baseline + 2%)
+  │   └─→ GATE: All checks must pass or PR blocks merge
+  │
+  ├─→ Code Review + Approval
+  │
+  ▼
+[STAGE 2: Merge to Main & Deploy to DEV]
+  ├─→ Merge squash to main branch
+  ├─→ Build Docker image
+  ├─→ Push to Azure Container Registry (ACR)
+  ├─→ Deploy to DEV environment
+  │   └─→ Automatic, no manual gate
+  ├─→ Run integration tests (real DB, real API calls)
+  ├─→ Smoke tests (happy path sanity check)
+  │   └─→ GATE: Integration tests must pass
+  │
+  ▼
+[STAGE 3: Deploy to STAGING]
+  ├─→ Manual trigger (developer / team lead)
+  ├─→ Pull image from ACR
+  ├─→ Blue-green deployment (canary slot)
+  ├─→ Run E2E tests (Cypress / Playwright)
+  ├─→ Performance testing (load test with k6)
+  ├─→ Run security penetration tests
+  │   └─→ GATE: E2E tests + security approval
+  │
+  ├─→ Manual QA sign-off (deployed to real staging environment)
+  │   └─→ GATE: QA team validates against test cases
+  │
+  ▼
+[STAGE 4: Deploy to PRODUCTION]
+  ├─→ Manual approval + release notes (requires manager signature)
+  ├─→ Health check on staging (is it still healthy?)
+  ├─→ Pull image from ACR
+  ├─→ Blue-green deployment (production slot)
+  ├─→ Smoke tests in production (10-minute validation window)
+  ├─→ Gradual traffic shift (0% old → 10% new → 25% new → 100% new)
+  ├─→ Application Insights monitoring (5-minute check)
+  │   └─→ GATE: Error rate < 1%, latency P95 < baseline
+  │   └─→ If gate fails: automatic rollback (swap slots back)
+  │
+  ├─→ Post-deployment validation
+  │   ├─→ Run production smoke tests
+  │   ├─→ Check database migrations completed
+  │   ├─→ Verify feature toggles didn't change unexpectedly
+  │   └─→ Alert if deployment took longer than expected
+  │
+  ▼
+[COMPLETE]
+  ├─→ Slack notification: "✅ Deployment successful, all gates passed"
+  ├─→ Post-incident review (if any gate failed and was manually overridden)
+  └─→ Deployment log archived for audit
+```
+
+### Stage 1: PR Validation (Code Quality Gates)
+
+**Trigger:** Developer pushes to feature branch and opens PR.
+
+**What happens (in real time):**
+
+```
+2026-07-08 10:15:32 — git push origin feature/investor-alerts
+  └─→ GitHub webhook fires → Azure DevOps pipeline starts
+
+2026-07-08 10:15:45 — [Build Started]
+  Pool: ubuntu-latest (Linux agent)
+  
+2026-07-08 10:15:50 — [Step: Checkout Code]
+  ✅ Cloning repository...
+  
+2026-07-08 10:16:02 — [Step: Install Node Dependencies]
+  npm ci --prefer-offline
+  ✅ Installed 1,247 packages (89 MB)
+  
+2026-07-08 10:16:15 — [Step: Lint (ESLint + Prettier)]
+  eslint src/**/*.ts src/**/*.tsx
+  ✅ No linting errors
+  
+2026-07-08 10:16:22 — [Step: Run Unit Tests (Jest)]
+  jest --coverage --passWithNoTests
+  ────────────────────────────────────
+  PASS  src/services/investor-alerts.service.spec.ts
+  PASS  src/components/alert-dialog.spec.ts
+  ────────────────────────────────────
+  Coverage: 82.4% (target: ≥80%)
+  ✅ All tests passed
+  
+2026-07-08 10:16:35 — [Step: Build (esbuild)]
+  ng build --configuration production
+  ✅ Built 6 chunks, bundle size: 485 KB (baseline: 475 KB, +2.1%)
+  ⚠️ GATE CHECK: Bundle size increase ≤ 2%? YES ✅
+  
+2026-07-08 10:16:50 — [Step: Security Scan (SonarQube)]
+  sonar-scanner -Dsonar.projectKey=capital-access-webapp
+  ✅ No critical vulnerabilities found
+  ✅ No code smells rated "Blocker"
+  ✅ Code coverage meets threshold
+  
+2026-07-08 10:17:05 — [Step: Accessibility Scan (axe-core)]
+  axe-core scan on build output
+  ✅ No WCAG 2.1 AA violations
+  ✅ All interactive elements keyboard-accessible
+  
+2026-07-08 10:17:15 — [Publish Build Artifacts]
+  Zipping build folder → artifact "drop"
+  ✅ Artifact size: 2.3 MB
+  
+2026-07-08 10:17:20 — [BUILD SUCCESSFUL]
+  All gates passed ✅
+  Result: PR is ready for code review
+```
+
+**Code Review Gate:**
+```
+GitHub PR Page:
+  Author: alice@capital-access.com
+  Title: "feature: investor ownership change alerts via email"
+  Description: "Notifies IR teams when major shareholders sell positions"
+  
+  Checks: ✅ All checks passed
+    ├─ Build passes (10:17 AM) ✅
+    ├─ 2+ code reviews required (1/2 approved) ⏳
+    └─ No merge conflicts ✅
+  
+  Team Lead Review (bob@capital-access.com):
+    "Good implementation. Alert deduplication logic is solid.
+     Confirmed alert fatigue won't happen. Approved ✅"
+  
+  Maintainer Approval (carol@capital-access.com):
+    "LGTM. Follows our notification service patterns.
+     Ready to merge 🚀"
+```
+
+### Stage 2: Merge to Main & Deploy to DEV
+
+**Trigger:** PR approved + all gates pass → Developer clicks "Squash and Merge".
+
+**What happens:**
+
+```
+2026-07-08 10:45:22 — [Merge Commit Created]
+  GitHub squash-merges feature/investor-alerts → main
+  Commit: 3a7f2c8 "feature: investor ownership change alerts via email"
+  
+  └─→ Webhook: main branch changed → Azure DevOps pipeline auto-triggers
+
+2026-07-08 10:45:30 — [BUILD MICROSERVICES]
+  
+  Step 1: Build Ownership Service (.NET)
+    dotnet build OwnershipService/OwnershipService.csproj --configuration Release
+    ✅ Build successful
+    
+  Step 2: Build Notifications Service (.NET)
+    dotnet build NotificationsService/NotificationsService.csproj --configuration Release
+    ✅ Build successful
+    
+  Step 3: Run Backend Unit Tests
+    dotnet test --configuration Release --logger trx
+    ✅ OwnershipService.Tests: 47/47 passed
+    ✅ NotificationsService.Tests: 63/63 passed
+    
+  Step 4: Build Docker Images
+    docker build -f OwnershipService.Dockerfile -t capitalaccessacr.azurecr.io/ownership-service:3a7f2c8 .
+    docker build -f NotificationsService.Dockerfile -t capitalaccessacr.azurecr.io/notifications-service:3a7f2c8 .
+    ✅ Both images built (125 MB, 140 MB)
+    
+  Step 5: Push to Azure Container Registry (ACR)
+    docker push capitalaccessacr.azurecr.io/ownership-service:3a7f2c8
+    docker push capitalaccessacr.azurecr.io/notifications-service:3a7f2c8
+    ✅ Images pushed
+    
+2026-07-08 10:48:15 — [DEPLOY TO DEV ENVIRONMENT]
+  
+  kubectl set image deployment/ownership-service \
+    ownership-service=capitalaccessacr.azurecr.io/ownership-service:3a7f2c8 \
+    -n dev
+  ✅ Deployment updated
+  
+  kubectl set image deployment/notifications-service \
+    notifications-service=capitalaccessacr.azurecr.io/notifications-service:3a7f2c8 \
+    -n dev
+  ✅ Deployment updated
+  
+  kubectl rollout status deployment/ownership-service -n dev
+  ✅ New pods are ready
+  
+  2026-07-08 10:49:05 — [Run Integration Tests]
+    Test environment: PostgreSQL test DB + test Okta tenant
+    
+    TestCase: InvestorAlerts.SendAlert_WhenOwnershipDrops()
+      Database: Connected ✅
+      Okta: Mock tenant auth ✅
+      Alert service: Sending via SendGrid ✅
+    ✅ 156 integration tests passed
+    
+  2026-07-08 10:50:30 — [Run Smoke Tests]
+    GET https://ownership-service.dev.capital-access.local/health
+    ✅ Service is healthy
+    
+    POST https://api.dev.capital-access.local/api/alerts/test
+    ✅ Alert endpoint responds
+    
+  ✅ DEV DEPLOYMENT COMPLETE
+```
+
+**DEV environment is now live with the new feature (disabled by default):**
+```
+Azure App Configuration (DEV):
+  "InvestorOwnershipAlerts": {
+    "Enabled": false  ← Feature is OFF, code is deployed but not running
+  }
+```
+
+Developers can manually enable it in DEV to test:
+```bash
+az appconfig kv set \
+  --name capital-access-dev-config \
+  --key "FeatureManagement:InvestorOwnershipAlerts:Enabled" \
+  --value true
+```
+
+Then test the full flow in DEV before moving to staging.
+
+### Stage 3: Deploy to STAGING (QA Validation)
+
+**Trigger:** Team lead manually approves → clicks "Deploy to Staging" in Azure DevOps.
+
+**What happens:**
+
+```
+2026-07-08 14:00:00 — [Manual Trigger: Deploy to Staging]
+  Approved by: bob@capital-access.com (Team Lead)
+  Release notes: "Investor ownership change alerts. Feature behind toggle."
+  
+2026-07-08 14:00:15 — [Pre-deployment Checks]
+  
+  ✅ Staging is healthy (current version running)
+  ✅ All images exist in ACR
+  ✅ Database migrations are applied in staging
+  ✅ Staging feature toggles match production baseline
+  
+2026-07-08 14:00:30 — [Blue-Green Deployment: Create STAGING-CANARY Slot]
+  
+  Current (Blue):   ownership-service (v2.1.5, 10 pods)
+  New (Green):      ownership-service-canary (v2.1.6, 2 pods)
+  
+  kubectl apply -f ownership-service-canary-deployment.yaml
+  kubectl rollout status deployment/ownership-service-canary -n staging
+  ✅ Canary pods are running (2/2 ready)
+  
+2026-07-08 14:01:00 — [Run E2E Tests Against Canary]
+  
+  Cypress test suite running:
+    ✅ Login flow (Okta)
+    ✅ Navigate to Investor Alerts (feature disabled)
+    ✅ Alert not visible ✅ (toggle is off)
+    
+    Manual enable in staging config:
+    az appconfig kv set ... InvestorOwnershipAlerts=true
+    
+    ✅ Alert UI appears
+    ✅ Create alert rule
+    ✅ Simulate ownership change
+    ✅ Email sent to test user
+    ✅ Alert marked as "read"
+    
+  Duration: 8 minutes
+  ✅ All E2E tests passed
+  
+2026-07-08 14:09:15 — [Performance Test (k6 Load Test)]
+  
+  Simulate: 100 concurrent users viewing alerts for 5 minutes
+  
+  k6 run --vus 100 --duration 5m load-test.js
+  
+  Results:
+    P50 latency: 120ms ✅
+    P95 latency: 450ms ✅
+    P99 latency: 800ms ✅
+    Error rate: 0.2% ✅
+    
+  ✅ Performance acceptable (no degradation vs baseline)
+  
+2026-07-08 14:14:30 — [Security Penetration Test]
+  
+  OWASP ZAP scans the canary endpoint:
+    ✅ No SQL injection vectors
+    ✅ No XSS vulnerabilities
+    ✅ No CSRF tokens missing
+    ✅ Auth tokens properly validated
+    
+  ✅ Security gates passed
+  
+2026-07-08 14:20:00 — [Swap: Canary → Production Slot]
+  
+  If everything above is green, swap the slots:
+  kubectl patch service ownership-service \
+    -p '{"spec":{"selector":{"version":"v2.1.6"}}}'
+  
+  Traffic is now:
+    Old (v2.1.5): 0 pods
+    New (v2.1.6): 10 pods (all traffic)
+  
+  ✅ Staging now running v2.1.6
+  
+2026-07-08 14:20:15 — [QA Manual Testing in Staging]
+  
+  QA team has 2 hours to validate against test cases:
+  
+  Test Case 1: "Investor Alert Creation"
+    ✅ User logs in
+    ✅ Navigates to Alerts (feature disabled for QA user)
+    ✅ Feature not visible ✅ (expected)
+    ✅ Admin enables feature toggle
+    ✅ Feature now visible ✅
+    ✅ User creates alert rule
+    ✅ Alert rule saved in DB
+    ✅ PASS
+    
+  Test Case 2: "Alert Notification Email"
+    ✅ Ownership changes in test DB
+    ✅ Event published to Service Bus
+    ✅ Notifications Service receives event
+    ✅ Email sent to alert subscriber
+    ✅ Email contains investor name + ownership %
+    ✅ PASS
+    
+  QA Approval: "Ready for production ✅"
+  
+2026-07-08 16:30:00 — [STAGING DEPLOYMENT COMPLETE]
+  Staging now running v2.1.6 with feature toggle OFF by default
+```
+
+### Stage 4: Deploy to PRODUCTION (With Monitoring)
+
+**Trigger:** Manager approves release → clicks "Deploy to Production".
+
+```
+2026-07-08 17:00:00 — [Manual Release Approval]
+  
+  Release Manager Checklist:
+    ✅ All gates passed (DEV, Staging, E2E, security)
+    ✅ Release notes approved
+    ✅ Rollback plan documented
+    ✅ On-call engineer is standing by
+    ✅ Slack #deployments channel notified
+    
+  Release initiated by: carol@capital-access.com (Release Manager)
+  
+2026-07-08 17:00:15 — [Pre-Production Checks]
+  
+  ✅ Production is healthy (health checks all green)
+  ✅ All images in ACR
+  ✅ Database migrations tested in staging
+  ✅ Feature toggles: InvestorOwnershipAlerts = DISABLED
+  ✅ No active incidents in production
+  
+2026-07-08 17:00:30 — [Blue-Green Deployment: Create PROD-CANARY]
+  
+  Current (Blue):   ownership-service (v2.1.5, 50 pods across availability zones)
+  New (Green):      ownership-service-canary (v2.1.6, 5 pods in 1 AZ)
+  
+  kubectl apply -f ownership-service-prod-canary-deployment.yaml
+  kubectl rollout status deployment/ownership-service-prod-canary -n prod
+  ✅ Canary pods ready (5/5)
+  
+2026-07-08 17:01:00 — [Canary Smoke Tests]
+  
+  GET https://ownership-service.prod.capital-access.com/health
+  ✅ Canary is responding
+  
+  GET https://api.prod.capital-access.com/api/owners/123?tenant=spg-001
+  ✅ Canary returns data
+  
+  ✅ Smoke tests passed (1 minute)
+  
+2026-07-08 17:02:00 — [Gradual Traffic Shift: Canary (10%)]
+  
+  APIM config: Route 10% of traffic to canary, 90% to production
+  
+  kubectl set image deployment/ownership-service-canary-ingress \
+    weight=10 target=100
+  
+  Monitoring (Application Insights):
+  
+  2026-07-08 17:02:05 — [+0:05 min]
+    Canary pods:    Error rate 0.1%, P95 latency 140ms ✅
+    Blue pods:      Error rate 0.05%, P95 latency 120ms ✅
+    Difference:     Within acceptable range ✅
+  
+  2026-07-08 17:03:00 — [+1:00 min]
+    Canary pods:    Error rate 0.08%, P95 latency 145ms ✅
+    Blue pods:      Error rate 0.06%, P95 latency 118ms ✅
+    Stable for 1 min ✅
+  
+2026-07-08 17:03:15 — [Gradual Traffic Shift: Canary (25%)]
+  
+  kubectl set image deployment/ownership-service-canary-ingress \
+    weight=25 target=100
+  
+  2026-07-08 17:04:00 — [+1:15 min at 25%]
+    Canary pods:    Error rate 0.09%, P95 latency 142ms ✅
+    Increase requests 2.5×, latency flat ✅
+  
+2026-07-08 17:04:15 — [Gradual Traffic Shift: Canary (50%)]
+  
+  kubectl set image deployment/ownership-service-canary-ingress \
+    weight=50 target=100
+  
+  2026-07-08 17:05:00 — [+2:00 min at 50%]
+    Canary pods:    Error rate 0.07%, P95 latency 148ms ✅
+    Healthy under 50% load ✅
+  
+2026-07-08 17:05:15 — [Gradual Traffic Shift: Canary (100%)]
+  
+  All traffic now routes to v2.1.6 canary
+  Old v2.1.5 blue pods are drained
+  
+  kubectl patch service ownership-service \
+    -p '{"spec":{"selector":{"version":"v2.1.6"}}}'
+  
+  2026-07-08 17:06:00 — [+3:00 min, 100% traffic shifted]
+    Canary pods:      Error rate 0.06%, P95 latency 125ms ✅
+    All v2.1.6 pods:  50 replicas healthy
+    Drain old pods:   v2.1.5 pods shutting down gracefully
+    
+  ✅ PRODUCTION DEPLOYMENT COMPLETE
+  
+2026-07-08 17:06:30 — [Post-Deployment Validation]
+  
+  ✅ Health checks: All regions responding (US-East, EU-West, APAC)
+  ✅ Database: No migration errors, schema correct
+  ✅ Feature toggles: InvestorOwnershipAlerts still DISABLED ✅
+  ✅ API latency: P95 = 125ms (baseline = 120ms, +4% acceptable)
+  ✅ Error rate: 0.06% (target < 1%, we're at 0.06% ✅)
+  ✅ No cascading failures in dependent services
+  
+2026-07-08 17:07:00 — [Notification]
+  
+  Slack #deployments:
+  
+    ✅ DEPLOYMENT SUCCESSFUL
+    Service: ownership-service
+    Version: v2.1.6
+    Time to deploy: 6 minutes 30 seconds
+    Regions: US-East ✅ | EU-West ✅ | APAC ✅
+    Errors: 0.06% (all baseline noise)
+    P95 latency: 125ms (baseline: 120ms, +4%)
+    
+    Deployment monitoring window: 10 minutes
+    
+    Old version: v2.1.5 (gracefully shut down)
+    Rollback command: [If needed, click here] (one-click)
+```
+
+### What Happens If Something Goes Wrong
+
+**Scenario: Error rate spikes to 5% during deployment**
+
+```
+2026-07-08 17:04:30 — [ALERT: High Error Rate Detected]
+  
+  Application Insights detects:
+    Error rate: 0.1% baseline → 5.2% current ⚠️
+    P95 latency: 120ms baseline → 850ms current ⚠️
+    
+  Automated gate check:
+    Condition: Error rate < 1%?
+    Actual: 5.2%?
+    Result: GATE FAILED ❌
+  
+  On-Call Engineer alerted via PagerDuty:
+    "Production deployment gate failed: error rate spike"
+  
+2026-07-08 17:04:45 — [AUTOMATIC ROLLBACK INITIATED]
+  
+  System automatically swaps slots back:
+  
+  kubectl patch service ownership-service \
+    -p '{"spec":{"selector":{"version":"v2.1.5"}}}'
+  
+  Traffic shift:
+    v2.1.6 (new): 100% → 0%
+    v2.1.5 (old): 0% → 100%
+  
+  Rollback time: 30 seconds
+  
+  Post-rollback (10 seconds):
+    Error rate: 5.2% → 0.08% ✅
+    P95 latency: 850ms → 120ms ✅
+    
+  ✅ PRODUCTION RESTORED
+  
+2026-07-08 17:05:00 — [Post-Incident]
+  
+  Slack #incidents:
+    🔴 ROLLBACK: ownership-service v2.1.6 → v2.1.5
+    Reason: Error rate spike (5.2% detected at gate)
+    Duration of outage: 30 seconds
+    Current status: All services healthy ✅
+    
+    Oncall will investigate root cause.
+    Deployment can be retried after fix is applied.
+  
+  Root cause analysis (next day):
+    Code review found: Bug in new alert parsing logic
+    Specific case: malformed alert object from old Service Bus message
+    
+    Fix: Deployed v2.1.7 (with backward-compat handling)
+    Re-deployment: v2.1.7 passes all gates ✅
+    Production: v2.1.7 deployed successfully ✅
+```
+
+### Real-Time Deployment Metrics
+
+**Dashboard visible in real-time during deployment:**
+
+```
+Capital Access Deployment Dashboard (Azure DevOps)
+
+Pipeline Status:
+  Build:              ✅ SUCCESS (2m 15s)
+  Unit Tests:         ✅ PASSED (47 tests)
+  Integration Tests:  ✅ PASSED (156 tests)
+  E2E Tests:          ✅ PASSED (23 tests)
+  Security Scan:      ✅ PASSED (0 critical)
+  
+Dev Deployment:       ✅ COMPLETE (3m 40s)
+Staging Deployment:   ✅ COMPLETE (8m 30s)
+Production Deployment: ⏳ IN PROGRESS
+  - Canary creation: ✅ (5 pods ready)
+  - Smoke tests:     ✅ (passed in 1m)
+  - Traffic 10%:     ✅ (1m 00s, stable)
+  - Traffic 25%:     ✅ (1m 15s, stable)
+  - Traffic 50%:     ⏳ (current, monitoring...)
+  
+Metrics (Live):
+  Error Rate:        0.06% (target: < 1%)  ✅
+  P95 Latency:       125ms  (baseline: 120ms, +4%) ✅
+  P99 Latency:       240ms  (baseline: 250ms, -4%) ✅
+  Requests/sec:      45K    (healthy)
+  Success Rate:      99.94% ✅
+  
+Target Deployment Time:
+  Canary to 100%: 5 minutes remaining
+  Post-validation: 10 minutes monitoring
+  Total: ~15 minutes remaining
+```
+
+### Common Interview Questions on CI/CD
+
+**Q: What happens if a PR fails linting?**
+A: The pipeline stops at the Lint stage. The developer gets a link to the failing check, fixes the linting errors locally, pushes again, and the pipeline re-runs automatically. The PR can't be merged until linting passes.
+
+**Q: How do you handle database migrations during deployment?**
+A: Migrations are versioned alongside the code (EF Core migrations). The deployment pipeline:
+1. Applies migrations to staging first
+2. Verifies rollback scripts work
+3. Then deploys to production (migrations run as part of app startup)
+If a migration fails, the app won't start, and health checks fail, triggering automatic rollback.
+
+**Q: Can you deploy to just one microservice, or does the whole pipeline deploy everything?**
+A: Each microservice is independently deployable. Each has its own pipeline. The Ownership Service pipeline doesn't touch the Notifications Service. This is crucial for scaling — you can deploy the Targeting Service 5 times a day without redeploying Contacts.
+
+**Q: What if you need to deploy a hotfix urgently?**
+A: The same pipeline runs. No skipping gates. However, you can:
+1. Create a hotfix branch from main (not a feature branch)
+2. Fast-track through code review (team lead + 1 approval, not 2)
+3. Deploy to staging (1-2 hours of testing instead of full day)
+4. Deploy to production with same gates (error rate, latency, health checks)
+Even in urgent mode, you don't bypass the automated gates — you just move faster through the manual gates.
+
+**Q: How do you coordinate deployments across multiple services?**
+A: Each service is independent. If Ownership and Notifications are both deploying on the same day:
+- Both deploy to dev automatically
+- Both deploy to staging in parallel (separate pipelines)
+- Both deploy to production, but sequenced (not simultaneously)
+  - Ownership goes first (no dependents)
+  - Then Notifications (depends on Ownership Service Bus topics)
+This is orchestrated by deployment release trains (scheduled weekly windows).
+
+**Q: What happens if feature toggles get out of sync?**
+A: Feature toggles are versioned in source control (in a `config/toggles.json` file or via Azure App Configuration APIs that track history). Each deployment includes a snapshot of the toggle state. If someone manually edits a toggle in production and it causes issues, you can replay the correct state from source control.
+
+---
+
 ## The STAR Story — Say This in the Interview
 
 > ⚠️
