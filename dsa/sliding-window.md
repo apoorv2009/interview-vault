@@ -14,21 +14,47 @@
 
 ## Pseudo Code
 
-### Fixed Size Window (size K)
+### Fixed Size Window — Approach 1 (pre-calculate first window)
 
 ```
-initialize window with first K elements
+// step 1: build first window
+for i = 0 to k-1:
+    process nums[i]
 result = compute(window)
 
-for right = K to n-1:
-    add s[right] to window
-    remove s[right - K] from window     ← element that fell out
+// step 2: slide from k onwards
+for right = k to n-1:
+    add nums[right] to window
+    remove nums[right - k] from window
     result = max/min/sum(result, window)
 
 return result
 ```
 
-**When to use:** Problem mentions a fixed size K
+**When to use:** Need first window result as baseline (sum, max, avg)
+**Example:** LC 643 Maximum Average Subarray
+
+---
+
+### Fixed Size Window — Approach 2 (build and slide together)
+
+```
+left = 0
+
+for right = 0 to n-1:
+    add nums[right] to window       ← always expand
+
+    if window size > k:             ← shrink if exceeded
+        remove nums[left]
+        left++
+
+    check condition on window
+
+return result
+```
+
+**When to use:** Need to check condition during window building too
+**Example:** LC 219 Contains Duplicate II
 
 ---
 
