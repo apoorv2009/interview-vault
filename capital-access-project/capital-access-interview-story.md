@@ -251,7 +251,15 @@ READ SIDE (Cosmos DB):
 | Lambda (Read DB Updater) | Azure Functions (Service Bus trigger) |
 | Read DB (DynamoDB) | Azure Cosmos DB |
 | Write DB | Azure SQL |
-| Microservice pods | AKS pods |
+| Microservice pods | Azure App Service (multiple instances with built-in load balancing) |
+
+### Microservice Deployment — App Service with Built-in Load Balancing
+
+Each of the six microservices runs on **Azure App Service** with 2-3 instances for high availability, auto-scaling to 5-10 instances during peak load (based on CPU and memory thresholds). App Service includes **built-in load balancing** — traffic is automatically distributed across instances by the platform. No explicit load balancer configuration is needed.
+
+From APIM's perspective, each microservice is a single endpoint (e.g., `ownership-service.azurewebsites.net`). APIM routes API requests to that endpoint; App Service's platform-level load balancer transparently distributes the request to one of the running instances. If an instance fails, App Service automatically routes traffic around it. This architecture is simple, scalable, and requires zero Kubernetes knowledge or operational overhead.
+
+---
 
 ### Eventual Consistency — How We Handle It
 
