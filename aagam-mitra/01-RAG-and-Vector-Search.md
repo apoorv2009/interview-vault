@@ -5,6 +5,131 @@
 
 ---
 
+## RAG Pipeline Architecture
+
+```mermaid
+flowchart TD
+    subgraph IDX["INDEXING PHASE — done once per PDF upload (offline, admin only)"]
+        PDF["Admin uploads Jain Scripture PDF<br/>POST /api/v1/ingest/upload<br/>multipart/form-data"]
+        Pypdf["pypdf extraction<br/>for page in reader.pages:<br/>  page.extract_text() → re.sub whitespace"]
+        Chunk["Chunker<br/>chunk_size: 800 characters<br/>chunk_overlap: 100 characters<br/>→ [{text, page_num, chunk_index}, ...]"]
+        EmbedD["Gemini batchEmbedContents<br/>model: gemini-embedding-001<br/>task_type: RETRIEVAL_DOCUMENT<br/>outputDimensionality: 2048<br/>batch_size: 100 texts/call"]
+        Upsert["Pinecone Upsert<br/>index: 'jain-texts'<br/>id = 'source:page:chunk_index'<br/>values: [float × 2048]<br/>metadata: {text, source, page}"]
+    end
+
+    subgraph RET["RETRIEVAL PHASE — runs on every user question"]
+        Q["User Question<br/>'What is the meaning of Navakar Mantra?'"]
+        EmbedQ["Gemini Embed (QUERY mode)<br/>model: gemini-embedding-001<br/>task_type: RETRIEVAL_QUERY<br/>→ [float × 2048]"]
+        Search["Pinecone Similarity Search<br/>index.query(vector, top_k=8)<br/>metric: cosine · index: HNSW<br/>include_metadata: True"]
+        Passages["Top 8 Retrieved Passages<br/>each with: text + source + page + score<br/>score = (A·B) / (|A| × |B|)"]
+        Prompt["Build Groq Prompt<br/>system: ScriptureAgent system prompt<br/>context: 8 passages injected<br/>user: original question"]
+        GroqR["Groq LLM Synthesis<br/>model: llama-4-scout-17b-16e-instruct<br/>temperature: 0.3<br/>4-part answer structure"]
+        Ans["Final Answer<br/>Context → Sacred Text → Meaning → Practical Wisdom<br/>+ citations (source + page) + action_cards"]
+    end
+
+    PDF --> Pypdf --> Chunk --> EmbedD --> Upsert
+    Q --> EmbedQ --> Search --> Passages --> Prompt --> GroqR --> Ans
+
+    classDef upload fill:#1D4ED8,color:#fff,stroke:#1339A8
+    classDef extract fill:#003057,color:#fff,stroke:#001933
+    classDef chunk fill:#065A82,color:#fff,stroke:#044268
+    classDef embed fill:#0F766E,color:#fff,stroke:#0B5A54
+    classDef vector fill:#14532D,color:#fff,stroke:#0A3A1E
+    classDef query fill:#92400E,color:#fff,stroke:#5C2800
+    classDef retrieve fill:#7C2D12,color:#fff,stroke:#4C1A0A
+    classDef llm fill:#6B21A8,color:#fff,stroke:#4A1570
+    classDef output fill:#B91C1C,color:#fff,stroke:#7F1010
+
+    class PDF upload
+    class Pypdf extract
+    class Chunk chunk
+    class EmbedD embed
+    class Upsert vector
+    class Q,EmbedQ query
+    class Search,Passages retrieve
+    class Prompt,GroqR llm
+    class Ans output
+```
+
+### Why two separate task types for embedding?
+
+```mermaid
+flowchart LR
+    DocEmbed["Storage: RETRIEVAL_DOCUMENT<br/>Optimised for information density<br/>Pack as much meaning as possible<br/>Used at ingest time"]
+    QueryEmbed["Query: RETRIEVAL_QUERY<br/>Optimised for retrieval accuracy<br/>Maximise similarity to relevant docs<br/>Used at question time"]
+    Pinecone["Pinecone<br/>Cosine similarity<br/>between DOCUMENT vectors<br/>and QUERY vector"]
+
+    DocEmbed -- "stored in" --> Pinecone
+    QueryEmbed -- "compared against" --> Pinecone
+
+    classDef doc fill:#0F766E,color:#fff,stroke:#0B5A54
+    classDef qry fill:#92400E,color:#fff,stroke:#5C2800
+    classDef db fill:#003057,color:#fff,stroke:#001933
+
+    class DocEmbed doc
+    class QueryEmbed qry
+    class Pinecone db
+```
+
+> Using the wrong task type for either direction reduces retrieval accuracy by ~10–15%.
+
+### Temple Live Data — Separate RAG Store
+
+```mermaid
+flowchart TD
+    Trigger["Any AI request arrives<br/>sync_if_needed(temple_id)"]
+    TTL{"synced_at < 300s ago?"}
+    Cache["Use SQLite cache<br/>no re-sync needed"]
+
+    subgraph FETCH["6 PARALLEL CALLS — asyncio.gather"]
+        F1["GET admin:8003/temples/{id}"]
+        F2["GET admin:8003/shantidhara/slots"]
+        F3["GET admin:8003/news-feed"]
+        F4["GET admin:8003/events"]
+        F5["GET admin:8003/wall-of-fame"]
+        F6["GET admin:8003/payment-profile/{id}"]
+    end
+
+    SHA{"SHA-256 checksum<br/>changed?"}
+    Skip["Skip re-embed<br/>saves Gemini API cost"]
+    ReEmbed["delete old chunks<br/>re-chunk → embed → SQLite"]
+    CosSrch["In-memory cosine search<br/>top_k = 4 (retrieval_limit)<br/>injected into agent context"]
+
+    Trigger --> TTL
+    TTL -- "yes" --> Cache --> CosSrch
+    TTL -- "no (300s+)" --> F1 & F2 & F3 & F4 & F5 & F6
+    F1 & F2 & F3 & F4 & F5 & F6 --> SHA
+    SHA -- "unchanged" --> Skip --> CosSrch
+    SHA -- "changed" --> ReEmbed --> CosSrch
+
+    classDef trigger fill:#374151,color:#fff,stroke:#1F2937
+    classDef ttl fill:#0F766E,color:#fff,stroke:#0B5A54
+    classDef cached fill:#14532D,color:#fff,stroke:#0A3A1E
+    classDef fetch fill:#003057,color:#fff,stroke:#001933
+    classDef sha fill:#92400E,color:#fff,stroke:#5C2800
+    classDef embed fill:#6B21A8,color:#fff,stroke:#4A1570
+    classDef result fill:#065A82,color:#fff,stroke:#044268
+
+    class Trigger trigger
+    class TTL ttl
+    class Cache,Skip cached
+    class F1,F2,F3,F4,F5,F6 fetch
+    class SHA sha
+    class ReEmbed embed
+    class CosSrch result
+```
+
+| | Jain Scripture | Temple Live Data |
+|---|---|---|
+| Storage | Pinecone (cloud) | SQLite (local) |
+| Embedding | Gemini 2048-dim | Gemini 2048-dim |
+| Search | Pinecone HNSW | In-memory cosine |
+| top_k | 8 | 4 |
+| Update freq | Once per new book | Every 300 seconds |
+| Why | Best semantic search at scale | Free · fast · private |
+
+---
+
 ## 1. What is RAG and why did you use it in Aagam Mitra?
 
 > **Why asked:** This is the most fundamental question in any AI/LLM interview. The interviewer wants to know if you understand the *problem* RAG solves, not just the acronym. Always anchor your answer with a concrete reason — in our case, Jain scripture needs to be accurate and citable, so the AI can't just guess from training data.
