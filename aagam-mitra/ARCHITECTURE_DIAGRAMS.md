@@ -380,7 +380,7 @@ flowchart TD
     Req["AI request arrives<br/>sync_if_needed(temple_id)"]
 
     TTL{"Last sync less than 300s ago?"}
-    Cache["Use SQLite cache<br/>skip re-sync"]
+    Cache["Use DB cache<br/>skip re-sync"]
 
     subgraph PAR["6 PARALLEL CALLS · asyncio.gather"]
         P1["GET admin:8003/temples/{id}"]
@@ -393,7 +393,7 @@ flowchart TD
 
     Dedup{"SHA-256 checksum changed?"}
     Skip["Skip — no re-embed<br/>saves Gemini API cost"]
-    ReEmbed["Delete old chunks<br/>re-chunk → embed → SQLite"]
+    ReEmbed["Delete old chunks<br/>re-chunk → embed → PostgreSQL<br/>(SQLite locally until deployed)"]
 
     Search["In-memory cosine search<br/>top_k=4 (retrieval_limit)<br/>injected into agent context"]
 
@@ -474,7 +474,7 @@ erDiagram
 flowchart TD
     Agent["Agent returns final text"]
 
-    Persist["1. Persist to SQLite<br/>INSERT user + assistant message<br/>TRIM to 100 rows per (user_id, temple_id)"]
+    Persist["1. Persist to PostgreSQL (SQLite locally)<br/>INSERT user + assistant message<br/>TRIM to 100 rows per (user_id, temple_id)"]
 
     subgraph CARDS["2. Action-card keyword matching (on user message)"]
         K1["'book' / 'shantidhara' / 'slot'<br/>action_target: 'book'"]

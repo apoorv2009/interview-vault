@@ -131,25 +131,28 @@ Live videos fail at Layer 1 (youtube-transcript-api raises `TranscriptsDisabled`
 
 ---
 
-## 5. What database does each service use and why SQLite over PostgreSQL?
+## 5. What database does each service use in production vs development?
 
-> **Why asked:** Database choice is often misunderstood — developers default to PostgreSQL even when it adds unnecessary complexity. SQLite is a legitimate production database for single-instance apps with moderate traffic. The interviewer wants to see you made a conscious tradeoff (simplicity, zero ops overhead, easy migration path) rather than just using whatever you knew.
+> **Why asked:** Database choice is often misunderstood — developers default to PostgreSQL even when it adds unnecessary complexity. The right answer here shows production awareness: we use SQLite locally for zero-setup development, PostgreSQL is the production target, and the migration script is already written. SQLAlchemy abstracts the difference so it's one env var change to switch.
 
-| Service | DB | Notes |
+| Environment | DB | Notes |
 |---|---|---|
-| All services | SQLite (default) | Zero setup, file-based, persists in Docker volumes |
-| All services | PostgreSQL (optional) | Change one env var: `DATABASE_URL=postgresql://...` |
+| Local development | SQLite | Zero setup, file-based, persists in Docker volumes |
+| Production (on server) | PostgreSQL | Migration script exists — change one env var: `DATABASE_URL=postgresql://...` |
 
-**Why SQLite first:**
+**Why SQLite for local development:**
 - No separate process to manage or monitor
-- Zero configuration — just a file
-- SQLAlchemy abstracts the difference — migration is one env var change
-- At current scale (<1000 users, single temple), SQLite handles the load easily
+- Zero configuration — just a file in the Docker volume
+- SQLAlchemy + Alembic abstracts the difference — switching to PostgreSQL is one env var change
+- Fast iteration locally — no DB server to spin up
 
-**When to switch to PostgreSQL:**
-- Multiple concurrent write-heavy processes
-- Need full-text search across chat messages
-- Horizontal scaling with multiple app instances (SQLite doesn't support concurrent writers across processes)
+**Production target is PostgreSQL because:**
+- Handles multiple concurrent write processes safely (SQLite can't)
+- Supports `SELECT FOR UPDATE` row-level locking (needed for booking dedup)
+- Full-text search across chat messages if needed
+- Horizontal scaling — multiple app instances can share one PostgreSQL server
+
+**Migration is already done:** migration script in the codebase, Alembic handles schema. Switch is `DATABASE_URL=postgresql://user:pass@host/dbname` in `.env`.
 
 ---
 

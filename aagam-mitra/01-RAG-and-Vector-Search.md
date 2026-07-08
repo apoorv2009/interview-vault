@@ -79,7 +79,7 @@ flowchart LR
 flowchart TD
     Trigger["Any AI request arrives<br/>sync_if_needed(temple_id)"]
     TTL{"synced_at < 300s ago?"}
-    Cache["Use SQLite cache<br/>no re-sync needed"]
+    Cache["Use DB cache<br/>no re-sync needed"]
 
     subgraph FETCH["6 PARALLEL CALLS — asyncio.gather"]
         F1["GET admin:8003/temples/{id}"]
@@ -92,7 +92,7 @@ flowchart TD
 
     SHA{"SHA-256 checksum<br/>changed?"}
     Skip["Skip re-embed<br/>saves Gemini API cost"]
-    ReEmbed["delete old chunks<br/>re-chunk → embed → SQLite"]
+    ReEmbed["delete old chunks<br/>re-chunk → embed → PostgreSQL (SQLite locally)"]
     CosSrch["In-memory cosine search<br/>top_k = 4 (retrieval_limit)<br/>injected into agent context"]
 
     Trigger --> TTL
@@ -121,12 +121,12 @@ flowchart TD
 
 | | Jain Scripture | Temple Live Data |
 |---|---|---|
-| Storage | Pinecone (cloud) | SQLite (local) |
+| Storage | Pinecone (cloud) | PostgreSQL (SQLite locally until deployed) |
 | Embedding | Gemini 2048-dim | Gemini 2048-dim |
 | Search | Pinecone HNSW | In-memory cosine |
 | top_k | 8 | 4 |
-| Update freq | Once per new book | Every 300 seconds |
-| Why | Best semantic search at scale | Free · fast · private |
+| Update freq | Once per new book | Every 300 seconds (5 min TTL) |
+| Why | Best semantic search at scale | Fast · private · migration script ready |
 
 ---
 
@@ -321,7 +321,7 @@ embed_texts([user_question], task_type="RETRIEVAL_QUERY")
 
 Jain scripture doesn't change — it stays in Pinecone forever. But temple news, events, and slots change daily. Storing live data in Pinecone would cost money per write and have staleness issues.
 
-**Solution: Local SQLite with TTL-based sync**
+**Solution: PostgreSQL with TTL-based sync** (SQLite used locally until the app is deployed to a server — migration script already exists in the codebase, one env var change: `DATABASE_URL=postgresql://...`)
 
 ```python
 async def sync_if_needed(temple_id: str):
@@ -344,31 +344,33 @@ async def sync_if_needed(temple_id: str):
         new_checksum = sha256(doc.content)
         if doc.checksum != stored_checksum:
             delete_old_chunks(doc.document_id)
-            embed_and_store(doc)  # chunk → embed → SQLite
+            embed_and_store(doc)  # chunk → embed → PostgreSQL (SQLite locally)
 
     update_sync_state(temple_id, synced_at=now())
 ```
 
 **In-memory cosine search** (not Pinecone) for temple data:
 ```python
-# Load all chunks from SQLite, compute cosine similarity in Python
+# Load all chunks from DB, compute cosine similarity in Python
 # Return top 4 (retrieval_limit=4) most relevant chunks
 ```
 
 ---
 
-## 8. Why Pinecone for Jain texts but SQLite for temple data?
+## 8. Why Pinecone for Jain texts but PostgreSQL for temple data?
 
-> **Why asked:** Architecture decisions like "why did you use two different storage systems for the same type of data?" reveal whether you made thoughtful tradeoffs or just used whatever was convenient. Be ready to explain cost, update frequency, scale, and privacy as the four reasons for this split.
+> **Why asked:** Architecture decisions like "why did you use two different storage systems for the same type of data?" reveal whether you made thoughtful tradeoffs or just used whatever was convenient. Be ready to explain cost, update frequency, scale, and privacy as the four reasons for this split. Also be ready to explain the SQLite → PostgreSQL migration path — this shows production awareness.
 
 | | Jain Texts | Temple Live Data |
 |---|---|---|
-| Storage | Pinecone (cloud) | SQLite (local) |
-| Update frequency | Once (per new book) | Every 5 minutes |
+| Storage | Pinecone (cloud) | PostgreSQL in production |
+| Current dev setup | Pinecone | SQLite (file-based, zero setup) |
+| Migration | — | Migration script ready — one env var: `DATABASE_URL=postgresql://...` |
+| Update frequency | Once (per new book) | Every 5 minutes (TTL=300s) |
 | Scale | Shared across all temples | Per-temple, small |
 | Search | Pinecone HNSW | In-process cosine |
 | top_k | 8 | 4 |
-| Reason | Best semantic search at scale | Free, fast, private |
+| Reason | Best semantic search at scale | Fast, private, no Pinecone cost for live data |
 
 ---
 
