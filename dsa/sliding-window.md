@@ -94,6 +94,7 @@ Each element is added once and removed once = 2n operations = O(n).
 | 1 | [Best Time to Buy and Sell Stock — LC 121](#1-best-time-to-buy-and-sell-stock--lc-121) | Easy | 2026-07-06 |
 | 2 | [Maximum Average Subarray I — LC 643](#2-maximum-average-subarray-i--lc-643) | Easy | 2026-07-08 |
 | 3 | [Contains Duplicate II — LC 219](#3-contains-duplicate-ii--lc-219) | Easy | 2026-07-08 |
+| 4 | [Number of Subarrays of Size K and Average ≥ Threshold — LC 1343](#4-number-of-subarrays-of-size-k-and-average--threshold--lc-1343) | Easy | 2026-07-08 |
 
 ---
 
@@ -283,5 +284,67 @@ public class Solution {
 ### Key Takeaway
 
 "Index difference at most k" = fixed window of size k. Use HashSet to check duplicates in O(1). Window size > k → remove leftmost. This uses Approach 2 (build + slide in one loop) since duplicates can appear during window building.
+
+---
+
+## 4. Number of Subarrays of Size K and Average ≥ Threshold — LC 1343
+
+**LeetCode:** https://leetcode.com/problems/number-of-sub-arrays-of-size-k-and-average-greater-than-or-equal-to-threshold/
+**Difficulty:** Easy
+**Date:** 2026-07-08
+
+### Problem Statement
+
+Given an integer array `arr`, an integer `k` and an integer `threshold`, return the number of subarrays of size `k` whose average is greater than or equal to `threshold`.
+
+**Examples:**
+```
+Input:  arr = [2,2,2,2,5,5,5,8], k = 3, threshold = 4
+Output: 3
+
+Input:  arr = [1,1,1,1,1], k = 1, threshold = 0
+Output: 5
+```
+
+### Approach
+
+Calculate sum of first k elements. Check if average >= threshold, increment count. Then slide — add incoming, remove outgoing, check condition each time. Use Approach 1 (pre-calculate first window) since we need a baseline sum to start from.
+
+### Solution
+
+```csharp
+public class Solution {
+    public int NumOfSubarrays(int[] arr, int k, int threshold)
+    {
+        int windowSum = 0;
+        int count = 0;
+
+        for (int i = 0; i < k; i++)
+            windowSum += arr[i];
+
+        if (windowSum / k >= threshold)
+            count++;
+
+        for (int i = k; i < arr.Length; i++)
+        {
+            windowSum += arr[i];
+            windowSum -= arr[i - k];
+
+            if (windowSum / k >= threshold)
+                count++;
+        }
+        return count;
+    }
+}
+```
+
+### Complexity
+
+- **Time:** O(n)
+- **Space:** O(1)
+
+### Key Takeaway
+
+Use `>=` not `>` when problem says "greater than or equal to". Compare `windowSum / k >= threshold` — no need for HashSet, just a counter. Classic Approach 1 fixed window.
 
 ---
