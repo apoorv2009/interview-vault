@@ -67,6 +67,7 @@ Each element is added once and removed once = 2n operations = O(n).
 |---|---------|------------|-------------|
 | 1 | [Best Time to Buy and Sell Stock — LC 121](#1-best-time-to-buy-and-sell-stock--lc-121) | Easy | 2026-07-06 |
 | 2 | [Maximum Average Subarray I — LC 643](#2-maximum-average-subarray-i--lc-643) | Easy | 2026-07-08 |
+| 3 | [Contains Duplicate II — LC 219](#3-contains-duplicate-ii--lc-219) | Easy | 2026-07-08 |
 
 ---
 
@@ -195,5 +196,66 @@ Brute force recalculates sum of k elements for every window = O(n×k). Sliding w
 ### Key Takeaway
 
 Fixed window = calculate first window once, then slide by adding `nums[right]` and removing `nums[right - k]`. No need to recompute the whole window each time.
+
+---
+
+## 3. Contains Duplicate II — LC 219
+
+**LeetCode:** https://leetcode.com/problems/contains-duplicate-ii/
+**Difficulty:** Easy
+**Date:** 2026-07-08
+
+### Problem Statement
+
+Given an integer array `nums` and an integer `k`, return `true` if there are two equal elements in the array whose index difference is at most `k`.
+
+**Examples:**
+```
+Input:  nums = [1,2,3,1], k = 3
+Output: true   → 1 at index 0 and 3, difference = 3 ≤ k
+
+Input:  nums = [1,2,3,1,2,3], k = 2
+Output: false  → all duplicates are more than 2 apart
+```
+
+### Approach
+
+Maintain a sliding window of size k using a HashSet. At each step check if current element already exists in the window — if yes return true (duplicate within distance k). If window grows beyond k, remove the leftmost element. Use Approach 2 (build and slide together) since we need to check condition during window building too.
+
+### Solution
+
+```csharp
+public class Solution {
+    public bool ContainsNearbyDuplicate(int[] nums, int k)
+    {
+        var seen = new HashSet<int>();
+        int left = 0;
+
+        for (int i = 0; i < nums.Length; i++)
+        {
+            if (seen.Contains(nums[i]))
+                return true;
+
+            seen.Add(nums[i]);
+
+            if (seen.Count > k)
+            {
+                seen.Remove(nums[left]);
+                left++;
+            }
+        }
+        return false;
+    }
+}
+```
+
+### Complexity
+
+- **Time:** O(n)
+- **Space:** O(k) — HashSet holds at most k elements
+
+### Key Takeaway
+
+"Index difference at most k" = fixed window of size k. Use HashSet to check duplicates in O(1). Window size > k → remove leftmost. This uses Approach 2 (build + slide in one loop) since duplicates can appear during window building.
 
 ---
