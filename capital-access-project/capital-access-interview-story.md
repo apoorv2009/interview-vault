@@ -93,12 +93,12 @@ flowchart TD
     GW["Azure API Management — Gateway<br/>Validates JWT + tenant/role claims · Rate limiting · Routes to microservices"]
 
     subgraph MS["MICROSERVICES (Azure App Service, 2-3+ instances per service, built-in load balancing)"]
-        Own["Ownership Service<br/>Institutional ownership %, history<br/>publishes → Service Bus"]
-        Prof["Profiles Service<br/>Company profiles, financials<br/>publishes → Service Bus"]
-        Targ["Targeting Service<br/>Investor scores, recommendations<br/>Redis cached, &lt;5ms reads<br/>subscribes ← Service Bus"]
-        Cont["Contacts Service<br/>IR contacts, meetings<br/>REST only (sync)"]
-        Notif["Notifications Service<br/>Alerts, in-app/email<br/>subscribes ← Service Bus"]
-        Rep["Report Service<br/>Job management, status<br/>publishes → Queue"]
+        Own["Ownership Service (Azure App Service)<br/>Institutional ownership %, history<br/>publishes → Service Bus"]
+        Prof["Profiles Service (Azure App Service)<br/>Company profiles, financials<br/>publishes → Service Bus"]
+        Targ["Targeting Service (Azure App Service)<br/>Investor scores, recommendations<br/>Redis cached, &lt;5ms reads<br/>subscribes ← Service Bus"]
+        Cont["Contacts Service (Azure App Service)<br/>IR contacts, meetings<br/>REST only (sync)"]
+        Notif["Notifications Service (Azure App Service)<br/>Alerts, in-app/email<br/>subscribes ← Service Bus"]
+        Rep["Report Service (Azure App Service)<br/>Job management, status<br/>publishes → Queue"]
     end
 
     subgraph SB["AZURE SERVICE BUS"]
