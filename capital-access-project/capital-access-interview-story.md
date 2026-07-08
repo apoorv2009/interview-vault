@@ -195,6 +195,386 @@ flowchart TD
 > ℹ️
 > **The Angular SPA talks to a single API Gateway, not directly to individual microservices.** Every request from the SPA carries the Bearer JWT and is sent to the Gateway's URL. The Gateway (Azure API Management) validates the JWT signature against Okta's JWKS, checks the tenant and role claims, applies rate limiting, and routes the request to the correct downstream microservice. Individual microservices trust the Gateway for SPA-originated traffic and don't need to re-implement that check on every request. The exception is service-to-service traffic that bypasses the Gateway entirely — for example the Report Worker (Azure Function) calling Ownership/Profiles/Targeting/Contacts directly to aggregate data — those calls still validate the JWT independently against Okta's JWKS as a defense-in-depth measure, since they're not coming through the Gateway's boundary.
 
+---
+
+## Deep Dive — Azure App Service (Microservices Hosting)
+
+Azure App Service is the compute tier where all 6 microservices (Ownership, Profiles, Targeting, Contacts, Notifications, Report) run. It is not a container orchestration platform like Kubernetes — it's a managed Platform-as-a-Service (PaaS) that handles the operational complexity of VMs, load balancing, patching, and auto-scaling transparently.
+
+### Why Azure App Service Instead of AKS or VMs?
+
+**Compared to VMs (Azure VMs):**
+- VMs require manual OS patching, security updates, and dependency management — each patch is an operational decision and a risk vector
+- Capital Access serves 2,500+ regulated clients; every unpatched VM is a compliance audit question
+- VMs force you to manage infrastructure — provisioning, decommissioning, networking — that scales linearly with team size
+- **App Service abstracts the OS away:** Microsoft patches automatically, certification is simpler, and you focus on code
+
+**Compared to AKS (Azure Kubernetes Service):**
+- AKS is optimized for systems with 50+ microservices, complex inter-service networking, and polyglot workloads
+- Capital Access has 6 microservices, all C# / .NET — we don't need Kubernetes's flexibility
+- AKS operators spend time on: service mesh configuration, RBAC policies, node auto-scaling, pod placement constraints, helm charts, network policies
+- **App Service is simpler:** deploy a .NET app, it runs; add instances for load — done
+- Kubernetes introduces operational risk: a misconfigured ingress, a CrashLoop pod, or a node-drain can cascade failures. Simpler systems have fewer failure modes.
+
+**When to reconsider:**
+- If you grow to 50+ services and need service-to-service mesh networking, AKS makes sense
+- If you need OS-level customization (custom kernel settings, specialized drivers), VMs are required
+- For this interview context at 6 services on a PaaS, App Service is the right call
+
+### How App Service Hosting Works
+
+**Deployment model:**
+```
+Your .NET 8 microservice (e.g., Ownership Service)
+        ↓
+Published as Azure App Service Plan (Linux, B2 instance type)
+        ↓
+App Service instances (2-3 baseline, auto-scale to 5-10)
+        ↓
+Built-in load balancer routes requests across instances
+        ↓
+Each instance runs your app in a Kestrel web server
+        ↓
+Database connections to Azure SQL via Entity Framework Core
+```
+
+**Instance types and scaling:**
+```
+B2 Instance Type (Burstable):
+- 2 CPU cores
+- 3.5 GB RAM
+- Pricing: ~$44/month per instance
+
+Standard Instance Type (S1):
+- 1 CPU core
+- 1.75 GB RAM  
+- Pricing: ~$70/month per instance
+
+P1V2 Instance Type (Premium):
+- 1 CPU core
+- 3.5 GB RAM
+- Pricing: ~$100/month per instance
+- Includes custom domains, staging slots, auto-scale
+
+For Capital Access: Use S1 or B2 baseline (2-3 instances per service).
+Each instance handles ~2,000-5,000 concurrent requests depending on workload.
+With 6 microservices × 3 instances = 18 instances total for baseline HA.
+During peak traffic (9:00 AM), scale to 6-8 instances per service = 36-48 instances total.
+```
+
+**Built-in load balancing:**
+Azure App Service automatically distributes incoming requests across instances using round-robin:
+```
+Request 1 → Instance 1
+Request 2 → Instance 2
+Request 3 → Instance 3
+Request 4 → Instance 1 (round-robin repeats)
+```
+
+This means APIM doesn't need to know about individual instances — it sends all requests to the single App Service DNS name (e.g., `ownership-service.azurewebsites.net`), and App Service handles the distribution internally. This is fundamentally different from Kubernetes, where you explicitly manage Service resources and selector labels.
+
+**Health checks & auto-remediation:**
+```csharp
+// Every App Service app should expose a /health endpoint
+[HttpGet("/health")]
+public IActionResult HealthCheck()
+{
+    return Ok(new { status = "healthy", timestamp = DateTime.UtcNow });
+}
+```
+
+App Service's built-in load balancer pings `/health` every 30 seconds per instance:
+- If response is 200, instance is healthy → receives traffic
+- If response is non-200 or timeout → instance is removed from the load balancer
+- If an instance crashes or becomes unresponsive, it's automatically replaced (within a few minutes)
+
+This is passive health checking — App Service doesn't take action if a single request fails, only if the entire instance becomes unhealthy.
+
+**Auto-scaling configuration:**
+
+```json
+{
+  "scaleRules": [
+    {
+      "metricName": "CpuPercentage",
+      "threshold": 70,
+      "scaleOutInterval": "PT5M",
+      "scaleOutStepSize": 1,
+      "maxInstances": 10
+    },
+    {
+      "metricName": "CpuPercentage",
+      "threshold": 30,
+      "scaleInInterval": "PT10M",
+      "scaleInStepSize": 1,
+      "minInstances": 2
+    }
+  ]
+}
+```
+
+Translation:
+- When CPU > 70% for 5 minutes, add 1 instance (up to max 10)
+- When CPU < 30% for 10 minutes, remove 1 instance (down to min 2)
+- Min 2 instances ensures HA even at 0 traffic
+- Max 10 instances caps runaway cost during unexpected spikes
+
+**Custom scaling metrics (beyond just CPU):**
+
+Instead of relying solely on CPU (which can be misleading — async code has low CPU but high latency), you can auto-scale on:
+
+```csharp
+// In your service, track custom metrics
+public class OwnershipServiceHealthCheck : IHealthCheck
+{
+    public async Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context)
+    {
+        var queueDepth = await _serviceBus.GetQueueDepthAsync("ownership-recalc-queue");
+        var telemetryClient = new TelemetryClient();
+        telemetryClient.GetMetric("QueueDepth").TrackValue(queueDepth);
+        
+        if (queueDepth > 1000)
+            return HealthCheckResult.Degraded("Queue backing up");
+        
+        return HealthCheckResult.Healthy();
+    }
+}
+
+// Auto-scale rule: if QueueDepth > 500, scale out
+// This scales preemptively before the queue overwhelms the system
+```
+
+### Deployment to App Service
+
+**Via Azure CLI:**
+```bash
+# Build and publish your .NET app
+dotnet publish -c Release -o ./publish
+
+# Create a ZIP package
+cd publish && zip -r ../app.zip . && cd ..
+
+# Deploy to App Service
+az webapp deployment source config-zip \
+  --resource-group capital-access \
+  --name ownership-service-app \
+  --src app.zip
+
+# Restart the app
+az webapp restart \
+  --resource-group capital-access \
+  --name ownership-service-app
+```
+
+**Via Azure DevOps CI/CD pipeline (recommended for Capital Access):**
+```yaml
+trigger:
+  - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+stages:
+  - stage: Build
+    jobs:
+      - job: BuildAndPublish
+        steps:
+          - task: DotNetCoreCLI@2
+            inputs:
+              command: 'publish'
+              projects: '**/OwnershipService.csproj'
+              arguments: '--configuration Release'
+              publishWebProjects: false
+              outputDir: '$(Build.ArtifactStagingDirectory)'
+          
+          - task: PublishBuildArtifacts@1
+            inputs:
+              artifactName: 'drop'
+
+  - stage: Deploy
+    dependsOn: Build
+    jobs:
+      - deployment: DeployAppService
+        displayName: 'Deploy to Ownership Service App'
+        environment: 'Production'
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - task: AzureWebApp@1
+                  inputs:
+                    azureSubscription: 'Capital-Access-Production'
+                    appType: 'webAppLinux'
+                    appName: 'ownership-service-app'
+                    package: '$(Pipeline.workspace)/drop/**/*.zip'
+                    deploymentMethod: 'zipDeploy'
+                
+                - script: |
+                    # Wait for deployment and verify
+                    for i in {1..10}; do
+                      STATUS=$(curl -s https://ownership-service-app.azurewebsites.net/health)
+                      if [ "$STATUS" == "200" ]; then
+                        echo "✅ Deployment successful"
+                        exit 0
+                      fi
+                      sleep 5
+                    done
+                    echo "❌ Deployment health check failed"
+                    exit 1
+                  displayName: 'Post-deployment health check'
+```
+
+### Multi-tenancy on App Service
+
+Capital Access is a multi-tenant system, but **multi-tenancy is not handled by infrastructure — it's enforced in code.**
+
+```csharp
+// In your middleware or service layer, enforce tenant isolation
+public class TenantMiddleware
+{
+    public async Task InvokeAsync(HttpContext ctx, ILogger<TenantMiddleware> logger)
+    {
+        // Extract tenant from JWT claims
+        var tenantId = ctx.User.FindFirst("tenant_id")?.Value;
+        
+        if (string.IsNullOrEmpty(tenantId))
+        {
+            logger.LogWarning("Request without tenant_id claim");
+            ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            return;
+        }
+        
+        // Store in items so services can access
+        ctx.Items["TenantId"] = tenantId;
+        await _next(ctx);
+    }
+}
+
+// In your DbContext, use global query filters to isolate data per tenant
+public class OwnershipDbContext : DbContext
+{
+    private readonly IHttpContextAccessor _httpContextAccessor;
+    
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        var tenantId = _httpContextAccessor.HttpContext?.Items["TenantId"]?.ToString();
+        
+        modelBuilder.Entity<Ownership>()
+            .HasQueryFilter(o => o.TenantId == tenantId);
+        
+        // Every query on Ownership automatically filters by tenant
+        // No way to query cross-tenant data, even by accident
+    }
+}
+```
+
+All 6 App Service instances run the same code but with the tenant ID enforced at the middleware and database layer. There's no need for separate App Service instances per tenant — one set of instances serves all 2,500 tenants.
+
+### Networking & Security
+
+**By default, App Service is internet-accessible.** Requests come through:
+1. **Azure Front Door** (public entry point, WAF, DDoS)
+2. **APIM** (JWT validation, rate limiting, routing)
+3. **App Service** (your code)
+
+**Optional: Virtual Network integration** — if you want to restrict App Service to private network traffic only:
+```bash
+# Add App Service to a Virtual Network subnet
+az webapp vnet-integration add \
+  --resource-group capital-access \
+  --name ownership-service-app \
+  --vnet myvnet \
+  --subnet mysubnet
+
+# Now the app can only be reached from within the VNet
+# (APIM must also be in the VNet, or routable to it)
+```
+
+For Capital Access, we don't need VNet isolation because:
+- All traffic through APIM is validated
+- Tenant data is isolated in code (via global query filters)
+- Azure SQL is protected by firewall rules that allow only App Service IPs
+
+**Environment-specific config:**
+```xml
+<!-- .csproj -->
+<ItemGroup>
+  <None Update="appsettings.*.json" CopyToOutputDirectory="PreserveNewest" />
+</ItemGroup>
+```
+
+```json
+{
+  "appsettings.production.json": {
+    "KeyVault": "https://capital-access-kv.vault.azure.net/",
+    "Database": "Server=capital-access-prod.database.windows.net;Database=OwnershipDb;",
+    "Logging": {
+      "LogLevel": {
+        "Default": "Information",
+        "Microsoft": "Warning"
+      }
+    }
+  },
+  "appsettings.staging.json": {
+    "KeyVault": "https://capital-access-staging-kv.vault.azure.net/",
+    "Database": "Server=capital-access-staging.database.windows.net;Database=OwnershipDb;",
+    "Logging": {
+      "LogLevel": {
+        "Default": "Debug"
+      }
+    }
+  }
+}
+```
+
+App Service automatically picks the right config based on the `ASPNETCORE_ENVIRONMENT` variable (set in App Service settings).
+
+### Common Interview Questions on App Service
+
+**Q: What happens if an instance crashes?**
+A: App Service's health check detects it's unhealthy (no 200 response on `/health`), removes it from the load balancer, and spins up a replacement instance from the App Service Plan. Requests in flight on the crashed instance fail (connections are severed), but new requests go to healthy instances. This is why you should make API calls idempotent or use distributed transactions (see Outbox Pattern).
+
+**Q: Can two requests hit the same instance?**
+A: Yes, round-robin is stateless. The same instance can handle consecutive requests from different users. This is fine as long as your app is stateless (which it should be) — store session data in Redis or cookies, not in-memory.
+
+**Q: What's the difference between scaling up (bigger instance) and scaling out (more instances)?**
+A:
+- **Scale up:** B2 → S1 (more CPU/RAM per instance). Manual, requires restart.
+- **Scale out:** 2 instances → 5 instances (more instances, same size). Automatic via auto-scale rules.
+For Capital Access, prefer scaling out (auto-scale) over up (manual). Horizontal scaling is simpler to reason about and can handle traffic spikes automatically.
+
+**Q: How do you do zero-downtime deployments?**
+A: Use **slots** — App Service lets you have a "staging" slot running a previous version while you deploy the new code to a "production" slot, then swap them atomically:
+```bash
+# Deploy new code to staging slot
+az webapp deployment source config-zip \
+  --resource-group capital-access \
+  --name ownership-service-app \
+  --slot staging \
+  --src app.zip
+
+# Run smoke tests against staging
+curl https://ownership-service-app-staging.azurewebsites.net/health
+
+# If healthy, swap slots (production ← staging)
+az webapp deployment slot swap \
+  --resource-group capital-access \
+  --name ownership-service-app \
+  --slot staging
+
+# Old code stays in staging, ready to swap back if issues
+```
+
+**Q: What's the difference between Restart, Stop, and Deallocate?**
+A: 
+- **Restart** — recycle the process but keep the VM running (seconds, you're still billed)
+- **Stop** — gracefully shut down, VM still allocated (still billed, used for testing)
+- **Deallocate** — turn off the VM, stop billing (used for dev/test to save money)
+
+For production, you only use Restart (during deployments). Stop/Deallocate are for non-production to save costs.
+
+---
+
 ## Service-to-Service Communication Patterns
 
 The architecture diagram shows the SPA → Gateway → services path and the Service Bus fan-out clearly, but it deliberately doesn't draw a separate arrow for every direct service-to-service call — that would turn the diagram into spaghetti. There are really three distinct patterns in play, and which one applies depends on what kind of communication it is.
