@@ -588,6 +588,605 @@ The architecture diagram shows the SPA → Gateway → services path and the Ser
 > ℹ️
 > **Why direct REST for the Report Worker specifically:** by the time the Function runs, it already has the full request context (tenant, jobId, which company) and needs synchronous answers right now to assemble one report — there's no "event" to publish, just data it needs to fetch immediately from four different owners. Pub/sub is reserved for the opposite case: multiple independent consumers reacting to a state change without being coupled to the producer or to each other.
 
+---
+
+## Deep Dive — Microservices Patterns & Strategies in Capital Access
+
+Capital Access didn't start as 6 microservices. The platform evolved into this architecture through deliberate decomposition driven by **bounded contexts** (Domain-Driven Design) and operational need. This section covers the patterns that make microservices work at scale.
+
+### Service Decomposition Strategy — Why 6 Services?
+
+Each of Capital Access's 6 microservices owns a **bounded context** — a distinct business capability with clear responsibility and minimal cross-service knowledge:
+
+| Service | Bounded Context | Why Separate? |
+|---------|-----------------|---------------|
+| **Ownership Service** | "Who owns what shares, and how is it changing?" | Highest write volume (regulatory filings, continuous updates). Needs CQRS to separate writes from expensive read queries. Publishes ownership-change events that drive downstream intelligence. |
+| **Profiles Service** | "Company metadata — financials, sectors, IR teams" | Relatively static (updated quarterly or on news events). No high-frequency updates, so doesn't compete with operational traffic. Can be cached aggressively. |
+| **Targeting Service** | "ML scoring — which investors are likely buyers for this company?" | Compute-intensive (scores are expensive). Needs independent scaling. Reads heavily from Redis cache; updates only on ownership/profile changes (async). |
+| **Contacts Service** | "IR contacts, investor contact details, meeting history" | CRM data — fundamentally relational (contacts → companies, attendees → meetings, follow-ups → tasks). Benefits from SQL's ACID guarantees and rich query capability. No cross-tenant data sharing. |
+| **Notifications Service** | "Alerts, alerts delivery status, email/in-app rendering" | High write volume (millions of alert events per day), low query complexity. Uses Table Storage (partition key = user ID + day, super scalable). Independent scaling. |
+| **Report Service** | "Report job orchestration, status tracking, result storage" | Sits on the boundary between user request (synchronous) and long-running work (asynchronous). Owns the job queue, coordinates the Report Worker function. Can be deployed independently of the actual report-generation computation. |
+
+**Key principle: One service = one database. Never share databases across services.** This forces clean boundaries and prevents accidental coupling through the database layer.
+
+```
+❌ WRONG (Monolithic database):
+    All services → Shared "capital_access" DB
+    Problem: If Targeting needs a schema change, it affects Contacts queries
+    Problem: A slow report query locks ownership updates
+    
+✅ RIGHT (Database per service):
+    Ownership Service → ownership_db (Cosmos DB)
+    Profiles Service → profiles_db (SQL)
+    Targeting Service → targeting_db (SQL) + Redis cache
+    Contacts Service → contacts_db (SQL)
+    Notifications Service → notifications_table (Table Storage)
+    Report Service → reports_db (SQL)
+    
+    Problem solved: Each service scales independently
+                   Schema changes are isolated
+                   Ownership updates never block report queries
+```
+
+### SAGA Pattern — Distributed Transactions Across Services
+
+**The Problem:**
+Creating an **Engagement** (a meeting between an IR team and an investor) requires coordinating multiple services:
+1. **Contacts Service**: Create or retrieve the investor contact record
+2. **Profiles Service**: Validate the company exists and is still active
+3. **Ownership Service**: Check current ownership (is this investor likely to be interested?)
+4. **Engagement Service**: Create the engagement record
+5. **Notifications Service**: Send notification to the IR team and investor
+
+All 5 operations must **succeed together or all fail together** (ACID guarantee). But they're spread across 5 different databases with no shared transaction context.
+
+Traditional databases have transactions (ACID). Microservices don't — you need a **SAGA pattern** to orchestrate distributed transactions.
+
+**Two SAGA Approaches:**
+
+### **SAGA Option 1: Orchestration (Command-Driven)**
+
+One service (Engagement Service) acts as a **choreographer** — it issues commands and waits for responses:
+
+```
+User creates engagement via API
+    │
+    ▼
+Engagement Service (Orchestrator)
+    │
+    ├─→ Command: "ValidateInvestorContact" → Contacts Service
+    │       ✅ Contact exists or created
+    │
+    ├─→ Command: "ValidateCompany" → Profiles Service
+    │       ✅ Company active
+    │
+    ├─→ Command: "CheckOwnership" → Ownership Service
+    │       ✅ Ownership data retrieved
+    │
+    ├─→ Command: "CreateEngagementRecord" → Local DB
+    │       ✅ Record created
+    │
+    └─→ Command: "SendEngagementNotification" → Notifications Service
+            ✅ Notification queued
+
+Result: ✅ Engagement successfully created
+```
+
+**Rollback (if something fails):**
+```
+User creates engagement via API
+    │
+    ▼
+Engagement Service (Orchestrator)
+    │
+    ├─→ Command: "ValidateInvestorContact" → Contacts Service ✅
+    ├─→ Command: "ValidateCompany" → Profiles Service ✅
+    ├─→ Command: "CheckOwnership" → Ownership Service ❌ FAILS
+    │
+    ▼
+Engagement Service detects failure
+    │
+    ├─→ Compensating Action: "RollbackContactCreation" → Contacts Service
+    │       (Undo the contact created in step 1)
+    │
+    └─→ Compensating Action: "RollbackCompanyValidation" → Profiles Service
+            (Undo any side effects)
+
+Result: ❌ Engagement creation failed, all partial changes undone
+```
+
+**Code Example:**
+
+```csharp
+public class CreateEngagementOrchestrator
+{
+    private readonly IContactsService _contactsService;
+    private readonly IProfilesService _profilesService;
+    private readonly IOwnershipService _ownershipService;
+    private readonly EngagementDbContext _dbContext;
+    private readonly INotificationsService _notificationsService;
+    
+    public async Task<Result<Engagement>> CreateAsync(CreateEngagementRequest request)
+    {
+        // Step 1: Validate investor contact
+        var contactResult = await _contactsService.GetOrCreateContactAsync(
+            request.InvestorId, request.TenantId
+        );
+        if (!contactResult.Success)
+            return Result.Failed($"Contact validation failed: {contactResult.Error}");
+        
+        // Step 2: Validate company exists
+        var companyResult = await _profilesService.ValidateCompanyAsync(
+            request.CompanyId, request.TenantId
+        );
+        if (!companyResult.Success)
+            return Result.Failed($"Company validation failed: {companyResult.Error}");
+        
+        // Step 3: Check ownership (read-only, no rollback needed)
+        var ownershipResult = await _ownershipService.GetOwnershipAsync(
+            request.CompanyId, request.InvestorId
+        );
+        if (!ownershipResult.Success)
+            return Result.Failed($"Ownership check failed: {ownershipResult.Error}");
+        
+        // Step 4: Create engagement record (in local DB)
+        var engagement = new Engagement
+        {
+            TenantId = request.TenantId,
+            CompanyId = request.CompanyId,
+            InvestorId = request.InvestorId,
+            ScheduledDate = request.ScheduledDate,
+            Status = "Scheduled"
+        };
+        
+        _dbContext.Engagements.Add(engagement);
+        try
+        {
+            await _dbContext.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            // If engagement creation fails, we didn't call external services yet
+            // (transaction not started yet), so no compensation needed
+            return Result.Failed($"Failed to create engagement: {ex.Message}");
+        }
+        
+        // Step 5: Send notification (best-effort, can be retried independently)
+        try
+        {
+            await _notificationsService.SendEngagementCreatedNotificationAsync(
+                engagement, request.TenantId
+            );
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning($"Failed to send notification for engagement {engagement.Id}: {ex.Message}");
+            // Don't fail the whole operation, notification can be retried
+        }
+        
+        return Result.Success(engagement);
+    }
+}
+```
+
+**Pros:** Simple orchestration logic lives in one place. Easy to debug.
+**Cons:** Orchestrator becomes a bottleneck. If Orchestrator crashes mid-SAGA, you need compensating transaction cleanup logic (manual recovery).
+
+### **SAGA Option 2: Choreography (Event-Driven)**
+
+Services react to events from other services. No central orchestrator:
+
+```
+User creates engagement via API → Engagement Service
+    │
+    ▼
+Engagement Service publishes: "EngagementCreationRequested" event
+    │
+    ├─→ Contacts Service listens: "Is this contact valid?"
+    │   │   ✅ Contact exists or created
+    │   └─→ Publishes: "ContactValidated" event
+    │
+    ├─→ Profiles Service listens: "Is this company valid?"
+    │   │   ✅ Company active
+    │   └─→ Publishes: "CompanyValidated" event
+    │
+    ├─→ Ownership Service listens: "Check ownership"
+    │   │   ✅ Ownership data retrieved
+    │   └─→ Publishes: "OwnershipChecked" event
+    │
+    ├─→ Engagement Service listens to all "Validated" events
+    │   │   Once all three arrive → Create engagement record
+    │   └─→ Publishes: "EngagementCreated" event
+    │
+    └─→ Notifications Service listens: "Send engagement notification"
+            Publishes: "NotificationSent" event
+
+Result: ✅ Engagement successfully created (all events received)
+```
+
+**Rollback (if something fails):**
+```
+User creates engagement
+    │
+    ▼
+"EngagementCreationRequested" published
+    │
+    ├─→ Contacts Service: ✅ ContactValidated
+    ├─→ Profiles Service: ✅ CompanyValidated
+    └─→ Ownership Service: ❌ ValidationFailed
+    
+    ▼
+Ownership Service publishes: "OwnershipValidationFailed" event
+    │
+    ▼
+Engagement Service listens and publishes: "EngagementCreationFailed" event
+    │
+    ├─→ Contacts Service hears failure → Publishes "ContactRollbackInitiated"
+    ├─→ Profiles Service hears failure → Publishes "CompanyValidationRolledBack"
+    └─→ Notifications Service hears failure → Does NOT send notification
+
+Result: ❌ Engagement creation failed, all services cleaned up independently
+```
+
+**Code Example (Choreography):**
+
+```csharp
+// Engagement Service publishes an event
+public class EngagementService
+{
+    private readonly IServiceBusPublisher _serviceBus;
+    
+    public async Task RequestEngagementCreationAsync(CreateEngagementRequest request)
+    {
+        var evt = new EngagementCreationRequested
+        {
+            TenantId = request.TenantId,
+            CompanyId = request.CompanyId,
+            InvestorId = request.InvestorId,
+            ScheduledDate = request.ScheduledDate,
+            CorrelationId = Guid.NewGuid() // Track this saga through all services
+        };
+        
+        await _serviceBus.PublishAsync(evt);
+        // Don't await response — choreography is async
+    }
+}
+
+// Contacts Service listens and reacts
+public class ContactsEventHandler
+{
+    public async Task Handle(EngagementCreationRequested evt)
+    {
+        var contact = await _contactsDb.GetOrCreateAsync(evt.InvestorId, evt.TenantId);
+        
+        if (contact == null)
+        {
+            // Validation failed
+            await _serviceBus.PublishAsync(new ContactValidationFailed
+            {
+                CorrelationId = evt.CorrelationId,
+                Reason = "Investor not found"
+            });
+            return;
+        }
+        
+        // Validation succeeded
+        await _serviceBus.PublishAsync(new ContactValidated
+        {
+            CorrelationId = evt.CorrelationId,
+            ContactId = contact.Id
+        });
+    }
+}
+
+// Engagement Service waits for all validations, then acts
+public class EngagementCreationSaga
+{
+    private readonly EngagementDbContext _dbContext;
+    private readonly IServiceBusPublisher _serviceBus;
+    
+    // Track in-flight sagas by correlation ID
+    private ConcurrentDictionary<Guid, SagaState> _inFlightSagas = new();
+    
+    public async Task OnContactValidated(ContactValidated evt)
+    {
+        var saga = _inFlightSagas[evt.CorrelationId];
+        saga.ContactValidated = true;
+        
+        await CheckIfAllValidationsCompleteAsync(evt.CorrelationId);
+    }
+    
+    public async Task OnCompanyValidated(CompanyValidated evt)
+    {
+        var saga = _inFlightSagas[evt.CorrelationId];
+        saga.CompanyValidated = true;
+        
+        await CheckIfAllValidationsCompleteAsync(evt.CorrelationId);
+    }
+    
+    public async Task OnOwnershipChecked(OwnershipChecked evt)
+    {
+        var saga = _inFlightSagas[evt.CorrelationId];
+        saga.OwnershipChecked = true;
+        
+        await CheckIfAllValidationsCompleteAsync(evt.CorrelationId);
+    }
+    
+    private async Task CheckIfAllValidationsCompleteAsync(Guid correlationId)
+    {
+        var saga = _inFlightSagas[correlationId];
+        
+        if (!saga.AllValidated)
+            return; // Wait for all validations
+        
+        // All validations passed — create engagement
+        var engagement = new Engagement
+        {
+            TenantId = saga.TenantId,
+            CompanyId = saga.CompanyId,
+            InvestorId = saga.InvestorId,
+            ScheduledDate = saga.ScheduledDate
+        };
+        
+        _dbContext.Engagements.Add(engagement);
+        await _dbContext.SaveChangesAsync();
+        
+        // Publish success
+        await _serviceBus.PublishAsync(new EngagementCreated
+        {
+            CorrelationId = correlationId,
+            EngagementId = engagement.Id
+        });
+        
+        _inFlightSagas.TryRemove(correlationId, out _);
+    }
+}
+```
+
+**Pros:** Loosely coupled. Services don't know about the SAGA; they just react to events. Highly scalable.
+**Cons:** Harder to understand the overall flow (it's implicit in event handlers). Debugging is trickier (you need correlation IDs everywhere).
+
+### **Orchestration vs Choreography — Which Does Capital Access Use?**
+
+**Capital Access uses a hybrid approach:**
+
+- **Choreography** for reactive, event-driven workflows (ownership changes trigger targeting recalculation, notifications)
+- **Orchestration** for coordinated, sequential workflows (report generation aggregating multiple services)
+
+```
+Choreography Example:
+    Ownership changes → Event published → Targeting & Notifications independently react
+    
+Orchestration Example:
+    User requests report → Report Service orchestrates calls to:
+        1. Ownership Service (get data)
+        2. Profiles Service (get metadata)
+        3. Targeting Service (get scores)
+        4. Contacts Service (get attendees)
+    Once all 4 respond, generate PDF
+```
+
+**Decision matrix:**
+| Scenario | Use | Reason |
+|----------|-----|--------|
+| **Multiple services reacting to a single event** | Choreography | Ownership change → Targeting + Notifications both need to react independently |
+| **Coordinated sequence that needs rollback** | Orchestration | Report generation: must collect data from 4 services in order, with error handling |
+| **Asynchronous broadcast** | Choreography | "Profile updated" → any service interested can subscribe |
+| **Request-response with timeout** | Orchestration | HTTP REST call with SLA (must respond within N seconds) |
+
+### Idempotency & Eventual Consistency
+
+In a microservices architecture, **you can't guarantee immediate consistency** across all services. When an ownership change happens:
+
+```
+T0: Ownership Service updates DB ✅
+T1: Event published to Service Bus ✅
+T2: Targeting Service receives event → starts recalculating scores
+T3: Meanwhile, user queries Targeting Dashboard
+     → Old scores still there (not updated yet)
+     → This is OK — "eventual consistency"
+
+T4: Targeting Service finishes calculation, stores new scores ✅
+T5: User queries again → new scores visible ✅
+```
+
+Eventual consistency means **by "eventually" (seconds to minutes), all services converge to the same truth**. This is fundamentally different from ACID transactions where consistency is immediate.
+
+**Problem: What if a message is processed twice?**
+
+```
+Service Bus publishes: "OwnershipChanged: AAPL 5% → 6%"
+
+Targeting Service receives it:
+  T0: Increment score by 0.5 ✅
+  T1: Confirm receipt to Service Bus ✅
+  
+But network hiccup — message retried:
+  T2: Targeting Service receives same message again
+  T3: Increments score by 0.5 again (now +1.0, wrong!)
+  
+Result: AAPL score is 1.0 higher than it should be
+```
+
+**Solution: Idempotency (same message can be processed multiple times safely)**
+
+```csharp
+public async Task OnOwnershipChanged(OwnershipChangedEvent evt)
+{
+    // Use idempotency key = messageId + operation
+    var idempotencyKey = $"{evt.MessageId}:update-targeting-scores";
+    
+    // Check if we've already processed this message
+    var existingRecord = await _idempotencyStore.GetAsync(idempotencyKey);
+    if (existingRecord != null)
+    {
+        _logger.LogInformation($"Message {evt.MessageId} already processed, skipping");
+        return; // Already processed, don't do it again
+    }
+    
+    // Process the message
+    var targetingScores = await CalculateNewScoresAsync(evt.CompanyId);
+    await _dbContext.UpdateScoresAsync(targetingScores);
+    
+    // Record that we've processed this message
+    await _idempotencyStore.RecordAsync(idempotencyKey, DateTime.UtcNow);
+}
+```
+
+Every message has a **unique ID** (messageId from Service Bus). If the same message arrives twice, the service checks "did I already process this?" and skips if yes.
+
+### Circuit Breaker Pattern — Cascading Failures
+
+**The Problem:**
+Targeting Service depends on Ownership Service (to get ownership data). If Ownership Service becomes slow or unresponsive:
+
+```
+User requests: "Score all investors for AAPL"
+    │
+    ▼
+Targeting Service calls: GET /api/ownership/aapl
+    │
+    ├─→ Ownership Service is slow (15s response time)
+    ├─→ Targeting Service waits 15s
+    ├─→ Timeout? Retry? Timeout again?
+    │
+    ▼
+Eventually, Targeting Service has 1,000 hanging requests
+    waiting for Ownership Service to respond
+    
+Result: Targeting Service crashes (memory exhausted)
+        → Targeting Dashboard is down
+        → Even though Ownership Service is only slow (not down)
+        → Cascading failure
+```
+
+**Solution: Circuit Breaker**
+
+Think of a circuit breaker like an electrical breaker in your home:
+- **Closed** (normal): Requests flow through
+- **Open** (failure detected): Stop sending requests, return error immediately
+- **Half-open** (recovery): Try one request; if it succeeds, close; if fails, open again
+
+```csharp
+// Install Polly NuGet package
+// dotnet add package Polly
+
+var circuitBreakerPolicy = Policy.Handle<HttpRequestException>()
+    .Or<TimeoutException>()
+    .CircuitBreakerAsync(
+        handledEventsAllowedBeforeBreaking: 5,  // Fail 5 times, then open
+        durationOfBreak: TimeSpan.FromSeconds(30) // Stay open for 30s
+    );
+
+var timeoutPolicy = Policy.TimeoutAsync<HttpResponseMessage>(TimeSpan.FromSeconds(5));
+
+// Combine policies
+var fallbackPolicy = Policy<HttpResponseMessage>
+    .Handle<BrokenCircuitException>()
+    .FallbackAsync<HttpResponseMessage>(
+        async (_) => new HttpResponseMessage(System.Net.HttpStatusCode.ServiceUnavailable)
+    );
+
+var policyWrap = Policy.WrapAsync(timeoutPolicy, circuitBreakerPolicy, fallbackPolicy);
+
+// Use in Targeting Service
+public async Task<List<InvestorScore>> ScoreAsync(int companyId)
+{
+    try
+    {
+        var response = await policyWrap.ExecuteAsync(
+            () => _httpClient.GetAsync($"https://ownership-service/api/ownership/{companyId}")
+        );
+        
+        if (!response.IsSuccessStatusCode)
+            return await GetCachedScoresAsync(companyId); // Fallback to cache
+        
+        var ownership = await response.Content.ReadAsAsync<OwnershipData>();
+        return await CalculateScoresAsync(companyId, ownership);
+    }
+    catch (BrokenCircuitException)
+    {
+        _logger.LogError("Circuit breaker open: Ownership Service unreachable");
+        return await GetCachedScoresAsync(companyId); // Graceful degradation
+    }
+}
+```
+
+**Real timeline with Circuit Breaker:**
+
+```
+T0: Ownership Service is healthy → Circuit CLOSED
+T1: Request 1 fails (timeout) → Failure count: 1
+T2: Request 2 fails (timeout) → Failure count: 2
+T3: Request 3 fails (timeout) → Failure count: 3
+T4: Request 4 fails (timeout) → Failure count: 4
+T5: Request 5 fails (timeout) → Failure count: 5 → Circuit OPENS
+T6: Request 6 → Circuit is OPEN → Rejected immediately, returns cached score
+T7: Request 7 → Circuit is OPEN → Rejected immediately, returns cached score
+...
+T30: 30 seconds passed → Circuit moves to HALF-OPEN
+T31: Probe request to Ownership Service → Succeeds! → Circuit CLOSES
+T32: Request 8 → Circuit is CLOSED → Proceeds normally
+```
+
+Without Circuit Breaker: Request 6+ would hang for 5 seconds each, depleting connection pool.
+With Circuit Breaker: Request 6+ returns immediately with cached data.
+
+### API Versioning & Backward Compatibility
+
+Capital Access services must evolve without breaking clients. When Ownership Service needs to add a new field:
+
+**Option 1: Additive Changes (Safest)**
+```csharp
+// Old API response (v1)
+{
+  "ownershipPercent": 5.2,
+  "lastUpdate": "2026-07-08"
+}
+
+// New API response (still v1, backward compatible)
+{
+  "ownershipPercent": 5.2,
+  "lastUpdate": "2026-07-08",
+  "confidence": 0.95  // New field, but clients that ignore it still work
+}
+```
+
+Clients that expect only `ownershipPercent` and `lastUpdate` continue working. New clients use `confidence`. No versioning needed.
+
+**Option 2: Major Changes (Versioning Required)**
+```csharp
+// API v1 (old)
+GET /api/v1/ownership/123
+{
+  "ownershipPercent": 5.2,
+  "companyId": 123
+}
+
+// API v2 (new schema, major change)
+GET /api/v2/ownership/123
+{
+  "shares": 15000000,
+  "sharesOutstanding": 2600000000,
+  "ownershipPercent": 5.77,  // Calculated differently
+  "confidence": 0.99,
+  "dataSource": "EDGAR"
+}
+
+// Keep v1 running for backward compatibility
+// Clients can gradually migrate to v2
+```
+
+APIM routes based on version:
+```yaml
+/api/v1/* → ownership-service:8080/v1/*
+/api/v2/* → ownership-service:8080/v2/*
+```
+
+Both versions run simultaneously in the same App Service. Clients choose when to upgrade.
+
+---
+
 ## CQRS Pattern — Ownership Data
 
 Capital Access uses CQRS (Command Query Responsibility Segregation) in the Ownership and Engagement services to solve a concrete read/write contention problem.
