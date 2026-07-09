@@ -61,13 +61,13 @@ Combined moves = 2n = O(n).
 
 ## Table of Contents
 
-| # | Problem | Difficulty | Date Solved |
-|---|---------|------------|-------------|
-| 1 | [Valid Palindrome — LC 125](#1-valid-palindrome--lc-125) | Easy | 2026-06-29 |
-| 2 | [Two Sum II — LC 167](#2-two-sum-ii--lc-167) | Medium | 2026-06-29 |
-| 3 | [3Sum — LC 15](#3-3sum--lc-15) | Medium | 2026-06-29 |
-| 4 | [Container With Most Water — LC 11](#4-container-with-most-water--lc-11) | Medium | 2026-06-29 |
-| 5 | [Trapping Rain Water — LC 42](#5-trapping-rain-water--lc-42) | Hard | - |
+| # | Problem | Difficulty | LeetCode | Date Solved |
+|---|---------|------------|----------|-------------|
+| 1 | [Valid Palindrome — LC 125](#1-valid-palindrome--lc-125) | Easy | [LC 125](https://leetcode.com/problems/valid-palindrome/) | 2026-06-29 |
+| 2 | [Two Sum II — LC 167](#2-two-sum-ii--lc-167) | Medium | [LC 167](https://leetcode.com/problems/two-sum-ii-input-array-is-sorted/) | 2026-06-29 |
+| 3 | [3Sum — LC 15](#3-3sum--lc-15) | Medium | [LC 15](https://leetcode.com/problems/3sum/) | 2026-06-29 |
+| 4 | [Container With Most Water — LC 11](#4-container-with-most-water--lc-11) | Medium | [LC 11](https://leetcode.com/problems/container-with-most-water/) | 2026-06-29 |
+| 5 | [Trapping Rain Water — LC 42](#5-trapping-rain-water--lc-42) | Hard | [LC 42](https://leetcode.com/problems/trapping-rain-water/) | - |
 
 ---
 

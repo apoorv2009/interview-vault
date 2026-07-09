@@ -89,12 +89,12 @@ Each element is added once and removed once = 2n operations = O(n).
 
 ## Table of Contents
 
-| # | Problem | Difficulty | Date Solved |
-|---|---------|------------|-------------|
-| 1 | [Best Time to Buy and Sell Stock — LC 121](#1-best-time-to-buy-and-sell-stock--lc-121) | Easy | 2026-07-06 |
-| 2 | [Maximum Average Subarray I — LC 643](#2-maximum-average-subarray-i--lc-643) | Easy | 2026-07-08 |
-| 3 | [Contains Duplicate II — LC 219](#3-contains-duplicate-ii--lc-219) | Easy | 2026-07-08 |
-| 4 | [Number of Subarrays of Size K and Average ≥ Threshold — LC 1343](#4-number-of-subarrays-of-size-k-and-average--threshold--lc-1343) | Easy | 2026-07-08 |
+| # | Problem | Difficulty | LeetCode | Date Solved |
+|---|---------|------------|----------|-------------|
+| 1 | [Best Time to Buy and Sell Stock — LC 121](#1-best-time-to-buy-and-sell-stock--lc-121) | Easy | [LC 121](https://leetcode.com/problems/best-time-to-buy-and-sell-stock/) | 2026-07-06 |
+| 2 | [Maximum Average Subarray I — LC 643](#2-maximum-average-subarray-i--lc-643) | Easy | [LC 643](https://leetcode.com/problems/maximum-average-subarray-i/) | 2026-07-08 |
+| 3 | [Contains Duplicate II — LC 219](#3-contains-duplicate-ii--lc-219) | Easy | [LC 219](https://leetcode.com/problems/contains-duplicate-ii/) | 2026-07-08 |
+| 4 | [Number of Subarrays of Size K and Average ≥ Threshold — LC 1343](#4-number-of-subarrays-of-size-k-and-average--threshold--lc-1343) | Easy | [LC 1343](https://leetcode.com/problems/number-of-sub-arrays-of-size-k-and-average-greater-than-or-equal-to-threshold/) | 2026-07-08 |
 
 ---
 
