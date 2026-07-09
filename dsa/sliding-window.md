@@ -95,6 +95,7 @@ Each element is added once and removed once = 2n operations = O(n).
 | 2 | [Maximum Average Subarray I — LC 643](#2-maximum-average-subarray-i--lc-643) | Easy | [LC 643](https://leetcode.com/problems/maximum-average-subarray-i/) | 2026-07-08 |
 | 3 | [Contains Duplicate II — LC 219](#3-contains-duplicate-ii--lc-219) | Easy | [LC 219](https://leetcode.com/problems/contains-duplicate-ii/) | 2026-07-08 |
 | 4 | [Number of Subarrays of Size K and Average ≥ Threshold — LC 1343](#4-number-of-subarrays-of-size-k-and-average--threshold--lc-1343) | Easy | [LC 1343](https://leetcode.com/problems/number-of-sub-arrays-of-size-k-and-average-greater-than-or-equal-to-threshold/) | 2026-07-08 |
+| 5 | [Longest Substring Without Repeating Characters — LC 3](#5-longest-substring-without-repeating-characters--lc-3) | Medium | [LC 3](https://leetcode.com/problems/longest-substring-without-repeating-characters/) | 2026-07-08 |
 
 ---
 
@@ -346,5 +347,74 @@ public class Solution {
 ### Key Takeaway
 
 Use `>=` not `>` when problem says "greater than or equal to". Compare `windowSum / k >= threshold` — no need for HashSet, just a counter. Classic Approach 1 fixed window.
+
+---
+
+## 5. Longest Substring Without Repeating Characters — LC 3
+
+**LeetCode:** https://leetcode.com/problems/longest-substring-without-repeating-characters/
+**Difficulty:** Medium
+**Date:** 2026-07-08
+
+### Problem Statement
+
+Given a string `s`, find the length of the longest substring without duplicate characters.
+
+**Examples:**
+```
+Input:  s = "zxyzxyz"
+Output: 3  → "xyz"
+
+Input:  s = "xxxx"
+Output: 1  → "x"
+
+Input:  s = "abcabcbb"
+Output: 3  → "abc"
+```
+
+### Approach
+
+Variable size window using HashSet. Expand right on every step. When duplicate found, shrink from left (remove s[left], left++) until duplicate is gone. Track max window size seen so far.
+
+### Solution
+
+```csharp
+public class Solution {
+    public int LengthOfLongestSubstring(string s)
+    {
+        var seen = new HashSet<char>();
+        int left = 0;
+        int maxLength = 0;
+
+        for (int i = 0; i < s.Length; i++)
+        {
+            while (seen.Contains(s[i]))
+            {
+                seen.Remove(s[left]);  // shrink from left
+                left++;
+            }
+            seen.Add(s[i]);
+            if (maxLength < seen.Count())
+            {
+                maxLength = seen.Count();
+            }
+        }
+        return maxLength;
+    }
+}
+```
+
+### Complexity
+
+- **Time:** O(n)
+- **Space:** O(k) — k = size of character set in window
+
+### Why O(n) and not O(n²)?
+
+The while loop looks like O(n²) but left and right never reset — each moves forward at most n times total. Every character is added once and removed once = 2n operations = O(n).
+
+### Key Takeaway
+
+Variable window = expand right always, shrink left when condition violated. Always remove `s[left]` not `s[right]` when shrinking. Window size = `right - left + 1` or `seen.Count()`.
 
 ---
