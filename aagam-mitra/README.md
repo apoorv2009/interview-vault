@@ -8,6 +8,8 @@ Every answer references actual config values, library versions, design decisions
 
 ## Files in This Folder
 
+### Foundation & Architecture (Files 01–05)
+
 | File | Topics Covered | Questions |
 |---|---|---|
 | [01-RAG-and-Vector-Search.md](01-RAG-and-Vector-Search.md) | RAG pipeline, chunking, embeddings, Pinecone, cosine similarity, semantic search, temple knowledge sync | 10 |
@@ -16,7 +18,30 @@ Every answer references actual config values, library versions, design decisions
 | [04-Security-and-Production.md](04-Security-and-Production.md) | 4-layer security, prompt injection, graceful degradation, double-booking prevention, scaling, tricky questions, all config values | 10 |
 | [05-YouTube-Transcript-Pipeline.md](05-YouTube-Transcript-Pipeline.md) | Dual-layer extraction, Whisper ASR, LLM formatting, Shanka Samadhan vs Pravachan detection, RAG storage, live stream handling | 8 |
 
-**Total: 48 detailed Q&As** covering the entire system from UI to vector database.
+**Subtotal: 48 detailed Q&As**
+
+### Framework & Patterns (Files 06–07)
+
+| File | Topics Covered | Questions |
+|---|---|---|
+| [06-LangChain-Concepts-and-Prompt-Templates.md](06-LangChain-Concepts-and-Prompt-Templates.md) | LangChain principles, prompt templates, RAG pattern, chains & composition, framework vs custom, error handling in LLM apps. How Aagam Mitra follows LangChain patterns without the library. | 6 |
+| [07-LangGraph-Agent-Design-and-Orchestration.md](07-LangGraph-Agent-Design-and-Orchestration.md) | LangGraph vs LangChain, state management, nodes & edges, agent loop, multi-agent orchestration, why build custom vs LangGraph. How Aagam Mitra implements LangGraph patterns natively. | 6 |
+
+**Subtotal: 12 detailed Q&As**
+
+### Expert Deep-Dives (File 08)
+
+| File | Topics Covered | Questions |
+|---|---|---|
+| [08-Agentic-Design-Patterns-and-Enterprise-AI.md](08-Agentic-Design-Patterns-and-Enterprise-AI.md) | **5 agentic design patterns** (router, hierarchical, tool-using, reflection, autonomous) with Aagam Mitra examples. **Advanced RAG**: retrieval quality metrics (hit rate, NDCG, MRR), knowledge base freshness strategies. **Enterprise AI**: compliance, regulatory requirements (Basel III, GDPR, Fair Lending), model governance, fairness testing, explainability, audit trails. **Governance & Observability**: monitoring, cost optimization (caching, batching, model routing), testing strategies (routing, end-to-end, quality, security, human evaluation, A/B testing). | 10 |
+
+**Subtotal: 10 expert-level Q&As**
+
+---
+
+## Total Coverage
+
+**70+ detailed Q&As** organized across 8 files, covering everything from foundational RAG & LLM concepts to expert-level enterprise AI architecture. All answers grounded in real Aagam Mitra production code and systems.
 
 ---
 

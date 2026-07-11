@@ -2,6 +2,8 @@
 
 My interview prep notes, organized by topic. Most answers are framed around the **Capital Access** project at S&P Global; a subset (clearly labeled "Interview Rounds" / "Other Company Rounds" sections) is sourced from live interview rounds at other companies and framed around the **Entity Management System** project instead — kept separate rather than blended since the two report different tenure and a different most-recent project.
 
+**Latest addition:** The `aagam-mitra` folder contains 70+ Q&As on production agentic AI systems, with expert-level deep-dives on design patterns, RAG at scale, and enterprise governance — tailored for VP-level interviews on AI/ML leadership roles.
+
 ## Structure
 
 | Folder | Description | Coverage |
@@ -20,6 +22,7 @@ My interview prep notes, organized by topic. Most answers are framed around the 
 | [behavioural](https://github.com/apoorv2009/interview-vault/tree/main/behavioural) | Behavioural interview STAR answers (two tracks: EPAM/Architect + other-company Full Stack) | Reference |
 | [capital-access-project](https://github.com/apoorv2009/interview-vault/tree/main/capital-access-project) | Real-project deep dive: S&P Global, Capital Access | Reference |
 | [system-design-interview-playbook](https://github.com/apoorv2009/interview-vault/tree/main/system-design-interview-playbook) | System design Q&A at Staff/Principal depth | 24+ questions |
+| [aagam-mitra](https://github.com/apoorv2009/interview-vault/tree/main/aagam-mitra) | Production agentic AI system: RAG, LLMs, multi-agent orchestration, enterprise governance | 70+ questions |
 | [angular-interview-prep-app](https://github.com/apoorv2009/interview-vault/tree/main/angular-interview-prep-app) | Hands-on Angular 19 app for practising concepts | App |
 
 ---
@@ -153,6 +156,36 @@ Interview prep tied to my current role: S&P Global, Lead Software Development En
 24+ advanced system design Q&As at Staff/Principal Engineer depth — one file per scenario. Covers: distributed systems & scale, reliability & incident response, security, concurrency, RAG/AI systems, and engineering practice.
 
 See its own `README.md` and `CLAUDE.md` for authoring conventions.
+
+---
+
+## aagam-mitra
+
+70+ Q&As covering a production agentic AI system built for a Jain temple community platform. All answers grounded in real code, config values, and production patterns.
+
+**8 files organized in 3 tiers:**
+
+**Foundation (Files 01–05):** 48 Q&As
+- RAG pipeline, vector embeddings, semantic search
+- LLM selection, temperature tuning, tool-calling loops, chat history management
+- Multi-agent orchestration (4 specialist agents, 12 tools)
+- System architecture, JWT auth, Cloudflare tunnel, push notifications
+- 4-layer security pipeline (guardrails, RBAC, prompt hardening, audit logging)
+- YouTube transcript extraction with ASR fallback
+
+**Framework & Patterns (Files 06–07):** 12 Q&As
+- LangChain principles, prompt templates, RAG pattern — how Aagam Mitra implements LangChain patterns without the library
+- LangGraph concepts, state management, agent reasoning loops — how Aagam Mitra implements LangGraph-like patterns with custom Python
+
+**Expert Deep-Dive (File 08):** 10 Q&As ⭐ *Specifically prepared for VP-level agentic system interviews*
+- 5 agentic design patterns (router, hierarchical, tool-using, reflection, autonomous) with real Aagam Mitra examples
+- Advanced RAG: retrieval quality metrics (hit rate, NDCG, MRR, precision@k), knowledge base freshness strategies, semantic reranking
+- Enterprise AI: regulatory compliance (Basel III, GDPR, Fair Lending), model governance, fairness testing, explainability, audit trails
+- Production governance: observability stack (metrics, logs, traces), incident response, cost optimization strategies, testing frameworks (unit, integration, human eval, A/B testing)
+
+**Key production numbers:** 17B LLM, 2048-dim embeddings, 8 passage retrieval, 4-attempt retries with exponential backoff, 25% → 2% hallucination rate reduction via RAG, 5 microservices, custom-built agent loop (no LangChain/LangGraph dependencies).
+
+See the folder `README.md` for a detailed breakdown and quick architecture summary.
 
 ---
 
