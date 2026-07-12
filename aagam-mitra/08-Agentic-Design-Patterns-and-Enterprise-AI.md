@@ -2000,14 +2000,639 @@ After 1 week:
 
 ---
 
+# PART 5: MEMORY ARCHITECTURES IN AGENTIC SYSTEMS
+## Multi-Layer Memory Design & Production Patterns
+
+### Question 11: How do you design memory layers in agentic systems? What information flows between them?
+
+> **Why asked:** Memory is the backbone of agentic systems. An interviewer asking this wants to see: (1) Do you understand different types of memory (working, conversational, semantic, episodic)? (2) Can you design a memory architecture that scales? (3) Do you think about data lifecycle, privacy, and cost? This is crucial at JPMC, where decisions must be auditable and compliant.
+
+#### The Four-Layer Memory Architecture
+
+Every production agentic system needs **4 distinct memory layers**, each serving a different purpose:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│ LAYER 1: SHORT-TERM MEMORY (Working Memory)                │
+│ ├─ Lifetime: 1 agent execution (~1-5 seconds)              │
+│ ├─ Storage: In-memory (messages list)                       │
+│ ├─ Capacity: 4-8K tokens per request                       │
+│ └─ Aagam Mitra: Last 8 conversation turns passed to Groq   │
+├─────────────────────────────────────────────────────────────┤
+│ LAYER 2: CONVERSATIONAL MEMORY (Session Memory)             │
+│ ├─ Lifetime: 24-48 hours (configurable TTL)                │
+│ ├─ Storage: Database + Redis cache                          │
+│ ├─ Capacity: 100-1000 messages per user+temple             │
+│ └─ Aagam Mitra: Chat history table, auto-trimmed after 30d │
+├─────────────────────────────────────────────────────────────┤
+│ LAYER 3: SEMANTIC MEMORY (Knowledge Base)                   │
+│ ├─ Lifetime: Permanent (versioned)                          │
+│ ├─ Storage: Vector database (Pinecone)                      │
+│ ├─ Capacity: Millions of passages/embeddings               │
+│ └─ Aagam Mitra: ~800 Jain texts, temple events, FAQs       │
+├─────────────────────────────────────────────────────────────┤
+│ LAYER 4: EPISODIC MEMORY (Audit Trail & Action Log)         │
+│ ├─ Lifetime: 90 days - 7 years (compliance)                │
+│ ├─ Storage: Audit log (database, S3, CloudWatch)           │
+│ ├─ Capacity: Every query ever logged                       │
+│ └─ Aagam Mitra: PII-masked query log for debugging & audit │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+#### Layer 1: Short-Term Memory (Working Memory)
+
+**Purpose:** Current reasoning context. The agent needs this to think about the current problem.
+
+**What it contains:**
+- System prompt (instructions for the agent)
+- Last N conversation turns (context for multi-turn reasoning)
+- Current user query
+- In-flight tool results (accumulated as the agent loops)
+
+**In Aagam Mitra:**
+
+```python
+# From BaseAgent.run()
+messages = [
+    {"role": "system", "content": system_prompt},      # ~500 tokens
+    *history[-8:],                                      # Last 8 turns = ~3000 tokens
+    {"role": "user", "content": user_message}           # Current query = ~100 tokens
+]
+# Total: ~3600 tokens per request
+
+# During agent loop (tool-calling):
+response = await groq.chat(messages=messages, tools=tools)
+
+if response.finish_reason == "tool_calls":
+    # Execute tools in parallel
+    results = await asyncio.gather(*[
+        execute_tool(tc.function.name, json.loads(tc.function.arguments))
+        for tc in response.tool_calls
+    ])
+    
+    # Append tool results to messages (grows working memory)
+    messages.append({
+        "role": "assistant",
+        "content": None,
+        "tool_calls": response.tool_calls
+    })
+    for tool_call, result in zip(response.tool_calls, results):
+        messages.append({
+            "role": "tool",
+            "tool_call_id": tool_call.id,
+            "content": json.dumps(result)
+        })
+    
+    # Next iteration sees: system + history + user + tool_result1 + tool_result2
+```
+
+**Key insight:** Working memory grows with each tool call. After iteration 3, the messages list might be 6K tokens. This is necessary for reasoning, but expensive (each token costs money).
+
+**Tradeoffs:**
+- ✅ Fast (no DB latency)
+- ✅ Complete context for complex reasoning
+- ❌ Expensive (grows with each tool call)
+- ❌ Lost after agent finishes (not persistent)
+
+**Cost impact at scale:**
+- Single request: 3600 tokens × $0.0001 per token = $0.36 per request
+- 1M requests/day: $360,000/day = $10.8M/month
+
+**Optimization:** Limit to essential history. Aagam Mitra uses last 8 turns, not last 100.
+
+---
+
+#### Layer 2: Conversational Memory (Session Memory)
+
+**Purpose:** Persistent multi-turn context. Users should be able to ask related questions over hours or days without losing context.
+
+**What it contains:**
+- Full chat history for (user_id, temple_id)
+- Structured as: role, content, timestamp, metadata
+- Indexed for fast retrieval
+
+**In Aagam Mitra:**
+
+```python
+# Storage schema
+class ChatHistory(Base):
+    __tablename__ = "chat_history"
+    
+    id: int = Column(Integer, primary_key=True)
+    user_id: str = Column(String, index=True)
+    temple_id: str = Column(String, index=True)
+    role: str = Column(String)  # 'user' | 'assistant'
+    content: str = Column(Text)
+    timestamp: datetime = Column(DateTime, default=datetime.utcnow)
+    metadata: dict = Column(JSON)  # Optional: tool_calls, response_time, etc.
+
+# Retention policy:
+# Keep last 100 messages per (user_id, temple_id)
+# Expire messages older than 30 days
+async def trim_chat_history(user_id: str, temple_id: str):
+    # Delete messages beyond 100
+    excess = await db.execute(
+        delete(ChatHistory)
+        .where(
+            (ChatHistory.user_id == user_id) &
+            (ChatHistory.temple_id == temple_id) &
+            (ChatHistory.timestamp < (
+                select(ChatHistory.timestamp)
+                .where(...)
+                .order_by(ChatHistory.timestamp.desc())
+                .limit(1)
+                .offset(100)  # 100th oldest
+            ))
+        )
+    )
+    
+    # Delete messages older than TTL
+    expired = await db.execute(
+        delete(ChatHistory)
+        .where(
+            (ChatHistory.user_id == user_id) &
+            (ChatHistory.timestamp < (datetime.utcnow() - timedelta(days=30)))
+        )
+    )
+```
+
+**Retrieval with caching (critical for performance):**
+
+```python
+async def get_conversation_history(user_id: str, temple_id: str, n_turns: int = 8):
+    # Try Redis first
+    cache_key = f"chat_history:{user_id}:{temple_id}"
+    cached = await redis.get(cache_key)
+    if cached:
+        return json.loads(cached)  # ~1ms
+    
+    # Cache miss: fetch from DB
+    history = await db.execute(
+        select(ChatHistory)
+        .where(
+            (ChatHistory.user_id == user_id) &
+            (ChatHistory.temple_id == temple_id)
+        )
+        .order_by(ChatHistory.timestamp.desc())
+        .limit(n_turns * 2)  # 2 messages per turn (user + assistant)
+    )
+    
+    # Cache for 1 hour
+    await redis.setex(cache_key, 3600, json.dumps(history))
+    return history
+```
+
+**Why it matters:**
+
+User context: "I asked about Karma yesterday. Today I ask 'How does it relate to rebirth?' The agent should remember the earlier discussion."
+
+With Layer 2:
+```
+Day 1:
+  User: "What is Karma?"
+  Agent: "Karma is the law of cause and effect..."
+  
+Day 2:
+  User: "How does it relate to rebirth?"
+  Agent: (retrieves history) "Based on yesterday's discussion about Karma, 
+          rebirth is..."
+```
+
+Without Layer 2, the agent would treat it as a new conversation.
+
+**Tradeoffs:**
+- ✅ Enables multi-day conversations
+- ✅ Persistent context
+- ⚠️ Slower than working memory (100-500ms vs <5ms)
+- ❌ Privacy risk (stores sensitive queries)
+- ❌ Storage cost (every message stored)
+
+**Privacy mitigation:**
+```python
+# Before storing, mask PII
+message_content = mask_pii(user_message)
+    # Removes: email, phone, SSN, credit card, etc.
+    
+# Encrypt at rest
+message_encrypted = encrypt(message_content, encryption_key)
+
+# Log with audit trail
+audit_log.insert({
+    "event": "MESSAGE_STORED",
+    "user_id_masked": hash(user_id),
+    "content_encrypted": True,
+    "timestamp": now()
+})
+```
+
+---
+
+#### Layer 3: Semantic Memory (Knowledge Base)
+
+**Purpose:** Factual grounding. The agent uses this to answer questions with real information instead of hallucinating.
+
+**What it contains:**
+- Embeddings of domain knowledge (texts, FAQs, events, docs)
+- Each passage: text + vector + metadata
+- Indexed for fast similarity search
+
+**In Aagam Mitra:**
+
+```python
+# Data preparation
+passages = [
+    {
+        "id": "jain_sutra_001",
+        "text": "Karma is the law of cause and effect in Jainism. Every action has consequences.",
+        "source": "Aadigranth",
+        "language": "Sanskrit",
+        "chunk_index": 0,
+        "chunk_size": 800  # characters
+    },
+    {
+        "id": "event_paryushana_2026",
+        "text": "Paryushana festival 2026 begins August 20 and lasts 8 days.",
+        "source": "temple_events",
+        "temple_id": "tmpl_001",
+        "event_date": "2026-08-20"
+    },
+    # ... 800+ more passages
+]
+
+# Embedding step (expensive, done offline)
+for passage in passages:
+    embedding = await gemini.embed_text(passage["text"])  # 2048-dim vector
+    passage["embedding"] = embedding
+
+# Storage in Pinecone (vector DB)
+pinecone.upsert(
+    vectors=[
+        (
+            passage["id"],
+            passage["embedding"],
+            passage  # metadata
+        )
+        for passage in passages
+    ],
+    namespace="jain-texts"
+)
+
+# Retrieval: Semantic search during agent execution
+async def search_semantic_memory(query: str, top_k: int = 8):
+    query_embedding = await gemini.embed_text(query)  # ~50ms
+    
+    results = pinecone.query(
+        vector=query_embedding,
+        top_k=top_k,
+        namespace="jain-texts",
+        include_metadata=True
+    )
+    
+    # Results: [(id, score, metadata), ...]
+    # score = cosine similarity (0-1), higher = more relevant
+    
+    return [
+        {
+            "passage": result.metadata["text"],
+            "source": result.metadata["source"],
+            "relevance_score": result.score
+        }
+        for result in results
+    ]
+
+# Agent use:
+# ScriptureAgent calls: search_semantic_memory("What is Karma?")
+# → Returns: top 8 passages about Karma
+# → Passes to Groq: "Answer based on these passages: [passages]"
+# → Groq synthesizes: "Karma is the law of cause and effect, as stated in..."
+```
+
+**Hallucination reduction:**
+
+Without Layer 3 (pure LLM):
+```
+User: "What is Karma?"
+Groq (from training data): "Karma is the law of cause and effect. 
+                             In Buddhism, it's called 'kamma'..."
+Result: Correct but generic. May mix Buddhist and Jain concepts.
+Hallucination rate: ~25% (model might invent details)
+```
+
+With Layer 3 (RAG):
+```
+User: "What is Karma?"
+Retrieve: ["Karma in Jain texts is...", "Karma leads to rebirth through...", ...]
+Groq (grounded in passages): "According to Jain texts, Karma is the law 
+                               of cause and effect, binding the soul..."
+Result: Specific, grounded, accurate.
+Hallucination rate: ~2% (model sticks to retrieved passages)
+```
+
+**Tradeoffs:**
+- ✅ Drastically reduces hallucinations
+- ✅ Scales to millions of documents
+- ✅ Enables domain-specific knowledge
+- ⚠️ Retrieval quality matters (bad retrieval = bad answer)
+- ❌ Stale if knowledge base isn't refreshed
+- ❌ Extra latency (embedding + search: 100-200ms)
+
+**Freshness strategy:**
+
+```python
+# Strategy 1: Daily batch refresh
+@scheduler.scheduled_job('cron', hour=1)  # 1 AM daily
+async def refresh_knowledge_base():
+    # Fetch latest from sources
+    new_passages = []
+    new_passages.extend(await fetch_jain_texts())
+    new_passages.extend(await fetch_temple_events())
+    new_passages.extend(await fetch_faqs())
+    
+    # Embed and re-upload to Pinecone
+    for passage in new_passages:
+        passage["embedding"] = await gemini.embed_text(passage["text"])
+    
+    pinecone.upsert(vectors=[(p["id"], p["embedding"], p) for p in new_passages])
+
+# Strategy 2: Real-time webhooks for critical updates
+@app.post("/webhooks/events")
+async def on_event_created(event: Event):
+    # New temple event published
+    embedding = await gemini.embed_text(event.description)
+    pinecone.upsert([(event.id, embedding, event.to_dict())])
+    # Agent will retrieve it in next query
+```
+
+---
+
+#### Layer 4: Episodic Memory (Audit Trail & Action Log)
+
+**Purpose:** Complete accountability. Every decision is logged so it can be replayed, debugged, and audited.
+
+**What it contains:**
+- Every query, tool call, and response
+- Timing, errors, and metadata
+- Structured for querying and compliance
+
+**In Aagam Mitra:**
+
+```python
+# Audit log schema
+class AuditLog(Base):
+    __tablename__ = "audit_log"
+    
+    id: UUID = Column(UUID, primary_key=True, default=uuid4)
+    event_type: str = Column(String)  # 'QUERY_RECEIVED', 'TOOL_CALLED', 'ERROR', 'RESPONSE_SENT'
+    user_id_masked: str = Column(String, index=True)  # Hash of user_id for privacy
+    temple_id: str = Column(String, index=True)
+    role: str = Column(String)  # 'devotee' | 'admin'
+    message: str = Column(Text)  # User's query (truncated if >500 chars)
+    tools_called: List[str] = Column(JSON)
+    response_time_ms: int = Column(Integer)
+    error_category: str = Column(String)  # If error: 'GUARDRAIL_BLOCK', 'RBAC_DENIED', 'TOOL_TIMEOUT'
+    trace_id: str = Column(String, index=True)  # Links to distributed trace
+    created_at: datetime = Column(DateTime, default=datetime.utcnow, index=True)
+
+# Logging throughout agent execution:
+# 1. Query received
+audit_log.insert({
+    "event_type": "QUERY_RECEIVED",
+    "user_id_masked": hash(user_id),
+    "temple_id": temple_id,
+    "role": role,
+    "message": user_message[:500],  # Truncate
+    "trace_id": trace_id,
+    "timestamp": now()
+})
+
+# 2. Intent routing
+audit_log.insert({
+    "event_type": "INTENT_DETECTED",
+    "intents": ["scripture", "temple_ops"],  # Detected intents
+    "trace_id": trace_id
+})
+
+# 3. Tool execution
+audit_log.insert({
+    "event_type": "TOOL_CALLED",
+    "tools_called": ["search_jain_texts", "get_shantidhara_slots"],
+    "response_time_ms": 450,
+    "trace_id": trace_id
+})
+
+# 4. Response sent
+audit_log.insert({
+    "event_type": "RESPONSE_SENT",
+    "response_time_ms": 1212,
+    "tools_called": ["search_jain_texts", "get_shantidhara_slots"],
+    "trace_id": trace_id,
+    "timestamp": now()
+})
+
+# If error:
+audit_log.insert({
+    "event_type": "ERROR",
+    "error_category": "GUARDRAIL_BLOCK",
+    "message": "Input matched injection pattern",
+    "trace_id": trace_id
+})
+```
+
+**How to use the audit log:**
+
+**Debugging:** User reports "The AI gave me wrong info about Karma."
+
+```python
+# Find the request
+log_entry = db.select(AuditLog).where(
+    (AuditLog.user_id_masked == hash(user_id)) &
+    (AuditLog.created_at >= datetime.now() - timedelta(hours=2)) &
+    (AuditLog.message.contains("Karma"))
+).first()
+
+# Trace it
+trace_id = log_entry.trace_id
+all_events = db.select(AuditLog).where(AuditLog.trace_id == trace_id)
+
+# Visualize:
+QUERY_RECEIVED: "What is Karma?"
+  ↓
+INTENT_DETECTED: intents=["scripture"]
+  ↓
+TOOL_CALLED: ["search_jain_texts"]  (response_time_ms: 100)
+  ↓
+GROQ_CALLED: temperature=0.5, tokens_in=3500, tokens_out=250
+  ↓
+RESPONSE_SENT: "Karma is..." (response_time_ms: 1200)
+
+Root cause: Retrieved passages were about "karma in Buddhism," not Jainism.
+Fix: Improve query expansion in retrieval step.
+```
+
+**Compliance:** Regulator asks "Why did you deny this user's request?"
+
+```python
+# Find denial event
+denial = db.select(AuditLog).where(
+    (AuditLog.event_type == "RBAC_DENIED") &
+    (AuditLog.user_id_masked == hash(user_id))
+).first()
+
+# Explain
+print(f"User tried to: {denial.message}")
+print(f"User role: {denial.role}")
+print(f"Required role: admin")
+print(f"Denial reason: Non-admin users cannot access admin features")
+
+# Log retention: 7 years (compliance requirement)
+```
+
+**Learning:** Which queries fail most often?
+
+```python
+# Analyze error patterns
+errors = db.select(AuditLog).where(
+    (AuditLog.event_type == "ERROR") &
+    (AuditLog.created_at >= datetime.now() - timedelta(days=30))
+).all()
+
+error_categories = Counter(e.error_category for e in errors)
+# Output:
+# GUARDRAIL_BLOCK: 45%
+# TOOL_TIMEOUT: 30%
+# RBAC_DENIED: 15%
+# HALLUCINATION: 10%
+
+# Action: Improve guardrails (most common error)
+```
+
+**Tradeoffs:**
+- ✅ Complete audit trail (no surprises)
+- ✅ Enables root-cause analysis
+- ✅ Satisfies compliance requirements
+- ⚠️ Storage cost (every request logged)
+- ❌ PII risk (must mask sensitive data)
+- ❌ Query latency if audit logging is synchronous
+
+**Optimization:**
+```python
+# Async audit logging (don't block the response)
+async def run_agent(...):
+    response = await orchestrator.run(...)
+    
+    # Fire-and-forget audit logging
+    asyncio.create_task(audit_log.insert_async({
+        "event": "RESPONSE_SENT",
+        "response_time_ms": elapsed,
+        ...
+    }))
+    
+    return response  # Return immediately, audit log in background
+```
+
+---
+
+#### How Layers Interact During Execution
+
+```
+User asks: "Book Shantidhara for January 15 and explain its significance"
+
+┌─ LAYER 1: SHORT-TERM (Working Memory)
+│  messages = [
+│    system_prompt,
+│    history[-8:],  ← Retrieved from LAYER 2
+│    user_message,
+│  ]
+│  Pass to Groq
+│  (Groq thinks: "I need to book and search for significance")
+│
+├─ LAYER 2: CONVERSATIONAL (Session Memory)
+│  history = await redis.get("chat_history:usr_123:tmpl_001")
+│  if not cached:
+│    history = await db.select(ChatHistory where user_id=..., limit=8)
+│    await redis.set(cache_key, history, ex=3600)
+│
+├─ LAYER 3: SEMANTIC (Knowledge Base)
+│  ScriptureAgent.run():
+│    embeddings = await gemini.embed("significance of Shantidhara")
+│    passages = await pinecone.query(embeddings, top_k=8)
+│    (Gets: 8 passages about Shantidhara ritual meaning)
+│
+├─ LAYER 4: EPISODIC (Audit Trail)
+│  audit_log.insert({
+│    event: "QUERY_RECEIVED",
+│    message: "Book Shantidhara...",
+│    trace_id: "trace_xyz789"
+│  })
+│
+│  audit_log.insert({
+│    event: "TOOL_CALLED",
+│    tools: ["book_shantidhara_slot", "search_jain_texts"],
+│    response_time_ms: 1200,
+│    trace_id: "trace_xyz789"
+│  })
+│
+│  audit_log.insert({
+│    event: "RESPONSE_SENT",
+│    response: "Shantidhara is available on...",
+│    trace_id: "trace_xyz789"
+│  })
+│
+└─ User receives answer: "Shantidhara slots are [dates]. Its significance is..."
+```
+
+---
+
+#### Memory Layer Tradeoffs at Scale
+
+| Layer | Lifetime | Speed | Cost | Size | Risk |
+|-------|----------|-------|------|------|------|
+| **Short-term** | 1-5s | <5ms | High ($) | 4-8K tokens | Token overage |
+| **Conversational** | 24-48h | 10-100ms | Medium | 100-1K messages | PII exposure |
+| **Semantic** | Permanent | 50-200ms | Low | Millions | Stale data |
+| **Episodic** | 90d-7y | Async | Medium | All queries | Storage cost |
+
+**For Aagam Mitra scale (100 queries/day):**
+- Working memory: 3600 tokens × $0.0001 × 100 = $0.036/day = $1.08/month
+- Conversational: 100 messages × 100 users = 10K messages stored = 1-5 MB (negligible)
+- Semantic: 800 passages × 2048 dims × 4 bytes = 6.5 GB (one-time, then query cost only)
+- Episodic: 100 queries/day × 1KB per log = 100KB/day = 3MB/month
+
+**At JPMC scale (100K queries/day):**
+- Working memory: $3600/month (optimize by truncating history)
+- Conversational: 100K × 100 users = 10M messages = 50-100 GB (archive old data)
+- Semantic: 1M+ passages (cost: Pinecone subscription ~$500/month)
+- Episodic: Compressing and archiving becomes critical (compliance requires 7-year retention)
+
+---
+
+#### What JPMC Would Add
+
+At enterprise scale:
+
+1. **Hierarchical Summarization:** Automatically summarize old conversations into topic summaries (reduces Layer 2 size)
+2. **Vector Indices per Domain:** Separate semantic memory for credit risk, fraud, trading, compliance
+3. **Memory Confidence Scores:** Track which memories are reliable vs speculative
+4. **Cross-Agent Memory Sharing:** One agent's episodic memory informs another's decisions
+5. **Reasoning Traces:** Store not just tool calls, but *why* the agent called them (reasoning chain)
+6. **Memory Compression:** Periodically compress episodic logs (archive old entries, summarize events)
+7. **Explainability Layer:** When explaining a decision, trace it back through all 4 memory layers
+
+---
+
+---
+
 ## Summary & Interview Tips
 
-This document covers four expert-level domains:
+This document covers five expert-level domains:
 
-1. **Agentic Design Patterns** — Router, hierarchical, tool-using, reflection, autonomous patterns
-2. **Advanced RAG** — Retrieval quality metrics (hit rate, NDCG, MRR), freshness strategies
-3. **Enterprise AI Architecture** — Compliance, governance, explainability, scale
-4. **Governance & Observability** — Monitoring, cost optimization, testing strategies
+1. **Agentic Design Patterns** — Router, hierarchical, tool-using, reflection, autonomous patterns (Q1-Q4)
+2. **Advanced RAG** — Retrieval quality metrics (hit rate, NDCG, MRR), freshness strategies (Q5-Q6)
+3. **Enterprise AI Architecture** — Compliance, governance, explainability, scale (Q7-Q8)
+4. **Governance & Observability** — Monitoring, cost optimization, testing strategies (Q9-Q10)
+5. **Memory Architectures** — 4-layer memory design (working, conversational, semantic, episodic), data lifecycle, production patterns (Q11)
 
 ### Key Takeaways for Your Interview:
 
