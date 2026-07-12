@@ -11,6 +11,79 @@ All answers are grounded in **Aagam Mitra's production implementation** and incl
 
 ---
 
+## Table of Contents
+
+### [PART 1: AGENTIC DESIGN PATTERNS](#part-1-agentic-design-patterns)
+- [Q1: Core agentic design patterns and Aagam Mitra implementation](#question-1-what-are-the-core-agentic-design-patterns-and-how-does-aagam-mitra-implement-them)
+  - The Agentic Design Pattern Taxonomy
+  - 5 patterns: Router, Hierarchical, Tool-Using, Reflection, Autonomous
+  - Summary: Which patterns Aagam Mitra uses today
+- [Q2: Orchestrator parallel vs sequential execution](#question-2-how-does-aagam-mitras-orchestrator-decide-when-to-run-multiple-agents-in-parallel-vs-sequentially)
+  - Current behavior: Parallel execution
+  - When sequential makes sense
+  - What JPMC should consider
+- [Q2b: LangGraph migration story](#question-2b-aagam-mitras-langgraph-migration-story-when-wed-switch)
+  - Current state: Why custom works today
+  - 5 triggers for migration (branching, streaming, human-in-loop, hierarchies, audit)
+  - Migration matrix and interview narrative
+- [Q3: Agent failures, hallucinations, timeout edge cases](#question-3-how-do-you-handle-agent-failures-hallucinations-and-timeout-edge-cases)
+  - Tool call failures & retry logic
+  - Max iterations exceeded
+  - LLM hallucinations & mitigation
+  - Timeout edge cases
+  - RBAC & security violations
+- [Q4: Scaling agent orchestration to 1000s of concurrent requests](#question-4-how-do-you-scale-agent-orchestration-to-handle-1000s-of-concurrent-requests)
+  - Current state: Small scale
+  - Horizontal scaling strategies (multi-instance, async I/O, queuing, caching, rate limiting, connection pooling, model optimization, Kubernetes)
+  - Scaling strategy for JPMC
+
+### [PART 2: ADVANCED RAG & DATA INTEGRATION](#part-2-advanced-rag--data-integration)
+- [Q5: Ensuring retrieval quality in RAG systems](#question-5-how-do-you-ensure-retrieval-quality-in-rag-systems-what-metrics-do-you-use)
+  - RAG pipeline overview
+  - Challenge: Poor retrieval
+  - Metrics (Hit Rate, NDCG, MRR, Precision@k)
+  - Aagam Mitra's current retrieval quality
+  - How to improve retrieval (query expansion, reranking, hybrid search, entity linking, filtering, active learning, chunking)
+  - Measuring quality in production
+- [Q6: Keeping knowledge base fresh and current](#question-6-whats-your-approach-to-keeping-a-knowledge-base-fresh-and-current)
+  - Problem: Stale knowledge bases
+  - Strategies (push-based, batch imports, versioning, source-of-truth, monitoring)
+  - Aagam Mitra's current approach & improvement plan
+
+### [PART 3: ENTERPRISE AI ARCHITECTURE](#part-3-enterprise-ai-architecture)
+- [Q7: Designing for compliance and regulatory requirements](#question-7-how-do-you-design-for-compliance-and-regulatory-requirements-in-ai-systems)
+  - Regulatory landscape (Basel III, Fair Lending, GDPR, SOX)
+  - Design for compliance (explainability, model governance, data governance, fairness testing, human-in-the-loop, right to explanation, continuous monitoring)
+  - Aagam Mitra & compliance
+- [Q8: Observability and monitoring in production agentic systems](#question-8-whats-your-approach-to-observability-and-monitoring-in-production-agentic-systems)
+  - Observability stack (metrics, logs, traces, events)
+  - Aagam Mitra's current observability
+  - Building observability at scale (dashboards, distributed tracing, logging, alerting, debugging, incident response)
+  - Roadmap
+
+### [PART 4: GOVERNANCE & OBSERVABILITY](#part-4-governance--observability)
+- [Q9: Balancing cost and quality in LLM-powered systems](#question-9-how-do-you-balance-cost-and-quality-in-llm-powered-systems)
+  - Cost-quality tradeoff
+  - Optimization strategies (caching, prompt compression, model routing, batching, token optimization, RAG efficiency, monitoring)
+  - Aagam Mitra cost analysis & reduction opportunities
+- [Q10: Testing and validation of agentic systems](#question-10-how-do-you-approach-testing-and-validation-of-agentic-systems)
+  - Testing challenge: Agents aren't deterministic
+  - Testing strategy (intent routing, tool functionality, end-to-end loops, answer quality, retrieval quality, security, manual review, A/B testing)
+  - Aagam Mitra's current testing & improvements
+
+### [PART 5: MEMORY ARCHITECTURES IN AGENTIC SYSTEMS](#part-5-memory-architectures-in-agentic-systems)
+- [Q11: Designing memory layers in agentic systems](#question-11-how-do-you-design-memory-layers-in-agentic-systems-what-information-flows-between-them)
+  - 4-layer memory architecture
+  - Layer 1: Short-term memory (working memory)
+  - Layer 2: Conversational memory (session memory)
+  - Layer 3: Semantic memory (knowledge base)
+  - Layer 4: Episodic memory (audit trail)
+  - How layers interact during execution
+  - Memory layer tradeoffs at scale
+  - What JPMC would add
+
+---
+
 # PART 1: AGENTIC DESIGN PATTERNS
 ## Multi-Agent Systems & Autonomous Orchestration
 
@@ -2826,13 +2899,14 @@ At enterprise scale:
 
 ## Summary & Interview Tips
 
-This document covers five expert-level domains:
+This document covers five expert-level domains with **11 comprehensive Q&As**:
 
-1. **Agentic Design Patterns** — Router, hierarchical, tool-using, reflection, autonomous patterns (Q1-Q4)
-2. **Advanced RAG** — Retrieval quality metrics (hit rate, NDCG, MRR), freshness strategies (Q5-Q6)
-3. **Enterprise AI Architecture** — Compliance, governance, explainability, scale (Q7-Q8)
-4. **Governance & Observability** — Monitoring, cost optimization, testing strategies (Q9-Q10)
-5. **Memory Architectures** — 4-layer memory design (working, conversational, semantic, episodic), data lifecycle, production patterns (Q11)
+1. **Agentic Design Patterns** — 5 patterns, orchestration decisions, migration strategy (Q1-Q2b)
+2. **Production Reliability** — Failure handling, hallucinations, scaling (Q3-Q4)
+3. **Advanced RAG** — Retrieval quality metrics, knowledge freshness (Q5-Q6)
+4. **Enterprise Governance** — Compliance, observability, monitoring (Q7-Q8)
+5. **Cost & Quality Optimization** — LLM cost strategies, testing validation (Q9-Q10)
+6. **Memory Architecture** — 4-layer memory design, data lifecycle, production patterns (Q11)
 
 ### Key Takeaways for Your Interview:
 
