@@ -229,6 +229,206 @@ At JPMC scale, you'd likely implement:
 
 ---
 
+### Question 2b: Aagam Mitra's LangGraph Migration Story: When We'd Switch
+
+> **Why asked:** This is the critical narrative question. Interviewers don't just want "why custom now?" They want "when would we migrate?" This shows you think about technical evolution, not dismissing frameworks. It also proves you understand LangGraph's actual value.
+
+#### Current State: Why Custom Works Today
+
+Aagam Mitra's agent loop is **~40 lines of Python**. Simple and sufficient:
+- Intent detection via regex patterns (fast, deterministic)
+- Sequential or parallel agent routing (explicit with `asyncio.gather()`)
+- Basic tool-calling loop (no complex state management)
+- No conditional branching (no "if confidence < 0.5, try different strategy")
+
+**Cost of adding LangGraph:** Abstractions (planners, graph nodes, state machines) we don't need yet. It's overkill for our current domain.
+
+**This mindset is correct:** Choose the simplest tool that solves your problem.
+
+---
+
+#### Trigger #1: Multi-Step Reasoning with Conditional Branching
+
+**Scenario:** User asks "Plan my temple visit for next month."
+
+Agent needs:
+1. Check events for next month
+2. **IF** no suitable events → suggest alternatives
+3. **IF** events found → check user calendar
+4. **IF** conflicts → propose different dates
+5. **IF** no conflicts → book + create itinerary
+
+This is **conditional logic**, not just sequential tools.
+
+**Custom approach breaks:**
+```python
+# Current—doesn't handle branching:
+if "planning" in intents:
+    events = await community_agent.run("What events next month?")
+    # Now what? No way to conditionally route to booking_agent based on events
+```
+
+**LangGraph shines here:**
+```python
+# LangGraph—native conditional logic:
+def should_suggest_alternatives(state):
+    return len(state.events) == 0  # Branch point
+
+events_node → (check if empty) → suggest_alternatives_node
+                              → book_if_available_node
+```
+
+**Migration trigger:** When we need conditional branching, adopt LangGraph.
+
+---
+
+#### Trigger #2: Streaming Responses to UI
+
+**Scenario:** User on slow connection waits for agent (2-3 seconds). What if we streamed intermediate steps?
+
+```
+User: "Book Shantidhara and explain significance"
+
+[Real-time streaming]
+→ "Checking availability..." (instantly)
+→ "Found 3 slots" (100ms)
+→ "Searching scripture..." (200ms)
+→ "Retrieved 8 passages" (400ms)
+→ "Synthesizing answer..." (600ms)
+→ "Complete: [full response]" (1200ms)
+```
+
+**Custom approach:** No native streaming. We'd manually emit WebSocket events from each step — boilerplate-heavy.
+
+**LangGraph shines:** Streaming is first-class. Graph automatically emits events at each node transition.
+
+**Migration trigger:** When we need real-time streaming to UI, adopt LangGraph.
+
+---
+
+#### Trigger #3: Human-in-the-Loop Approval
+
+**Scenario:** User donates ₹100,000. Temple policy: donations > ₹50,000 require admin approval.
+
+Agent needs:
+1. Validate donation amount
+2. If > ₹50,000 → pause and ask: "Requires approval. Continue?"
+3. Wait for human response
+4. If approved → execute donation
+5. If rejected → cancel
+
+**Custom approach breaks:** No pause mechanism. We'd build custom state management — complex and error-prone.
+
+**LangGraph shines:** Nodes can pause and wait for human input before proceeding.
+
+```python
+# LangGraph:
+def validation_node(state):
+    if state.amount > 50000:
+        return {"needs_approval": True, "paused": True}  # Pause execution
+
+donation_node → validation_node → (pause: wait for human) → execute_node
+```
+
+**Migration trigger:** When we need mid-execution human approval, adopt LangGraph.
+
+---
+
+#### Trigger #4: Agent Hierarchies (Agents Calling Agents)
+
+**Scenario:** As we scale, single agents can't handle all temple operations. We need sub-agents:
+
+- **Finance Agent**
+  - Sub-agent: Transaction validation
+  - Sub-agent: Fraud detection
+  - Sub-agent: Reconciliation
+  
+- **Community Agent**
+  - Sub-agent: Content moderation
+  - Sub-agent: Sentiment analysis
+
+Agents need to call other agents and wait for results.
+
+**Custom approach breaks:** We'd manually orchestrate agent-to-agent calls. State flows become messy (does A wait for B? What if C fails?).
+
+**LangGraph shines:** State graphs naturally express agent hierarchies.
+
+```python
+# LangGraph:
+main_orchestrator_node
+  ├─ finance_agent_node
+  │   ├─ transaction_validation_sub_agent
+  │   ├─ fraud_detection_sub_agent
+  │   └─ reconciliation_sub_agent
+  ├─ community_agent_node
+  └─ synthesis_node (combines results)
+```
+
+**Migration trigger:** When we need agent-calling-agent hierarchies, adopt LangGraph.
+
+---
+
+#### Trigger #5: Complex State Audit & Session Persistence
+
+**Scenario:** For JPMC compliance, we need:
+1. Track every decision and what led to it
+2. Persist state across crashes (user starts query → system crashes → user resumes)
+3. Replay entire reasoning trace for regulatory audits
+
+**Custom approach:** We'd build custom serialization, versioning, and replay logic — lots of boilerplate.
+
+**LangGraph shines:** State is explicit. Graph execution is fully trackable and replayable.
+
+```python
+# LangGraph:
+state = {
+    "user_id": "usr_123",
+    "query": "Book Shantidhara...",
+    "nodes_visited": ["routing", "booking_check", "approval", "execution"],
+    "reasoning_trace": [...],
+    "final_answer": "..."
+}
+
+# After each node:
+db.save(state, trace_id="trace_xyz789")
+
+# If crash:
+state = db.load("trace_xyz789")  # Resume from exact point
+```
+
+**Migration trigger:** When we need complex audit trails and session persistence, adopt LangGraph.
+
+---
+
+#### The Migration Matrix
+
+| Requirement | Custom OK? | LangGraph Value |
+|---|---|---|
+| Simple sequential agents | ✅ Yes | ❌ Overkill |
+| Conditional branching | ❌ No | ✅ Native |
+| Streaming to UI | ❌ No | ✅ First-class |
+| Human-in-the-loop pausing | ❌ No | ✅ Native pause/resume |
+| Agent hierarchies | ❌ No | ✅ Graph structure |
+| Complex audit & replay | ❌ No | ✅ Built-in |
+
+**Aagam Mitra today:** All "Yes" ✅ → Custom is correct choice
+**Aagam Mitra at JPMC scale:** Multiple "No" ❌ → LangGraph is necessary
+
+---
+
+#### The Interview Narrative
+
+**Strong answer:**
+> "We use a custom 40-line agent loop because it's optimal for our current domain — simple routing, sequential/parallel execution, no branching. But I'm very aware of LangGraph. If we added multi-step reasoning with conditional logic, or human-in-the-loop approvals for high-value transactions, or agent-calling-agent hierarchies, or complex compliance audit requirements — we'd immediately migrate to LangGraph. The decision isn't 'LangGraph is bad,' it's 'LangGraph is overkill for our current complexity.' We'd re-evaluate this at each scale inflection."
+
+**Why it works:**
+- Shows you evaluated critically (not defaulting to custom)
+- Demonstrates deep LangGraph knowledge (specific use cases)
+- Indicates architectural thinking (evolution, not just current state)
+- Suggests sound tool selection judgment at different scales
+
+---
+
 ### Question 3: How do you handle agent failures, hallucinations, and timeout edge cases?
 
 > **Why asked:** This is a reliability question. Interviewers ask this because in production, things WILL fail. An LLM will hallucinate. A tool call will timeout. A dependency service will be down. Knowing how you handle these cases separates prototype code from production code. This is especially important at JPMC, where financial decisions depend on reliability.
