@@ -299,3 +299,109 @@ For bookings and temple operations, the AI can actually take actions — it chec
 - Response time: ~2 seconds
 - Accuracy improvement: 25% hallucination → 2% with our RAG approach
 - Scale: 5 backend services, 4 AI agents, 12 live data tools
+
+---
+
+## 11. An AI agent is about to go live. 1% of its responses violate company policy. Ship it?
+
+> **Why asked:** This tests your judgment on shipping vs. delaying — something the interviewer will care about way more than technical acumen. The "right" answer is not a single yes/no but a decision framework tied to consequence severity. Engineers who default to "ship it, we'll monitor" show risk-blindness. Those who understand tradeoffs show maturity.
+
+**The decision depends on consequence severity:**
+
+```
+FINANCIAL/LEGAL risk (booking, payment, approval):
+  ✗ Do not ship
+  1% violation on 1M queries = 10K bad bookings
+  Risk = refunds + disputes + legal + compliance audit
+  
+  Action: Canary at 0.1%, measure for 24h
+           If zero violations: → 1% for 48h
+           If any violation: → investigate + delay shipping
+
+REPUTATIONAL risk (messaging, content, brand voice):
+  ~ Conditional
+  1% violation = 1% of users see wrong message/tone
+  Risk = social media criticism, trust loss
+  
+  Action: Canary at 5%, collect sentiment for 48h
+          If users don't complain: → roll forward
+          If negative feedback: → rollback + fix
+
+INFORMATIONAL risk (scripture answer, search suggestion):
+  ✓ Can ship
+  1% wrong answer is recoverable (user can ask again, check source)
+  Risk = minor (user reads wrong scripture, realizes it's wrong, re-asks)
+  
+  Action: Ship to 100% with monitoring
+          Watch error rate for 7 days
+          If spikes above 2%: → auto-rollback + alert
+```
+
+**For Aagam Mitra — agent-by-agent gates:**
+
+```python
+AGENT_RISK_PROFILE = {
+    "scripture_agent": {
+        "consequence": "INFORMATIONAL",  # no binding action
+        "canary_percentage": 10,
+        "max_violation_rate": 0.02,  # 2%
+        "stakeholder_approval": False,
+        "rollback_trigger": "violation_rate > 0.03",  # auto-rollback at 3%
+    },
+    
+    "booking_agent": {
+        "consequence": "FINANCIAL",  # booking = money + commitment
+        "canary_percentage": 0.1,  # 0.1% of users
+        "max_violation_rate": 0.001,  # 0.1%
+        "stakeholder_approval": True,  # ← Finance Committee approval required
+        "rollback_trigger": "any_violation",  # one bad booking = rollback
+    },
+    
+    "broadcast_agent": {
+        "consequence": "LEGAL",  # messages go to all users + audit trail
+        "canary_percentage": 1,
+        "max_violation_rate": 0.005,  # 0.5%
+        "stakeholder_approval": True,  # ← Temple Board approval required
+        "rollback_trigger": "violation_rate > 0.01 OR legal_flag_raised",
+    },
+}
+
+async def deployment_gate(agent_name, measured_violation_rate):
+    config = AGENT_RISK_PROFILE[agent_name]
+    
+    # Gate 1: Stakeholder approval
+    if config["stakeholder_approval"]:
+        approval = await get_approval()  # blocks until human approves
+        if not approval:
+            return BLOCK("Awaiting stakeholder approval")
+    
+    # Gate 2: Violation rate acceptable?
+    if measured_violation_rate > config["max_violation_rate"]:
+        return BLOCK(f"Measured {measured_violation_rate}% exceeds {config['max_violation_rate']}%")
+    
+    # Gate 3: Deploy to canary
+    await deploy_to_percentage(config["canary_percentage"])
+    
+    # Gate 4: Monitor for rollback trigger
+    await monitor_until_trigger_or_success(
+        trigger=config["rollback_trigger"],
+        duration=hours(24) if config["consequence"] == "FINANCIAL" else hours(4),
+    )
+    
+    return SHIP("All gates passed, rolling forward")
+```
+
+**Why 1% still isn't trivial:**
+
+```
+Scenario: 1M temple devotees, 3 queries/user/month = 3M queries
+- 1% violation = 30K bad responses
+- Each bad response might affect 2-3 users = 60-90K devotees
+- Even if "only 1% are wrong," the absolute number is massive
+
+For temple: 30K incorrect scripture answers could damage credibility permanently
+For company: Shipping without understanding consequences is negligence
+```
+
+**The right answer:**
+"It depends on what the violations are. If they're scripture facts (recoverable by asking again), I'd canary at 10% with monitoring. If they're financial actions (bookings), I'd not ship — I'd canary at 0.1%, require Finance approval, and rollback on any violation. If they're broadcast messages (compliance), I'd require Board approval and wouldn't ship above 0.5% violation rate. The principle: consequence severity determines gate conservatism, not the violation percentage alone."

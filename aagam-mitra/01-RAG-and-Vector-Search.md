@@ -856,3 +856,482 @@ This is production thinking: how do you change systems that can't afford downtim
 | **Rollback safety** | Pray it works | Canary + A/B testing + instant rollback | Q13 (gaps) |
 
 ---
+
+## 19. How do you preserve table structure when chunking PDFs?
+
+> **Why asked:** Most basic RAG systems flatten PDFs into text, losing all structure. Tables are the killer case — if a cell contains the answer, naive chunking breaks it across boundaries and retrieval fails. This question separates engineers who've only read about RAG from those who've shipped it against real documents. The answer shows you know structured data extraction and when to apply it.
+
+**The problem:** A 10-row table with the answer in row 14, column 3.
+
+```
+Naive chunking:
+Chunk 1: "Row 1-5 of table... [chars 0-800]"
+Chunk 2: "[overflow] Row 6-10... Row 14 Cell 1..."
+Chunk 3: "Row 14 Cell 2... Row 14 Cell 3 (ANSWER) Row 15..."
+
+Query: "What is the value in row 14, column 3?"
+→ Retrieves chunks 2 and 3
+→ Context is split across two chunks, either misses the cell or sees it fragmented
+→ LLM struggles to construct the full cell value
+```
+
+**Solution 1: Detect tables and preserve structure**
+
+```python
+import pdfplumber
+
+def extract_from_pdf_smart(pdf_path):
+    chunks = []
+    
+    with pdfplumber.open(pdf_path) as pdf:
+        for page_num, page in enumerate(pdf.pages):
+            # Extract tables separately
+            tables = page.extract_tables()
+            text = page.extract_text()
+            
+            if tables:
+                # Keep each table as ONE atomic chunk — never split
+                for table in tables:
+                    table_md = _format_table_as_markdown(table)
+                    chunks.append({
+                        "text": table_md,
+                        "page": page_num,
+                        "type": "table",  # ← metadata for later filtering
+                        "table_rows": len(table),
+                        "table_cols": len(table[0]) if table else 0,
+                    })
+            
+            # Extract non-table text normally
+            non_table_text = _remove_table_text(text, tables)
+            if non_table_text.strip():
+                chunks.extend(_chunk_text(non_table_text, chunk_size=800))
+    
+    return chunks
+
+def _format_table_as_markdown(table):
+    """Convert table to markdown — preserves structure in text."""
+    lines = ["| " + " | ".join(row) + " |" for row in table]
+    return "\n".join(lines)
+```
+
+**Solution 2: Use metadata to rank table chunks higher**
+
+```python
+async def rerank_results_favor_tables(query, results):
+    """If query looks like 'row X column Y', boost table chunks."""
+    
+    if re.search(r"row|column|cell|table|row \d+|column \d+", query, re.IGNORECASE):
+        # User is asking about structure — prioritize table chunks
+        table_results = [r for r in results if r.metadata.get("type") == "table"]
+        text_results = [r for r in results if r.metadata.get("type") != "table"]
+        
+        return table_results + text_results
+    
+    return results  # default: mixed order
+```
+
+**Solution 3: For Aagam Mitra specifically — tables are rare**
+
+Jain scripture is primarily prose. But if temple operations add schedules or fee tables, ensure they're treated atomically:
+
+```python
+# Config in Aagam Mitra:
+PRESERVE_TABLE_CHUNKS = True  # ← admin can toggle
+MAX_TABLE_CHUNK_SIZE = None   # ← never split tables, no matter the size
+
+# When ingesting temple data (fees, schedules, seating charts):
+if detect_table(text):
+    chunk_size = None  # atomic — use whole thing
+else:
+    chunk_size = 800   # normal chunking
+```
+
+**Why this matters:**
+- Table queries are common in production (fees, schedules, seating)
+- One split table = one corrupted answer = one user complaint
+- Fixing after the fact requires re-ingestion
+- The cost of doing this right (one line of config) is zero
+
+---
+
+## 20. How does HNSW find 10 nearest neighbors from 100M embeddings without comparing all of them?
+
+> **Why asked:** This is a classic algorithmic interview question that also tests real-world knowledge. Many engineers know HNSW is "the index Pinecone uses" but can't explain *how* it's fast. The answer reveals whether you understand the speed/accuracy tradeoff and why it matters for production scale. Bonus: Explains why deleting old vectors can be expensive (graph restructuring).
+
+**The naive approach (brute force):**
+- Compare query vector against all 100M vectors = 100M similarity calculations
+- Sort by distance, return top 10
+- **Time: O(n)** — unacceptable at 100M scale
+
+**HNSW: Hierarchical Navigable Small World**
+
+```
+Think of it like a city with multilevel highways:
+
+Ground level: All 100M nodes, connected to ~10 nearest neighbors each
+↓
+Level 1:    10M nodes (subset), each connected to ~10 neighbors
+↓
+Level 2:    1M nodes, each connected to ~10 neighbors
+↓
+Level 3:    100K nodes, each connected to ~10 neighbors
+↓
+Entry:      1 single node at the top
+```
+
+**Query process:**
+
+```
+1. Start at entry node (Level 3, just 1 node)
+2. Greedy search at Level 3: Check ~20 nodes to find 1 closest neighbor
+   Cost: ~20 comparisons, not 100M
+   
+3. Move down to Level 2: Start from Level 3's closest neighbor
+   Greedy search: ~20 comparisons
+   
+4. Move down to Level 1: ~20 comparisons
+   
+5. Move to ground level: Do detailed search among ~100 candidates
+   → Find exact top 10
+
+Total comparisons: ~20 + ~20 + ~20 + 100 = ~160 comparisons
+(instead of 100M)
+```
+
+**Why it's fast:**
+- Early levels are *coarse* — quick approximate routing
+- Later levels are *fine* — accurate search among nearby candidates
+- **Total: O(log n)** search cost, not O(n)
+
+**The accuracy tradeoff:**
+```
+HNSW parameter `ef_construction`:
+- ef_construction=200 (high) → slower to build, very accurate retrieval
+- ef_construction=50 (low) → faster to build, ~95% recall
+
+Aagam Mitra uses: ef_construction=128 (balanced)
+This means: 2-3% of ideal answers might be just outside top-8
+But 160x faster than brute force for the 97% we find
+```
+
+**Why deletion is expensive:**
+```
+Deleting a vector from HNSW doesn't just remove it — the graph structure
+might break paths. Example:
+
+Level 1: Node A → B → C → D
+If B is deleted:
+    A → ?? → D
+
+HNSW rebuilds local connections:
+    A → (find new nearest) → C or E → D
+
+This is why:
+- Adding vectors to Pinecone is fast (append mode)
+- Deleting old temple data requires re-indexing nearby vectors
+- Bulk deletes (like "remove all old scripture versions") can spike latency
+```
+
+**Practical for Aagam Mitra:**
+```python
+# Pinecone config in production:
+{
+    "metric": "cosine",         # similarity function
+    "index": "hnsw",            # hierarchical small world
+    "ef_construction": 128,     # build time vs accuracy
+    "ef_search": 160,           # query time accuracy (higher = more accurate, slower)
+    "max_connections": 16,      # neighbors per node (higher = more accurate, more memory)
+}
+
+# If retrieval accuracy drops (low Recall@K):
+# → increase ef_search = more thorough per-level search
+# → increase ef_construction for new chunks = better index structure
+
+# If Pinecone latency spikes:
+# → check for bulk delete operations (graph rebuilding)
+# → reduce ef_search temporarily = faster but less accurate
+```
+
+---
+
+## 21. Your LLM bill is $2000/month. How would you cut it in half?
+
+> **Why asked:** Cost optimization separates builders from engineers who've run production systems. The interviewer wants to see you think about: (1) per-query cost (Groq is cheaper than OpenAI), (2) token efficiency (shorter prompts, cached history), (3) smarter routing (don't call LLM for simple queries), (4) batching (cheaper per-token at volume). Showing you've thought about all four signals deep systems thinking.
+
+**Current cost breakdown (Aagam Mitra):**
+
+```
+100,000 users × ~3 queries/user/month = 300K queries
+Groq cost: $0.11/M input tokens + $0.11/M output tokens
+
+Per query average:
+- System prompt: 500 tokens
+- Context (8 passages): 2000 tokens
+- History (8 turns): 1500 tokens
+- User question: 100 tokens
+- Total input: ~4100 tokens
+
+- LLM response: ~300 tokens
+- Total output: 300 tokens
+
+Cost per query: (4100 + 300) × $0.11 / 1M = $0.0005 = $0.5/1000 queries
+
+If using OpenAI GPT-4o:
+- Cost per query: (4100 + 300) × $5 / 1M = $0.02 = $20/1000 queries
+- 40x more expensive
+```
+
+**Strategy 1: Trim token count (immediate savings: 20%)**
+
+```python
+# Current: Send full 8 turns of history
+# Better: Send only last 2 turns (4 messages)
+history_to_send = history[-4:]  # not history[-16:]
+
+# Current: All system prompt rules
+# Better: Only active rules for this agent
+def get_system_prompt(agent_type, user_role):
+    base = SECURITY_HARDENED_RULES  # always
+    if agent_type == "scripture":
+        base += SCRIPTURE_AGENT_RULES
+    else:
+        base += OTHER_RULES[agent_type]
+    return base
+
+# Result: 
+# Before: 500 token system + 1500 token history = 2000 overhead
+# After:  350 token system + 600 token history = 950 overhead
+# Savings: ~1000 tokens/query = 20% cost reduction
+```
+
+**Strategy 2: Smart routing (30-40% savings)**
+
+```python
+def should_use_llm(user_query):
+    """Not every query needs an LLM call."""
+    
+    # Simple FAQ queries → template response (0 LLM cost)
+    if re.search(r"what is navakar|what is mahamantra", user_query, re.IGNORECASE):
+        return False, HARDCODED_ANSWERS["navakar"]
+    
+    # Booking queries that don't need RAG → direct tool call
+    if re.search(r"book.*shantidhara|check availability", user_query):
+        return False, await direct_tool_call("get_slots")
+    
+    # FAQ-like but still needs freshness → retrieve from DB, no LLM
+    if re.search(r"temple hours|contact|address", user_query):
+        return False, await query_temple_db()
+    
+    # Truly complex → use LLM
+    return True, None
+
+# Metrics:
+# 40% of queries are simple FAQ/booking
+# Each simple query saves: $0.0005 per query
+# 300K queries × 40% × $0.0005 = $60/month savings
+
+# Plus: Faster response time (no LLM latency)
+```
+
+**Strategy 3: Prompt caching (50% savings on repeated contexts)**
+
+```python
+# Groq doesn't offer caching yet, but here's the pattern for OpenAI:
+
+messages = [
+    {
+        "role": "system",
+        "content": [
+            {"type": "text", "text": SECURITY_HARDENED_RULES},
+            {"type": "text", "text": SCRIPTURE_AGENT_RULES, 
+             "cache_control": {"type": "ephemeral"}},  # ← cache this
+        ]
+    },
+    {
+        "role": "user",
+        "content": [
+            {"type": "text", "text": user_question},
+            {
+                "type": "text",
+                "text": f"Context: {retrieved_passages}",
+                "cache_control": {"type": "ephemeral"},  # ← cache this too
+            }
+        ]
+    }
+]
+
+response = await groq_client.post(..., messages=messages)
+
+# Benefit:
+# First call: Full cost (4100 tokens)
+# Follow-up call with same context: 90% cheaper (only output tokens charged)
+# If 10% of queries reuse same context: 5-10% savings
+```
+
+**Strategy 4: Batch inference (20% savings)**
+
+```python
+# Instead of 1 LLM call per user query (real-time):
+# Collect queries for 60 seconds, batch them
+
+class BatchQueue:
+    def __init__(self, batch_size=50, batch_timeout=60):
+        self.queue = []
+        self.batch_size = batch_size
+        self.batch_timeout = batch_timeout
+    
+    async def add(self, query_context):
+        self.queue.append(query_context)
+        
+        if len(self.queue) >= self.batch_size or (
+            self.queue and time.time() - self.queue[0]["timestamp"] > self.batch_timeout
+        ):
+            await self.process_batch()
+    
+    async def process_batch(self):
+        # Send 50 queries in one API call = cheaper per-token rate
+        # Groq: 1 API call for 50 queries vs 50 API calls
+        # Estimated: 15% cheaper due to batch efficiency
+        pass
+```
+
+**Combined impact:**
+
+```
+Baseline: $2000/month
+
+Strategy 1 (trim tokens):        -20% = -$400
+Strategy 2 (smart routing):       -30% = -$600
+Strategy 3 (caching):             -10% = -$200
+Strategy 4 (batching):            -15% = -$300
+
+Total: $2000 - $1500 = $500/month (75% reduction!)
+
+Most realistic (without batching):
+Strategies 1+2+3 = $2000 - $1100 = $900/month (55% reduction)
+```
+
+**For Aagam Mitra right now:**
+- Immediately: Implement Strategy 2 (FAQ routing) = 30% savings, no latency cost
+- Next sprint: Trim prompts (Strategy 1) = another 20%
+- When scale hits: Add caching + batching
+
+---
+
+## 22. An AI agent is about to go live. 1% of its responses violate company policy. What would you do?
+
+> **Why asked:** This is the classic production readiness trap. Many engineers would say "ship it — 1% is acceptable." But the question is testing your judgment: (1) Who owns the risk? (2) What defines "1%"? (3) What's your gate for shipping? This answer separates risk-aware engineers from those who default to shipping. The best answer is not a single choice — it's a decision framework.
+
+**The trap:** 1% sounds small until you do the math.
+
+```
+If the agent handles 1M queries/month:
+- 1% violation = 10,000 bad responses
+- If each violation affects 2 users = 20,000 users damaged
+
+1% is NOT acceptable for:
+- Financial actions (booking, payment approval)
+- Legal/compliance statements (advice, terms)
+- Safety-critical actions (medical guidance, crisis support)
+- Reputational damage (customer-facing messaging)
+
+1% IS acceptable for:
+- Search suggestions ("did you mean...?")
+- UI personalization (content ranking)
+- Non-binding recommendations
+```
+
+**Decision framework:**
+
+```
+STEP 1: Classify the violation
+┌─────────────────────────────────────────┐
+│ Policy Violation Type                   │
+└─────────────────────────────────────────┘
+
+If FINANCIAL (booking, payment, approval):
+  ✗ Ship? Absolutely not. Risk = $fraud + legal liability
+  → Deploy only to 0.1% of users (canary)
+  → Monitor 24h
+  → If zero violations: roll to 1%, then 5%, then 100%
+  → If any violation: investigate + fix before broader rollout
+
+If REPUTATIONAL (messaging, claims, brand voice):
+  ~ Maybe. Risk = customer trust
+  → Deploy to 5% (canary)
+  → Collect user feedback for 48h
+  → If sentiment stays positive: roll forward
+  → If negative: rollback
+
+If COMPLIANCE (legal/regulatory):
+  ✗ Ship? Depends on legal opinion
+  → Get explicit sign-off from Legal before canary
+  → Deploy to 1%, measure violations closely
+  → Document every violation for audit
+  → If violations exceed 0.5%: rollback + fix
+
+If LOW-RISK (suggestions, non-binding advice):
+  → Can ship to 100% with logging
+  → Monitor for 7 days
+  → If issues appear: quick rollback
+```
+
+**For Aagam Mitra specifically:**
+
+```python
+class AgentSafetyGate:
+    """Decision matrix for shipping Aagam Mitra agents."""
+    
+    SHIP_GATES = {
+        "scripture_agent": {
+            "action_type": "INFORMATIONAL",  # not binding
+            "rollback_cost": "reputational only",
+            "canary_pct": 5,
+            "max_acceptable_violation_rate": 0.02,  # 2%
+            "requires_approval": False,
+        },
+        "booking_agent": {
+            "action_type": "FINANCIAL",
+            "rollback_cost": "high (refunds, disputes)",
+            "canary_pct": 0.1,  # 0.1% of bookings
+            "max_acceptable_violation_rate": 0.001,  # 0.1%
+            "requires_approval": True,  # ← Temple Finance approval required
+        },
+        "notification_agent": {
+            "action_type": "BROADCAST",
+            "rollback_cost": "reputational + legal",
+            "canary_pct": 1,
+            "max_acceptable_violation_rate": 0.005,  # 0.5%
+            "requires_approval": True,  # ← Temple Board approval required
+        },
+    }
+    
+    async def can_ship(agent_name, violation_rate):
+        config = self.SHIP_GATES[agent_name]
+        
+        # Check 1: Does it need approval?
+        if config["requires_approval"]:
+            approval = await get_approval_from_stakeholders()
+            if not approval:
+                return False, "Awaiting approval from Temple Finance/Board"
+        
+        # Check 2: Is violation rate acceptable?
+        if violation_rate > config["max_acceptable_violation_rate"]:
+            return False, f"Violation rate {violation_rate}% exceeds {config['max_acceptable_violation_rate']}%"
+        
+        # Check 3: Deploy to canary first
+        return True, f"Deploy to {config['canary_pct']}% canary, monitor 24h"
+
+# Usage:
+result = await gate.can_ship("booking_agent", violation_rate=0.5)
+if result[0]:
+    print(result[1])  # "Deploy to 0.1% canary, monitor 24h"
+else:
+    print(result[1])  # "Violation rate 0.5% exceeds 0.1%"
+```
+
+**The right answer to this question:**
+
+"It depends on the type of response. For a scripture answer (informational), 1% might be acceptable with monitoring. For a booking confirmation, 1% is unacceptable — I'd canary at 0.1%, measure violations closely, and rollback if we see even a 0.5% rate. I'd also get stakeholder approval before shipping anything with financial or legal consequences. The gate is: What's the cost if this agent fails? That determines how conservative we need to be."
+
+---
