@@ -491,3 +491,368 @@ await store_chunks(new_chunks, embeddings)
 This means even if the sync runs every 5 minutes, Gemini API is only called when content actually changes — not on every sync tick.
 
 ---
+
+## 13. What's missing from Aagam Mitra to make it production-ready?
+
+> **Why asked:** This is a maturity question. Interviewers use it to separate "I built something that works" from "I built something that scales, doesn't break, and you can debug when it does." They want to see self-awareness: what guardrails do we lack? What would we add with more time? What do we monitor?
+
+**Comparison: Aagam Mitra today vs production-grade system**
+
+| Capability | Aagam Mitra (current) | Production-ready system (diagram above) | Gap |
+|---|---|---|---|
+| **Security** | 4-layer input validation + RBAC | ✓ + stress testing suite (biased opinion, prompt injection, info evasion) | No adversarial testing automation |
+| **Agents** | 4 specialist agents | ✓ + multi-agent orchestration | ✓ We have this |
+| **Validation** | None (we hope it works) | Gatekeeper (approval gate), Auditor (compliance), Strategist (routing) | No human-in-the-loop approval for high-stakes actions |
+| **Evaluation** | No LLM quality scoring | LLM Judges, Precision/Recall metrics, Latency/Cost monitoring | No automated quality assessment, cost tracking |
+| **Data processing** | Basic chunking (800 chars) | Structure-aware chunking + metadata extraction + re-structuring | No semantic structure extraction (headings, tables, etc.) |
+| **Vector DB** | Pinecone only | Pinecone + metadata enrichment + reranking | No metadata for filtering/ranking |
+| **Feedback** | One-way (user → chat) | Feedback loop: evaluation → re-rank → agent retry | No iterative improvement signal |
+| **Monitoring** | None | Latency, cost, hallucination rate, user satisfaction tracked | Blind to what's breaking |
+| **Deployment** | Single instance | ✓ + canary deployments, A/B testing, rollback strategy | No gradual rollout safety |
+
+**The core gaps:**
+
+1. **No adversarial testing** — we haven't tried to break the system systematically (creative prompt injection, contradictory context, misleading instructions)
+2. **No quality gates** — every response goes to the user; no "this is too uncertain to send" decision
+3. **No LLM-as-judge** — we don't score our own answers for hallucination, faithfulness, or relevance
+4. **No metadata extraction** — we chunk blindly; we don't extract "this is a definition", "this is a rule", "this is an example"
+5. **No cost tracking** — we don't know which queries are expensive; no budgeting or quota enforcement
+6. **No human loop for high-stakes** — booking a slot goes through unchanged; no approval for risky actions
+7. **No observability** — no dashboards for latency, error rates, user satisfaction
+8. **No rollout safety** — deploying new RAG chunks or new agents = instant risk to all users
+
+---
+
+## 14. How would you add LLM-as-judge evaluation to Aagam Mitra?
+
+> **Why asked:** This separates builders from engineers. Building a feature is one thing; knowing whether the feature works is a higher bar. LLM-as-judge is the practical answer to "does my RAG actually reduce hallucination?" Interviewers want to see you can instrument your own system.
+
+**The pattern:**
+
+```python
+async def evaluate_response(question: str, response: str, retrieved_passages: list[str]) -> dict:
+    """
+    Use an LLM to score our own answer for:
+    - Faithfulness: does the answer contradict any retrieved passage?
+    - Relevance: does it actually answer the question?
+    - Hallucination: are there facts not in the passages?
+    - Confidence: should we send this to the user?
+    """
+    
+    evaluation_prompt = f"""
+    Question: {question}
+    Retrieved passages: {json.dumps(retrieved_passages)}
+    Our answer: {response}
+    
+    Score on a scale 1-5:
+    1. Faithfulness (1=contradicts passages, 5=grounded in passages)
+    2. Relevance (1=off-topic, 5=directly answers)
+    3. Hallucination risk (1=high fabrication, 5=purely from passages)
+    
+    If any score < 3, suggest why and what to do (retry search? different agent? block?).
+    Return as JSON.
+    """
+    
+    scores = await groq.chat(
+        messages=[{"role": "user", "content": evaluation_prompt}],
+        temperature=0.1,  # ← deterministic scoring
+        response_format="json",
+    )
+    
+    return {
+        "faithfulness": scores.faithfulness,
+        "relevance": scores.relevance,
+        "hallucination_risk": scores.hallucination_risk,
+        "action": "send" if all(s >= 3 for s in scores.values()) else "retry",
+    }
+```
+
+**Where it fits in Aagam Mitra:**
+
+```
+ScriptureAgent generates answer
+    ↓
+Evaluation agent scores it
+    ↓
+If confidence < threshold:
+  - Retry with better search query
+  - Or block and tell user "I'm not confident enough"
+    ↓
+If confidence >= threshold:
+  - Send to user
+  - Log scores for monitoring
+```
+
+**Cost/latency tradeoff:**
+
+| Option | Cost | Latency | Use case |
+|---|---|---|---|
+| No evaluation | ✓ Cheap | ✓ Fast | Dev/testing |
+| Evaluate 10% of answers | ✓✓ ~10% more | ✓✓ Minimal | Sampling for metrics |
+| Evaluate all answers | ✗ 2× cost | ✗ +500ms | High-stakes (bookings) or financial decisions |
+| Evaluate only low-confidence | ✓ Cheap | ✓ Fast | Best for RAG — retry when uncertain |
+
+**We'd use:** Evaluate only low-confidence responses (those where Groq's internal uncertainty is high) — gives us safety gates without doubling latency.
+
+---
+
+## 15. What metadata should we extract during chunking to improve production quality?
+
+> **Why asked:** The diagram shows "metadata creation" as a separate step. Metadata enriches every chunk so we can filter, rank, and explain better. Interviewers want to see you think beyond "text + vector" to "text + vector + meaning".
+
+**Current chunking (naive):**
+
+```python
+chunks = [
+    {"text": "णमो अरिहंताणं is the opening mantra...", "page": 5},
+    {"text": "The five Paramesthi are Arihanta, Siddha...", "page": 5},
+]
+# Just text and source. That's it.
+```
+
+**Production chunking (with metadata):**
+
+```python
+chunks = [
+    {
+        "text": "णमो अरिहंताणं is the opening mantra...",
+        "page": 5,
+        "section_type": "definition",        ← what is this chunk?
+        "section_title": "Navakar Mantra",   ← what section?
+        "key_concepts": ["mantra", "salutation", "five_paramesthi"],
+        "confidence": 0.95,                  ← how sure are we?
+        "source_type": "scripture",           ← vs. commentary vs. rule
+        "language": "prakrit_hindi_mix",
+        "is_core_teaching": True,            ← is this foundational?
+    },
+    ...
+]
+```
+
+**How metadata improves the system:**
+
+| Metadata | Improvement |
+|---|---|
+| `section_type` | Reranker can boost "definitions" over "examples" when user asks "what is X?" |
+| `key_concepts` | Filter chunks before retrieval (only show "karma" chunks when question mentions karma) |
+| `confidence` | Downrank low-confidence chunks in final scoring |
+| `source_type` | Deprioritize commentary if user wants primary scripture |
+| `is_core_teaching` | Boost foundational concepts; demote obscure edge cases |
+
+**Who extracts it?**
+
+Not manual — use Gemini with a structured extraction prompt:
+
+```python
+extraction_prompt = f"""
+Chunk: {chunk_text}
+
+Extract JSON:
+{{
+  "section_type": "definition" | "rule" | "example" | "story" | "commentary",
+  "key_concepts": [list of 3-5 key terms],
+  "is_core_teaching": true/false,
+  "confidence": 0.0-1.0,
+}}
+"""
+
+metadata = await gemini.extract(extraction_prompt, response_format="json")
+```
+
+Cost: ~1 more API call per chunk at ingest time (one-time). Payoff: 10-20% better relevance + 100% traceable answers (we can say "this is a core teaching" vs "this is an obscure reference").
+
+---
+
+## 16. How would you add a human-in-the-loop gate for high-stakes actions?
+
+> **Why asked:** Production systems don't let AI make irreversible decisions alone. Booking a slot is reversible (user can cancel). But if we added "auto-donate ₹100 when user asks for blessing", that's high-stakes — it needs approval. Interviewers want to see you know the difference.
+
+**The pattern:**
+
+```python
+async def execute_action(agent_result, risk_level="normal"):
+    """
+    risk_level: "normal" | "high" | "critical"
+    """
+    
+    if risk_level == "critical":
+        # Block + ask human (Gatekeeper role)
+        return await gatekeeper.request_approval(
+            action=agent_result.tool_call,
+            reason="Financial action requires approval",
+            timeout_minutes=15,
+        )
+        # If approved in time → execute
+        # If rejected → tell user "Your request was reviewed and declined"
+        # If timeout → tell user "Please contact support"
+    
+    elif risk_level == "high":
+        # Log + audit trail, but execute
+        await auditor.log_sensitive_action(
+            user_id=context.user_id,
+            action=agent_result.tool_call,
+            timestamp=now(),
+        )
+        return await execute_tool(agent_result)
+    
+    else:  # normal
+        # Normal path
+        return await execute_tool(agent_result)
+```
+
+**Risk levels in Aagam Mitra:**
+
+| Action | Risk | Gate |
+|---|---|---|
+| Book Shantidhara slot | High | Log to audit trail (Auditor) |
+| Cancel booking | High | Log to audit trail (Auditor) |
+| Submit membership | High | Log + 24h cooling-off period (Gatekeeper) |
+| Donate ₹100+ | Critical | Require email confirmation (Strategist routes to email service) |
+| Change user permissions (admin only) | Critical | Require 2FA + manager approval (Gatekeeper) |
+| Broadcast push notification (admin only) | Critical | Preview + manual send button (Strategist) |
+
+**Today:** We do none of this. Everything goes through.
+**Production:** Critical actions need approval; high actions are logged for audit.
+
+---
+
+## 17. What observability would you add to production Aagam Mitra?
+
+> **Why asked:** "It works" is not production. "It works and I can see when it breaks" is production. Interviewers want a monitoring/logging strategy, not just code. This is the boring-but-essential part that separates hobby projects from systems people rely on.
+
+**The observability stack (from the diagram):**
+
+```
+Every LLM call → log:
+  - Input (question + context size)
+  - Output (answer + action_cards)
+  - Latency (ms)
+  - Token cost (input + output)
+  - LLM judge scores (faithfulness, relevance, hallucination_risk)
+  - Agent chosen (which agent ran?)
+  - Tool calls made (which tools invoked?)
+  - Whether user rated it 👍 or 👎
+
+Every database operation → log:
+  - Query type (search, insert, sync)
+  - Duration (ms)
+  - Rows affected
+  - Cache hit / miss
+
+Every error → log:
+  - Stack trace
+  - User ID + temple ID
+  - Message that caused it
+  - What we tried to do (for retry logic)
+
+Dashboard metrics:
+  - P50 / P95 / P99 latency (per agent)
+  - Cost per agent per day
+  - Error rate (% of messages that failed)
+  - Average LLM judge scores (hallucination trend)
+  - User satisfaction (👍 ratio)
+  - Cache hit rate (% of temple syncs that hit cache)
+```
+
+**Cheap implementation:**
+
+```python
+async def log_rag_call(question, answer, scores, latency_ms, cost_usd):
+    """Ship logs to a simple database or CSV."""
+    await db.insert("rag_calls", {
+        "timestamp": now(),
+        "user_id": current_user.id,
+        "question_length": len(question),
+        "answer_length": len(answer),
+        "latency_ms": latency_ms,
+        "cost_usd": cost_usd,
+        "faithfulness_score": scores.faithfulness,
+        "hallucination_risk": scores.hallucination_risk,
+        "agent_type": "scripture",  # or temple_ops, etc.
+    })
+
+# Then query it:
+# SELECT AVG(latency_ms) FROM rag_calls
+#        WHERE timestamp > NOW() - INTERVAL 7 DAY
+#        GROUP BY agent_type
+```
+
+This is the difference between "I hope it works" and "I know it works and can see when it starts to fail."
+
+---
+
+## 18. How would you handle schema versioning and metadata migration in production?
+
+> **Why asked:** You start with 800-char chunks, no metadata. Six months later, you add metadata extraction. Now you have 50,000 old chunks without metadata and 10,000 new chunks with metadata. How do you handle that? This separates someone who launched something from someone who maintains it in production.
+
+**The problem:**
+
+```
+Old chunks (no metadata):
+  {id: "chunk_1", text: "...", page: 5}
+
+New chunks (with metadata):
+  {id: "chunk_2001", text: "...", page: 6, section_type: "definition", key_concepts: [...]}
+
+Pinecone query returns a mix → some chunks have metadata filters, some don't → your reranker breaks.
+```
+
+**Solution: Schema versioning with gradual migration**
+
+```python
+class ChunkSchema:
+    VERSION = 2  # increment when schema changes
+    
+    # v1 (old) — minimal
+    # v2 (new) — with metadata
+
+async def ingest_chunk(text, page, schema_version=None):
+    if schema_version is None:
+        schema_version = ChunkSchema.VERSION
+    
+    chunk = {"text": text, "page": page, "schema_version": schema_version}
+    
+    if schema_version >= 2:
+        # Extract metadata for new chunks
+        chunk["metadata"] = await extract_metadata(text)
+    else:
+        # For old chunks retrieved from Pinecone, fill in metadata on-the-fly
+        chunk["metadata"] = await extract_metadata(text)  # lazy enrichment
+    
+    return chunk
+
+# On deploy:
+# - Old chunks stay as-is (schema_version=1)
+# - New chunks get metadata (schema_version=2)
+# - Retrieval layer handles both: if missing metadata, compute it at query time
+# - Background job: gradually re-embed old chunks with new metadata (during off-hours)
+```
+
+**Migration strategy:**
+
+```
+Week 1: Deploy new code with schema_version check
+Week 2-4: New uploads use schema_version=2
+        Old queries compute metadata on-the-fly
+Week 4+: Background job re-embeds old chunks (5% per night)
+        Once complete: old metadata computed at ingest, not query
+```
+
+This is production thinking: how do you change systems that can't afford downtime?
+
+---
+
+## Comparison Table: Current Aagam Mitra vs Production-Ready
+
+| Dimension | Current | Production-Ready | Interview Question |
+|---|---|---|---|
+| **Testing** | Unit tests | Adversarial + unit + integration | Q13 (gaps) |
+| **Quality gates** | None | LLM judges + confidence scores | Q14 (judges) |
+| **Data enrichment** | Raw chunks | Metadata + structure extraction | Q15 (metadata) |
+| **High-stakes actions** | Auto-execute | Human approval gates | Q16 (gatekeeper) |
+| **Observability** | Print logs | Dashboard + metrics + alerts | Q17 (observability) |
+| **Schema evolution** | Rewrite everything | Versioning + gradual migration | Q18 (versioning) |
+| **Cost tracking** | We don't know | Per-agent + per-query + budget alerts | Q17 (observability) |
+| **Rollback safety** | Pray it works | Canary + A/B testing + instant rollback | Q13 (gaps) |
+
+---
