@@ -49,7 +49,7 @@ Every answer references actual config values, library versions, design decisions
 
 ## Total Coverage
 
-**115 detailed Q&As** organized across 10 files, covering everything from foundational LLM concepts (tokenization, transformers, embeddings) and prompt engineering to expert-level enterprise AI architecture, agentic design patterns, cache invalidation strategies, indexing algorithms, prompt injection defense, vector database design, and memory systems. All answers grounded in real Aagam Mitra production code and real interview questions from companies like HDFC Bank.
+**120 detailed Q&As** organized across 10 files, covering everything from foundational LLM concepts (tokenization, transformers, embeddings) and prompt engineering to expert-level enterprise AI architecture, agentic design patterns, cache invalidation strategies, indexing algorithms, prompt injection defense, vector database design, memory systems, and financial guardrails for autonomous agents. All answers grounded in real Aagam Mitra production code and real interview questions from companies like HDFC Bank and Razorpay.
 
 ---
 
@@ -178,7 +178,7 @@ Q8:  How do you optimize costs of agentic systems?
 Q9:  What testing strategies apply to AI agents?
 Q10: How do you debug agent failures?
 Q11: What are the 4 memory layers in agentic systems?
-Q12: How do you version and manage LLM models in production?
+Q12: How do you design financial guardrails for autonomous agents? (Razorpay interview)
 ```
 
 ### 09-Semantic-Kernel-and-Dotnet-Agents.md (7 Q&As)
