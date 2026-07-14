@@ -33,15 +33,23 @@ Every answer references actual config values, library versions, design decisions
 
 | File | Topics Covered | Questions |
 |---|---|---|
-| [08-Agentic-Design-Patterns-and-Enterprise-AI.md](08-Agentic-Design-Patterns-and-Enterprise-AI.md) | **5 agentic design patterns** (router, hierarchical, tool-using, reflection, autonomous) with Aagam Mitra examples. **Advanced RAG**: retrieval quality metrics (hit rate, NDCG, MRR), knowledge base freshness strategies. **Enterprise AI**: compliance, regulatory requirements (Basel III, GDPR, Fair Lending), model governance, fairness testing, explainability, audit trails. **Governance & Observability**: monitoring, cost optimization (caching, batching, model routing), testing strategies (routing, end-to-end, quality, security, human evaluation, A/B testing). | 10 |
+| [08-Agentic-Design-Patterns-and-Enterprise-AI.md](08-Agentic-Design-Patterns-and-Enterprise-AI.md) | **5 agentic design patterns** (router, hierarchical, tool-using, reflection, autonomous) with Aagam Mitra examples. **Advanced RAG**: retrieval quality metrics (hit rate, NDCG, MRR), knowledge base freshness strategies. **Enterprise AI**: compliance, regulatory requirements (Basel III, GDPR, Fair Lending), model governance, fairness testing, explainability, audit trails. **Governance & Observability**: monitoring, cost optimization (caching, batching, model routing), testing strategies (routing, end-to-end, quality, security, human evaluation, A/B testing). **Memory Architectures**: 4-layer memory design (working, conversational, semantic, episodic), data lifecycle, production patterns. | 11 |
 
-**Subtotal: 10 expert-level Q&As**
+**Subtotal: 11 expert-level Q&As**
+
+### General AI & Prompt Engineering (File 10)
+
+| File | Topics Covered | Questions |
+|---|---|---|
+| [10-General-AI-and-Prompt-Engineering-Questions.md](10-General-AI-and-Prompt-Engineering-Questions.md) | **Foundation Concepts**: context window, LLM selection, AI agents, RAG (4 Q&As). **Prompt Engineering Fundamentals**: efficient prompts, context-aware RAG (2 Q&As). **Advanced Prompting**: structured output, versioning, adversarial testing, meta-prompting, recursive prompting (Q7). Few-shot prompting strategies & tradeoffs (Q8). **Security & Quality**: prompt injection defense layers, chain-of-thought & reasoning techniques, evaluation & iteration, token optimization (Q9-Q12). **General AI Knowledge**: hallucinations & mitigation, fine-tuning vs RAG vs prompting, LLM limitations & workarounds (Q13-Q15). | 15 |
+
+**Subtotal: 15 comprehensive Q&As**
 
 ---
 
 ## Total Coverage
 
-**70+ detailed Q&As** organized across 8 files, covering everything from foundational RAG & LLM concepts to expert-level enterprise AI architecture. All answers grounded in real Aagam Mitra production code and systems.
+**100+ detailed Q&As** organized across 10 files, covering everything from foundational LLM concepts and prompt engineering to expert-level enterprise AI architecture, agentic design patterns, and memory systems. All answers grounded in real Aagam Mitra production code and systems.
 
 ---
 
