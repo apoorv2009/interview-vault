@@ -41,15 +41,15 @@ Every answer references actual config values, library versions, design decisions
 
 | File | Topics Covered | Questions |
 |---|---|---|
-| [10-General-AI-and-Prompt-Engineering-Questions.md](10-General-AI-and-Prompt-Engineering-Questions.md) | **Foundation Concepts** (Q1-Q4): context window, LLM selection, AI agents, RAG. **Prompt Engineering Fundamentals** (Q5-Q6): efficient prompts, context-aware RAG. **Advanced Prompting** (Q7-Q12): structured output, versioning, few-shot, security, reasoning, evaluation, token optimization. **General AI Knowledge** (Q13-Q15): hallucinations, fine-tuning vs RAG vs prompting, LLM limitations. | 15 |
+| [10-General-AI-and-Prompt-Engineering-Questions.md](10-General-AI-and-Prompt-Engineering-Questions.md) | **Foundation Concepts** (Q1-Q4): context window, LLM selection, AI agents, RAG. **Prompt Engineering Fundamentals** (Q5-Q6): efficient prompts, context-aware RAG. **Advanced Prompting** (Q7-Q12): structured output, versioning, few-shot, security, reasoning, evaluation, token optimization. **General AI Knowledge** (Q13-Q15): hallucinations, fine-tuning vs RAG vs prompting, LLM limitations. **Production RAG** (Q16): cache invalidation strategies (HDFC Bank interview question). | 16 |
 
-**Subtotal: 15 comprehensive Q&As**
+**Subtotal: 16 comprehensive Q&As**
 
 ---
 
 ## Total Coverage
 
-**106 detailed Q&As** organized across 10 files, covering everything from foundational LLM concepts and prompt engineering to expert-level enterprise AI architecture, agentic design patterns, and memory systems. All answers grounded in real Aagam Mitra production code and systems.
+**107 detailed Q&As** organized across 10 files, covering everything from foundational LLM concepts and prompt engineering to expert-level enterprise AI architecture, agentic design patterns, cache invalidation strategies, and memory systems. All answers grounded in real Aagam Mitra production code and real interview questions from companies like HDFC Bank.
 
 ---
 

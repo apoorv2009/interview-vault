@@ -1339,14 +1339,386 @@ Why NOT fine-tuning for Aagam Mitra:
 
 ---
 
+## Q16. How do you invalidate and refresh AI-generated knowledge safely when source documents change? (HDFC Bank Interview Question)
+
+> **Why asked:** This is the **hardest problem in distributed RAG systems**. Easy to cache answers; hard to keep them fresh when source data changes. Critical in regulated industries (banking, healthcare) where stale answers can cause compliance violations. HDFC Bank (major financial institution) asks this for AI Engineer roles.
+
+**The Problem:**
+
+```
+Day 1: Knowledge base is current
+  RAG answers are cached and serve millions of queries
+
+Day 2: Source documents update
+  Policy change, regulatory update, new product launch
+  Thousands of cached answers become wrong
+  Users get stale, potentially harmful answers
+```
+
+This is **cache invalidation at scale** — Phil Karlton said "there are only two hard things in computer science: cache invalidation and naming things."
+
+---
+
+#### Strategy 1: Document Versioning (Foundation)
+
+**Tie cache keys to document version, not just query text:**
+
+```python
+# WRONG: Cache key based on query alone
+cache_key = hash("What is the loan interest rate?")
+# Problem: Document changes, but same query hits old cache
+
+# RIGHT: Cache key includes document version
+cache_key = hash(
+    query="What is the loan interest rate?",
+    doc_version="lending-policy-v2.3",  # Include version ID
+    doc_hash=sha256(document_content)     # Include content hash
+)
+
+# When document updates:
+# Old: lending-policy-v2.3 → cache_key_abc123
+# New: lending-policy-v2.4 → cache_key_xyz789 (different key, cache miss)
+```
+
+**Implementation:**
+
+```python
+class DocumentVersion:
+    def __init__(self, doc_id: str, content: str):
+        self.doc_id = doc_id
+        self.version_id = f"{doc_id}_v{timestamp()}"
+        self.content_hash = sha256(content)
+        self.updated_at = datetime.utcnow()
+
+def get_cached_answer(query: str, doc_version: DocumentVersion):
+    cache_key = hash_multipart(
+        query=query,
+        version_id=doc_version.version_id,
+        content_hash=doc_version.content_hash
+    )
+    
+    cached = redis.get(cache_key)
+    if cached:
+        return cached  # Hit
+    
+    # Miss: Re-generate answer with new document
+    answer = rag_pipeline(query, doc_version.content)
+    redis.set(cache_key, answer, ex=3600)
+    return answer
+```
+
+---
+
+#### Strategy 2: Document-to-Answer Dependency Map
+
+**Track which cached answers were generated from which source chunks:**
+
+```python
+class AnswerDependency:
+    def __init__(self, answer_id: str, query: str, source_chunks: list[str]):
+        self.answer_id = answer_id
+        self.query = query
+        self.source_chunks = source_chunks  # Which doc chunks generated this?
+        self.created_at = datetime.utcnow()
+        self.is_valid = True
+
+# Store dependency mapping:
+dependency_map = {
+    "answer_abc123": AnswerDependency(
+        answer_id="answer_abc123",
+        query="What is the loan interest rate?",
+        source_chunks=["lending-policy.pdf:page_5:para_2", "lending-policy.pdf:page_6:para_1"]
+    )
+}
+
+# When document updates:
+def invalidate_affected_answers(doc_id: str, changed_chunks: list[str]):
+    for answer_id, dependency in dependency_map.items():
+        # Check if this answer depends on any changed chunks
+        if any(chunk in dependency.source_chunks for chunk in changed_chunks):
+            dependency.is_valid = False
+            redis.delete(f"answer:{answer_id}")  # Invalidate cache
+            log(f"Invalidated {answer_id} due to {doc_id} changes")
+
+# Result: Targeted invalidation, not full wipe
+# Only answers that depend on changed chunks are invalidated
+# Answers from unchanged parts stay cached
+```
+
+**Benefit:** Surgical invalidation — you don't blow away the entire cache, just the answers that depend on changed documents.
+
+---
+
+#### Strategy 3: TTLs as a Safety Net (Not Primary Mechanism)
+
+**Never rely on TTLs alone. Use them as a backup:**
+
+```python
+# BAD: Rely only on TTL to catch updates
+redis.set(cache_key, answer, ex=86400)  # 24-hour TTL
+# Problem: If document changes at hour 1, users get stale answers for 23 hours
+
+# GOOD: Use TTL as safety net, dependency tracking as primary
+redis.set(
+    cache_key, 
+    answer, 
+    ex=86400,  # 24-hour TTL as safety
+    tags={"doc_version": doc_version_id}  # Also track version
+)
+
+# Check both:
+def get_answer_safe(query: str, doc_version: DocumentVersion):
+    cached = redis.get(cache_key)
+    
+    if cached:
+        # Check if cache is still valid (not just "not expired")
+        cached_doc_version = redis.get_tags(cache_key).get("doc_version")
+        
+        if cached_doc_version == doc_version.version_id:
+            return cached  # Valid
+        else:
+            # Version mismatch: even if not expired, invalidate
+            redis.delete(cache_key)
+    
+    # Miss: Re-generate
+    answer = rag_pipeline(query, doc_version.content)
+    redis.set(cache_key, answer, ex=86400, tags={"doc_version": doc_version.version_id})
+    return answer
+```
+
+**Why TTLs aren't enough:**
+- If TTL is 24 hours and document changes after 1 hour, users get stale answers for 23 hours
+- In banking, 1 hour of stale data = compliance violation
+- TTL is a **safety net for bugs in your dependency tracking**, not the primary mechanism
+
+---
+
+#### Strategy 4: Incremental Re-Embedding (Don't Re-Index Everything)
+
+**Detect what changed and update only affected vectors:**
+
+```python
+# NAIVE: Document changes? Re-embed entire corpus
+def update_knowledge_base_naive(new_document: str):
+    chunks = chunk(new_document)
+    embeddings = embed_all(chunks)  # 1000 chunks × embedding API = $$$
+    pinecone.upsert(embeddings)
+
+# EFFICIENT: Diff the document, re-embed only changes
+def update_knowledge_base_smart(doc_id: str, old_content: str, new_content: str):
+    # Step 1: Detect what changed
+    old_chunks = chunk(old_content)
+    new_chunks = chunk(new_content)
+    
+    # Simple diff: which chunks are new/modified?
+    changed_chunks = identify_changed_chunks(old_chunks, new_chunks)
+    # Result: "3 chunks changed out of 50"
+    
+    # Step 2: Re-embed only changed chunks
+    changed_embeddings = embed_batch(changed_chunks)  # 3 embeddings, not 50
+    
+    # Step 3: Delete old, upsert new
+    for old_chunk in changed_chunks:
+        pinecone.delete(id=old_chunk.id)
+    
+    for new_chunk, embedding in zip(changed_chunks, changed_embeddings):
+        pinecone.upsert([(new_chunk.id, embedding, new_chunk.metadata)])
+    
+    # Step 4: Track what changed
+    log_change(doc_id, changed_chunks, changed_at=datetime.utcnow())
+```
+
+**Cost savings:** If document is 50 chunks and 3 change, you save 94% of embedding costs.
+
+---
+
+#### Strategy 5: Version Your Knowledge Base (Snapshots)
+
+**Keep historical snapshots for auditability:**
+
+```python
+class KnowledgeBaseSnapshot:
+    def __init__(self, version_id: str, timestamp: datetime, index_state: dict):
+        self.version_id = version_id  # "kb-v2024-07-11-14-30"
+        self.timestamp = timestamp
+        self.index_state = index_state  # Hash of Pinecone state
+        self.documents = {}  # doc_id → version
+        self.chunks_count = 0
+
+# On every significant change:
+def create_snapshot():
+    snapshot = KnowledgeBaseSnapshot(
+        version_id=f"kb-v{datetime.utcnow().isoformat()}",
+        timestamp=datetime.utcnow(),
+        index_state=pinecone.describe_index()
+    )
+    db.save_snapshot(snapshot)
+
+# Benefits:
+# 1. Audit trail: "Who changed what and when?"
+# 2. Rollback: "Revert to v2024-07-10? Swap index with snapshot."
+# 3. Compliance: "What knowledge base version powered this answer on date X?"
+
+# Example: Financial advisor asks "What was the interest rate offer on July 10?"
+# → Look up answer generated on July 10
+# → Find it was based on KB snapshot "kb-v2024-07-10-15-00"
+# → Prove to regulator: "This was the approved rate on that date"
+```
+
+---
+
+#### Strategy 6: Freshness Check at Query Time (For High-Stakes Queries)
+
+**For sensitive domains (banking, healthcare), verify cache against live source:**
+
+```python
+# Regular query: Use cache
+def answer_query_fast(query: str, doc_version: DocumentVersion):
+    cached = get_cached_answer(query, doc_version)
+    if cached and is_valid(cached):
+        return cached  # Serve from cache, 10ms
+
+# High-stakes query: Verify before serving
+def answer_query_safe(query: str, doc_version: DocumentVersion, is_high_stakes: bool):
+    cached = get_cached_answer(query, doc_version)
+    
+    if cached and is_high_stakes:
+        # Verify: Does cached answer still match live document?
+        live_answer = rag_pipeline(query, doc_version.content_latest)
+        
+        if semantic_similarity(cached, live_answer) > 0.95:
+            return cached  # Safe to use cache
+        else:
+            # Cache diverged from reality
+            log_alert(f"Cache drift detected for query: {query}")
+            return live_answer  # Serve fresh answer, log incident
+    
+    return cached or rag_pipeline(query, doc_version.content_latest)
+
+# When to use high-stakes check:
+# - Banking: "What's my current account balance?" → Always fresh
+# - Healthcare: "What medication should I take?" → Always fresh
+# - News: "What happened today?" → Cache is fine
+```
+
+**Cost:** One extra LLM call (~1s, $0.0001) only for high-stakes queries, not every query.
+
+---
+
+#### Strategy 7: Webhook/Event-Driven Invalidation
+
+**Don't poll for changes. Be notified when documents update:**
+
+```python
+# Webhook endpoint (on your RAG service):
+@app.post("/webhooks/document-updated")
+async def on_document_updated(event: DocumentUpdateEvent):
+    """Fired when a document is updated in the source system (CMS, DB, etc.)"""
+    
+    # Extract what changed
+    doc_id = event.doc_id
+    changed_chunks = event.changed_chunks  # Provided by source system
+    
+    # Invalidate affected answers
+    invalidate_affected_answers(doc_id, changed_chunks)
+    
+    # Re-embed and re-index changed chunks
+    update_knowledge_base_smart(doc_id, event.old_content, event.new_content)
+    
+    # Create snapshot
+    create_snapshot()
+    
+    return {"status": "invalidated", "affected_answers": len(invalidation_log)}
+
+# Source system (e.g., your CMS) sends:
+POST /rag-service/webhooks/document-updated
+{
+    "doc_id": "lending-policy.pdf",
+    "version_id": "v2.4",
+    "changed_chunks": ["lending-policy.pdf:page_5:para_2", "lending-policy.pdf:page_6"],
+    "old_content": "...",
+    "new_content": "...",
+    "updated_at": "2026-07-11T14:30:00Z"
+}
+```
+
+**Timing:** Invalidation happens within seconds of document update, not hours.
+
+---
+
+#### Production Strategy: Layered Defense
+
+**Combine all strategies for production reliability:**
+
+```
+Layer 1: Document Versioning (Fast, Automatic)
+  └─ Cache key = (query + doc_version)
+  └─ Different version = cache miss, automatic refresh
+  └─ Cost: None (just metadata tracking)
+
+Layer 2: Dependency Map (Targeted)
+  └─ Track which answers depend on which chunks
+  └─ On update: Invalidate only affected answers
+  └─ Cost: Negligible (metadata storage)
+
+Layer 3: Event-Driven Invalidation (Real-time)
+  └─ Webhook fires when document updates
+  └─ Immediate re-embedding of changed chunks
+  └─ Cost: +1 LLM call per document update (not per query)
+
+Layer 4: TTL Safety Net (Catch Bugs)
+  └─ 24-hour TTL expires cached answers
+  └─ Catches bugs in layers 1-3
+  └─ Cost: Users get fresh answers after TTL
+
+Layer 5: Freshness Check at Query Time (High-Stakes)
+  └─ For sensitive queries, verify cache against live source
+  └─ Cost: +1 LLM call for flagged queries only
+```
+
+**For Aagam Mitra:**
+
+Currently we use Layer 1 + Layer 4:
+- Cache key includes document version (Shantidhara events change daily)
+- 24-hour TTL as safety net
+
+For production scale (banking), we'd add Layer 2 + Layer 3 + Layer 5:
+- Track which Q&A pairs depend on which temple documents
+- Webhook on event updates triggers re-embedding
+- High-stakes queries (donation confirmations) verified before serving cache
+
+---
+
+#### Interview Answer (30-Second Version)
+
+> "Cache invalidation in RAG is a three-layer problem. First, I tie cache keys to document versions, not just query text — when the source document updates, the key changes, and we get a cache miss automatically. Second, I track which cached answers were generated from which source chunks in a dependency map, so when a document updates, I invalidate only affected answers, not the entire cache. Third, I use TTLs as a safety net, not the primary mechanism — if my dependency tracking has a bug, the TTL catches it after 24 hours. For high-stakes domains like banking, I add a freshness check at query time: verify that a cached answer still matches the live document before serving it. The lesson: cache invalidation must be proactive (versioning, dependency tracking) and event-driven (webhooks on updates), not just time-based (TTLs)."
+
+---
+
+#### Why This Matters
+
+**In regulated industries (banking, healthcare, finance):**
+- Stale cached answers = compliance violations = fines
+- "Our AI told them X, but the current policy is Y" = liability
+- Document changes happen constantly (policy updates, rate changes, new regulations)
+
+**The tension:**
+- Fast: Cache everything (but risk stale answers)
+- Safe: Always query live (but high latency + cost)
+
+**The solution:** Make invalidation a first-class part of the RAG pipeline, not an afterthought.
+
+---
+
 ## Summary & Interview Tips
 
-This document covers **15 Q&As across 4 domains:**
+This document covers **16 Q&As across 5 domains:**
 
-1. **Foundation Concepts** (Q1-Q4): Context, LLM selection, agents, RAG
+1. **Foundation Concepts** (Q1-Q4): Context window, LLM selection, AI agents, RAG
 2. **Prompt Engineering Fundamentals** (Q5-Q6): Efficient prompts, context-aware RAG
-3. **Prompt Engineering Advanced** (Q7-Q12): Advanced techniques, few-shot, injection, reasoning, evaluation, optimization
-4. **General AI Knowledge** (Q13-Q15): Hallucinations, fine-tuning, limitations
+3. **Prompt Engineering Advanced** (Q7-Q12): Structured output, versioning, few-shot, security, reasoning, evaluation, optimization
+4. **General AI Knowledge** (Q13-Q15): Hallucinations, fine-tuning vs RAG, LLM limitations
+5. **Production RAG** (Q16): Cache invalidation strategies (HDFC Bank interview question)
 
 **Key Interview Narratives:**
 
