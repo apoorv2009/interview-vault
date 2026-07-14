@@ -21,6 +21,14 @@ All 10 patterns explained in detail with code examples:
 9. **Hybrid Search** — Dense + keyword
 10. **RAG-Fusion** — Multiple query variants
 
+### Q9 Expanded (Live Data + PDF Versioning)
+- **Original Q9:** Temple live data handling with TTL + SHA-256 dedup
+- **Bonus Section:** Handling frequently-changing PDFs (hourly updates)
+  - 4 detection strategies (polling, file watcher, upload trigger, versioning)
+  - Real-world cost analysis ($0.0365 → $0.01825 savings/year)
+  - Python implementation with working code
+  - Key differences between APIs and file-based data
+
 ### Deep Dives (Q25-Q27)
 - **Q25:** Corrective RAG (CRAG) — detailed explanation
 - **Q26:** Self-RAG vs CRAG — key differences clarified

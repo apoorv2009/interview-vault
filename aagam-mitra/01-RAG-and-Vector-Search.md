@@ -1499,6 +1499,483 @@ SPEED: <50ms (all local, no network!)
 
 ---
 
+### **Bonus: Handling Frequently-Changing PDFs (Hourly Updates)**
+
+> **Why this matters:** The temple live data logic works for APIs. But what if your data comes from files that change on disk (hourly PDF reports, user-uploaded documents, auto-generated CSVs)? Different detection mechanisms, same cost-optimization goals. This is a real-world variant that completes your understanding of the pattern.
+
+---
+
+#### **The Core Problem (Conceptual)**
+
+```
+WHAT'S DIFFERENT from APIs?
+
+API-based data (Q9):
+├─ Admin service HAS: GET /slots, GET /events, etc.
+├─ WE CONTROL when to fetch
+├─ Data is already structured
+└─ We decide sync timing
+
+File-based data (PDFs):
+├─ A file: /data/report.pdf
+├─ Gets OVERWRITTEN every hour (not API)
+├─ WE DON'T CONTROL when it changes
+├─ Unstructured (PDF = messy text)
+└─ We need to WATCH or POLL for changes
+```
+
+**Key question:** How do we even KNOW when the PDF changed?
+
+---
+
+#### **Why This Costs Money (The Real Insight)**
+
+```
+SCENARIO: PDF updates every hour for 1 year
+
+If we RE-EMBED every time (naive approach):
+├─ Updates per year: 365 × 24 = 8,760 updates
+├─ Cost per embed: $0.0001 (Gemini API)
+├─ Total cost: 8,760 × $0.0001 = $0.876/year
+
+But WAIT — what if the content is IDENTICAL?
+├─ Example: Yesterday's PDF was "Sales Report Q1 = $1M"
+├─ Today's PDF is "Sales Report Q1 = $1M" (same data)
+├─ We're paying to embed THE SAME CONTENT TWICE! 😱
+├─ Wasted money for zero value
+
+SOLUTION: Check if content ACTUALLY changed before re-embedding
+├─ Use SHA-256 hash (fingerprint of PDF content)
+├─ Old hash = abc123
+├─ New hash = abc123 (SAME!)
+├─ Skip embedding, save $0.0001 ✅
+└─ Over a year: save 50% of embedding costs = $0.44/year
+```
+
+The **fundamental insight** — we need to detect **content changes**, not just **file changes**.
+
+---
+
+#### **Four Detection Strategies (Why They Exist)**
+
+```
+The real question: HOW do we detect when the PDF content changed?
+
+There are three different DETECTION mechanisms:
+
+1. POLLING (Check periodically)
+   └─ "Is the file different than 1 hour ago?"
+   ├─ Pros: Simple, can batch checks
+   ├─ Cons: Lag (might miss changes within the hour)
+   └─ Use when: PDF updates are infrequent/predictable
+
+2. FILE WATCHING (Real-time detection)
+   └─ "OS notifies us IMMEDIATELY when file changes"
+   ├─ Pros: No lag, instant detection
+   ├─ Cons: Complex, needs always-running process
+   └─ Use when: Need instant updates (< 1 minute)
+
+3. UPLOAD TRIGGER (User explicitly uploads)
+   └─ "Admin clicks 'Upload New PDF' button"
+   ├─ Pros: Clear audit trail, no accidental processing
+   ├─ Cons: Manual (not automated)
+   └─ Use when: Updates are scheduled/controlled
+
+4. VERSIONING (Track all versions)
+   └─ "Each PDF upload becomes a version, old ones are archives"
+   ├─ Pros: Full history, can rollback, dedup by hash
+   ├─ Cons: DB complexity
+   └─ Use when: Need audit + cost optimization
+```
+
+**Which one should YOU use?**
+- Every hour = Regular schedule = **Use Polling + Versioning** ✅
+- Random times = Unpredictable = **Use File Watcher** ✅
+- Admin-controlled = Scheduled = **Use Upload Trigger** ✅
+
+---
+
+#### **Strategy 1: Polling — Simple Explanation**
+
+```
+WHAT IS POLLING?
+"Check every hour: Did the PDF file change?"
+
+HOW IT WORKS:
+Time: 8:00 AM
+├─ Check: Is /data/report.pdf different from 1 hour ago?
+├─ OS says: File was modified at 8:00 AM (today) vs 7:00 AM (yesterday)
+├─ Conclusion: YES, FILE CHANGED
+└─ Action: Extract → Check hash → If hash different → Re-embed
+
+Time: 9:00 AM
+├─ Check: Is /data/report.pdf different from 1 hour ago?
+├─ OS says: File was last modified at 8:00 AM (not changed since then)
+├─ Conclusion: NO, FILE UNCHANGED
+└─ Action: Skip (cost $0)
+
+WHY USE POLLING?
+├─ Simple: Just check file modification time (OS tells us)
+├─ Cheap: No extra processes running
+├─ Good for: Predictable updates (every hour at exact time)
+
+WHY NOT POLLING?
+├─ Lag: If PDF changes at 8:05 and we check at 9:00, we wait 55 minutes
+└─ Not ideal for: Real-time requirements
+```
+
+**Visual:**
+```
+Timeline:
+
+8:00 AM: PDF updated
+├─ We don't know yet (not checking)
+
+9:00 AM: We check
+├─ "Oh! File changed at 8:00, process it now"
+├─ Process takes 5 minutes
+└─ Data is now 1 hour 5 minutes old ⏳
+
+10:00 AM: Check again
+├─ File unchanged since 8:00
+└─ Skip!
+```
+
+---
+
+#### **Strategy 2: File Watcher — Simple Explanation**
+
+```
+WHAT IS FILE WATCHING?
+"OS tells us IMMEDIATELY when PDF changes, no polling needed"
+
+HOW IT WORKS:
+We tell the OS: "Notify me when /data/report.pdf changes"
+OS: "OK, I'm watching"
+
+Then:
+
+8:00 AM: PDF file is overwritten
+├─ OS detects immediately: "File changed!"
+├─ OS sends us an event: "Hey! report.pdf was modified"
+├─ We wake up and process immediately
+├─ Data is current (no lag!)
+
+9:00 AM: PDF file is overwritten
+├─ OS detects immediately: "File changed!"
+├─ We process immediately
+
+WHY USE FILE WATCHING?
+├─ Real-time: Zero lag (instant notification)
+├─ No polling overhead: Doesn't check every X minutes
+└─ Good for: When you need instant updates
+
+WHY NOT FILE WATCHING?
+├─ Complexity: Requires watchdog library
+├─ Always-running: Background process must stay alive
+└─ Not ideal for: Simple, scheduled updates
+```
+
+**Visual:**
+```
+Timeline:
+
+8:00 AM: PDF updated
+├─ OS: "File changed!"
+├─ We: Process immediately
+└─ Result: Data is current ✅
+
+9:00 AM: PDF updated
+├─ OS: "File changed!"
+├─ We: Process immediately
+└─ Result: Data is current ✅
+
+No waiting! No lag! ✅
+```
+
+---
+
+#### **Strategy 3: Upload Trigger — Simple Explanation**
+
+```
+WHAT IS UPLOAD TRIGGER?
+"Admin clicks a button to upload new PDF, we process it then"
+
+HOW IT WORKS:
+Admin: "Upload new report"
+├─ Admin clicks button in web UI
+├─ Uploads /data/report.pdf
+├─ We receive the upload event
+├─ We process immediately
+└─ Done!
+
+WHY USE UPLOAD TRIGGER?
+├─ Control: Clear when updates happen (user action)
+├─ Audit trail: We know who uploaded what when
+├─ Simple: No need to watch for changes
+└─ Good for: Scheduled, admin-controlled updates
+
+WHY NOT UPLOAD TRIGGER?
+├─ Manual: Requires human action each time
+├─ Scalability: Works for 1-2 PDFs, annoying for 100s
+└─ Not ideal for: Fully automated systems
+```
+
+**Visual:**
+```
+8:00 AM:
+├─ Admin checks: "New report generated"
+├─ Admin clicks: "Upload"
+├─ System processes immediately
+└─ Done!
+
+12:00 PM:
+├─ Admin checks: "Updated report ready"
+├─ Admin clicks: "Upload"
+├─ System processes immediately
+└─ Done!
+```
+
+---
+
+#### **Strategy 4: Versioning — Simple Explanation**
+
+```
+WHAT IS VERSIONING?
+"Each upload becomes a timestamped 'version', we track all of them"
+
+WHY VERSIONING MATTERS:
+The core insight: Same content doesn't need re-embedding!
+
+Example:
+├─ 8:00 AM: Upload "Sales Report v1"
+│  └─ Content hash: abc123
+│  └─ Action: Embed and store
+│
+├─ 9:00 AM: Upload "Sales Report v2" (minor update)
+│  └─ Content hash: abc123 (SAME!)
+│  └─ Action: Skip embedding, reuse v1's embeddings
+│
+├─ 10:00 AM: Upload "Sales Report v3" (major update)
+│  └─ Content hash: def456 (DIFFERENT!)
+│  └─ Action: Embed and store
+│
+└─ Cost: Only 2 embeds instead of 3!
+
+HOW VERSIONING SAVES MONEY:
+├─ Without versioning: Pay $0.0001 × 3 uploads = $0.0003
+├─ With versioning: Pay $0.0001 × 2 embeds = $0.0002
+├─ Over a year with 8,760 uploads:
+│  ├─ Without: $0.876
+│  └─ With: $0.438 (50% savings!)
+
+WHY USE VERSIONING?
+├─ Cost optimization: Deduplicate identical content
+├─ History: Track all versions (audit trail)
+├─ Rollback: Can revert to old version if needed
+└─ Good for: Production systems with multiple PDFs
+
+WHY NOT VERSIONING?
+├─ Complexity: Need to manage versions in DB
+└─ Not ideal for: Simple one-off PDFs
+```
+
+**Visual:**
+```
+Database schema:
+
+pdf_versions table:
+├─ v20250714_080000: hash=abc123, status=COMPLETE
+├─ v20250714_090000: hash=abc123, status=SKIPPED (same as previous)
+├─ v20250714_100000: hash=def456, status=COMPLETE
+└─ v20250714_110000: hash=def456, status=SKIPPED (same as previous)
+
+When searching in RAG:
+└─ Query only uses LATEST version (v20250714_110000)
+└─ Old versions are archived, not searched
+└─ Users always get current data ✅
+```
+
+---
+
+#### **Which Strategy For Your Scenario?**
+
+```
+YOUR SCENARIO: PDF changes every hour
+
+ANALYSIS:
+├─ Frequency: Regular (every hour, predictable)
+├─ Latency need: Moderate (1-hour old data is fine)
+├─ Complexity tolerance: Medium (production system)
+└─ Cost concern: YES (don't want to pay for identical content)
+
+RECOMMENDATION: COMBINE Polling + Versioning
+
+HOW:
+1. EVERY HOUR: Check if PDF file changed (polling)
+   └─ Fast (just check file mtime)
+   
+2. IF CHANGED: Extract content and compute hash
+   └─ Fast (hash is quick)
+   
+3. CHECK HASH: Is this content new or have we seen it before?
+   └─ If SAME hash: Skip embedding (save $0.0001) ✅
+   └─ If DIFF hash: Embed and store as new version ✅
+   
+4. SEARCH: Always use ONLY latest version
+   └─ Users always get current data
+   └─ No stale data from old versions
+
+RESULT:
+├─ Cost: $25-30/month (only embed when content changes)
+├─ Freshness: Up to 1 hour old (fine for reports)
+├─ Complexity: Medium (reasonable for production)
+└─ Reliability: High (polling is robust)
+```
+
+**Python Implementation (Polling + Versioning):**
+
+```python
+import hashlib
+import time
+from pathlib import Path
+from datetime import datetime
+
+class PDFVersionManager:
+    def __init__(self, pdf_path, db_connection):
+        self.pdf_path = Path(pdf_path)
+        self.db = db_connection
+        self.last_check_time = None
+    
+    async def sync_pdf_every_hour(self):
+        """Polling loop: check every hour"""
+        while True:
+            await self.check_and_process_pdf()
+            await asyncio.sleep(3600)  # Check every hour
+    
+    async def check_and_process_pdf(self):
+        """Main polling logic"""
+        # Step 1: Check file modification time
+        if not self.pdf_path.exists():
+            return
+        
+        current_mtime = self.pdf_path.stat().st_mtime
+        
+        # If file hasn't been modified, skip
+        if self.last_check_time and current_mtime == self.last_check_time:
+            print(f"[{datetime.now()}] PDF unchanged, skipping")
+            return
+        
+        self.last_check_time = current_mtime
+        print(f"[{datetime.now()}] PDF changed, processing...")
+        
+        # Step 2: Extract content and compute hash
+        content = self.extract_pdf_text(self.pdf_path)
+        content_hash = hashlib.sha256(content.encode()).hexdigest()
+        
+        # Step 3: Check if we've seen this content before
+        existing_version = await self.db.query(
+            "SELECT id FROM pdf_versions WHERE content_hash = ? ORDER BY created_at DESC LIMIT 1",
+            (content_hash,)
+        )
+        
+        if existing_version:
+            # Same content as before, skip embedding
+            print(f"Content already indexed, reusing version {existing_version[0]}")
+            return
+        
+        # Step 4: New content, must embed
+        print(f"New content detected, embedding...")
+        
+        # Chunk the content
+        chunks = chunk_text(content, chunk_size=800, overlap=100)
+        
+        # Embed all chunks
+        embedding_client = GeminiEmbedding()
+        embeddings = await embedding_client.embed_batch(
+            [chunk.text for chunk in chunks]
+        )
+        
+        # Create new version record
+        version_id = await self.db.query(
+            """INSERT INTO pdf_versions 
+               (content_hash, created_at, status) 
+               VALUES (?, ?, 'COMPLETE')""",
+            (content_hash, datetime.now())
+        )
+        
+        # Store chunks with their embeddings
+        for chunk, embedding in zip(chunks, embeddings):
+            await self.db.query(
+                """INSERT INTO pdf_chunks 
+                   (version_id, text, embedding) 
+                   VALUES (?, ?, ?)""",
+                (version_id, chunk.text, embedding)
+            )
+        
+        print(f"✅ Stored as version {version_id}")
+    
+    def extract_pdf_text(self, pdf_path):
+        """Extract text from PDF"""
+        import pdfplumber
+        text = ""
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                text += page.extract_text() + "\n"
+        return text
+```
+
+**Cost Analysis (Annual):**
+
+```
+Scenario: Sales report PDF, 1 change per day on average
+
+Without versioning/hashing:
+├─ Updates per year: 365
+├─ Cost: 365 × $0.0001 = $0.0365/year
+
+With versioning + polling:
+├─ Average duplicates: 2x (some days no change, some days 1)
+├─ Actual embeds per year: 365 / 2 = 182.5
+├─ Cost: 182.5 × $0.0001 = $0.01825/year
+├─ Savings: $0.0182/year ✅
+
+Scale up to 100 PDFs:
+├─ Without: 365 × 100 × $0.0001 = $3.65/year
+├─ With: 182.5 × 100 × $0.0001 = $1.825/year
+└─ Savings: $1.825/year ✅
+```
+
+---
+
+#### **Key Differences: PDFs vs Temple Data**
+
+```
+TEMPLE LIVE DATA (Q9):
+├─ Source: APIs (we fetch on demand)
+├─ Detection: TTL-based (check every 5 min)
+├─ Storage: PostgreSQL (structured, updatable)
+├─ Sync frequency: Only when TTL expires
+├─ Cost optimization: SHA-256 dedup
+└─ Use case: Semi-structured data (slots, news, events)
+
+FILE-BASED PDFs (This section):
+├─ Source: Disk files (we watch/poll)
+├─ Detection: Polling (check every hour) or File Watcher (instant)
+├─ Storage: PDF versioning (immutable versions)
+├─ Sync frequency: On file change or on schedule
+├─ Cost optimization: Content-hash versioning
+└─ Use case: Unstructured documents (reports, receipts, papers)
+
+SAME PRINCIPLES, DIFFERENT MECHANISMS:
+├─ Both avoid redundant re-embedding
+├─ Both use hashing to detect "real" changes
+├─ Both separate storage from search
+└─ Both optimize for cost + freshness tradeoff
+```
+
+---
+
 ### **Cost & Performance Comparison**
 
 ```
@@ -1647,72 +2124,342 @@ This means even if the sync runs every 5 minutes, Gemini API is only called when
 
 > **Why asked:** This separates builders from engineers. Building a feature is one thing; knowing whether the feature works is a higher bar. LLM-as-judge is the practical answer to "does my RAG actually reduce hallucination?" Interviewers want to see you can instrument your own system.
 
-**The pattern:**
+---
+
+### **The Core Problem (Conceptual)**
+
+```
+YOU BUILT RAG, NOW WHAT?
+
+Scenario: User asks "What is the Navakar Mantra?"
+
+Option A: Groq generates an answer
+├─ "The Navakar Mantra has 5 parts: Arihanta..."
+├─ You return it to user immediately
+└─ But WAIT — is this actually good?
+
+Questions you CAN'T answer without evaluation:
+├─ Did Groq contradict the retrieved passages? (Hallucination risk!)
+├─ Is this answer actually relevant to the question?
+├─ Is Groq making up facts not in our knowledge base?
+├─ Should we trust this answer enough to send to the user?
+└─ Or should we retry the search?
+
+THE HARD TRUTH:
+├─ You can't tell by just reading the answer
+├─ You need a SECOND LLM to score the FIRST LLM
+└─ This is "LLM-as-judge"
+```
+
+**Real Example of Why This Matters:**
+
+```
+User: "What are the 12 types of karma in Jainism?"
+
+WITHOUT evaluation:
+├─ Groq retrieves: "8 types: Ghati, Aghati, ..."
+├─ Groq generates: "The 12 types are: Ghati, Aghati, Vedaniya, Mohaniya, 
+│                   Ayu, Nama, Gotra, Varna, and 4 others including 
+│                   electricity, magnetism, gravity, and dark energy"
+│                   (COMPLETELY WRONG! Not in Jain texts!)
+├─ You send it to user immediately
+└─ User is misinformed 😞
+
+WITH evaluation:
+├─ Groq generates same answer
+├─ Judge LLM reads: "Passages say 8 types. Answer lists 12 and includes 
+│                   physics concepts. HALLUCINATION RISK = 0.1 (very low confidence)"
+├─ Evaluation says: "Action: RETRY with different search"
+├─ You retry with better query: "karma classification in Jain philosophy"
+├─ Groq now finds correct passage: "The 8 types are: Ghati, Aghati..."
+├─ Judge approves: "HALLUCINATION RISK = 0.9 (very high confidence)"
+└─ User gets correct answer ✅
+```
+
+---
+
+### **What "LLM-as-Judge" Actually Means**
+
+```
+CONCEPT:
+"Use a second LLM to evaluate the FIRST LLM's output"
+
+The judge answers three critical questions:
+
+1. FAITHFULNESS
+   ├─ Does the answer match the retrieved passages?
+   ├─ Or does it contradict them?
+   └─ Score: 1 (completely wrong) to 5 (grounded in passages)
+
+2. RELEVANCE
+   ├─ Does this answer address the user's question?
+   ├─ Or is it off-topic?
+   └─ Score: 1 (irrelevant) to 5 (directly answers)
+
+3. HALLUCINATION RISK
+   ├─ How many facts come from passages vs. Groq's training data?
+   ├─ High hallucination = Groq made things up
+   └─ Score: 1 (high fabrication) to 5 (only from passages)
+```
+
+---
+
+### **How It Works: The Decision Flow**
+
+```
+┌─────────────────────────────────────────┐
+│ User: "What is the Navakar Mantra?"    │
+└──────────────┬──────────────────────────┘
+               │
+               ↓
+┌─────────────────────────────────────────┐
+│ STEP 1: RETRIEVE from vector DB         │
+│ → Find top-4 relevant passages          │
+│ → Example: "Navakar Mantra = salutation │
+│            to 5 Parameshthi, composed of│
+│            9 parts..."                  │
+└──────────────┬──────────────────────────┘
+               │
+               ↓
+┌─────────────────────────────────────────┐
+│ STEP 2: GENERATE with Groq              │
+│ → Groq reads passages                   │
+│ → Groq generates answer                 │
+│ → Example: "The Navakar Mantra is a     │
+│            salutation with 9 parts..."  │
+└──────────────┬──────────────────────────┘
+               │
+               ↓
+┌─────────────────────────────────────────────────────────┐
+│ STEP 3: EVALUATE with Judge LLM (THE NEW STEP)          │
+│                                                         │
+│ Judge reads:                                            │
+│ ├─ Original question: "What is the Navakar Mantra?"     │
+│ ├─ Retrieved passages: [list of 4 passages]             │
+│ ├─ Groq's answer: [the generated answer]                │
+│                                                         │
+│ Judge scores:                                           │
+│ ├─ Faithfulness: 5 (matches passages exactly)           │
+│ ├─ Relevance: 5 (directly answers the question)         │
+│ ├─ Hallucination: 4.8 (99% from passages)               │
+│                                                         │
+│ Judge recommends:                                       │
+│ └─ Action: "SEND" (all scores >= 4)                    │
+└──────────────┬──────────────────────────────────────────┘
+               │
+               ↓
+        ┌──────────────┐
+        │ SEND to user │
+        └──────────────┘
+
+───────────────────────────────────────────────────────
+
+ALTERNATIVE SCENARIO (When answer is bad):
+
+┌─────────────────────────────────────────┐
+│ STEP 3: EVALUATE (Bad answer case)      │
+│                                         │
+│ Judge reads Groq's answer: "The Navakar│
+│ Mantra includes the Fibonacci sequence" │
+│                                         │
+│ Judge scores:                           │
+│ ├─ Faithfulness: 1 (contradicts)        │
+│ ├─ Relevance: 2 (partially relevant)    │
+│ ├─ Hallucination: 0.2 (high risk!)      │
+│                                         │
+│ Judge recommends:                       │
+│ └─ Action: "RETRY" (score < 3)         │
+└──────────────┬──────────────────────────┘
+               │
+               ↓
+    ┌──────────────────────────┐
+    │ RETRY with better query: │
+    │ "Navakar Mantra 9 parts"  │
+    │ or "Change to different   │
+    │ agent (not Scripture)"    │
+    └──────────────────────────┘
+```
+
+---
+
+### **Why This Works: The Real Insight**
+
+```
+PROBLEM WITHOUT JUDGE:
+├─ You generate answer
+├─ You have NO WAY to know if it's good
+├─ Best case: Wait for user feedback ("That was wrong!")
+├─ Worst case: User believes wrong information
+└─ Cost: Damage to system trust
+
+SOLUTION WITH JUDGE:
+├─ You generate answer
+├─ Judge immediately tells you: "This is 85% confident" or "This is risky"
+├─ If risky: Retry with different search/agent
+├─ If confident: Send to user
+├─ Cost: One extra LLM call per answer
+├─ Benefit: Catch hallucinations BEFORE they reach users
+└─ ROI: 100% worth it
+```
+
+---
+
+### **Implementation: The Judge Code**
 
 ```python
-async def evaluate_response(question: str, response: str, retrieved_passages: list[str]) -> dict:
+async def evaluate_response(
+    question: str, 
+    response: str, 
+    retrieved_passages: list[str]
+) -> dict:
     """
-    Use an LLM to score our own answer for:
-    - Faithfulness: does the answer contradict any retrieved passage?
-    - Relevance: does it actually answer the question?
-    - Hallucination: are there facts not in the passages?
-    - Confidence: should we send this to the user?
+    Judge LLM evaluates whether Groq's answer is trustworthy.
+    
+    Returns:
+    {
+        "faithfulness": 1-5 (does it match passages?),
+        "relevance": 1-5 (does it answer the question?),
+        "hallucination_risk": 1-5 (how fabricated is it?),
+        "action": "send" or "retry",
+        "reason": "explanation of why"
+    }
     """
     
+    # Build the evaluation prompt
     evaluation_prompt = f"""
-    Question: {question}
-    Retrieved passages: {json.dumps(retrieved_passages)}
-    Our answer: {response}
-    
-    Score on a scale 1-5:
-    1. Faithfulness (1=contradicts passages, 5=grounded in passages)
-    2. Relevance (1=off-topic, 5=directly answers)
-    3. Hallucination risk (1=high fabrication, 5=purely from passages)
-    
-    If any score < 3, suggest why and what to do (retry search? different agent? block?).
-    Return as JSON.
+You are a rigorous evaluator. Score the AI's answer on these criteria:
+
+QUESTION: {question}
+
+RETRIEVED PASSAGES (source of truth):
+{json.dumps(retrieved_passages, indent=2)}
+
+AI'S ANSWER (to evaluate):
+{response}
+
+Score each 1-5 (1=bad, 5=excellent):
+
+1. FAITHFULNESS: Does the answer match the passages, or does it make up facts?
+2. RELEVANCE: Does it actually answer the question asked?
+3. HALLUCINATION_RISK: How much is pure fabrication vs. from passages?
+
+Also provide:
+- REASON: Brief explanation
+- ACTION: "send" (if all scores >= 4) or "retry" (if any score < 3)
+
+Return as JSON.
     """
     
+    # Call the judge LLM
     scores = await groq.chat(
         messages=[{"role": "user", "content": evaluation_prompt}],
-        temperature=0.1,  # ← deterministic scoring
+        temperature=0.1,  # ← Deterministic (not creative) scoring
         response_format="json",
     )
     
+    # Structured response
     return {
         "faithfulness": scores.faithfulness,
         "relevance": scores.relevance,
         "hallucination_risk": scores.hallucination_risk,
-        "action": "send" if all(s >= 3 for s in scores.values()) else "retry",
+        "action": "send" if all(
+            s >= 4 for s in [
+                scores.faithfulness, 
+                scores.relevance, 
+                scores.hallucination_risk
+            ]
+        ) else "retry",
+        "reason": scores.reason,
     }
 ```
 
-**Where it fits in Aagam Mitra:**
+**Key Implementation Details:**
+- `temperature=0.1` → Scoring should be consistent, not creative
+- `response_format="json"` → Structured output we can parse
+- Score threshold = 4.0 (not 3.0) → Only send high-confidence answers
+- Three metrics → Catches different failure modes
+
+---
+
+### **Integration into Aagam Mitra Pipeline**
 
 ```
-ScriptureAgent generates answer
+User asks question
     ↓
-Evaluation agent scores it
-    ↓
-If confidence < threshold:
-  - Retry with better search query
-  - Or block and tell user "I'm not confident enough"
-    ↓
-If confidence >= threshold:
-  - Send to user
-  - Log scores for monitoring
+┌──────────────────────────────────────────┐
+│ RETRIEVE + GENERATE (existing flow)      │
+│ ├─ Vector search: Find top-4 passages    │
+│ ├─ Agent decides which to use            │
+│ └─ Generate answer with Groq             │
+└──────────────────┬───────────────────────┘
+                   │
+                   ↓
+┌──────────────────────────────────────────┐
+│ NEW STEP: EVALUATE (Judge LLM)           │
+│ └─ Score answer for quality              │
+└──────────────────┬───────────────────────┘
+                   │
+      ┌────────────┴────────────┐
+      │                         │
+      ↓                         ↓
+   SEND                      RETRY
+(score >= 4)              (score < 3)
+   ✅                         ❌
+ Send to user            - Try different search
+                         - Try different agent
+                         - Or block: "I'm not sure"
 ```
 
-**Cost/latency tradeoff:**
+---
 
-| Option | Cost | Latency | Use case |
-|---|---|---|---|
-| No evaluation | ✓ Cheap | ✓ Fast | Dev/testing |
-| Evaluate 10% of answers | ✓✓ ~10% more | ✓✓ Minimal | Sampling for metrics |
-| Evaluate all answers | ✗ 2× cost | ✗ +500ms | High-stakes (bookings) or financial decisions |
-| Evaluate only low-confidence | ✓ Cheap | ✓ Fast | Best for RAG — retry when uncertain |
+### **Cost vs. Benefit Analysis**
 
-**We'd use:** Evaluate only low-confidence responses (those where Groq's internal uncertainty is high) — gives us safety gates without doubling latency.
+```
+DECISION: Should you evaluate every answer, or just risky ones?
+
+Three strategies:
+
+STRATEGY 1: NO EVALUATION (❌ Risky)
+├─ Cost: $0 extra
+├─ Latency: <100ms
+├─ Hallucination rate: ~5-10% (you don't catch bad answers)
+├─ Use case: Dev/testing only
+└─ Problem: User gets wrong info, loses trust
+
+───────────────────────────────────────────────
+
+STRATEGY 2: EVALUATE ALL ANSWERS (✓ Safe, expensive)
+├─ Cost: 2× (one for generate, one for judge)
+├─ Cost per query: $0.0002 (Groq + judge)
+├─ Latency: +500ms (sequential judge call)
+├─ Hallucination rate: ~0.5% (catch most bad answers)
+├─ Use case: High-stakes (bookings, donations, prayers)
+└─ Problem: Doubles cost + adds 500ms latency
+
+───────────────────────────────────────────────
+
+STRATEGY 3: EVALUATE ONLY UNCERTAIN ANSWERS (✅ Optimal)
+├─ Cost: ~1.2× (extra evaluation on ~20% of answers)
+├─ Cost per query: $0.00012 (average)
+├─ Latency: +100ms average (most skip evaluation)
+├─ Hallucination rate: ~1% (good enough)
+├─ Use case: Aagam Mitra (knowledge base, reversible bookings)
+└─ Benefit: Safety net without doubling cost/latency
+
+HOW TO IDENTIFY "UNCERTAIN" ANSWERS:
+├─ Groq's confidence score < 0.7
+├─ Retrieved passages don't have strong semantic match
+├─ Question involves edge cases (rare terminology)
+└─ Answer requires synthesis of multiple passages
+```
+
+**For Aagam Mitra: Use Strategy 3** — evaluate uncertain answers only. Gives you safety without breaking latency budget.
+
+---
+
+### **Interview Summary**
+
+"RAG lets you generate answers grounded in knowledge. But how do you know the answers are actually good? Without evaluation, you're flying blind — Groq might hallucinate and you won't catch it. LLM-as-judge solves this: use a second LLM to score the first one on faithfulness, relevance, and hallucination risk. If the score is high (>= 4/5), send to user. If low, retry with different search or agent. For Aagam Mitra, we evaluate only uncertain answers — costs ~20% extra, catches 99% of hallucinations, and keeps latency at +100ms. The key insight: building RAG is one thing; knowing it works is another. Evaluation is how you bridge that gap."
 
 ---
 
@@ -1720,66 +2467,350 @@ If confidence >= threshold:
 
 > **Why asked:** The diagram shows "metadata creation" as a separate step. Metadata enriches every chunk so we can filter, rank, and explain better. Interviewers want to see you think beyond "text + vector" to "text + vector + meaning".
 
-**Current chunking (naive):**
+---
 
-```python
-chunks = [
-    {"text": "णमो अरिहंताणं is the opening mantra...", "page": 5},
-    {"text": "The five Paramesthi are Arihanta, Siddha...", "page": 5},
-]
-# Just text and source. That's it.
+### **The Problem: Chunks Without Context**
+
+```
+SCENARIO: User asks "What is the core teaching on the soul?"
+
+WITHOUT METADATA:
+├─ Vector search returns top-4 chunks
+├─ Chunk 1: "The soul (atma) is distinct from the body"
+├─ Chunk 2: "In the commentary section, scholars debate whether..."
+├─ Chunk 3: "An obscure edge case mentioned only once in appendix: the soul can be..."
+├─ Chunk 4: "Historical note: This interpretation was popular in 1200 CE but now debunked"
+│
+├─ All 4 chunks are returned equally
+├─ User gets: "Core teaching" + commentary + edge case + historical trivia
+└─ Result: CONFUSING and low-quality answer
+
+THE PROBLEM:
+├─ You can't tell if a chunk is foundational vs. obscure
+├─ You can't tell if it's explanation vs. story vs. rule
+├─ You can't prioritize "primary scripture" over "commentary"
+└─ Result: Mediocre answers
 ```
 
-**Production chunking (with metadata):**
+**Real Example: What Gets Lost**
 
-```python
-chunks = [
-    {
-        "text": "णमो अरिहंताणं is the opening mantra...",
-        "page": 5,
-        "section_type": "definition",        ← what is this chunk?
-        "section_title": "Navakar Mantra",   ← what section?
-        "key_concepts": ["mantra", "salutation", "five_paramesthi"],
-        "confidence": 0.95,                  ← how sure are we?
-        "source_type": "scripture",           ← vs. commentary vs. rule
-        "language": "prakrit_hindi_mix",
-        "is_core_teaching": True,            ← is this foundational?
-    },
-    ...
-]
+```
+Two chunks about "Ahimsa" (non-violence):
+
+CHUNK A: "Ahimsa is the first great vow. It means not harming any 
+         living being through thought, word, or deed."
+         → This is CORE TEACHING, PRIMARY SCRIPTURE
+
+CHUNK B: "In medieval times, some schools debated whether killing 
+         mosquitoes violates ahimsa. The conclusion was nuanced..."
+         → This is COMMENTARY, EDGE CASE
+
+Vector search treats them EQUALLY (both about ahimsa).
+User asks: "What is ahimsa?"
+Without metadata:
+├─ Returns both chunks equally
+├─ User gets confused by edge case
+└─ Doesn't get crisp definition
+
+With metadata:
+├─ Chunk A ranked higher (is_core_teaching=true, source_type=scripture)
+├─ Chunk B downranked (source_type=commentary, is_edge_case=true)
+└─ User gets clear, focused answer
 ```
 
-**How metadata improves the system:**
+---
 
-| Metadata | Improvement |
-|---|---|
-| `section_type` | Reranker can boost "definitions" over "examples" when user asks "what is X?" |
-| `key_concepts` | Filter chunks before retrieval (only show "karma" chunks when question mentions karma) |
-| `confidence` | Downrank low-confidence chunks in final scoring |
-| `source_type` | Deprioritize commentary if user wants primary scripture |
-| `is_core_teaching` | Boost foundational concepts; demote obscure edge cases |
+### **What Metadata Is (Conceptual)**
 
-**Who extracts it?**
+```
+METADATA = Extra information ABOUT the chunk (not IN the chunk)
 
-Not manual — use Gemini with a structured extraction prompt:
+Examples:
 
-```python
-extraction_prompt = f"""
-Chunk: {chunk_text}
+CHUNK TEXT: "The soul is eternal and immutable."
+METADATA ABOUT IT:
+├─ section_type: "definition" (not story, rule, example)
+├─ section_title: "Nature of the Soul"
+├─ key_concepts: ["soul", "eternity", "immutability"]
+├─ source_type: "scripture" (not commentary or rule)
+├─ language: "sanskrit"
+├─ is_core_teaching: true (foundational concept)
+├─ confidence: 0.98 (very sure this is accurate)
+└─ related_concepts: ["atma", "jiva", "moksha"]
 
-Extract JSON:
-{{
-  "section_type": "definition" | "rule" | "example" | "story" | "commentary",
-  "key_concepts": [list of 3-5 key terms],
-  "is_core_teaching": true/false,
-  "confidence": 0.0-1.0,
-}}
-"""
-
-metadata = await gemini.extract(extraction_prompt, response_format="json")
+WHY THIS MATTERS:
+├─ Chunk text answers WHAT
+└─ Metadata answers:
+   ├─ WHAT TYPE of information is this?
+   ├─ HOW IMPORTANT is it?
+   ├─ IS THIS PRIMARY or SECONDARY source?
+   └─ HOW CONFIDENT are we in this?
 ```
 
-Cost: ~1 more API call per chunk at ingest time (one-time). Payoff: 10-20% better relevance + 100% traceable answers (we can say "this is a core teaching" vs "this is an obscure reference").
+---
+
+### **How Metadata Improves Ranking**
+
+```
+SCENARIO: User asks "What is the soul?"
+
+WITHOUT METADATA:
+│
+├─ Vector search (purely semantic similarity)
+├─ Returns top-4 chunks by cosine similarity score
+├─ Example scores: [0.92, 0.91, 0.89, 0.88]
+│
+└─ Result: Similar chunks, but could be mixed quality
+
+WITH METADATA:
+│
+├─ Vector search returns top-4 chunks
+├─ THEN rerank by metadata:
+│
+│  Chunk 1: 0.92 similarity, is_core=true, source=scripture
+│  └─ Reranked score: 0.92 × 1.2 (boost) = 1.10 ✅ TOP
+│
+│  Chunk 2: 0.91 similarity, is_core=false, source=commentary  
+│  └─ Reranked score: 0.91 × 0.8 (penalty) = 0.73 (downranked)
+│
+│  Chunk 3: 0.89 similarity, is_core=true, source=scripture
+│  └─ Reranked score: 0.89 × 1.2 (boost) = 1.07 ✅ 2ND
+│
+│  Chunk 4: 0.88 similarity, is_edge_case=true, source=appendix
+│  └─ Reranked score: 0.88 × 0.5 (heavy penalty) = 0.44 (dropped)
+│
+└─ Result: Best, most relevant chunks float to top
+```
+
+---
+
+### **What Metadata to Extract**
+
+```
+CORE METADATA FIELDS:
+
+1. WHAT TYPE OF CONTENT?
+   ├─ section_type: "definition" | "rule" | "example" | "story" | "commentary"
+   ├─ Why: Different questions need different types
+   └─ Example: "What IS X?" wants definitions, not stories
+
+2. WHAT SECTION IS THIS?
+   ├─ section_title: "Navakar Mantra" | "The Five Vows" | etc.
+   ├─ Why: Context matters
+   └─ Example: Helps explain why this chunk appears
+
+3. WHAT ARE THE KEY IDEAS?
+   ├─ key_concepts: ["karma", "soul", "liberation"]
+   ├─ Why: Filter before search (only show karma chunks when asking about karma)
+   └─ Example: Question mentions "karma" → prioritize chunks with "karma" concept
+
+4. IS THIS IMPORTANT OR OBSCURE?
+   ├─ is_core_teaching: true/false
+   ├─ why: Foundational concepts matter more
+   └─ Example: Definition of Ahimsa > edge case about mosquitoes
+
+5. PRIMARY OR SECONDARY SOURCE?
+   ├─ source_type: "scripture" | "commentary" | "rule" | "interpretation"
+   ├─ Why: Some users want primary sources only
+   └─ Example: Theologian wants scripture, student wants commentary
+
+6. HOW CONFIDENT ARE WE?
+   ├─ confidence: 0.0-1.0
+   ├─ Why: Low-confidence chunks might be errors or OCR mistakes
+   └─ Example: OCR'd text (0.7 confidence) vs. typed text (0.99 confidence)
+
+7. WHAT LANGUAGE?
+   ├─ language: "sanskrit" | "hindi" | "prakrit_hindi_mix"
+   ├─ Why: Track translation accuracy
+   └─ Example: Sanskrit original is more authoritative than Hindi translation
+```
+
+---
+
+### **How Metadata Gets Used in Practice**
+
+```
+USER FLOW:
+
+Question: "What does 'ahimsa' mean in the context of violence?"
+
+STEP 1: Build search query with metadata filters
+├─ Search: "ahimsa violence"
+├─ Filter: section_type = "definition" (not story)
+├─ Filter: source_type = "scripture" (not commentary)
+├─ Filter: is_core_teaching = true (not obscure)
+└─ Result: Only relevant, foundational chunks
+
+STEP 2: Vector search (within filtered set)
+├─ Find semantically similar chunks
+├─ Among: Only definitions, scripture, core teachings
+└─ Result: Top-4 most relevant chunks
+
+STEP 3: Rerank by metadata quality
+├─ Boost: high confidence chunks
+├─ Boost: language = original (not translation)
+├─ Penalize: edge_case = true
+└─ Result: Best chunks float to top
+
+STEP 4: Send to Groq
+├─ Groq reads: top-4 high-quality, focused chunks
+├─ Groq generates answer
+└─ Result: Clear, authoritative answer
+```
+
+---
+
+### **Extracting Metadata: The Implementation**
+
+```
+PROBLEM: Who extracts all this metadata by hand?
+ANSWER: Don't. Use an LLM.
+
+The key insight: Metadata extraction is a SEPARATE task from embedding.
+
+Pipeline:
+
+Chunk text → Gemini → Extract metadata (JSON) → Store metadata
+              (one call)                      (alongside vector)
+```
+
+**Implementation Code:**
+
+```python
+async def extract_metadata_for_chunk(chunk_text: str) -> dict:
+    """
+    Use Gemini to extract metadata about this chunk.
+    
+    Returns: {
+        "section_type": "definition|rule|example|story|commentary",
+        "key_concepts": ["concept1", "concept2", ...],
+        "is_core_teaching": true/false,
+        "confidence": 0.0-1.0,
+        "source_type": "scripture|commentary|rule|interpretation",
+        "language": "sanskrit|hindi|prakrit_hindi_mix",
+    }
+    """
+    
+    extraction_prompt = f"""
+You are a Jain scripture expert. Analyze this chunk and extract structured metadata.
+
+CHUNK:
+{chunk_text}
+
+Extract:
+1. SECTION_TYPE: Is this a definition, rule, example, story, or commentary?
+2. KEY_CONCEPTS: What are 3-5 key ideas in this chunk?
+3. IS_CORE_TEACHING: Is this a foundational concept or an obscure edge case?
+4. CONFIDENCE: 0.0-1.0, how sure are we this is accurate? 
+   (0.7 for OCR'd, 0.99 for typed; 0.8 for commentary, 0.95 for primary text)
+5. SOURCE_TYPE: Is this from scripture, commentary, rules, or interpretation?
+6. LANGUAGE: What language is this in?
+
+Return as JSON with ONLY these fields. No explanations.
+    """
+    
+    response = await gemini.generate(
+        prompt=extraction_prompt,
+        response_format="json",
+        temperature=0.2,  # Low temperature for consistent extraction
+    )
+    
+    metadata = json.loads(response.text)
+    
+    return {
+        "section_type": metadata["section_type"],
+        "key_concepts": metadata["key_concepts"],
+        "is_core_teaching": metadata["is_core_teaching"],
+        "confidence": metadata["confidence"],
+        "source_type": metadata["source_type"],
+        "language": metadata["language"],
+    }
+
+
+# Usage in chunking pipeline:
+
+async def chunk_and_enrich(document_text: str):
+    """Chunk document AND extract metadata for each chunk."""
+    
+    # Step 1: Chunk the text
+    chunks = chunk_text(document_text, chunk_size=800, overlap=100)
+    
+    # Step 2: Extract metadata for each chunk (parallel)
+    metadata_list = await asyncio.gather(
+        *[extract_metadata_for_chunk(c.text) for c in chunks]
+    )
+    
+    # Step 3: Embed each chunk (parallel)
+    embeddings = await embed_texts([c.text for c in chunks])
+    
+    # Step 4: Combine everything
+    enriched_chunks = []
+    for chunk, metadata, embedding in zip(chunks, metadata_list, embeddings):
+        enriched_chunks.append({
+            "text": chunk.text,
+            "embedding": embedding,
+            "metadata": metadata,
+            "page": chunk.page,
+            "position": chunk.position,
+        })
+    
+    return enriched_chunks
+```
+
+**Cost Analysis:**
+```
+For 1,000-page book with 1,250 chunks:
+
+Without metadata extraction:
+├─ Embedding cost: 1,250 × $0.00003 = $0.0375
+
+With metadata extraction:
+├─ Extraction cost: 1,250 × $0.00001 = $0.0125
+├─ Embedding cost: 1,250 × $0.00003 = $0.0375
+├─ Total: $0.05
+├─ Extra cost: +$0.0125 (one-time, at ingestion)
+
+Benefit:
+├─ One-time extra cost: $0.0125 per book
+├─ Continuous improvement: 10-20% better relevance forever
+├─ Value: Immense (small cost, huge quality gain)
+```
+
+---
+
+### **Metadata in Action: Comparison**
+
+```
+QUESTION: "What is the core principle of Jainism?"
+
+WITHOUT METADATA:
+│
+├─ Top-4 chunks by similarity:
+│  1. "Ahimsa is the first vow" (0.89 similarity)
+│  2. "In 1200s, scholars debated whether..." (0.87 similarity)
+│  3. "Anekantavada means many-sidedness" (0.85 similarity)
+│  4. "A footnote mentions an obscure interpretation" (0.83 similarity)
+│
+├─ Groq synthesizes all 4
+└─ Answer: Confusing mix of core teaching + debate + footnote
+
+WITH METADATA:
+│
+├─ Top-4 chunks AFTER metadata reranking:
+│  1. "Ahimsa is the first vow" (0.89, is_core=true, source=scripture) ✅
+│  2. "Anekantavada means many-sidedness" (0.85, is_core=true, source=scripture) ✅
+│  3. "In 1200s, scholars debated..." (0.87, is_core=false, source=commentary) ↓
+│  4. "A footnote mentions..." (0.83, is_edge_case=true) ↓
+│
+├─ Groq synthesizes top-2 only (or weights them more)
+└─ Answer: Clear, authoritative, focused on core principles ✅
+```
+
+---
+
+### **Interview Summary**
+
+"Chunks are just text + vectors. But production RAG needs more: what type of content is this? Is it definition or story? Is it core teaching or edge case? Is it primary scripture or commentary? Metadata answers these questions. Use Gemini to extract metadata once per chunk at ingestion (cheap, one-time cost). Then, during search, rerank chunks by metadata: boost core teachings and primary scripture, downrank commentary and edge cases. This 10-20% quality improvement comes from a tiny cost uplift. The key insight: chunks are not all equal. Metadata lets you prioritize the right ones."
 
 ---
 
@@ -1787,52 +2818,331 @@ Cost: ~1 more API call per chunk at ingest time (one-time). Payoff: 10-20% bette
 
 > **Why asked:** Production systems don't let AI make irreversible decisions alone. Booking a slot is reversible (user can cancel). But if we added "auto-donate ₹100 when user asks for blessing", that's high-stakes — it needs approval. Interviewers want to see you know the difference.
 
-**The pattern:**
+---
+
+### **The Core Concept: Risk Levels**
+
+```
+FUNDAMENTAL INSIGHT:
+"Not all actions are equal. Some can be undone. Some cannot."
+
+THREE RISK TIERS:
+
+NORMAL (Reversible, low stakes)
+├─ Example: "Tell me about Ahimsa"
+├─ If wrong: User just ignores it
+├─ Cost of error: Zero
+└─ Gate needed: None (execute immediately)
+
+HIGH (Partially reversible, moderate stakes)
+├─ Example: "Book me a Shantidhara slot"
+├─ If wrong: User can cancel the booking (but it was created)
+├─ Cost of error: User support burden, audit trail matters
+└─ Gate needed: Log for audit trail (Auditor agent)
+
+CRITICAL (Irreversible, high stakes)
+├─ Example: "Donate ₹100 to the temple on my behalf"
+├─ If wrong: Money is gone, can't undo (need legal reversal)
+├─ Cost of error: Financial loss, user lawsuit, system distrust
+└─ Gate needed: Human approval before execution (Gatekeeper agent)
+```
+
+---
+
+### **Why This Matters: Real Scenarios**
+
+```
+SCENARIO A: Knowledge question (NORMAL)
+─────────────────────────────────────
+User: "What is Anekantavada?"
+
+AI answers: "It's the Jain principle of non-absolutism"
+
+If wrong:
+├─ User reads wrong definition
+├─ User might ask follow-up question
+├─ System corrects itself
+└─ No lasting damage
+
+Result: No approval gate needed ✅
+
+───────────────────────────────────────
+
+SCENARIO B: Booking action (HIGH)
+───────────────────────────────────
+User: "Book me the 9AM Shantidhara slot tomorrow"
+
+AI executes: 
+├─ Creates booking in database
+├─ Slot now shows as "booked"
+├─ Sends confirmation email
+└─ ✅ Action is done
+
+If AI books wrong slot:
+├─ User got booked for 10AM instead of 9AM
+├─ Admin needs to fix it manually
+├─ Audit trail essential (who booked what, when)
+├─ User experience damaged
+
+Result: Need audit logging but can execute ✅
+
+───────────────────────────────────────
+
+SCENARIO C: Financial action (CRITICAL)
+─────────────────────────────────────────
+User: "Donate ₹100 to the temple for my prayer intention"
+
+AI executes:
+├─ Debits ₹100 from user's account
+├─ Money is GONE (in gateway's hands now)
+├─ Sends receipt email
+
+If AI misunderstands and processes ₹1000 instead:
+├─ ₹900 is LOST (user sues)
+├─ Refund requires manual reversal (support nightmare)
+├─ Temple's trust in system is destroyed
+├─ Regulatory issues (financial regulation compliance)
+
+Result: MUST have human approval BEFORE executing ❌❌❌
+```
+
+---
+
+### **The Three Gates (Increasing Strictness)**
+
+```
+GATE 1: NO GATE (Normal actions)
+├─ Action: Execute immediately
+├─ Example: "Tell me about karma"
+├─ Latency: <500ms
+├─ Human involvement: Zero
+└─ Risk: None
+
+─────────────────────────────────
+
+GATE 2: AUDIT GATE (High actions)
+├─ Action: Log to audit trail, then execute
+├─ Example: Book slot, cancel booking
+├─ Latency: +50ms (just a database write)
+├─ Human involvement: Zero (but log is reviewed later)
+└─ Use case: User can undo themselves; we need proof of action
+
+─────────────────────────────────
+
+GATE 3: APPROVAL GATE (Critical actions)
+├─ Action: Ask human, wait for approval, then execute
+├─ Example: Financial transactions, permission changes
+├─ Latency: +15 minutes (wait for human)
+├─ Human involvement: Required (Gatekeeper or manager)
+└─ Use case: If AI is wrong, damage is irreversible
+```
+
+---
+
+### **How Approval Gates Work: The Flow**
+
+```
+SCENARIO: User donates ₹100
+
+USER REQUEST
+   │
+   ↓
+AGENT DETECTS: "This is a donation (financial, risk=critical)"
+   │
+   ↓
+┌────────────────────────────────────────────────┐
+│ GATEKEEPER APPROVES (APPROVAL GATE)            │
+│                                                │
+│ 1. Gatekeeper receives request                 │
+│    └─ "User wants to donate ₹100"              │
+│                                                │
+│ 2. Gatekeeper reviews:                         │
+│    ├─ User ID: Does the account exist?        │
+│    ├─ Amount: ₹100 (reasonable)                │
+│    ├─ Intent: "Prayer intention"               │
+│    └─ Previous donations: 3 (good history)    │
+│                                                │
+│ 3. Gatekeeper decides: APPROVE ✅              │
+│    (Or REJECT: "Amount too high" / "Fraud?")  │
+│                                                │
+│ 4. Send email to user for confirmation        │
+│    └─ "Please confirm: ₹100 donation"         │
+│                                                │
+│ 5. Wait for user email response (15 min)      │
+│    └─ User clicks: "Confirm" or "Cancel"      │
+└────────────────────────────────────────────────┘
+   │
+   ├─ If CONFIRMED:
+   │  ├─ Debit ₹100 from account
+   │  ├─ Send to payment gateway
+   │  ├─ Log to audit trail
+   │  └─ Send receipt to user
+   │
+   └─ If REJECTED:
+      ├─ Don't execute payment
+      ├─ Tell user: "Request was not approved"
+      └─ Log to audit trail (security)
+```
+
+---
+
+### **Risk Classification for Aagam Mitra**
+
+```
+┌────────────────────────────────────────────────────────┐
+│ NORMAL (No gate needed)                                 │
+├────────────────────────────────────────────────────────┤
+│ • Answer questions about scripture                      │
+│ • Provide event information                             │
+│ • Explain temple rules                                  │
+│ • Suggest prayer practices                              │
+└────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────┐
+│ HIGH (Audit gate: log then execute)                     │
+├────────────────────────────────────────────────────────┤
+│ • Book Shantidhara slot                                 │
+│ • Cancel booking                                        │
+│ • Register new membership                               │
+│ • Update user preferences                               │
+│ • Sign up for event notification                        │
+│                                                         │
+│ WHY: User can undo themselves (cancel slot, unregister).│
+│ Audit needed for: "Who booked what, when?"             │
+│ Latency impact: Minimal (+50ms)                         │
+└────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────┐
+│ CRITICAL (Approval gate: wait for human)                │
+├────────────────────────────────────────────────────────┤
+│ • Process donation/payment (₹1+)                        │
+│ • Change permissions (e.g., make user admin)            │
+│ • Delete account or data                                │
+│ • Send broadcast push notification                      │
+│ • Export user data                                      │
+│                                                         │
+│ WHY: Irreversible. If wrong, user loses money/data.     │
+│ Gate: Human approval required                           │
+│ Latency impact: Significant (+15 minutes)               │
+└────────────────────────────────────────────────────────┘
+```
+
+---
+
+### **Implementation: The Gate Logic**
 
 ```python
 async def execute_action(agent_result, risk_level="normal"):
     """
-    risk_level: "normal" | "high" | "critical"
+    Route action through appropriate gate based on risk level.
+    
+    agent_result = {
+        "action": "donate" | "book_slot" | "tell_about_mantra",
+        "parameters": {...},
+        "tool_call": {...},
+    }
+    
+    risk_level = "normal" | "high" | "critical"
     """
     
-    if risk_level == "critical":
-        # Block + ask human (Gatekeeper role)
-        return await gatekeeper.request_approval(
-            action=agent_result.tool_call,
-            reason="Financial action requires approval",
-            timeout_minutes=15,
-        )
-        # If approved in time → execute
-        # If rejected → tell user "Your request was reviewed and declined"
-        # If timeout → tell user "Please contact support"
+    # GATE 1: Normal actions (execute immediately)
+    if risk_level == "normal":
+        return await execute_tool(agent_result)
     
+    # GATE 2: High-risk actions (log then execute)
     elif risk_level == "high":
-        # Log + audit trail, but execute
+        # Write to audit log
         await auditor.log_sensitive_action(
-            user_id=context.user_id,
-            action=agent_result.tool_call,
-            timestamp=now(),
+            user_id=agent_result.user_id,
+            action_type=agent_result.action,
+            parameters=agent_result.parameters,
+            timestamp=datetime.now(),
+            ip_address=agent_result.request.ip,
         )
+        
+        # Then execute
         return await execute_tool(agent_result)
     
-    else:  # normal
-        # Normal path
-        return await execute_tool(agent_result)
+    # GATE 3: Critical actions (ask human, wait for approval)
+    elif risk_level == "critical":
+        # Send to Gatekeeper (human approval agent)
+        approval_request = await gatekeeper.request_approval(
+            action=agent_result.action,
+            parameters=agent_result.parameters,
+            reason="This action cannot be undone. Human review required.",
+            timeout_minutes=15,
+            escalate_to=["manager@temple.com", "finance@temple.com"],
+        )
+        
+        # Check if approved
+        if approval_request.status == "APPROVED":
+            # Execute the action
+            result = await execute_tool(agent_result)
+            
+            # Log approval + execution
+            await auditor.log_critical_action(
+                status="EXECUTED",
+                approval_token=approval_request.token,
+                approved_by=approval_request.approver_id,
+            )
+            
+            return result
+        
+        elif approval_request.status == "REJECTED":
+            # Don't execute; tell user
+            return {
+                "status": "rejected",
+                "message": "Your request was reviewed and declined.",
+                "reason": approval_request.rejection_reason,
+            }
+        
+        elif approval_request.status == "TIMEOUT":
+            # Timeout (no one approved in 15 minutes)
+            return {
+                "status": "timeout",
+                "message": "Your request requires manual approval. Please contact support.",
+            }
 ```
 
-**Risk levels in Aagam Mitra:**
+---
 
-| Action | Risk | Gate |
-|---|---|---|
-| Book Shantidhara slot | High | Log to audit trail (Auditor) |
-| Cancel booking | High | Log to audit trail (Auditor) |
-| Submit membership | High | Log + 24h cooling-off period (Gatekeeper) |
-| Donate ₹100+ | Critical | Require email confirmation (Strategist routes to email service) |
-| Change user permissions (admin only) | Critical | Require 2FA + manager approval (Gatekeeper) |
-| Broadcast push notification (admin only) | Critical | Preview + manual send button (Strategist) |
+### **Real-World Example: Booking Flow**
 
-**Today:** We do none of this. Everything goes through.
-**Production:** Critical actions need approval; high actions are logged for audit.
+```
+USER: "Book me the 9AM Shantidhara slot tomorrow"
+
+STEP 1: Agent understands action
+├─ Action: book_shantidhara_slot
+├─ Parameters: {slot_time: "09:00", date: "tomorrow"}
+├─ Risk level: HIGH (user can cancel later)
+└─ Flow: Audit gate
+
+STEP 2: Execute with audit logging
+├─ Log to audit trail: {user_id, action, time, params}
+├─ Create booking in database
+│  └─ INSERT INTO bookings (user_id, slot_time, date, status=CONFIRMED)
+├─ Debit from user's slot quota
+├─ Send confirmation email
+└─ Return result to user
+
+STEP 3: If user later says "Cancel my booking"
+├─ Action: cancel_shantidhara_slot (also HIGH risk)
+├─ Log to audit trail: {user_id, "cancel", time}
+├─ Delete booking from database (mark as CANCELLED)
+├─ Refund slot quota
+└─ User can see audit history: "Booked 9AM on Jan 15, cancelled on Jan 15 at 5:30pm"
+
+AUDIT TRAIL (visible to admin):
+├─ Jan 15, 4:00pm: User Raj booked 9AM slot
+├─ Jan 15, 5:30pm: User Raj cancelled 9AM slot
+└─ Clear history of user actions (compliance-ready)
+```
+
+---
+
+### **Interview Summary**
+
+"Not all actions are equal. Some are reversible (book a slot — user can cancel), others are not (donate money — gone forever). In production, you need three tiers: normal actions execute immediately (no gate), high-risk actions execute but log to audit trail (user can undo, but we need proof), critical actions require human approval before executing (irreversible, so human must sign off). In Aagam Mitra: knowledge questions are normal (execute immediately), bookings are high (audit log then execute), donations are critical (require email confirmation + manager approval). The key insight: let the risk level, not the code, decide the flow. High-risk doesn't mean block; it means log. Critical means require approval."
 
 ---
 
@@ -1840,64 +3150,348 @@ async def execute_action(agent_result, risk_level="normal"):
 
 > **Why asked:** "It works" is not production. "It works and I can see when it breaks" is production. Interviewers want a monitoring/logging strategy, not just code. This is the boring-but-essential part that separates hobby projects from systems people rely on.
 
-**The observability stack (from the diagram):**
+---
+
+### **The Core Problem: Blindness**
 
 ```
-Every LLM call → log:
-  - Input (question + context size)
-  - Output (answer + action_cards)
-  - Latency (ms)
-  - Token cost (input + output)
-  - LLM judge scores (faithfulness, relevance, hallucination_risk)
-  - Agent chosen (which agent ran?)
-  - Tool calls made (which tools invoked?)
-  - Whether user rated it 👍 or 👎
+SCENARIO A: Development (you)
+├─ You run the code locally
+├─ You see errors immediately in terminal
+├─ If something breaks, you know instantly
+└─ "It works!" ✅
 
-Every database operation → log:
-  - Query type (search, insert, sync)
-  - Duration (ms)
-  - Rows affected
-  - Cache hit / miss
+SCENARIO B: Production (users)
+├─ Code runs on server (you don't see the terminal)
+├─ Users use the app
+├─ If something breaks, users know FIRST
+├─ You find out from angry messages or support tickets
+└─ "It worked an hour ago... I guess it broke?" 😱
 
-Every error → log:
-  - Stack trace
-  - User ID + temple ID
-  - Message that caused it
-  - What we tried to do (for retry logic)
-
-Dashboard metrics:
-  - P50 / P95 / P99 latency (per agent)
-  - Cost per agent per day
-  - Error rate (% of messages that failed)
-  - Average LLM judge scores (hallucination trend)
-  - User satisfaction (👍 ratio)
-  - Cache hit rate (% of temple syncs that hit cache)
+THE GAP:
+├─ Dev: You have full visibility (terminal, logs, errors)
+├─ Prod: You have ZERO visibility unless you instrument it
+├─ Cost: Users suffer while you debug
+└─ Solution: OBSERVABILITY = Instrument everything to see what's happening
 ```
 
-**Cheap implementation:**
+**Real Example: Silent Failure**
+
+```
+SCENARIO: Hallucination rate suddenly jumps from 2% to 10%
+
+WITHOUT OBSERVABILITY:
+├─ Day 1: Hallucination filter broke, users get wrong answers
+├─ Day 2: No alerts, you don't know
+├─ Day 3: Users start complaining
+├─ Day 4: You investigate support tickets
+├─ Day 5: You find the bug
+├─ Damage: 4 days of bad answers sent to users ❌
+
+WITH OBSERVABILITY:
+├─ Day 1: Hallucination rate alert triggers (threshold crossed)
+├─ Day 1, 2 minutes later: You get paged
+├─ Day 1, 15 minutes later: Bug is fixed
+├─ Damage: 15 minutes of bad answers ✅
+```
+
+---
+
+### **What Can Break (The Three Layers)**
+
+```
+LAYER 1: LLM CALLS (Groq, Gemini, Pinecone)
+├─ What breaks:
+│  ├─ API timeout (Groq is slow today)
+│  ├─ Token limit exceeded (query is too long)
+│  ├─ Rate limit hit (too many calls to API)
+│  ├─ Answer quality degrading (hallucination rate up)
+│  └─ Cost explosion (suddenly expensive)
+├─ What to monitor:
+│  ├─ Latency (ms per call)
+│  ├─ Error rate (% failed calls)
+│  ├─ Cost (USD per day)
+│  ├─ Quality (LLM judge scores)
+│  └─ Agent performance (which agent is slowest?)
+└─ Alert threshold:
+   ├─ Latency > 2000ms (alert)
+   ├─ Error rate > 5% (alert)
+   ├─ Hallucination score < 3.0 (alert)
+   └─ Daily cost > budget (alert)
+
+LAYER 2: DATABASE OPERATIONS (PostgreSQL, Pinecone)
+├─ What breaks:
+│  ├─ Query timeout (database is overloaded)
+│  ├─ Connection pool exhausted (too many requests)
+│  ├─ Disk full (database runs out of space)
+│  ├─ Data inconsistency (cache vs. reality mismatch)
+│  └─ Replication lag (data not synced)
+├─ What to monitor:
+│  ├─ Query duration (ms)
+│  ├─ Cache hit rate (% of searches that hit cache)
+│  ├─ Rows affected (insert/update count)
+│  ├─ Disk usage (% full)
+│  └─ Replication lag (seconds behind primary)
+└─ Alert threshold:
+   ├─ Query > 1000ms (alert)
+   ├─ Cache hit rate < 50% (alert)
+   ├─ Disk > 80% full (alert)
+   └─ Replication lag > 10 seconds (alert)
+
+LAYER 3: USER EXPERIENCE
+├─ What breaks:
+│  ├─ High error rate (users see errors)
+│  ├─ Slow responses (users wait >5 seconds)
+│  ├─ Bad answer quality (users rate answer 👎)
+│  ├─ Timeout (user requests time out)
+│  └─ Crashes (app crashes for some users)
+├─ What to monitor:
+│  ├─ P50 / P95 / P99 latency (end-to-end response time)
+│  ├─ User satisfaction (👍 / 👎 ratio)
+│  ├─ Error rate (% of requests that fail)
+│  ├─ Timeout rate (% that exceed 30 seconds)
+│  └─ Crash rate (% that hit unhandled exception)
+└─ Alert threshold:
+   ├─ P99 latency > 5000ms (alert)
+   ├─ Satisfaction < 80% (alert)
+   ├─ Error rate > 1% (alert)
+   └─ Any crash (alert immediately)
+```
+
+---
+
+### **The Observability Strategy: Three Levels**
+
+```
+LEVEL 1: LOGGING (What happened?)
+├─ Every action writes to a log
+├─ Example: "2026-07-14 14:23:05 | User Raj | Asked about karma | Latency=234ms | Cost=$0.0002"
+├─ Storage: Simple database or CSV (cheap)
+├─ Query: "Show me all requests from User Raj"
+└─ Use: Debugging, audit trail, per-user analysis
+
+LEVEL 2: METRICS (How is the system doing?)
+├─ Aggregated statistics from logs
+├─ Example: "Average latency = 234ms, P95 = 450ms, P99 = 890ms"
+├─ Refreshed: Every minute
+├─ Query: "Show me latency trend over 7 days"
+└─ Use: Trends, performance SLAs, capacity planning
+
+LEVEL 3: ALERTS (What broke?)
+├─ Automated checks on metrics
+├─ Example: "If P95 latency > 1000ms, send Slack alert"
+├─ Trigger: Real-time (as soon as threshold crossed)
+├─ Action: Page oncall engineer
+└─ Use: Catch problems BEFORE users notice
+```
+
+**Pyramid View:**
+
+```
+┌─────────────────────────────┐
+│   ALERTS (act on)           │  Most urgent
+│  "P99 latency exceeded!"    │  Real-time
+├─────────────────────────────┤
+│   METRICS (monitor)         │  Weekly review
+│  "Avg latency = 450ms"      │  Trends
+├─────────────────────────────┤
+│   LOGGING (debug)           │  Least urgent
+│ "User X, Q='...',L=450ms"   │  Historical
+└─────────────────────────────┘
+```
+
+---
+
+### **What to Log: The Three Layers**
+
+```
+LAYER 1: LLM CALLS
+┌──────────────────────────────────────────┐
+│ {                                        │
+│   "timestamp": "2026-07-14T14:23:05Z",  │
+│   "user_id": "raj_123",                 │
+│   "temple_id": "kailash_main",          │
+│   "question": "What is karma?",         │
+│   "question_length": 16,                │
+│   "answer": "Karma is the law of...",   │
+│   "answer_length": 342,                 │
+│   "latency_ms": 450,                    │
+│   "tokens_input": 127,                  │
+│   "tokens_output": 56,                  │
+│   "cost_usd": 0.000234,                 │
+│   "agent_type": "scripture",            │
+│   "faithfulness_score": 4.8,            │
+│   "hallucination_risk": 0.95,           │
+│   "user_rating": "👍",                  │
+│   "error": null                         │
+│ }                                       │
+└──────────────────────────────────────────┘
+
+LAYER 2: DATABASE OPERATIONS
+┌──────────────────────────────────────────┐
+│ {                                        │
+│   "timestamp": "2026-07-14T14:23:05Z",  │
+│   "operation_type": "vector_search",    │
+│   "query_type": "semantic",             │
+│   "duration_ms": 125,                   │
+│   "rows_searched": 1250,                │
+│   "rows_returned": 4,                   │
+│   "cache_hit": true,                    │
+│   "cache_age_ms": 45000,                │
+│   "database": "pinecone",               │
+│   "error": null                         │
+│ }                                       │
+└──────────────────────────────────────────┘
+
+LAYER 3: ERRORS
+┌──────────────────────────────────────────┐
+│ {                                        │
+│   "timestamp": "2026-07-14T14:23:05Z",  │
+│   "severity": "error",                  │
+│   "message": "Timeout calling Groq API",│
+│   "error_type": "TimeoutError",         │
+│   "stack_trace": "...",                 │
+│   "user_id": "raj_123",                 │
+│   "temple_id": "kailash_main",          │
+│   "request_id": "req_abc123",           │
+│   "what_we_tried": "Generate answer",   │
+│   "retry_count": 2,                     │
+│   "resolved": false                     │
+│ }                                       │
+└──────────────────────────────────────────┘
+```
+
+---
+
+### **Implementation: Simple Version**
 
 ```python
-async def log_rag_call(question, answer, scores, latency_ms, cost_usd):
-    """Ship logs to a simple database or CSV."""
-    await db.insert("rag_calls", {
-        "timestamp": now(),
-        "user_id": current_user.id,
+import json
+from datetime import datetime
+
+async def log_rag_call(question, answer, scores, latency_ms, cost_usd, user_id, agent_type):
+    """Log one LLM call to database."""
+    
+    log_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "user_id": user_id,
         "question_length": len(question),
         "answer_length": len(answer),
         "latency_ms": latency_ms,
         "cost_usd": cost_usd,
         "faithfulness_score": scores.faithfulness,
         "hallucination_risk": scores.hallucination_risk,
-        "agent_type": "scripture",  # or temple_ops, etc.
-    })
+        "agent_type": agent_type,
+    }
+    
+    # Write to database
+    await db.insert("rag_calls", log_entry)
+    
+    # Also write to CSV for simple analysis
+    with open("logs/rag_calls.jsonl", "a") as f:
+        f.write(json.dumps(log_entry) + "\n")
 
-# Then query it:
-# SELECT AVG(latency_ms) FROM rag_calls
-#        WHERE timestamp > NOW() - INTERVAL 7 DAY
-#        GROUP BY agent_type
+
+async def log_database_operation(operation_type, duration_ms, rows_affected, cache_hit=False):
+    """Log one database operation."""
+    
+    log_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "operation_type": operation_type,
+        "duration_ms": duration_ms,
+        "rows_affected": rows_affected,
+        "cache_hit": cache_hit,
+    }
+    
+    await db.insert("db_operations", log_entry)
+
+
+async def log_error(message, error_type, user_id, stack_trace):
+    """Log an error with context."""
+    
+    log_entry = {
+        "timestamp": datetime.now().isoformat(),
+        "severity": "error",
+        "message": message,
+        "error_type": error_type,
+        "stack_trace": stack_trace,
+        "user_id": user_id,
+    }
+    
+    await db.insert("errors", log_entry)
+    
+    # ALSO: Alert immediately if critical
+    if error_type in ["TimeoutError", "OutOfMemoryError"]:
+        await slack.post_alert(f"CRITICAL: {error_type} for user {user_id}")
 ```
 
-This is the difference between "I hope it works" and "I know it works and can see when it starts to fail."
+---
+
+### **Dashboard Metrics (What to Display)**
+
+```
+DASHBOARD VIEW 1: System Health (Real-time)
+┌─────────────────────────────────────┐
+│ AAGAM MITRA HEALTH DASHBOARD       │
+├─────────────────────────────────────┤
+│                                     │
+│ Latency:                            │
+│   P50: 234ms ✅                     │
+│   P95: 450ms ✅                     │
+│   P99: 890ms ⚠️ (approaching limit) │
+│                                     │
+│ Error Rate:                         │
+│   0.3% ✅ (target: < 1%)            │
+│                                     │
+│ Cost Today:                         │
+│   $34.56 ✅ (budget: $50/day)       │
+│                                     │
+│ User Satisfaction:                  │
+│   86% 👍 ✅ (target: > 80%)         │
+│                                     │
+│ Hallucination Rate:                 │
+│   3.2% ✅ (target: < 5%)            │
+│                                     │
+│ Cache Hit Rate:                     │
+│   62% ✅ (target: > 50%)            │
+│                                     │
+└─────────────────────────────────────┘
+
+DASHBOARD VIEW 2: Per-Agent Performance
+┌─────────────────────────────────────┐
+│ Agent Performance (Last 24h)        │
+├──────────────┬──────────┬──────────┤
+│ Agent        │ Latency  │ Accuracy │
+├──────────────┼──────────┼──────────┤
+│ Scripture    │ 234ms ✅ │ 94% ✅   │
+│ Temple Ops   │ 567ms ⚠️ │ 88% ✅   │
+│ Bookings     │ 123ms ✅ │ 100% ✅  │
+│ Finance      │ 1200ms ❌│ 75% ❌   │
+│                                    │
+│ Action: Investigate Finance agent │
+└────────────────────────────────────┘
+
+DASHBOARD VIEW 3: Cost Breakdown
+┌─────────────────────────────────────┐
+│ Cost by Agent (Weekly)              │
+├──────────────┬──────────────────────┤
+│ Scripture    │ $120 (68%)           │
+│ Temple Ops   │ $34 (19%)            │
+│ Bookings     │ $22 (13%)            │
+├──────────────┼──────────────────────┤
+│ Total        │ $176 (budget: $200)  │
+│                                     │
+│ Trend: ↑ Up 10% from last week      │
+│        (Scripture agent getting     │
+│         more complex questions)     │
+└─────────────────────────────────────┘
+```
+
+---
+
+### **Interview Summary**
+
+"Production systems must be observable. You can't fix what you can't see. Instrument three layers: (1) LLM calls — log latency, cost, quality scores; (2) database operations — log query time, cache hits, errors; (3) user experience — log end-to-end latency and satisfaction. Then aggregate logs into metrics (P50/P95/P99 latency, error rate, cost trend), and set alerts on metrics (if P95 > 1 second, page oncall). The result: you catch problems before users do, you see cost trends before they explode, you can answer 'which agent is slowest?' instantly. It's the difference between flying blind and having a dashboard."
 
 ---
 
@@ -1905,60 +3499,298 @@ This is the difference between "I hope it works" and "I know it works and can se
 
 > **Why asked:** You start with 800-char chunks, no metadata. Six months later, you add metadata extraction. Now you have 50,000 old chunks without metadata and 10,000 new chunks with metadata. How do you handle that? This separates someone who launched something from someone who maintains it in production.
 
-**The problem:**
+---
+
+### **The Real-World Problem**
 
 ```
-Old chunks (no metadata):
-  {id: "chunk_1", text: "...", page: 5}
+Timeline:
 
-New chunks (with metadata):
-  {id: "chunk_2001", text: "...", page: 6, section_type: "definition", key_concepts: [...]}
+MONTH 1 (Launch):
+├─ Upload Jain scriptures
+├─ Create 50,000 chunks
+├─ Schema: {id, text, page}
+├─ Store in Pinecone
+└─ Works great!
 
-Pinecone query returns a mix → some chunks have metadata filters, some don't → your reranker breaks.
+MONTH 6 (Improvement):
+├─ Add metadata extraction (Q15)
+├─ New schema: {id, text, page, section_type, key_concepts, is_core_teaching}
+├─ New uploads get metadata
+└─ But 50,000 OLD chunks don't have metadata!
+
+QUERY TIME (Month 6+):
+├─ Search returns: [old_chunk, new_chunk, old_chunk, new_chunk]
+├─ Some have metadata, some don't
+├─ Reranker code says: "boost is_core_teaching=true"
+├─ Problem: old_chunk doesn't HAVE is_core_teaching!
+├─ Crash: KeyError: 'is_core_teaching'
+└─ Result: ❌ Production is broken
 ```
 
-**Solution: Schema versioning with gradual migration**
+**The Question:**
+```
+You can't afford downtime to rebuild 50,000 chunks.
+You can't afford to lose data.
+You can't afford to confuse the system with mixed schemas.
+
+What do you do?
+```
+
+---
+
+### **Why This Is Hard**
+
+```
+NAIVE SOLUTION 1: Stop the system, rebuild everything
+├─ Downtime: 8 hours (50,000 chunks × 1 second = 50,000 seconds)
+├─ Cost: Zero revenue during maintenance
+├─ User experience: "Service unavailable"
+└─ Not acceptable ❌
+
+───────────────────────────────────────────────
+
+NAIVE SOLUTION 2: Just write new chunks, ignore old ones
+├─ Problem: Old chunks still exist in Pinecone
+├─ Result: Queries return both old and new
+├─ Reranker crashes on old chunks (missing metadata)
+└─ Not acceptable ❌
+
+───────────────────────────────────────────────
+
+THE RIGHT SOLUTION: Gradual migration with versioning
+├─ Deploy code that handles BOTH schemas
+├─ New chunks get metadata (schema v2)
+├─ Old chunks stay without metadata (schema v1)
+├─ During queries: Handle both (compute metadata on-the-fly for v1)
+├─ Background job: Slowly rebuild old chunks to v2 (off-hours)
+├─ Downtime: ZERO
+├─ Data loss: ZERO
+├─ User impact: NONE
+└─ Acceptable ✅
+```
+
+---
+
+### **Schema Versioning Strategy**
+
+```
+CONCEPT: Mark every chunk with its schema version
+
+Chunk v1 (old):
+{
+  "id": "chunk_1",
+  "text": "The Navakar Mantra...",
+  "page": 5,
+  "schema_version": 1      ← This marks it as old
+}
+
+Chunk v2 (new):
+{
+  "id": "chunk_2001",
+  "text": "The Navakar Mantra...",
+  "page": 5,
+  "schema_version": 2,     ← This marks it as new
+  "section_type": "definition",
+  "key_concepts": ["mantra", "salutation"],
+  "is_core_teaching": true
+}
+
+WHY THIS WORKS:
+├─ At query time, you know which chunks are old vs. new
+├─ For v1 chunks: compute metadata on-the-fly (slow, but only for retrieval)
+├─ For v2 chunks: use stored metadata (fast)
+├─ Both paths work, so no crashes
+└─ Migration happens in background without affecting queries
+```
+
+---
+
+### **Three-Phase Migration Plan**
+
+```
+PHASE 1: DEPLOY WITH DUAL-SCHEMA SUPPORT (Week 1)
+├─ Code change: Add schema_version to every chunk
+├─ Backward compatibility: Handle both v1 and v2
+├─ Retrieval logic: If v1 chunk, compute metadata at query time
+├─ New uploads: Use schema_version=2
+├─ Downtime: ZERO (just a code deploy)
+├─ User impact: NONE
+│
+└─ Check:
+   ├─ Old queries still work ✅
+   ├─ New queries return mixed results ✅
+   └─ No crashes on missing metadata ✅
+
+───────────────────────────────────────────────
+
+PHASE 2: GRADUAL BACKGROUND MIGRATION (Week 2-4)
+├─ Background job runs during off-hours (2-6 AM)
+├─ Job logic:
+│  ├─ Find chunks with schema_version=1
+│  ├─ Extract metadata for each
+│  ├─ Update chunk to schema_version=2
+│  └─ Migrate at 5% per night (1,000 chunks/night)
+│
+├─ Why 5% per night?
+│  ├─ If job crashes, only 1% of data is affected
+│  ├─ Doesn't hog Gemini API quota (still available for user queries)
+│  ├─ Can be retried tomorrow night
+│  └─ Easy to pause if something goes wrong
+│
+├─ Cost: Spread out (not one huge bill)
+├─ Risk: Low (can resume anytime)
+└─ Duration: ~20 nights to complete
+
+───────────────────────────────────────────────
+
+PHASE 3: DEPRECATION (Week 4+)
+├─ Once all chunks migrated:
+│  ├─ Remove code path for schema_version=1
+│  ├─ Assume all chunks are v2
+│  ├─ Simplify retrieval logic
+│  └─ Commit: "Removed v1 chunk support"
+│
+├─ Now:
+│  ├─ All chunks have metadata
+│  ├─ Reranker is simpler (no null checks)
+│  ├─ Performance is faster (no on-the-fly computation)
+│  └─ Ready for next improvement ✅
+```
+
+---
+
+### **Implementation: Dual-Schema Handling**
 
 ```python
 class ChunkSchema:
-    VERSION = 2  # increment when schema changes
+    """Track schema versions"""
+    VERSION = 2  # Current version
     
-    # v1 (old) — minimal
-    # v2 (new) — with metadata
+    # v1: {id, text, page}
+    # v2: {id, text, page, metadata{section_type, key_concepts, is_core_teaching}}
 
-async def ingest_chunk(text, page, schema_version=None):
-    if schema_version is None:
-        schema_version = ChunkSchema.VERSION
-    
-    chunk = {"text": text, "page": page, "schema_version": schema_version}
-    
-    if schema_version >= 2:
-        # Extract metadata for new chunks
-        chunk["metadata"] = await extract_metadata(text)
-    else:
-        # For old chunks retrieved from Pinecone, fill in metadata on-the-fly
-        chunk["metadata"] = await extract_metadata(text)  # lazy enrichment
-    
-    return chunk
 
-# On deploy:
-# - Old chunks stay as-is (schema_version=1)
-# - New chunks get metadata (schema_version=2)
-# - Retrieval layer handles both: if missing metadata, compute it at query time
-# - Background job: gradually re-embed old chunks with new metadata (during off-hours)
+async def retrieve_chunks_with_mixed_schemas(query_vector, top_k=4):
+    """
+    Handle retrieval from mixed v1/v2 chunks.
+    Compute metadata on-the-fly for v1, use stored for v2.
+    """
+    
+    # Search Pinecone (returns v1 + v2 chunks mixed)
+    raw_chunks = await pinecone.query(query_vector, top_k=top_k)
+    
+    # Enrich chunks (handle both schemas)
+    enriched_chunks = []
+    
+    for chunk in raw_chunks:
+        if chunk.get("schema_version") == 1:
+            # v1 chunk: no metadata, compute on-the-fly
+            print(f"v1 chunk, computing metadata...")
+            chunk["metadata"] = await extract_metadata(chunk["text"])
+            chunk["schema_version"] = 1  # Mark as computed, not stored
+            
+        elif chunk.get("schema_version") == 2:
+            # v2 chunk: already has metadata
+            print(f"v2 chunk, using stored metadata")
+            # metadata already present
+        
+        enriched_chunks.append(chunk)
+    
+    return enriched_chunks
+
+
+async def background_migration_job():
+    """
+    Runs every night: migrate v1 chunks to v2.
+    Batch size: 1000 chunks/night (5% of 20,000).
+    """
+    
+    while True:
+        # Find 1,000 v1 chunks
+        v1_chunks = await db.query(
+            "SELECT * FROM chunks WHERE schema_version=1 LIMIT 1000"
+        )
+        
+        if not v1_chunks:
+            print("Migration complete!")
+            break
+        
+        # Extract metadata for each
+        for chunk in v1_chunks:
+            chunk["metadata"] = await extract_metadata(chunk["text"])
+            chunk["schema_version"] = 2  # Upgrade to v2
+            
+            # Update in database
+            await db.update("chunks", chunk.id, chunk)
+        
+        print(f"Migrated {len(v1_chunks)} chunks")
+        
+        # Wait 24 hours before next batch
+        await asyncio.sleep(86400)
+
+
+# DEPLOY SEQUENCE:
+
+# Day 1: Deploy code with dual-schema support
+# ├─ No data changes
+# ├─ Code handles both v1 and v2
+# └─ Queries work for all chunks
+
+# Night 1: Start background job
+# ├─ Migrate 1,000 chunks (5%)
+# └─ All queries still work (v1 fallback)
+
+# Night 2-20: Continue migration
+# ├─ 1,000 chunks/night
+# └─ System remains responsive
+
+# Night 21: Last batch complete
+# ├─ Remove dual-schema code path
+# ├─ Simplify retrieval logic
+# └─ Performance improvement: no on-the-fly metadata
 ```
 
-**Migration strategy:**
+---
+
+### **Why This Works**
 
 ```
-Week 1: Deploy new code with schema_version check
-Week 2-4: New uploads use schema_version=2
-        Old queries compute metadata on-the-fly
-Week 4+: Background job re-embeds old chunks (5% per night)
-        Once complete: old metadata computed at ingest, not query
+ADVANTAGES:
+
+1. ZERO DOWNTIME
+   ├─ System keeps running during migration
+   ├─ No "maintenance window"
+   └─ Users don't notice anything
+
+2. ZERO DATA LOSS
+   ├─ Old chunks are never deleted
+   ├─ Just updated with new metadata
+   └─ Can rollback anytime
+
+3. GRADUAL RISK
+   ├─ Migrate 5% per night (1,000 chunks)
+   ├─ If something goes wrong, only 1% affected
+   ├─ Can pause, debug, resume
+   └─ Not a "all or nothing" deployment
+
+4. COST SPREAD
+   ├─ Metadata extraction cost spread over 20 nights
+   ├─ Doesn't spike API quota for a day
+   ├─ Fits into normal budget
+
+5. COMPATIBILITY
+   ├─ Code handles both schemas simultaneously
+   ├─ No "rip and replace"
+   ├─ Can test new schema in production before deprecating old
+   └─ Smooth transition
 ```
 
-This is production thinking: how do you change systems that can't afford downtime?
+---
+
+### **Interview Summary**
+
+"Production systems can't afford downtime for schema changes. You start simple (chunks with just text + page), then add features (metadata extraction), but now you have mixed schemas. Solution: Schema versioning. Mark every chunk with its version. Deploy code that handles both old and new schemas — for old chunks, compute metadata on-the-fly during queries; for new chunks, use stored metadata. Run a background migration job at night: gradually upgrade old chunks to new schema (5% per night, 20 nights to finish). Result: zero downtime, zero data loss, gradual risk. Users see no interruption. This is production thinking: how do you evolve a system that's running live."
 
 ---
 
@@ -1981,18 +3813,100 @@ This is production thinking: how do you change systems that can't afford downtim
 
 > **Why asked:** Most basic RAG systems flatten PDFs into text, losing all structure. Tables are the killer case — if a cell contains the answer, naive chunking breaks it across boundaries and retrieval fails. This question separates engineers who've only read about RAG from those who've shipped it against real documents. The answer shows you know structured data extraction and when to apply it.
 
-**The problem:** A 10-row table with the answer in row 14, column 3.
+---
+
+### **Why Tables Are Special**
 
 ```
-Naive chunking:
-Chunk 1: "Row 1-5 of table... [chars 0-800]"
-Chunk 2: "[overflow] Row 6-10... Row 14 Cell 1..."
-Chunk 3: "Row 14 Cell 2... Row 14 Cell 3 (ANSWER) Row 15..."
+NORMAL TEXT:
+│ "The soul is eternal and distinct from the body. 
+│ It transmigrates through multiple lifetimes. 
+│ Freedom from soul means liberation."
+│
+│ If chunked at 800 chars:
+│ Chunk 1: "The soul is eternal..."
+│ Chunk 2: "...through multiple lifetimes..."
+│ Chunk 3: "...means liberation"
+│
+│ These chunks work fine separately. Each is meaningful.
+│ Even if query returns just Chunk 1, you get a valid answer.
 
-Query: "What is the value in row 14, column 3?"
-→ Retrieves chunks 2 and 3
-→ Context is split across two chunks, either misses the cell or sees it fragmented
-→ LLM struggles to construct the full cell value
+TABLES:
+│ "Fee Schedule:
+│  | Type        | Amount | Frequency |
+│  | Basic       | ₹100   | Monthly   |
+│  | Premium     | ₹500   | Monthly   |
+│  | Life Member | ₹5000  | One-time  |"
+│
+│ If chunked at 800 chars:
+│ Chunk 1: "Fee Schedule: | Type | Amount..."
+│ Chunk 2: "...| Premium | ₹500 | Monthly | Life Member | ₹5000..."
+│ Chunk 3: "...| One-time |"
+│
+│ These chunks are MEANINGLESS ALONE.
+│ Query: "How much is Premium membership?"
+│ Retrieves: Chunk 2
+│ Chunk 2 contains: partial header + partial rows
+│ LLM can't construct the answer from fragmented data ❌
+
+KEY DIFFERENCE:
+├─ Text chunks: Individually meaningful
+└─ Table chunks: ONLY meaningful as a complete unit
+```
+
+---
+
+### **The Real Problem**
+
+```
+SCENARIO: PDF with fee schedule table (12 rows, 4 columns)
+
+NAIVE CHUNKING (no structure awareness):
+├─ Treat table like normal text
+├─ Split at 800 characters
+├─ Result: Rows 1-3 in chunk A, Rows 4-8 in chunk B, Rows 9-12 in chunk C
+│
+├─ Query: "What's the annual fee for Premium members?"
+├─ Vector search finds: Chunk B (happens to contain "Premium")
+├─ But Chunk B is fragmented: "...Premium | ₹500 | M..." (incomplete)
+├─ LLM sees partial row, can't reconstruct full answer
+└─ Result: Wrong answer or "I don't know" ❌
+
+SMART CHUNKING (structure-aware):
+├─ Detect: "This is a table"
+├─ Decision: Keep entire table as ONE chunk (never split)
+├─ Result: One atomic chunk with all 12 rows intact
+│
+├─ Query: "What's the annual fee for Premium members?"
+├─ Vector search finds: Table chunk (complete and intact)
+├─ Chunk contains: Full table with all rows visible
+├─ LLM sees: Complete "Premium | ₹500 | Monthly" row
+└─ Result: Perfect answer ✅
+```
+
+---
+
+### **The Core Insight**
+
+```
+RULE: Chunk size is FLEXIBLE based on content type
+
+RULE 1: Normal text → Chunk at 800 characters
+├─ Each chunk is independently understandable
+├─ Can be split across boundaries
+├─ Loss of 1 chunk = loss of 1 concept (not corrupted concept)
+
+RULE 2: Tables → Chunk at WHOLE TABLE (never split)
+├─ Each chunk is the entire table, regardless of size
+├─ Can't split across rows/columns
+├─ Loss of 1 chunk = loss of entire table (or keep it whole)
+├─ Even 50-row table = 1 chunk (not 50 chunks)
+
+IMPLEMENTATION:
+├─ Detect: Is this content a table?
+├─ If YES: chunk_size = None (use entire table)
+├─ If NO: chunk_size = 800 (use normal splitting)
+└─ Result: Some chunks are 50 chars, some are 5000 chars
 ```
 
 **Solution 1: Detect tables and preserve structure**
@@ -2078,50 +3992,234 @@ else:
 
 > **Why asked:** This is a classic algorithmic interview question that also tests real-world knowledge. Many engineers know HNSW is "the index Pinecone uses" but can't explain *how* it's fast. The answer reveals whether you understand the speed/accuracy tradeoff and why it matters for production scale. Bonus: Explains why deleting old vectors can be expensive (graph restructuring).
 
-**The naive approach (brute force):**
-- Compare query vector against all 100M vectors = 100M similarity calculations
-- Sort by distance, return top 10
-- **Time: O(n)** — unacceptable at 100M scale
+---
 
-**HNSW: Hierarchical Navigable Small World**
+### **The Problem: Why Naive Search Is Impossible**
 
 ```
-Think of it like a city with multilevel highways:
+SCENARIO: You have 100 million embeddings in Pinecone.
+User asks a question.
+You embed it (query vector).
 
-Ground level: All 100M nodes, connected to ~10 nearest neighbors each
-↓
-Level 1:    10M nodes (subset), each connected to ~10 neighbors
-↓
-Level 2:    1M nodes, each connected to ~10 neighbors
-↓
-Level 3:    100K nodes, each connected to ~10 neighbors
-↓
-Entry:      1 single node at the top
+NAIVE APPROACH: Compare query against ALL vectors
+├─ For each vector: Calculate cosine similarity
+├─ 100M comparisons = 100M × 1 microsecond = 100 seconds
+├─ User waits... and waits...
+├─ Timeout after 30 seconds ❌
+
+MATH:
+├─ O(n) = O(100,000,000) = unacceptable for real-time
+└─ We need O(log n) or O(sqrt n), not O(n)
 ```
 
-**Query process:**
+---
+
+### **The Insight: Use Geometry to Skip Comparisons**
 
 ```
-1. Start at entry node (Level 3, just 1 node)
-2. Greedy search at Level 3: Check ~20 nodes to find 1 closest neighbor
-   Cost: ~20 comparisons, not 100M
-   
-3. Move down to Level 2: Start from Level 3's closest neighbor
-   Greedy search: ~20 comparisons
-   
-4. Move down to Level 1: ~20 comparisons
-   
-5. Move to ground level: Do detailed search among ~100 candidates
-   → Find exact top 10
+KEY IDEA:
+"If A and B are close together, and B and C are close together,
+then A and C are probably close together."
 
-Total comparisons: ~20 + ~20 + ~20 + 100 = ~160 comparisons
-(instead of 100M)
+This lets us:
+├─ Start near the answer without checking everything
+├─ Skip 99.999% of comparisons
+└─ Still find the true top-10 nearest neighbors
 ```
 
-**Why it's fast:**
-- Early levels are *coarse* — quick approximate routing
-- Later levels are *fine* — accurate search among nearby candidates
-- **Total: O(log n)** search cost, not O(n)
+---
+
+### **HNSW: Hierarchical Navigable Small World**
+
+```
+CONCEPT: Multi-level graph structure
+
+Think of it as a city with express highways at different levels:
+
+LEVEL 3 (Sky level — express route):
+│ Only 100K nodes (1 out of 1000)
+│ Each connected to ~10 closest neighbors
+│ Coarse routing only
+│
+├─ ○ ─── ○ ─── ○ ─── ○ ─── ○
+│  \     /\     /\     /\     /
+│   ○ ─ ○  ○ ─ ○  ○ ─ ○  ○ ─ ○
+│ Entry point ↑ (1 node at the very top)
+
+LEVEL 2 (Highway level):
+│ 1M nodes (1 out of 100)
+│ Each connected to ~10 closest neighbors
+│ Medium-resolution routing
+│
+└─ ○ ─── ○ ─── ○ ─── ○ ── ... (1M nodes)
+
+LEVEL 1 (Main street level):
+│ 10M nodes (1 out of 10)
+│ Each connected to ~10 closest neighbors
+│ Finer routing
+│
+└─ ○ ─── ○ ─── ○ ─── ○ ── ... (10M nodes)
+
+LEVEL 0 (Ground level):
+│ All 100M nodes
+│ Each connected to ~10 closest neighbors
+│ Fine-grained search
+│
+└─ ○ ─── ○ ─── ○ ─── ○ ── ... (100M nodes)
+```
+
+---
+
+### **How Search Works: The Journey**
+
+```
+QUERY: Find top-10 nearest neighbors to vector Q
+
+START at top (Level 3, entry point):
+│ Only 1 node. No choice, go to it.
+│ Distance = 5.2
+│
+├─ Step 1: Greedy search at Level 3
+│  ├─ Check neighboring nodes: ~10-20 total nodes examined
+│  ├─ Find which is closest to Q
+│  ├─ Move to that node
+│  ├─ Repeat: check its neighbors, move closer
+│  └─ Cost: ~20 comparisons (not 100M!)
+│
+└─ You've narrowed down to 1 candidate node at Level 3
+
+MOVE DOWN to Level 2:
+│ Enter at the node you found at Level 2
+│
+├─ Step 2: Greedy search at Level 2
+│  ├─ Similar greedy walk as Level 3
+│  ├─ But now 10x more nodes to search within
+│  ├─ Cost: ~20-50 comparisons
+│  └─ You've found closest node at Level 2
+│
+└─ You've narrowed down to 1 candidate at Level 2
+
+MOVE DOWN to Level 1:
+│
+├─ Step 3: Greedy search at Level 1
+│  ├─ Cost: ~50-100 comparisons
+│  └─ Found closest node at Level 1
+
+MOVE DOWN to Level 0 (ground level):
+│
+├─ Step 4: Detailed search at Level 0
+│  ├─ You now have ~100-500 candidate nodes (from previous levels)
+│  ├─ Search exhaustively among these candidates
+│  ├─ Find exact top-10 nearest neighbors
+│  └─ Cost: ~500 comparisons
+│
+└─ Return top-10
+
+TOTAL COMPARISONS:
+├─ Level 3: ~20
+├─ Level 2: ~40
+├─ Level 1: ~80
+├─ Level 0: ~500
+├─ TOTAL: ~640 comparisons (vs. 100M)
+└─ SPEEDUP: 156,000x faster!
+```
+
+---
+
+### **Why This Works: Coarse-to-Fine Navigation**
+
+```
+STRATEGY: Get closer incrementally
+
+Level 3: "Am I in the North or South part of the city?"
+├─ Answer with 20 comparisons
+├─ Divide 100M problem into 1M problem
+
+Level 2: "Within this 1M region, am I East or West?"
+├─ Answer with 50 comparisons
+├─ Divide 1M problem into 10K problem
+
+Level 1: "Within this 10K region, am I North or South?"
+├─ Answer with 80 comparisons
+├─ Divide 10K problem into 100 problem
+
+Level 0: "Within these 100, which is closest?"
+├─ Answer with 500 comparisons (exhaustive search)
+├─ Found it! ✅
+
+KEY INSIGHT:
+├─ Early levels: Coarse routing (skip 99% of data)
+├─ Later levels: Fine-grained search (among survivors only)
+└─ O(log n) instead of O(n)
+```
+
+---
+
+### **Accuracy vs. Speed Tradeoff**
+
+```
+HNSW has knobs to tune:
+
+PARAMETER: m (connections per node)
+├─ m=5 (fewer connections)
+│  ├─ Pro: Faster search (fewer neighbors to check)
+│  ├─ Pro: Less memory per node
+│  └─ Con: Less accurate (might miss true neighbors)
+│
+├─ m=15 (more connections)
+│  ├─ Pro: More accurate (more paths to good nodes)
+│  ├─ Con: Slower search (more neighbors to check)
+│  └─ Con: More memory per node
+│
+└─ Sweet spot: m=10-15 (Pinecone default)
+
+PARAMETER: ef (search effort)
+├─ ef=10 (low effort)
+│  ├─ Pro: Faster (check fewer candidates at ground level)
+│  └─ Con: Less accurate (might miss true top-10)
+│
+├─ ef=200 (high effort)
+│  ├─ Pro: More accurate (thorough ground-level search)
+│  └─ Con: Slower (but still fast, ~160 comparisons vs. 500)
+│
+└─ Tuning: Adjust based on accuracy needs
+
+PINECONE EXAMPLE:
+├─ Default: m=12, ef=200
+├─ Result: 99%+ accuracy, <50ms latency
+└─ Cost: Worth it
+```
+
+---
+
+### **Why Deletion Is Expensive**
+
+```
+PROBLEM: Delete one vector from the index
+
+NAIVE: Just remove it
+├─ But now: connections point to a deleted node
+├─ Search might try to visit deleted node
+├─ Crash or missed results
+
+PROPER: Update the graph
+├─ Find all nodes pointing to deleted node: ~10m nodes
+├─ For each: reconnect to alternative neighbors
+├─ Rebuild affected paths in hierarchy
+├─ Cost: Expensive! (O(m log n) where m = connections)
+
+WHY PINECONE IS "APPEND-ONLY":
+├─ Deletion rebuilds the graph
+├─ Expensive operation
+├─ Better to mark-as-deleted (soft delete) than rebuild
+└─ Reason to understand: Design your indices for append-heavy, not deletion-heavy workloads
+```
+
+---
+
+### **Interview Summary**
+
+"Naive nearest-neighbor search is O(n) — compare query against 100M vectors = 100 seconds. Impossible for real-time. HNSW solves this by building a hierarchical graph: coarse routing at top levels (10M→1M→100K levels), fine search at ground level. Search starts at top level (20 comparisons to narrow 100M to 1M), descends to level 2 (50 comparisons narrow 1M to 10K), descends to level 1 (80 comparisons narrow 10K to 100), then exhausts ground level (500 comparisons find exact top-10). Total: ~640 comparisons instead of 100M. This is O(log n) instead of O(n) — 156,000x faster. The key insight: use geometry to skip 99.999% of comparisons, not check them all."
 
 **The accuracy tradeoff:**
 ```
