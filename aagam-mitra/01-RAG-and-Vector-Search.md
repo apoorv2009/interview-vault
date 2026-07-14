@@ -35,6 +35,8 @@
 - [Q24: Vector DB costs](# 24-our-pinecone-bill-is-5000month-and-growing-how-would-you-optimize-vector-db-costs)
 - [Q25: Corrective RAG](# 25-what-is-corrective-rag-crag-and-when-should-we-use-it)
 - [Q26: Self-RAG](# 26-what-is-self-rag-and-how-is-it-different-from-corrective-rag)
+- [Q27: Prompt injection defense](# 27-how-do-you-prevent-prompt-injection-attacks-in-a-rag-system)
+- [Q28: LangChain & Graph RAG](# 28-how-would-langchain-and-graph-rag-implement-the-aagam-mitra-pipeline)
 - [Q29: Retrieval edge case](# 29-what-happens-if-the-real-answer-is-in-rank-10-12-but-we-only-retrieve-top-8-how-do-you-handle-this)
 
 ---
@@ -6178,6 +6180,8 @@ We considered Graph RAG for multi-hop reasoning ('How is X related to Y?'), but 
 For Agentic RAG with 4 specialist agents, we manage tool routing directly to avoid LangChain Agent's overhead and get fine-tuned control over parallel execution with `asyncio.gather`."
 
 ---
+
+## 27. How do you prevent prompt injection attacks in a RAG system?
 
 > **Why asked:** This is the critical security question. RAG systems have a fundamental vulnerability: they retrieve and inject documents into LLM prompts. If an attacker can control a document, they can inject malicious instructions into the LLM's context. Interviewers ask this to test if you understand RAG's security model. The answer should show: (1) How prompt injection works in RAG, (2) Layered defenses, (3) Practical mitigations for your specific system. This is production-critical knowledge.
 
