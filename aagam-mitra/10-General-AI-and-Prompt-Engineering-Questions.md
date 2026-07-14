@@ -38,6 +38,23 @@
 
 > **Why asked:** Shows you understand LLM constraints and can design systems that respect them. Real-world impact: miscalculating context usage can cause silent failures or data loss.
 
+---
+
+### **Context Window: The LLM's Working Memory**
+
+```
+ANALOGY: Human short-term memory
+├─ You can hold ~7 items in working memory
+├─ Add an 8th item = push out the 1st item
+├─ Result: Forget the 1st item
+
+Context window: LLM's working memory
+├─ GPT-4o can hold 128k tokens (~96k words)
+├─ Fill it with conversation history + documents
+├─ Add one more document = drop oldest messages
+└─ Result: Model "forgets" early parts of conversation
+```
+
 The context window is the maximum amount of text (measured in tokens) that a model can hold in its "working memory" at one time. It includes everything the model can see: the system prompt, conversation history, and the current user message.
 
 A token is roughly 3–4 characters or about 0.75 words.
@@ -83,6 +100,26 @@ We limit chat history to last 8 turns (~3-4K tokens) to stay well under Groq's l
 ## Q2. How do you choose which LLM to use for a given task?
 
 > **Why asked:** Model selection is a cost-performance trade-off. Shows judgment about tool selection at different scales.
+
+---
+
+### **Model Selection: Quality vs Cost**
+
+```
+PRINCIPLE: Use the smallest model that solves the problem.
+
+WRONG: Always use GPT-4o (best, most expensive)
+├─ "Why not use the best?" sounds logical
+├─ Cost: $5/M tokens
+├─ Problem: Overkill for classification = waste
+└─ Result: ❌ Great quality, terrible ROI
+
+RIGHT: Match model to task complexity
+├─ Classification/simple Q&A → Haiku ($0.075/M)
+├─ Code generation → Sonnet ($3/M)
+├─ Complex reasoning → Opus ($15/M)
+└─ Result: ✅ Best ROI for each task
+```
 
 Model selection: Pick the **smallest, cheapest model** that reliably produces needed quality. Throwing $15/M-token frontier model at classification wastes money; using cheap fast model for reasoning fails.
 
@@ -133,6 +170,17 @@ Groq LLaMA Scout 17B because:
 ## Q3. What is an AI agent? What is agentic mode?
 
 > **Why asked:** Distinguishes people who use the buzzword from those who understand it. Core to modern AI development.
+
+---
+
+### **Agency: Decision-Making Loop**
+
+```
+CHATBOT: User → LLM → Answer
+AGENT: User → LLM → Plan → Tool1 → Observe → Tool2 → Answer
+
+Key difference: Agent DECIDES which tools to use, not human.
+```
 
 An **AI agent** is an LLM given tools (functions it can call) and a goal, and it decides autonomously which tools to call, in what order. Unlike single-turn Q&A, an agent runs a loop: **think → act → observe → think again**.
 
