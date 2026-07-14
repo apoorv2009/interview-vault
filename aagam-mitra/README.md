@@ -12,13 +12,13 @@ Every answer references actual config values, library versions, design decisions
 
 | File | Topics Covered | Questions |
 |---|---|---|
-| [01-RAG-and-Vector-Search.md](01-RAG-and-Vector-Search.md) | RAG pipeline, chunking, embeddings, Pinecone, cosine similarity, semantic search, temple knowledge sync, HNSW indexing algorithm | 29 |
+| [01-RAG-and-Vector-Search.md](01-RAG-and-Vector-Search.md) | RAG pipeline, chunking, embeddings, Pinecone, cosine similarity, semantic search, temple knowledge sync, HNSW, prompt injection | 30 |
 | [02-LLM-and-Groq.md](02-LLM-and-Groq.md) | LLM basics, temperature, Groq API, tool-call loop, chat history, parallel execution, retry logic, orchestrator routing | 10 |
 | [03-Agents-and-Architecture.md](03-Agents-and-Architecture.md) | Agent types, 12 tools, system architecture, JWT auth, password hashing, Cloudflare tunnel, action cards, push notifications | 10 |
 | [04-Security-and-Production.md](04-Security-and-Production.md) | 4-layer security, prompt injection, graceful degradation, double-booking prevention, scaling, tricky questions, all config values | 11 |
 | [05-YouTube-Transcript-Pipeline.md](05-YouTube-Transcript-Pipeline.md) | Dual-layer extraction, Whisper ASR, LLM formatting, Shanka Samadhan vs Pravachan detection, RAG storage, live stream handling | 8 |
 
-**Subtotal: 68 detailed Q&As** (29 + 10 + 10 + 11 + 8)
+**Subtotal: 69 detailed Q&As** (30 + 10 + 10 + 11 + 8)
 
 ### Framework & Patterns (Files 06–07)
 
@@ -49,13 +49,13 @@ Every answer references actual config values, library versions, design decisions
 
 ## Total Coverage
 
-**108 detailed Q&As** organized across 10 files, covering everything from foundational LLM concepts and prompt engineering to expert-level enterprise AI architecture, agentic design patterns, cache invalidation strategies, indexing algorithms, and memory systems. All answers grounded in real Aagam Mitra production code and real interview questions from companies like HDFC Bank.
+**109 detailed Q&As** organized across 10 files, covering everything from foundational LLM concepts and prompt engineering to expert-level enterprise AI architecture, agentic design patterns, cache invalidation strategies, indexing algorithms, prompt injection defense, and memory systems. All answers grounded in real Aagam Mitra production code and real interview questions from companies like HDFC Bank.
 
 ---
 
 ## Detailed Index by File
 
-### 01-RAG-and-Vector-Search.md (29 Q&As)
+### 01-RAG-and-Vector-Search.md (30 Q&As)
 ```
 Q1:  Which RAG architectural pattern are you using?
 Q2:  What RAG architecture patterns exist today, and why did you pick Agentic RAG?
@@ -85,6 +85,8 @@ Q23: How do you build an AI system with ZERO internet access? (On-Prem / Offline
 Q24: Our Pinecone bill is $5000/month and growing. How would you optimize vector DB costs?
 Q25: What is Corrective RAG (CRAG) and when should we use it?
 Q26: What is Self-RAG and how is it different from Corrective RAG?
+Q27: How do you prevent prompt injection attacks in a RAG system?
+Q28: How would LangChain and Graph RAG implement the Aagam Mitra pipeline?
 Q29: What happens if the real answer is in rank 10-12 but we only retrieve top-8? How do you handle this?
 ```
 
