@@ -1244,41 +1244,304 @@ embed_texts([user_question], task_type="RETRIEVAL_QUERY")
 
 > **Why asked:** This is a classic production AI problem — your vector DB has static knowledge, but real-world data changes constantly. The interviewer wants to see that you thought about freshness, cost, and avoiding unnecessary re-embedding. SHA-256 deduplication and TTL-based sync are the two design decisions worth highlighting here.
 
-Jain scripture doesn't change — it stays in Pinecone forever. But temple news, events, and slots change daily. Storing live data in Pinecone would cost money per write and have staleness issues.
+---
 
-**Solution: PostgreSQL with TTL-based sync** (SQLite used locally until the app is deployed to a server — migration script already exists in the codebase, one env var change: `DATABASE_URL=postgresql://...`)
+### **The Problem: Two Different Data Types**
 
-```python
-async def sync_if_needed(temple_id: str):
-    state = await get_sync_state(temple_id)
-    if state and (now() - state.synced_at).seconds < 300:  # TTL = 5 min
-        return  # use cached chunks
+```
+JAIN SCRIPTURE (Static):
+├─ Once uploaded, never changes
+├─ Store in Pinecone forever (one-time cost)
+├─ ~5,625 vectors in Pinecone
+└─ Cost: ~$50/month (storage only)
 
-    # Fetch 6 data sources in parallel
-    profile, slots, news, events, wof, payment = await asyncio.gather(
-        GET admin:8003/temples/{id},
-        GET admin:8003/shantidhara/slots,
-        GET admin:8003/news-feed,
-        GET admin:8003/events,
-        GET admin:8003/wall-of-fame,
-        GET admin:8003/payment-profile,
-    )
-
-    # Content-addressed dedup: only re-embed if content changed
-    for doc in build_documents(profile, slots, news, ...):
-        new_checksum = sha256(doc.content)
-        if doc.checksum != stored_checksum:
-            delete_old_chunks(doc.document_id)
-            embed_and_store(doc)  # chunk → embed → PostgreSQL (SQLite locally)
-
-    update_sync_state(temple_id, synced_at=now())
+TEMPLE LIVE DATA (Dynamic):
+├─ Changes every day
+│  ├─ "Shantidhara slots available: 9AM, 10AM"
+│  ├─ "Temple closed due to festival"
+│  ├─ "Special event: Mahavira Jayanti"
+│  └─ "Payment methods updated"
+├─ If stored in Pinecone with every update:
+│  ├─ Cost explosion: $0.01 per write × millions of writes
+│  ├─ Staleness: Old data lingers until re-indexed
+│  └─ Waste: Redundant embeddings of same content
+└─ ❌ Bad approach!
 ```
 
-**In-memory cosine search** (not Pinecone) for temple data:
-```python
-# Load all chunks from DB, compute cosine similarity in Python
-# Return top 4 (retrieval_limit=4) most relevant chunks
+---
+
+### **Why NOT Pinecone for Live Data**
+
 ```
+Scenario: Shantidhara slot changes
+
+Time 10:00 AM: Admin adds "9AM slot available"
+├─ We embed it → add to Pinecone → costs $0.01
+├─ Pinecone stores: [vector for this slot]
+
+Time 10:30 AM: Someone books 9AM slot, slot no longer available
+├─ We embed updated text → add to Pinecone → costs $0.01
+├─ Pinecone now stores: [old vector] AND [new vector]
+│  (old data still searchable!)
+
+Time 11:00 AM: Slot cancelled entirely
+├─ We embed "This slot is cancelled" → add to Pinecone → costs $0.01
+├─ Now Pinecone has: [old] [updated] [cancelled]
+│  (users might get wrong slot status!)
+
+This happens every 5 minutes for every temple!
+
+Cost calculation (300 temples, 10 changes per temple per day):
+├─ Changes per day: 300 × 10 = 3,000 changes
+├─ Cost: 3,000 × $0.01 = $30/day
+├─ Monthly: $30 × 30 = $900/month (for updates alone!)
+└─ ❌ Unacceptable!
+```
+
+---
+
+### **Our Solution: PostgreSQL + TTL-Based Sync**
+
+```
+ARCHITECTURE:
+
+┌─────────────────────────────────────────────┐
+│ Admin Service (Port 8003)                   │
+│ ├─ temples/{id} - Temple profile            │
+│ ├─ shantidhara/slots - Available slots      │
+│ ├─ news-feed - Latest announcements         │
+│ ├─ events - Upcoming events                 │
+│ ├─ wall-of-fame - Member highlights         │
+│ └─ payment-profile - Payment methods        │
+└──────────┬──────────────────────────────────┘
+           │ (Fetch on demand)
+           ↓
+┌─────────────────────────────────────────────┐
+│ Aagam Mitra (Sync Pipeline)                 │
+│ ├─ TTL Check: Last synced < 5 minutes ago?  │
+│ ├─ If YES → Use cached data (FAST!)         │
+│ ├─ If NO → Fetch from admin service        │
+│ │          (all 6 sources in parallel)      │
+│ ├─ SHA-256 Check: Did content actually      │
+│ │  change from last sync?                   │
+│ ├─ If NO change → Skip re-embedding (SAVE $)│
+│ └─ If changed → Re-chunk + Re-embed         │
+└──────────┬──────────────────────────────────┘
+           │
+           ↓
+┌─────────────────────────────────────────────┐
+│ PostgreSQL (or SQLite locally)              │
+│ ├─ Stores chunks (not vectors!)             │
+│ ├─ Stores metadata + checksums              │
+│ ├─ Stores embeddings (2048-dim vectors)     │
+│ └─ Fast local access (no network calls!)    │
+└──────────┬──────────────────────────────────┘
+           │
+           ↓
+┌─────────────────────────────────────────────┐
+│ In-Memory Cosine Search (Python)            │
+│ ├─ Load chunks from DB                      │
+│ ├─ Compute similarity locally (no API call!)│
+│ └─ Return top 4 chunks                      │
+└─────────────────────────────────────────────┘
+```
+
+---
+
+### **How It Works: Real Example**
+
+```
+SCENARIO: User asks "When are Shantidhara slots available?"
+
+STEP 1: TTL CHECK (5-minute cache)
+┌─────────────────────────────────────────┐
+│ Last sync at 2:00 PM                    │
+│ Current time: 2:03 PM                   │
+│ Difference: 3 minutes < 5 minutes ✅     │
+│                                         │
+│ Action: USE CACHED DATA                 │
+│ Cost: $0 (just read from DB)            │
+│ Speed: <10ms (memory access)            │
+└─────────────────────────────────────────┘
+
+(Case A: If still within 5 min TTL)
+└─ Read slots from PostgreSQL (cached)
+   └─ Chunk: "Shantidhara slots: 9AM, 10AM, 11AM available"
+   └─ Embedding: [0.123, -0.456, ..., 0.789] (cached)
+   └─ Return immediately
+
+───────────────────────────────────────────────
+
+STEP 2: TTL EXPIRED (Sync needed)
+┌─────────────────────────────────────────┐
+│ Last sync at 1:00 PM                    │
+│ Current time: 2:10 PM                   │
+│ Difference: 70 minutes > 5 minutes ❌    │
+│                                         │
+│ Action: SYNC WITH ADMIN SERVICE         │
+└─────────────────────────────────────────┘
+
+(Case B: If TTL expired, do full sync)
+
+FETCH all 6 data sources in PARALLEL:
+├─ GET /temples/kailash-temple
+│  └─ New data: "Temple name: Kailash Jain Temple"
+│
+├─ GET /shantidhara/slots
+│  └─ New data: "Slots: 9AM BOOKED, 10AM available, 11AM available"
+│
+├─ GET /news-feed
+│  └─ New data: "Breaking: Temple hosting Mahavira Jayanti"
+│
+├─ GET /events
+│  └─ New data: "Event: Puja at 6PM tomorrow"
+│
+├─ GET /wall-of-fame
+│  └─ New data: "Donor: Raj Patel donated ₹10,000"
+│
+└─ GET /payment-profile
+   └─ New data: "Accepted: Visa, UPI, Bank transfer"
+
+All 6 fetches happen simultaneously (via asyncio.gather)
+Cost: 6 HTTP calls (cheap, only once per 5 minutes)
+Time: ~500ms for all 6
+```
+
+---
+
+### **Step 3: SHA-256 Deduplication (Avoid Unnecessary Re-Embedding)**
+
+```
+AFTER fetching all 6 data sources, check if anything ACTUALLY changed:
+
+Document 1: Temple Profile
+├─ Old content: "Kailash Jain Temple, Est. 1850"
+├─ New content: "Kailash Jain Temple, Est. 1850"
+├─ Old SHA-256: abc123def456...
+├─ New SHA-256: abc123def456... ← SAME!
+└─ Action: SKIP (don't re-embed, don't update chunks)
+   └─ Saved: $0.0001 (one Gemini embed call)
+
+───────────────────────────────────────────────
+
+Document 2: Shantidhara Slots
+├─ Old content: "Available: 9AM, 10AM, 11AM, 12PM"
+├─ New content: "Available: 10AM, 11AM, 12PM"  (9AM booked)
+├─ Old SHA-256: xyz789abc123...
+├─ New SHA-256: pqr456uvw789... ← DIFFERENT!
+└─ Action: CHANGED! (must re-embed)
+   ├─ Step A: Delete old chunks for this document
+   │  └─ Remove: [old vector for slots]
+   ├─ Step B: Chunk new content (800 chars)
+   │  └─ "Available: 10AM, 11AM, 12PM. Book via..."
+   ├─ Step C: Embed new chunk (Gemini embedding)
+   │  └─ [0.234, -0.567, ..., 0.891]
+   ├─ Step D: Store in PostgreSQL
+   │  └─ INSERT chunks, embeddings, metadata
+   └─ Cost: $0.0001 (one Gemini embed call)
+
+───────────────────────────────────────────────
+
+Document 3-6: News, Events, etc.
+├─ Similar check for each
+├─ Only changed documents trigger re-embedding
+└─ Rest are skipped (SAVE MONEY!)
+
+───────────────────────────────────────────────
+
+RESULT:
+├─ Checked 6 documents
+├─ Only 1 actually changed (slots)
+├─ Only 1 re-embedded (slots)
+├─ Saved: 5 × $0.0001 = $0.0005/sync
+├─ For 300 temples × 288 syncs/day (every 5 min):
+│  ├─ Syncs per day: 300 × 288 = 86,400
+│  ├─ Savings: 86,400 × $0.0005 = $43/day
+│  └─ Monthly: $43 × 30 = $1,290/month! 🎉
+```
+
+---
+
+### **Step 4: In-Memory Cosine Search**
+
+```
+User asks: "When are Shantidhara slots available?"
+
+STEP 1: Embed question (Gemini API)
+├─ Question: "When are slots available?"
+├─ Result: [0.345, -0.234, ..., 0.456] (query vector)
+
+STEP 2: Load chunks from PostgreSQL
+├─ SELECT * FROM temple_chunks WHERE temple_id = 'kailash'
+├─ Loaded chunks:
+│  ├─ Chunk 1: "Kailash Jain Temple, established 1850..."
+│  │  Vector: [0.123, -0.456, ..., 0.789]
+│  ├─ Chunk 2: "Shantidhara slots: 10AM, 11AM, 12PM available"
+│  │  Vector: [0.356, -0.267, ..., 0.478]
+│  ├─ Chunk 3: "Mahavira Jayanti event: 6PM puja"
+│  │  Vector: [0.234, -0.123, ..., 0.345]
+│  └─ Chunk 4: "Accepted payment: Visa, UPI, Bank transfer"
+│     Vector: [0.445, -0.334, ..., 0.567]
+
+STEP 3: Compute cosine similarity (in Python, no API call!)
+├─ Similarity(query, Chunk 1): 0.45 (not very relevant)
+├─ Similarity(query, Chunk 2): 0.92 ← TOP! (slots info)
+├─ Similarity(query, Chunk 3): 0.38 (event, not slots)
+└─ Similarity(query, Chunk 4): 0.34 (payment, not slots)
+
+STEP 4: Return top 4 (retrieval_limit=4)
+├─ [Chunk 2 (0.92), Chunk 1 (0.45), Chunk 3 (0.38), Chunk 4 (0.34)]
+└─ Send to Groq for answer synthesis
+
+COST: $0 (just Python math, no API calls!)
+SPEED: <50ms (all local, no network!)
+```
+
+---
+
+### **Cost & Performance Comparison**
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ APPROACH 1: Store live data in Pinecone (❌ BAD)         │
+├──────────────────────────────────────────────────────────┤
+│ Every slot change → Embed → Write to Pinecone → $0.01   │
+│                                                          │
+│ For 300 temples:                                         │
+│ ├─ Changes per day: 300 × 10 = 3,000                    │
+│ ├─ Cost per day: 3,000 × $0.01 = $30                    │
+│ ├─ Monthly: $900                                         │
+│ ├─ Plus: Data staleness, redundant vectors              │
+│ └─ Plus: Pinecone storage for live data ($200+)         │
+│                                                          │
+│ Total: $1,100+/month ❌                                  │
+└──────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────┐
+│ APPROACH 2: PostgreSQL + TTL + SHA-256 (✅ GOOD)        │
+├──────────────────────────────────────────────────────────┤
+│ Sync every 5 minutes (only if changed):                  │
+│                                                          │
+│ For 300 temples:                                         │
+│ ├─ Syncs per day: 300 temples × 288 syncs = 86,400     │
+│ ├─ Average changes: 10 docs changed per sync             │
+│ ├─ Only re-embed changed docs:                           │
+│ │  ├─ Embeds per day: 86,400 × 1.5 (avg) = 130K        │
+│ │  ├─ Cost: 130K × $0.00003/embed = $3.90/day           │
+│ │  └─ Monthly: $120                                      │
+│ ├─ PostgreSQL storage: $50/month                         │
+│ ├─ HTTP calls to admin: ~free (internal network)        │
+│ └─ In-memory cosine search: $0 (Python math)             │
+│                                                          │
+│ Total: $170/month ✅ (6x cheaper!)                       │
+└──────────────────────────────────────────────────────────┘
+```
+
+---
+
+### **Interview Summary**
+
+"Jain scripture is static, so we store it in Pinecone once and forget about it. But temple live data changes constantly — slots, news, events, payments. Storing that in Pinecone would be expensive ($900+/month) and cause data staleness. Instead: (1) We sync from the admin service every 5 minutes, but only for that temple when needed (TTL=5min cache). (2) We use SHA-256 checksumming — if content hasn't changed, we skip re-embedding entirely (saves $1,290/month). (3) For storage, we use PostgreSQL (or SQLite locally) instead of Pinecone — much cheaper and faster. (4) For search, we load chunks and compute cosine similarity locally in Python (no API call, just math). The result: $170/month instead of $1,100+, fresh data within 5 minutes, and no Pinecone cost for live data. The key insight is matching storage to data velocity: static data → expensive cloud DB once, live data → cheap local DB + in-process search."
 
 ---
 
