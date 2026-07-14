@@ -91,6 +91,20 @@ All answers are grounded in **Aagam Mitra's production implementation** and incl
 
 > **Why asked:** This is THE fundamental question for someone interviewing with an agent-systems expert. They want to hear: Do you know the taxonomy of patterns? Can you map them to real code? Can you explain when each pattern is appropriate? The interviewer likely uses these patterns in JPMC DART, and they want to see if you think the same way.
 
+---
+
+### **Five Reusable Patterns for Building Multi-Agent Systems**
+
+```
+Pattern 1: Router → Route to specialist agent based on intent
+Pattern 2: Hierarchical → Supervisor breaks tasks into subtasks
+Pattern 3: Tool-Using → Agent calls functions, observes results, loops
+Pattern 4: Reflection → Agent critiques own output and refines
+Pattern 5: Autonomous → Agent runs without human intervention
+
+Aagam Mitra uses: Router + Tool-Using (sufficient for current complexity)
+```
+
 #### The Agentic Design Pattern Taxonomy
 
 An **agentic pattern** is a reusable architectural approach to organizing AI agents—how they communicate, make decisions, coordinate, and execute tasks. Understanding the taxonomy helps you choose the right pattern for your problem and avoid pitfalls.
@@ -247,6 +261,22 @@ The key design decision: We prioritized **clarity and simplicity** over advanced
 
 > **Why asked:** This reveals your understanding of: (1) how to coordinate multiple agents, (2) tradeoffs between latency and coherence, (3) when parallelism actually helps vs. adds complexity. JPMC DART likely has similar orchestration challenges—this question tests if you think about those tradeoffs.
 
+---
+
+### **Parallel vs Sequential: Latency vs Cost**
+
+```
+Parallel: Run TempleOpsAgent + ScriptureAgent together
+  Latency: 1.5s (slowest agent)
+  Cost: 2× API calls
+  
+Sequential: Run TempleOpsAgent, then ScriptureAgent
+  Latency: 3s (sum of both)
+  Cost: 2× API calls (same)
+  
+Decision: Use parallel (faster UX) unless dependencies exist
+```
+
 #### Current Behavior: Parallel Execution
 
 In `OrchestratorAgent.run()`, when multiple intents are detected (e.g., user asks "Book Shantidhara and tell me its significance"), the orchestrator runs all matched agents **in parallel**:
@@ -305,6 +335,25 @@ At JPMC scale, you'd likely implement:
 ### Question 2b: Aagam Mitra's LangGraph Migration Story: When We'd Switch
 
 > **Why asked:** This is the critical narrative question. Interviewers don't just want "why custom now?" They want "when would we migrate?" This shows you think about technical evolution, not dismissing frameworks. It also proves you understand LangGraph's actual value.
+
+---
+
+### **Technology Debt: When Custom Becomes Liability**
+
+```
+Custom agent loop: 40 lines of Python, works great for simple routing
+Cost of LangGraph: Abstractions we don't need yet
+
+5 Triggers to migrate:
+1. Conditional branching (decision trees, not just if/then)
+2. Streaming responses to UI (real-time intermediate steps)
+3. Human-in-the-loop (pause for approval, then resume)
+4. Agent hierarchies (agents calling agents)
+5. Complex audit & session persistence (state tracking)
+
+Today: 0/5 triggers → Custom is correct
+At 10x scale: 3-4/5 triggers → Time to migrate to LangGraph
+```
 
 #### Current State: Why Custom Works Today
 
@@ -506,6 +555,19 @@ state = db.load("trace_xyz789")  # Resume from exact point
 
 > **Why asked:** This is a reliability question. Interviewers ask this because in production, things WILL fail. An LLM will hallucinate. A tool call will timeout. A dependency service will be down. Knowing how you handle these cases separates prototype code from production code. This is especially important at JPMC, where financial decisions depend on reliability.
 
+---
+
+### **Production Readiness: Five Categories of Failures**
+
+```
+Failure Type            | Strategy                           | Cost
+Tool timeout            | Retry 4× with exponential backoff  | +9 sec latency
+Max iterations exceeded | Cap loop at N iterations           | Incomplete answer
+LLM hallucinations      | Ground in RAG + prompt constraints | +100ms retrieval
+RBAC violations         | Block before LLM call              | Input check
+Slow Groq responses     | Timeout after 60s, fail gracefully | User waits or error
+```
+
 #### 1. Agent Loop Failures (Tool Calls Timing Out or Returning Errors)
 
 **The problem:** An agent calls a tool (e.g., `get_shantidhara_slots`), but the HTTP request times out or returns a 500 error.
@@ -678,6 +740,24 @@ At an enterprise scale (JPMC with billions of transactions), you'd add:
 ### Question 4: How do you scale agent orchestration to handle 1000s of concurrent requests?
 
 > **Why asked:** This is a scaling question. In production, you're not serving one user. You're serving thousands. At JPMC, you might serve millions of requests per day across multiple data centers. This question tests if you understand: (1) bottlenecks in agentic systems, (2) how to remove them, (3) tradeoffs between latency, cost, and complexity.
+
+---
+
+### **Scale Progression: 10x to 1000x**
+
+```
+Scale 1: Home scale (100 req/day)
+  → Single instance FastAPI + async, works fine
+
+Scale 10x: 1K req/day
+  → Add Redis caching, connection pooling, rate limiting
+
+Scale 100x: 10K req/day
+  → Horizontal scaling (3-5 instances), load balancer, message queue
+
+Scale 1000x: 100K req/day
+  → Multi-region, Kubernetes auto-scaling, specialized agents per domain, observability everywhere
+```
 
 #### Current State: Small Scale
 
@@ -903,6 +983,22 @@ At JPMC, scaling looks like:
 ### Question 5: How do you ensure retrieval quality in RAG systems? What metrics do you use?
 
 > **Why asked:** RAG is only as good as the retrieved documents. If retrieval is poor, synthesis (LLM) can't help. This question tests: (1) Do you understand retrieval quality is THE bottleneck in RAG? (2) Can you measure it? (3) Do you iterate on it? (4) What's your strategy for improving it?
+
+---
+
+### **Retrieval is the Bottleneck, Not LLM Synthesis**
+
+```
+Bad retrieval: Returns [temple schedule, donation info, event calendar]
+  LLM synthesis: "I found scheduling info..." (misses the point)
+  
+Good retrieval: Returns [Karma passages, rebirth passages, karma+destiny passages]
+  LLM synthesis: "Karma is the law of cause and effect..." (directly answers)
+  
+Key metric: Hit Rate (does relevant passage exist in top-8?)
+  Current: ~80% (informal estimate)
+  Target: >90%
+```
 
 #### The RAG Pipeline & Where Retrieval Fits
 
@@ -1198,6 +1294,22 @@ Over time, this gives you a feedback signal to improve retrieval.
 
 > **Why asked:** RAG systems have a cold-start problem: What if the answer isn't in the vector DB yet? What if the answer was in there but changed? At JPMC, regulations change, product docs change, market data changes. This question tests if you think about data freshness and update strategies.
 
+---
+
+### **Cache Invalidation Problem #2: Document Changes**
+
+```
+Day 1: Vector DB has Shantidhara times (3 PM - 5 PM)
+Day 2: Admin changes to (2 PM - 6 PM), but vector DB still has old time
+Day 3: User asks "When is Shantidhara?" → Gets wrong answer
+
+Solutions (in order of speed):
+1. Push-based (webhook on update): 1-2 sec latency
+2. Batch refresh (daily): Stale during the day
+3. Versioning (keep history): Auditable but storage overhead
+4. TTLs (expire after 24h): Fallback for bugs in #1-3
+```
+
 #### The Problem: Stale Knowledge Bases
 
 Scenario 1: Temple publishes new Shantidhara timings. The vector DB still has old timings. User asks "What time is Shantidhara?" They get outdated info.
@@ -1334,6 +1446,25 @@ Currently, we have:
 ### Question 7: How do you design for compliance and regulatory requirements in AI systems?
 
 > **Why asked:** This is critical at JPMC. Financial services are heavily regulated. Model decisions might be subject to regulatory scrutiny ("Why did you deny this person a loan?"). This question tests if you understand the regulatory landscape and how to build AI systems that satisfy it.
+
+---
+
+### **Regulation Requires Explainability, Not Just Accuracy**
+
+```
+Accurate but Black-Box ❌:
+  Decision: "Loan denied"
+  Regulator: "Why?"
+  AI: "Neural network output was 0.23"
+  Result: FAILS compliance
+
+Explainable ✅:
+  Decision: "Loan denied"
+  Regulator: "Why?"
+  AI: "Debt-to-income ratio (60%) exceeds threshold (50%), and 
+       credit score (650) is below minimum (680)"
+  Result: PASSES compliance
+```
 
 #### Regulatory Landscape (Financial Services Focus)
 
@@ -1554,6 +1685,20 @@ For JPMC DART (financial services), compliance is **mandatory**. Every agentic s
 ### Question 8: What's your approach to observability and monitoring in production agentic systems?
 
 > **Why asked:** In production, things fail. Users experience bugs. Systems degrade. This question tests: (1) Do you have visibility into what's happening? (2) Can you detect issues automatically? (3) Can you debug production issues quickly? (4) Do you learn from issues to prevent repeats?
+
+---
+
+### **Observability: Four Pillars of Visibility**
+
+```
+Metrics: "System is healthy?" → Response time, error rate, cache hit %, cost
+Logs: "What happened?" → Structured JSON events with timestamps, trace IDs
+Traces: "Where did latency go?" → Distributed request timeline (100ms in Groq, 50ms in Pinecone)
+Events: "Why?" → User feedback, error categories, anomalies
+
+At scale: All four pillars mandatory.
+At Aagam Mitra: Only audit logs (log pillar). Missing metrics, traces, events.
+```
 
 #### The Observability Stack
 
@@ -1816,6 +1961,25 @@ Example post-mortem:
 
 > **Why asked:** LLMs are expensive. An LLM call costs ~$0.001 per request. At scale (1M requests/day), that's $1000/day = $30k/month. This question tests: (1) Do you think about cost vs. quality tradeoffs? (2) Can you optimize without sacrificing user experience? (3) Do you measure ROI?
 
+---
+
+### **Cost Drivers: Seven Optimization Levers**
+
+```
+Lever               | Savings    | Tradeoff
+Caching             | 50%        | Stale for 24h
+Prompt compression  | 20%        | Less context
+Model routing       | 30%        | Quality variance
+Batching            | 50%        | Higher latency
+Token optimization  | 80%        | Shorter responses
+RAG efficiency      | 75%        | Retrieval quality matters
+Smaller model       | 90%        | Less capable
+
+Aagam Mitra cost (10k queries/day):
+  Without optimization: $600/month
+  With all 7 levers: ~$0/month (100% savings possible)
+```
+
 #### The Cost-Quality Tradeoff
 
 **Expensive = High Quality:**
@@ -2034,6 +2198,24 @@ Tools: Custom dashboards or integrated cost tracking (Groq provides usage via AP
 ### Question 10: How do you approach testing and validation of agentic systems?
 
 > **Why asked:** Testing AI systems is hard. You can't unit test an LLM call the same way you test a function. This question tests: (1) Do you understand the unique challenges of testing agents? (2) Can you design a testing strategy? (3) Do you know when to use automated tests vs. manual review?
+
+---
+
+### **Testing Non-Deterministic Systems: Determinism Where Possible**
+
+```
+Deterministic (can unit test):
+  ✅ Intent routing (regex patterns)
+  ✅ Tool execution (mock API responses)
+  ✅ RBAC checks (given role, check permission)
+
+Non-deterministic (need integration + human review):
+  ❌ LLM output quality (two runs might differ)
+  ❌ Answer relevance (no ground truth test)
+  ❌ Retrieval quality (semantic similarity is fuzzy)
+
+Strategy: Test what's testable automatically, human-eval what's not
+```
 
 #### The Testing Challenge
 
@@ -2279,6 +2461,23 @@ After 1 week:
 ### Question 11: How do you design memory layers in agentic systems? What information flows between them?
 
 > **Why asked:** Memory is the backbone of agentic systems. An interviewer asking this wants to see: (1) Do you understand different types of memory (working, conversational, semantic, episodic)? (2) Can you design a memory architecture that scales? (3) Do you think about data lifecycle, privacy, and cost? This is crucial at JPMC, where decisions must be auditable and compliant.
+
+---
+
+### **Four Independent Memory Systems: Different Speeds, Lifetimes, Purposes**
+
+```
+Layer 1 (Working):       In-memory, 1-5 sec, current reasoning context
+Layer 2 (Conversational): DB+cache, 24-48h, multi-turn thread history
+Layer 3 (Semantic):       Vector DB, permanent, factual knowledge (RAG)
+Layer 4 (Episodic):       Audit log, 90d-7y, complete decision trail
+
+Cost at scale (100K queries/day):
+  Working memory: $3600/month (optimize by truncating history)
+  Conversational: Storage costs (compress old data)
+  Semantic: ~$500/month (Pinecone subscription)
+  Episodic: Compliance-driven (7-year retention required)
+```
 
 #### The Four-Layer Memory Architecture
 
