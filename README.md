@@ -2,7 +2,7 @@
 
 My interview prep notes, organized by topic. Most answers are framed around the **Capital Access** project at S&P Global; a subset (clearly labeled "Interview Rounds" / "Other Company Rounds" sections) is sourced from live interview rounds at other companies and framed around the **Entity Management System** project instead — kept separate rather than blended since the two report different tenure and a different most-recent project.
 
-**Latest addition:** The `aagam-mitra` folder now contains **100+ Q&As** on production agentic AI systems, prompt engineering, and LLM fundamentals — from foundation concepts to expert-level deep-dives on design patterns, RAG at scale, enterprise governance, and memory architectures. Tailored for VP-level interviews on AI/ML leadership roles.
+**Latest addition:** The `aagam-mitra` folder now contains **106 Q&As** on production agentic AI systems, prompt engineering, and LLM fundamentals — from foundation concepts to expert-level deep-dives on design patterns, RAG at scale, enterprise governance, and memory architectures. Tailored for VP-level interviews on AI/ML leadership roles.
 
 ## Structure
 
@@ -21,7 +21,7 @@ My interview prep notes, organized by topic. Most answers are framed around the 
 | [behavioural](https://github.com/apoorv2009/interview-vault/tree/main/behavioural) | Behavioural interview STAR answers (two tracks: EPAM/Architect + other-company Full Stack) | Reference |
 | [capital-access-project](https://github.com/apoorv2009/interview-vault/tree/main/capital-access-project) | Real-project deep dive: S&P Global, Capital Access | Reference |
 | [system-design-interview-playbook](https://github.com/apoorv2009/interview-vault/tree/main/system-design-interview-playbook) | System design Q&A at Staff/Principal depth | 24+ questions |
-| [aagam-mitra](https://github.com/apoorv2009/interview-vault/tree/main/aagam-mitra) | Production agentic AI system: RAG, LLMs, multi-agent orchestration, enterprise governance, prompt engineering | 100+ questions |
+| [aagam-mitra](https://github.com/apoorv2009/interview-vault/tree/main/aagam-mitra) | Production agentic AI system: RAG, LLMs, multi-agent orchestration, enterprise governance, prompt engineering | 106 questions |
 | [angular-interview-prep-app](https://github.com/apoorv2009/interview-vault/tree/main/angular-interview-prep-app) | Hands-on Angular 19 app for practising concepts | App |
 
 ---
@@ -160,36 +160,34 @@ See its own `README.md` and `CLAUDE.md` for authoring conventions.
 
 ## aagam-mitra
 
-**100+ Q&As** covering production agentic AI systems, prompt engineering, and LLM fundamentals. All answers grounded in real code, config values, and production patterns from the Aagam Mitra system (built for a Jain temple community platform).
+**106 Q&As** covering production agentic AI systems, prompt engineering, and LLM fundamentals. All answers grounded in real code, config values, and production patterns from the Aagam Mitra system (built for a Jain temple community platform).
 
 **10 files organized in 5 tiers:**
 
-**Foundation (Files 01–05):** 48 Q&As
-- RAG pipeline, vector embeddings, semantic search
-- LLM selection, temperature tuning, tool-calling loops, chat history management
-- Multi-agent orchestration (4 specialist agents, 12 tools)
-- System architecture, JWT auth, Cloudflare tunnel, push notifications
-- 4-layer security pipeline (guardrails, RBAC, prompt hardening, audit logging)
-- YouTube transcript extraction with ASR fallback
+**Foundation (Files 01–05):** 67 Q&As
+- RAG pipeline, vector embeddings, semantic search (28 Q&As)
+- LLM selection, temperature tuning, tool-calling loops, chat history management (10 Q&As)
+- Multi-agent orchestration (4 specialist agents, 12 tools) (10 Q&As)
+- System architecture, JWT auth, Cloudflare tunnel, push notifications (11 Q&As)
+- 4-layer security pipeline, YouTube transcript extraction (8 Q&As)
 
 **Framework & Patterns (Files 06–07):** 12 Q&As
-- LangChain principles, prompt templates, RAG pattern — how Aagam Mitra implements patterns without the library
-- LangGraph concepts, state management, agent reasoning loops — custom Python implementation
+- LangChain principles, prompt templates, RAG pattern (6 Q&As)
+- LangGraph concepts, state management, agent reasoning loops (6 Q&As)
 
-**Expert Deep-Dive (File 08):** 11 Q&As ⭐ *VP-level agentic system interviews*
+**Expert Deep-Dive (File 08):** 12 Q&As ⭐ *VP-level agentic system interviews*
 - 5 agentic design patterns + LangGraph migration story
-- Advanced RAG: quality metrics, freshness strategies, semantic reranking
+- Advanced RAG: quality metrics, freshness strategies
 - Enterprise AI: regulatory compliance, model governance, fairness testing
-- Production governance: observability, cost optimization, testing frameworks
+- Production governance: observability, cost optimization, testing
 - Memory architecture: 4-layer design (working, conversational, semantic, episodic)
 
-**General AI & Prompt Engineering (File 10):** 15 Q&As ⭐ *NEW: Prompt engineering + general AI knowledge*
+**General AI & Prompt Engineering (File 10):** 15 Q&As ⭐ *Prompt engineering + general AI knowledge*
 - Foundation concepts: context window, LLM selection, agents, RAG (Q1-Q4)
-- Prompt engineering fundamentals: efficient prompts, context-aware RAG (Q5-Q6)
-- Advanced prompting: structured output, few-shot, security, reasoning, evaluation, token optimization (Q7-Q12)
-- General AI: hallucinations, fine-tuning vs RAG, LLM limitations (Q13-Q15)
+- Prompt engineering: efficient prompts, context-aware RAG, advanced techniques (Q5-Q12)
+- General AI: hallucinations, fine-tuning, LLM limitations (Q13-Q15)
 
-**Key numbers:** 17B LLM, 2048-dim embeddings, 8-passage retrieval, 25%→2% hallucination reduction via RAG, custom 40-line agent loop, 100+ interview Q&As.
+**Key numbers:** 17B LLM, 2048-dim embeddings, 8-passage retrieval, 25%→2% hallucination reduction via RAG, custom 40-line agent loop, **106 interview Q&As**.
 
 See the folder `README.md` for detailed breakdown.
 

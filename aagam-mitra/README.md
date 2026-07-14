@@ -12,20 +12,20 @@ Every answer references actual config values, library versions, design decisions
 
 | File | Topics Covered | Questions |
 |---|---|---|
-| [01-RAG-and-Vector-Search.md](01-RAG-and-Vector-Search.md) | RAG pipeline, chunking, embeddings, Pinecone, cosine similarity, semantic search, temple knowledge sync | 10 |
+| [01-RAG-and-Vector-Search.md](01-RAG-and-Vector-Search.md) | RAG pipeline, chunking, embeddings, Pinecone, cosine similarity, semantic search, temple knowledge sync, production considerations | 28 |
 | [02-LLM-and-Groq.md](02-LLM-and-Groq.md) | LLM basics, temperature, Groq API, tool-call loop, chat history, parallel execution, retry logic, orchestrator routing | 10 |
 | [03-Agents-and-Architecture.md](03-Agents-and-Architecture.md) | Agent types, 12 tools, system architecture, JWT auth, password hashing, Cloudflare tunnel, action cards, push notifications | 10 |
-| [04-Security-and-Production.md](04-Security-and-Production.md) | 4-layer security, prompt injection, graceful degradation, double-booking prevention, scaling, tricky questions, all config values | 10 |
+| [04-Security-and-Production.md](04-Security-and-Production.md) | 4-layer security, prompt injection, graceful degradation, double-booking prevention, scaling, tricky questions, all config values | 11 |
 | [05-YouTube-Transcript-Pipeline.md](05-YouTube-Transcript-Pipeline.md) | Dual-layer extraction, Whisper ASR, LLM formatting, Shanka Samadhan vs Pravachan detection, RAG storage, live stream handling | 8 |
 
-**Subtotal: 48 detailed Q&As**
+**Subtotal: 67 detailed Q&As**
 
 ### Framework & Patterns (Files 06–07)
 
 | File | Topics Covered | Questions |
 |---|---|---|
-| [06-LangChain-Concepts-and-Prompt-Templates.md](06-LangChain-Concepts-and-Prompt-Templates.md) | LangChain principles, prompt templates, RAG pattern, chains & composition, framework vs custom, error handling in LLM apps. How Aagam Mitra follows LangChain patterns without the library. | 6 |
-| [07-LangGraph-Agent-Design-and-Orchestration.md](07-LangGraph-Agent-Design-and-Orchestration.md) | LangGraph vs LangChain, state management, nodes & edges, agent loop, multi-agent orchestration, why build custom vs LangGraph. How Aagam Mitra implements LangGraph patterns natively. | 6 |
+| [06-LangChain-Concepts-and-Prompt-Templates.md](06-LangChain-Concepts-and-Prompt-Templates.md) | LangChain principles, prompt templates, RAG pattern, chains & composition, framework vs custom, error handling in LLM apps | 6 |
+| [07-LangGraph-Agent-Design-and-Orchestration.md](07-LangGraph-Agent-Design-and-Orchestration.md) | LangGraph vs LangChain, state management, nodes & edges, agent loop, multi-agent orchestration, why build custom vs LangGraph | 6 |
 
 **Subtotal: 12 detailed Q&As**
 
@@ -33,15 +33,15 @@ Every answer references actual config values, library versions, design decisions
 
 | File | Topics Covered | Questions |
 |---|---|---|
-| [08-Agentic-Design-Patterns-and-Enterprise-AI.md](08-Agentic-Design-Patterns-and-Enterprise-AI.md) | **5 agentic design patterns** (router, hierarchical, tool-using, reflection, autonomous) with Aagam Mitra examples. **Advanced RAG**: retrieval quality metrics (hit rate, NDCG, MRR), knowledge base freshness strategies. **Enterprise AI**: compliance, regulatory requirements (Basel III, GDPR, Fair Lending), model governance, fairness testing, explainability, audit trails. **Governance & Observability**: monitoring, cost optimization (caching, batching, model routing), testing strategies (routing, end-to-end, quality, security, human evaluation, A/B testing). **Memory Architectures**: 4-layer memory design (working, conversational, semantic, episodic), data lifecycle, production patterns. | 11 |
+| [08-Agentic-Design-Patterns-and-Enterprise-AI.md](08-Agentic-Design-Patterns-and-Enterprise-AI.md) | **5 agentic design patterns** (router, hierarchical, tool-using, reflection, autonomous). **LangGraph migration story** (when & why). **Advanced RAG**: retrieval quality metrics (hit rate, NDCG, MRR), knowledge base freshness. **Enterprise AI**: compliance (Basel III, GDPR, Fair Lending), model governance, fairness testing. **Governance & Observability**: monitoring, cost optimization, testing strategies. **Memory Architectures**: 4-layer design (working, conversational, semantic, episodic). | 12 |
 
-**Subtotal: 11 expert-level Q&As**
+**Subtotal: 12 expert-level Q&As**
 
 ### General AI & Prompt Engineering (File 10)
 
 | File | Topics Covered | Questions |
 |---|---|---|
-| [10-General-AI-and-Prompt-Engineering-Questions.md](10-General-AI-and-Prompt-Engineering-Questions.md) | **Foundation Concepts**: context window, LLM selection, AI agents, RAG (4 Q&As). **Prompt Engineering Fundamentals**: efficient prompts, context-aware RAG (2 Q&As). **Advanced Prompting**: structured output, versioning, adversarial testing, meta-prompting, recursive prompting (Q7). Few-shot prompting strategies & tradeoffs (Q8). **Security & Quality**: prompt injection defense layers, chain-of-thought & reasoning techniques, evaluation & iteration, token optimization (Q9-Q12). **General AI Knowledge**: hallucinations & mitigation, fine-tuning vs RAG vs prompting, LLM limitations & workarounds (Q13-Q15). | 15 |
+| [10-General-AI-and-Prompt-Engineering-Questions.md](10-General-AI-and-Prompt-Engineering-Questions.md) | **Foundation Concepts** (Q1-Q4): context window, LLM selection, AI agents, RAG. **Prompt Engineering Fundamentals** (Q5-Q6): efficient prompts, context-aware RAG. **Advanced Prompting** (Q7-Q12): structured output, versioning, few-shot, security, reasoning, evaluation, token optimization. **General AI Knowledge** (Q13-Q15): hallucinations, fine-tuning vs RAG vs prompting, LLM limitations. | 15 |
 
 **Subtotal: 15 comprehensive Q&As**
 
@@ -49,7 +49,7 @@ Every answer references actual config values, library versions, design decisions
 
 ## Total Coverage
 
-**100+ detailed Q&As** organized across 10 files, covering everything from foundational LLM concepts and prompt engineering to expert-level enterprise AI architecture, agentic design patterns, and memory systems. All answers grounded in real Aagam Mitra production code and systems.
+**106 detailed Q&As** organized across 10 files, covering everything from foundational LLM concepts and prompt engineering to expert-level enterprise AI architecture, agentic design patterns, and memory systems. All answers grounded in real Aagam Mitra production code and systems.
 
 ---
 
