@@ -8,6 +8,19 @@
 
 > **Why asked:** LangChain is for chains (linear flows), LangGraph is for agents (reasoning loops). Interviewers ask this to test whether you understand when to use each. The key difference: chains execute once, agents loop and make decisions. Aagam Mitra implements LangGraph-like patterns without the library.
 
+---
+
+### **LangChain vs LangGraph: Linear vs Looping**
+
+```
+LangChain: Input → Process → Output (one-way)
+  Good for: Simple Q&A ("What is X?")
+
+LangGraph: Input → Reason → Act → Observe → Loop?
+  Good for: Complex queries ("Book this AND explain why")
+  Agent can loop if it needs more info
+```
+
 **LangChain = Linear pipelines**
 ```
 User Input → Retriever → Prompt → LLM → Parser → Answer
@@ -82,6 +95,22 @@ Multi-intent, multi-agent, parallel execution → LangGraph-like design.
 ## 2. What is state in LangGraph and how do you design it?
 
 > **Why asked:** State is the most important concept in agentic systems — it's what the agent "remembers" across iterations. Interviewers want to see you think carefully about: What information must be tracked? What gets passed between nodes? How do you prevent data loss? This is core system design.
+
+---
+
+### **State: Agent Memory Across Iterations**
+
+```
+Iteration 1: Agent sees [query, history]
+  → Calls search_jain_texts("Karma")
+  → Learns: "Karma is law of cause and effect"
+  
+Iteration 2: Agent sees [query, history, search_results_from_iteration_1]
+  → Calls search_jain_texts("Karma effects")
+  → Decides: "Now I have enough info"
+  
+State must flow between iterations, else agent loses info.
+```
 
 **State = Data structure that persists across agent loop iterations**
 
@@ -180,6 +209,22 @@ return AgentResult(answer, agent_name, tools_called)
 ## 3. What are nodes and edges in LangGraph?
 
 > **Why asked:** Nodes and edges are the building blocks of agent graphs. Nodes are "what happens," edges are "when to move." This tests whether you can design complex workflows. For Aagam Mitra, specialist agents are nodes, and intent detection is edges.
+
+---
+
+### **Graph Structure: Nodes (Work) + Edges (Flow)**
+
+```
+Nodes: ScriptureAgent, TempleOpsAgent, SynthesisAgent
+  Each is a function that takes state, returns updated state
+
+Edges: Orchestrator routing
+  Detect intent → Route to appropriate node(s) → Synthesis → Return
+  
+Example:
+  Input → [Route by intent] → ScriptureAgent [NODE] → [Flow to synthesis] →
+  SynthesisAgent [NODE] → Output
+```
 
 **Nodes = Functions that do work**
 **Edges = Connections between nodes (determine flow)**
@@ -294,6 +339,24 @@ Final Answer
 
 > **Why asked:** The agent loop (decide → act → observe → loop) is the soul of agentic systems. Interviewers want to see you understand that agents are different from chains because they can reason, make mistakes, recover. This is high-level thinking about system design.
 
+---
+
+### **The Agent Loop: Autonomy Through Iteration**
+
+```
+Loop (reason-act-observe-decide) vs Chain (just execute):
+
+Chain: Question → (Fixed steps) → Answer
+  If first step wrong, answer is wrong (no recovery)
+
+Loop:
+  Iter 1: "Query not clear, search for more context"
+  Iter 2: "Now I have context, search for specific info"
+  Iter 3: "Got 8 passages, time to answer"
+  
+Each iteration learns and can adjust strategy.
+```
+
 **The Agent Loop = Reason → Act → Observe → Decide → Loop**
 
 ```
@@ -405,6 +468,22 @@ Return: Synthesized answer about booking + Shantidhara significance
 
 > **Why asked:** This is real-world complexity. Most real apps need multiple agents working together. Interviewers want to see you think about: coordination (parallel vs sequential), conflict resolution (what if agents disagree?), data aggregation (how to combine results). Aagam Mitra's orchestrator is a great example.
 
+---
+
+### **Multiple Agents: Parallel > Sequential**
+
+```
+Sequential: Agent1 (1s) → Agent2 (1s) → Agent3 (1s) = 3s total
+Parallel:   Agent1, Agent2, Agent3 all at once = 1s total
+
+Aagam Mitra uses parallel with intent detection:
+  "Book Shantidhara" + "Explain significance" 
+  → Detect intents [TEMPLE_OPS, SCRIPTURE]
+  → Run both in parallel
+  → Synthesize results
+  → 3x faster than sequential
+```
+
 **Multi-agent orchestration = Running multiple agents and combining results**
 
 ### Patterns:
@@ -514,6 +593,27 @@ Return to user
 ## 6. Why build custom vs using LangGraph?
 
 > **Why asked:** This gets at framework decisions. When do you use a library vs build custom? Interviewers value clear trade-off analysis. Aagam Mitra built custom agents — why? What did we gain? What did we sacrifice?
+
+---
+
+### **Framework Decision: Time vs Control**
+
+```
+LangGraph (Use library):
+  Build time: 2-3 days
+  Dependencies: 10+
+  Control: Medium
+  
+Custom (Aagam Mitra):
+  Build time: 2-3 weeks
+  Dependencies: 5
+  Control: Very high
+  
+Aagam Mitra chose custom because:
+- Need min 120-word answers (framework doesn't enforce)
+- Need role-based tools (framework doesn't model RBAC)
+- Need parallel execution (framework can do it, but complex)
+```
 
 ### LangGraph (Use the library)
 
