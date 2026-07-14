@@ -5,41 +5,37 @@
 
 ---
 
-## Quick Navigation
+## Quick Navigation — Click Any Question Below
 
-**Foundational Q&As (1-9):** RAG patterns, architecture, embeddings, similarity, knowledge sync  
-**Production Q&As (10-19):** Storage strategy, semantic search, metadata, schema versioning, PDF chunking  
-**Advanced Q&As (20-29):** HNSW algorithm, cost optimization, policy compliance, offline systems  
+**Foundational (1-9)** • **Production (10-19)** • **Advanced (20-29)**
 
-| Q | Topic |
-|---|---|
-| [1](#1-which-rag-architectural-pattern-are-you-using) | RAG architectural pattern |
-| [2](#2-what-rag-architecture-patterns-exist-today-and-why-did-you-pick-agentic-rag) | RAG patterns overview |
-| [3](#3-what-is-rag-and-why-did-you-use-it-in-aagam-mitra) | What is RAG? |
-| [4](#4-walk-me-through-your-complete-rag-pipeline-end-to-end) | Complete RAG pipeline |
-| [5](#5-why-chunk-at-800-characters-with-100-overlap-how-did-you-choose-these-values) | Chunking strategy |
-| [6](#6-what-is-an-embedding-explain-it-to-a-non-technical-person) | Embeddings explained |
-| [7](#7-what-is-cosine-similarity-and-how-does-pinecone-use-it) | Cosine similarity |
-| [8](#8-what-is-the-difference-between-retrieval_document-and-retrieval_query-task-types-in-gemini) | Embedding task types |
-| [9](#9-how-do-you-handle-temple-live-data-that-changes-frequently-news-events-slots) | Live data handling |
-| [10](#10-why-pinecone-for-jain-texts-but-postgresql-for-temple-data) | Storage strategy |
-| [11](#11-what-is-semantic-search-and-how-is-it-different-from-keyword-search) | Semantic search |
-| [12](#12-how-does-the-temple-knowledge-sync-handle-content-addressed-deduplication) | Knowledge sync |
-| [13](#13-whats-missing-from-aagam-mitra-to-make-it-production-ready) | Production gaps |
-| [14](#14-how-would-you-add-llm-as-judge-evaluation-to-aagam-mitra) | LLM-as-judge |
-| [15](#15-what-metadata-should-we-extract-during-chunking-to-improve-production-quality) | Metadata extraction |
-| [16](#16-how-would-you-add-a-human-in-the-loop-gate-for-high-stakes-actions) | Human-in-the-loop |
-| [17](#17-what-observability-would-you-add-to-production-aagam-mitra) | Observability |
-| [18](#18-how-would-you-handle-schema-versioning-and-metadata-migration-in-production) | Schema versioning |
-| [19](#19-how-do-you-preserve-table-structure-when-chunking-pdfs) | PDF structure |
-| [20](#20-how-does-hnsw-find-10-nearest-neighbors-from-100m-embeddings-without-comparing-all-of-them) | HNSW algorithm |
-| [21](#21-your-llm-bill-is-2000month-how-would-you-cut-it-in-half) | LLM cost optimization |
-| [22](#22-an-ai-agent-is-about-to-go-live-1-of-its-responses-violate-company-policy-what-would-you-do) | Policy compliance |
-| [23](#23-how-do-you-build-an-ai-system-with-zero-internet-access-on-prem--offline) | Offline systems |
-| [24](#24-our-pinecone-bill-is-5000month-and-growing-how-would-you-optimize-vector-db-costs) | Vector DB costs |
-| [25](#25-what-is-corrective-rag-crag-and-when-should-we-use-it) | Corrective RAG |
-| [26](#26-what-is-self-rag-and-how-is-it-different-from-corrective-rag) | Self-RAG |
-| [29](#29-what-happens-if-the-real-answer-is-in-rank-10-12-but-we-only-retrieve-top-8-how-do-you-handle-this) | Retrieval edge case |
+- [Q1: RAG architectural pattern](# 1-which-rag-architectural-pattern-are-you-using)
+- [Q2: RAG patterns overview](# 2-what-rag-architecture-patterns-exist-today-and-why-did-you-pick-agentic-rag)
+- [Q3: What is RAG?](# 3-what-is-rag-and-why-did-you-use-it-in-aagam-mitra)
+- [Q4: Complete RAG pipeline](# 4-walk-me-through-your-complete-rag-pipeline-end-to-end)
+- [Q5: Chunking strategy](# 5-why-chunk-at-800-characters-with-100-overlap-how-did-you-choose-these-values)
+- [Q6: Embeddings explained](# 6-what-is-an-embedding-explain-it-to-a-non-technical-person)
+- [Q7: Cosine similarity](# 7-what-is-cosine-similarity-and-how-does-pinecone-use-it)
+- [Q8: Embedding task types](# 8-what-is-the-difference-between-retrieval_document-and-retrieval_query-task-types-in-gemini)
+- [Q9: Live data handling](# 9-how-do-you-handle-temple-live-data-that-changes-frequently-news-events-slots)
+- [Q10: Storage strategy](# 10-why-pinecone-for-jain-texts-but-postgresql-for-temple-data)
+- [Q11: Semantic search](# 11-what-is-semantic-search-and-how-is-it-different-from-keyword-search)
+- [Q12: Knowledge sync](# 12-how-does-the-temple-knowledge-sync-handle-content-addressed-deduplication)
+- [Q13: Production gaps](# 13-whats-missing-from-aagam-mitra-to-make-it-production-ready)
+- [Q14: LLM-as-judge](# 14-how-would-you-add-llm-as-judge-evaluation-to-aagam-mitra)
+- [Q15: Metadata extraction](# 15-what-metadata-should-we-extract-during-chunking-to-improve-production-quality)
+- [Q16: Human-in-the-loop](# 16-how-would-you-add-a-human-in-the-loop-gate-for-high-stakes-actions)
+- [Q17: Observability](# 17-what-observability-would-you-add-to-production-aagam-mitra)
+- [Q18: Schema versioning](# 18-how-would-you-handle-schema-versioning-and-metadata-migration-in-production)
+- [Q19: PDF structure](# 19-how-do-you-preserve-table-structure-when-chunking-pdfs)
+- [Q20: HNSW algorithm](# 20-how-does-hnsw-find-10-nearest-neighbors-from-100m-embeddings-without-comparing-all-of-them)
+- [Q21: LLM cost optimization](# 21-your-llm-bill-is-2000month-how-would-you-cut-it-in-half)
+- [Q22: Policy compliance](# 22-an-ai-agent-is-about-to-go-live-1-of-its-responses-violate-company-policy-what-would-you-do)
+- [Q23: Offline systems](# 23-how-do-you-build-an-ai-system-with-zero-internet-access-on-prem--offline)
+- [Q24: Vector DB costs](# 24-our-pinecone-bill-is-5000month-and-growing-how-would-you-optimize-vector-db-costs)
+- [Q25: Corrective RAG](# 25-what-is-corrective-rag-crag-and-when-should-we-use-it)
+- [Q26: Self-RAG](# 26-what-is-self-rag-and-how-is-it-different-from-corrective-rag)
+- [Q29: Retrieval edge case](# 29-what-happens-if-the-real-answer-is-in-rank-10-12-but-we-only-retrieve-top-8-how-do-you-handle-this)
 
 ---
 
