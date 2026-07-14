@@ -2,6 +2,23 @@
 
 ---
 
+## Quick Navigation
+
+| Q | Topic |
+|---|---|
+| [1](#1-what-is-an-ai-agent-how-is-it-different-from-a-regular-llm-call) | What is an agent? |
+| [2](#2-what-are-the-4-agents-in-aagam-mitra-and-what-do-they-do) | Aagam Mitra agents |
+| [3](#3-how-does-multi-agent-routing-work) | Multi-agent routing |
+| [4](#4-what-are-the-12-tools-available-to-agents) | Agent tools |
+| [5](#5-walk-me-through-the-system-architecture-end-to-end) | System architecture |
+| [6](#6-how-does-jwt-authentication-work-in-aagam-mitra) | JWT auth |
+| [7](#7-how-do-you-hash-passwords-securely) | Password hashing |
+| [8](#8-what-is-cloudflare-tunnel-and-why-use-it-instead-of-a-public-ip) | Cloudflare Tunnel |
+| [9](#9-what-are-action-cards-and-how-do-they-guide-users) | Action cards |
+| [10](#10-how-do-push-notifications-work-in-the-mobile-app) | Push notifications |
+
+---
+
 ## 1. What is an AI agent? How is it different from a regular LLM call?
 
 > **Why asked:** "Agent" is one of the most overused buzzwords in AI right now. Interviewers ask this to filter out people who just use the word vs people who can explain what it actually means in code. The clearest way to answer is side-by-side: regular LLM answers from training data, an agent calls live APIs and incorporates the results. Always give a concrete example from the project.

@@ -4,6 +4,19 @@
 
 ---
 
+## Quick Navigation
+
+| Q | Topic |
+|---|---|
+| [1](#1-what-is-langgraph-and-how-does-it-differ-from-langchain) | LangGraph vs LangChain |
+| [2](#2-what-are-nodes-edges-and-state-graphs) | Nodes, edges, state |
+| [3](#3-how-do-you-build-an-agent-loop-in-langgraph) | Agent loop |
+| [4](#4-what-is-conditional-branching-and-why-does-it-matter) | Conditional branching |
+| [5](#5-how-do-you-orchestrate-multi-agent-workflows) | Multi-agent orchestration |
+| [6](#6-why-did-aagam-mitra-build-custom-instead-of-using-langgraph) | Custom vs LangGraph |
+
+---
+
 ## 1. What is LangGraph and how does it differ from LangChain?
 
 > **Why asked:** LangChain is for chains (linear flows), LangGraph is for agents (reasoning loops). Interviewers ask this to test whether you understand when to use each. The key difference: chains execute once, agents loop and make decisions. Aagam Mitra implements LangGraph-like patterns without the library.

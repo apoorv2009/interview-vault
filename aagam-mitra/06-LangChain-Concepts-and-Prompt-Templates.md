@@ -4,6 +4,19 @@
 
 ---
 
+## Quick Navigation
+
+| Q | Topic |
+|---|---|
+| [1](#1-what-is-langchain-and-why-is-it-useful) | LangChain intro |
+| [2](#2-what-are-chains-and-how-do-you-compose-them) | Chains & composition |
+| [3](#3-how-do-you-build-reusable-prompt-templates) | Prompt templates |
+| [4](#4-what-is-the-rag-pattern-in-langchain) | RAG pattern |
+| [5](#5-when-should-you-use-a-framework-vs-build-custom) | Framework vs custom |
+| [6](#6-how-do-you-handle-errors-in-llm-application-pipelines) | Error handling |
+
+---
+
 ## 1. What is LangChain and why is it useful?
 
 > **Why asked:** LangChain is the most popular LLM framework right now. Interviewers ask this to see if you understand the problem it solves (standardization, reusability, composition) vs just knowing it exists. The clearest answer compares "before" and "after" — scattered LLM code vs organized, reusable chains.

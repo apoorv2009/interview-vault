@@ -2,6 +2,24 @@
 
 ---
 
+## Quick Navigation
+
+| Q | Topic |
+|---|---|
+| [1](#1-describe-the-4-layer-security-model-in-aagam-mitra) | 4-layer security |
+| [2](#2-how-do-you-prevent-prompt-injection-attacks) | Prompt injection defense |
+| [3](#3-how-do-you-handle-edge-cases-gracefully) | Graceful degradation |
+| [4](#4-how-do-you-prevent-double-booking-in-shantidhara-slots) | Booking prevention |
+| [5](#5-what-scaling-challenges-exist-and-how-would-you-solve-them) | Scaling challenges |
+| [6](#6-what-configuration-values-matter-most-in-production) | Config values |
+| [7](#7-how-do-you-handle-concurrent-requests-to-the-same-temple) | Concurrency handling |
+| [8](#8-what-are-some-tricky-edge-cases-youve-encountered) | Edge cases |
+| [9](#9-how-do-you-secure-the-api-gateway) | Gateway security |
+| [10](#10-how-do-you-monitor-for-security-incidents) | Security monitoring |
+| [11](#11-what-would-you-change-if-aagam-mitra-scaled-to-1m-users) | 1M user scaling |
+
+---
+
 ## 1. Describe the 4-layer security model in Aagam Mitra.
 
 > **Why asked:** Security in AI systems is an active area of concern — prompt injection and jailbreaking are real attacks. Interviewers at product companies want to know you thought about this proactively, not reactively. Having four named layers (not just "we check the input") shows maturity. The key point: Layer 1 (regex) blocks before the LLM is even called — so you save money *and* stay secure.

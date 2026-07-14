@@ -2,6 +2,21 @@
 
 ---
 
+## Quick Navigation
+
+| Q | Topic |
+|---|---|
+| [1](#1-how-does-the-youtube-transcript-extraction-work) | Transcript extraction |
+| [2](#2-what-is-whisper-asr-and-why-use-it-for-audio) | Whisper ASR |
+| [3](#3-how-do-you-distinguish-between-shanka-samadhan-and-pravachan-videos) | Video classification |
+| [4](#4-how-do-you-format-llm-cleaned-transcripts-into-structured-summaries) | Transcript formatting |
+| [5](#5-how-do-you-handle-live-streams-that-are-still-being-recorded) | Live stream handling |
+| [6](#6-how-do-you-deduplicate-transcript-chunks-before-storage) | Deduplication |
+| [7](#7-what-metadata-do-you-extract-from-each-video) | Metadata extraction |
+| [8](#8-how-do-you-integrate-transcripts-into-the-main-rag-pipeline) | RAG integration |
+
+---
+
 ## 1. How does the YouTube transcript extraction work?
 
 > **Why asked:** Building something on top of YouTube's transcript system is a real engineering challenge because it can fail in many ways — no captions, live stream, private video, language not available. Having a fallback strategy (Layer 2 with Whisper) shows you thought about reliability, not just the happy path. The dual-layer approach is the most interesting architectural decision here and should be the centrepiece of your answer.

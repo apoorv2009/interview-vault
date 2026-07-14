@@ -4,6 +4,23 @@
 
 ---
 
+## Quick Navigation
+
+| Q | Topic |
+|---|---|
+| [1](#1-what-llm-does-aagam-mitra-use-and-why-groq) | Groq choice & LLM basics |
+| [2](#2-whats-the-difference-between-temperature-and-top-p) | Temperature vs top-p |
+| [3](#3-what-is-the-groq-api-and-why-did-we-choose-it-over-openai) | Groq API overview |
+| [4](#4-how-do-you-structure-a-tool-call-loop-llm--tool--llm) | Tool-call loop |
+| [5](#5-how-do-you-manage-chat-history-in-production) | Chat history management |
+| [6](#6-how-do-you-make-llm-calls-in-parallel-and-handle-results) | Parallel LLM calls |
+| [7](#7-how-do-you-implement-exponential-backoff-for-llm-timeouts) | Exponential backoff |
+| [8](#8-what-happens-when-groq-is-down-how-do-you-gracefully-degrade) | Graceful degradation |
+| [9](#9-how-do-you-route-different-query-types-to-different-agents) | Query routing |
+| [10](#10-how-do-you-reduce-latency-for-llm-responses-to-200ms) | Latency optimization |
+
+---
+
 ## 1. What LLM does Aagam Mitra use and why Groq?
 
 > **Why asked:** Provider choice signals whether you evaluated options or just used the default. Interviewers want to hear a cost + performance justification. The key numbers to remember: Groq is ~45x cheaper than GPT-4o and 5–10x faster because it uses custom LPU chips. Also important: Groq's API is OpenAI-compatible, so switching providers requires changing one line, not rewriting code.
