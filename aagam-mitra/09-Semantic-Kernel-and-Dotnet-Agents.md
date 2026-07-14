@@ -20,6 +20,17 @@
 
 ## What is Semantic Kernel?
 
+---
+
+### **.NET's LangChain Equivalent: Enterprise-Grade AI SDK**
+
+```
+Python: LangChain → Flexible, broad ecosystem, community-driven
+.NET: Semantic Kernel → Enterprise, Azure-native, Microsoft-backed
+  Both solve: Standardize LLM interactions, orchestrate tools, manage memory
+  SK advantage: Tighter Azure integration, compliance-ready, production patterns
+```
+
 **Semantic Kernel** is an open-source SDK by Microsoft for building AI applications in .NET. It's the .NET equivalent of LangChain but with tighter integration with Azure services and a focus on enterprise reliability.
 
 **Official:** https://github.com/microsoft/semantic-kernel
@@ -43,6 +54,18 @@ Console.WriteLine(result);
 
 ## Semantic Kernel vs LangChain vs LangGraph
 
+---
+
+### **Tool Comparison: SK vs LC vs LG**
+
+```
+Question: Which .NET framework?
+Answer: Semantic Kernel (Microsoft's official .NET AI SDK)
+
+Comparison table below shows feature parity and differences.
+SK is production-grade, enterprise-focused, Azure-native.
+```
+
 | Feature | Semantic Kernel | LangChain | LangGraph |
 |---------|-----------------|-----------|-----------|
 | **Language** | C# / .NET | Python | Python |
@@ -65,6 +88,19 @@ Console.WriteLine(result);
 ---
 
 ## Core Concepts: Plugins, Functions, Planners
+
+---
+
+### **Three Building Blocks: Plugins, Functions, Planners**
+
+```
+Plugin = Collection of capabilities (like LangChain tools)
+Function = Individual capability marked with [KernelFunction]
+Planner = Orchestrator that routes to appropriate plugin/function
+
+Example: TempleOpsPlugin has functions: GetSlots, BookSlot
+         JainPhilosophyPlugin has function: SearchJainTexts
+```
 
 ### Plugins (≈ LangChain Tools)
 
@@ -191,6 +227,20 @@ var kernel = builder.Build();
 
 ## Building an Agent Loop in C#
 
+---
+
+### **Aagam Mitra Loop Ported to C# (.NET)**
+
+```
+Same 4-step loop as Python:
+1. Build message history (system prompt + last 8 turns)
+2. Detect intent (regex keywords)
+3. Route to appropriate plugin(s)
+4. Synthesize via LLM
+
+Implementation: C# async/await, Semantic Kernel plugins instead of custom tools
+```
+
 Here's how to build the Aagam Mitra agent loop equivalent in Semantic Kernel:
 
 ```csharp
@@ -310,6 +360,19 @@ var response = await agent.RunAsync(
 
 ## Prompt Management & Templates
 
+---
+
+### **Template-Based Prompts: 3 Approaches**
+
+```
+1. Inline: String interpolation with {{$variable}}
+2. Structured: Multi-line templates with variables
+3. External: YAML files with prompt + settings
+
+Semantic Kernel: {{$input}} syntax
+LangChain: {variable} syntax (similar concept)
+```
+
 Semantic Kernel supports prompt templates similar to LangChain:
 
 ```csharp
@@ -352,6 +415,20 @@ var result = await kernel.InvokeAsync(promptSettings, arguments);
 ---
 
 ## Memory Management in Semantic Kernel
+
+---
+
+### **Two Memory Types: Semantic (RAG) + Conversational (Chat History)**
+
+```
+Semantic Memory: Store embeddings, search by similarity (RAG)
+  - VolatileMemoryStore (in-memory, fast, lost on restart)
+  - SqlServerMemoryStore (persistent, survives restarts)
+
+Conversational Memory: Store chat messages (session history)
+  - ChatHistory object (in-memory for current request)
+  - Custom DB store (persist across sessions)
+```
 
 Semantic Kernel provides built-in memory management (similar to LangChain's memory):
 
@@ -399,6 +476,16 @@ foreach (var memory in memories)
 
 ### Chat History Management
 
+---
+
+### **Persistent Chat: Database-Backed History**
+
+```
+Store pattern: SaveMessageAsync(userId, templeId, role, content)
+Retrieve pattern: GetHistoryAsync(userId, templeId, limit=8)
+Same as Aagam Mitra: Only keep last 8 turns to save tokens
+```
+
 ```csharp
 // Store conversation history
 public class ChatHistoryStore
@@ -435,6 +522,17 @@ foreach (var msg in history)
 
 ## Tool Integration & Plugin Architecture
 
+---
+
+### **Two Tool Approaches: Auto-Binding + Step-wise Calling**
+
+```
+Auto-binding: Kernel discovers plugins, LLM sees tool metadata
+Step-wise: LLM calls tool → observe result → loop
+
+Semantic Kernel supports both patterns.
+```
+
 ### Automatic Tool Binding (Function Calling)
 
 Semantic Kernel can automatically convert plugins to tool definitions for the LLM:
@@ -461,6 +559,19 @@ foreach (var tool in tools)
 ```
 
 ### Step-wise Function Calling (Like Agent Loop)
+
+---
+
+### **Loop Pattern: Call → Execute → Observe → Loop**
+
+```
+Similar to Aagam Mitra's custom agent loop:
+1. Call LLM with available tools
+2. Check if LLM wants to call tool
+3. Execute tool, append result to history
+4. Loop back, LLM sees result and can refine
+5. When LLM returns no more tool calls, done
+```
 
 ```csharp
 // Semantic Kernel's function calling planner (similar to LangGraph)
@@ -521,6 +632,16 @@ public class StepwiseAgentExecutor
 
 ## Production Patterns
 
+---
+
+### **Production Requirements: Error Handling, Logging, Caching**
+
+```
+Pattern 1: Polly retry policy (exponential backoff)
+Pattern 2: ILogger integration (all operations logged)
+Pattern 3: Prompt caching with Azure OpenAI (90% token discount)
+```
+
 ### Error Handling & Retry Logic
 
 ```csharp
@@ -571,6 +692,20 @@ public class ResilientAgent
 
 ### Observability & Logging
 
+---
+
+### **Built-In Logging: ILogger Integration**
+
+```
+All kernel operations auto-logged:
+- Function invocations
+- Tool calls
+- LLM requests/responses
+- Errors
+
+Similar to Aagam Mitra's audit log, but framework-native.
+```
+
 ```csharp
 // Semantic Kernel integrates with Microsoft.Extensions.Logging
 builder.Services.AddLogging(config =>
@@ -598,6 +733,21 @@ builder.Services.AddSingleton(sp =>
 ```
 
 ### Prompt Caching (Cost Optimization)
+
+---
+
+### **Cache System Prompt: 90% Cost Reduction**
+
+```
+Pattern: Mark system prompt with CacheControlType = "ephemeral"
+Result: Same system prompt cached for 5 minutes
+Savings: 90% discount on cached tokens
+
+Example: 500-token system prompt
+  Without cache: 500 tokens × $0.0001 = $0.05
+  With cache: 50 tokens × $0.0001 = $0.005
+  Per request (100/day): $5 → $0.50/month savings
+```
 
 ```csharp
 // Azure OpenAI with prompt caching (reduces cost by 90%)
