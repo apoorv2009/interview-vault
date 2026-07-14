@@ -41,15 +41,15 @@ Every answer references actual config values, library versions, design decisions
 
 | File | Topics Covered | Questions |
 |---|---|---|
-| [10-General-AI-and-Prompt-Engineering-Questions.md](10-General-AI-and-Prompt-Engineering-Questions.md) | **Foundation Concepts** (Q1-Q4): context window, LLM selection, AI agents, RAG. **Prompt Engineering Fundamentals** (Q5-Q6): efficient prompts, context-aware RAG. **Advanced Prompting** (Q7-Q12): structured output, versioning, few-shot, security, reasoning, evaluation, token optimization. **General AI Knowledge** (Q13-Q15): hallucinations, fine-tuning vs RAG vs prompting, LLM limitations. **Production RAG** (Q16): cache invalidation strategies (HDFC Bank interview question). | 16 |
+| [10-General-AI-and-Prompt-Engineering-Questions.md](10-General-AI-and-Prompt-Engineering-Questions.md) | **Foundation** (Q1-Q4): context window, LLM selection, AI agents, RAG. **Prompt Engineering** (Q5-Q12): efficient prompts, advanced techniques, few-shot, security, reasoning, evaluation. **General AI** (Q13-Q15): hallucinations, fine-tuning vs RAG, LLM limitations. **Production RAG** (Q16): cache invalidation. **LLM Deep-Dive** (Q17-Q22): tokenization, transformers/attention, vector DBs, embeddings, vector DB comparisons, schema design. | 22 |
 
-**Subtotal: 16 comprehensive Q&As**
+**Subtotal: 22 comprehensive Q&As**
 
 ---
 
 ## Total Coverage
 
-**109 detailed Q&As** organized across 10 files, covering everything from foundational LLM concepts and prompt engineering to expert-level enterprise AI architecture, agentic design patterns, cache invalidation strategies, indexing algorithms, prompt injection defense, and memory systems. All answers grounded in real Aagam Mitra production code and real interview questions from companies like HDFC Bank.
+**115 detailed Q&As** organized across 10 files, covering everything from foundational LLM concepts (tokenization, transformers, embeddings) and prompt engineering to expert-level enterprise AI architecture, agentic design patterns, cache invalidation strategies, indexing algorithms, prompt injection defense, vector database design, and memory systems. All answers grounded in real Aagam Mitra production code and real interview questions from companies like HDFC Bank.
 
 ---
 
@@ -192,7 +192,7 @@ Q6: How do you manage memory in Semantic Kernel?
 Q7: What are production patterns for Semantic Kernel?
 ```
 
-### 10-General-AI-and-Prompt-Engineering-Questions.md (16 Q&As)
+### 10-General-AI-and-Prompt-Engineering-Questions.md (22 Q&As)
 ```
 Q1:  What is a context window and what happens when you exhaust it?
 Q2:  How do you choose which LLM to use for a given task?
@@ -210,6 +210,12 @@ Q13: What causes hallucinations and how do you reduce them?
 Q14: When should you fine-tune vs. RAG vs. prompt engineering?
 Q15: What are the limitations of LLMs?
 Q16: How do you implement cache invalidation for production RAG systems? (HDFC Bank)
+Q17: What is tokenization and why do LLMs work with tokens instead of characters?
+Q18: How do Large Language Models actually work? Explain transformers and attention.
+Q19: What is a Vector Database and why do we need it for RAG systems?
+Q20: How do embeddings work and why are they central to vector search?
+Q21: Compare vector databases: Pinecone vs Weaviate vs Qdrant vs Milvus. When would you use each?
+Q22: How do you design a vector database schema for a specific RAG use case?
 ```
 
 ---

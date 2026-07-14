@@ -29,6 +29,15 @@
 - [Q13: Hallucinations & Mitigation](#q13-what-causes-llm-hallucinations-and-how-do-you-mitigate-them)
 - [Q14: Fine-Tuning vs RAG vs Prompting](#q14-when-would-you-fine-tune-vs-use-rag-vs-just-improve-prompts)
 - [Q15: Model Limitations & Edge Cases](#q15-what-are-the-main-limitations-of-current-llms-and-how-do-you-work-around-them)
+- [Q16: Production RAG Cache Invalidation](#q16-how-do-you-invalidate-and-refresh-ai-generated-knowledge-safely-when-source-documents-change-hdfc-bank-interview-question)
+
+### LLM Fundamentals (Deep Dive)
+- [Q17: Tokenization](#q17-what-is-tokenization-and-why-do-llms-work-with-tokens-instead-of-characters)
+- [Q18: How LLMs Work (Transformers & Attention)](#q18-how-do-large-language-models-actually-work-explain-transformers-and-attention)
+- [Q19: Vector Databases](#q19-what-is-a-vector-database-and-why-do-we-need-it-for-rag-systems)
+- [Q20: Embeddings](#q20-how-do-embeddings-work-and-why-are-they-central-to-vector-search)
+- [Q21: Vector DB Comparison](#q21-compare-vector-databases-pinecone-vs-weaviate-vs-qdrant-vs-milvus-when-would-you-use-each)
+- [Q22: Vector DB Schema Design](#q22-how-do-you-design-a-vector-database-schema-for-a-specific-rag-use-case)
 
 ---
 
@@ -1938,15 +1947,604 @@ For production scale (banking), we'd add Layer 2 + Layer 3 + Layer 5:
 
 ---
 
+## Q17. What is tokenization and why do LLMs work with tokens instead of characters?
+
+> **Why asked:** Tokenization is the bridge between human text and LLM math. Understanding tokens explains why context windows have limits, why certain languages are more expensive, and why prompt engineering matters. Shows you understand the LLM's actual input format.
+
+**Tokenization** is the process of breaking text into small units called **tokens** that the LLM can process. Tokens are NOT characters or words—they're subword units.
+
+```
+Example: "Hello, world!"
+
+CHARACTER-level:
+├─ H | e | l | l | o | , | (space) | w | o | r | l | d | !
+└─ 13 units
+
+WORD-level:
+├─ Hello | , | world | !
+└─ 4 units
+
+TOKEN-level (GPT/Claude):
+├─ "Hello" | "," | "world" | "!"
+└─ 4 tokens (roughly: 1 token ≈ 4 characters or 0.75 words)
+```
+
+**Why tokens instead of characters?**
+
+```
+Efficiency:
+├─ Characters: 1 billion × 13 chars = massive input size
+├─ Tokens: 1 billion × 4 tokens = 3x smaller input
+└─ Smaller input = faster training, cheaper inference
+
+Math alignment:
+├─ LLMs use embeddings (vectors)
+├─ Each token maps to a vector (e.g., 2048 dimensions)
+├─ Token-level = right granularity for embeddings
+└─ Character-level = too sparse, word-level = too coarse
+```
+
+**Token counting in practice:**
+
+```python
+import tiktoken
+
+# GPT-4o tokenizer
+enc = tiktoken.encoding_for_model("gpt-4o")
+text = "What is Karma?"
+tokens = enc.encode(text)
+
+print(len(tokens))  # Usually 4-5 tokens
+print(tokens)       # [16, 69, 374, 13]
+```
+
+**Real-world impact at Aagam Mitra:**
+
+```
+User question: "What is Navakar Mantra and why is it important?"
+├─ Characters: 56
+├─ Tokens: ~15 tokens
+├─ Cost: 15 × $0.11/1M = negligible
+
+System prompt: (500 tokens) → $0.000055
+8 passages: (2000 tokens) → $0.00022
+Chat history: (1500 tokens) → $0.000165
+
+Total cost per query: ~$0.0003 (0.03 cents)
+× 300K queries/month = $90/month
+```
+
+**Token pricing varies by language:**
+
+```
+English: "Hello" = 1 token
+Japanese: "こんにちは" = 4-5 tokens
+Emoji: "😊" = 2 tokens
+
+Why? Japanese has 46,000 characters → huge vocabulary
+→ More tokens needed to represent same idea
+→ 2-3x more expensive to use Japanese LLMs
+```
+
+---
+
+## Q18. How do Large Language Models actually work? Explain transformers and attention.
+
+> **Why asked:** This question separates engineers who use LLMs from engineers who understand them. Being able to explain transformers shows depth and helps you make better design decisions (e.g., why context windows have limits, why longer prompts cost more).
+
+**LLMs are neural networks** that predict the next word one token at a time by learning patterns from billions of text examples.
+
+**The core mechanism: Transformer + Attention**
+
+```
+TRANSFORMER ARCHITECTURE (simplified):
+
+Input: "What is Karma?"
+    ↓ [Tokenize]
+    "What" | "is" | "Karma" | "?"
+    ↓ [Convert to vectors (embeddings)]
+    [0.5, -0.2, 0.8, ...] | [0.1, 0.6, -0.3, ...] | ...
+    ↓ [TRANSFORMER LAYERS]
+    
+    Layer 1: Self-Attention
+    ├─ "What" attends to: "What", "is", "Karma", "?"
+    ├─ Compute: How related is "What" to each word?
+    ├─ Weight: "What"=0.7, "is"=0.2, "Karma"=0.05, "?"=0.05
+    └─ Result: Weighted combination = new vector for "What"
+    
+    Layer 2: Feed-Forward
+    ├─ Transform the new vector through dense layers
+    ├─ Add non-linearity (ReLU, GELU)
+    └─ Result: Better representation
+    
+    [Repeat 32-128 layers]
+    
+    Final layer: Predict next token
+    ├─ Use all 4 token representations
+    ├─ Output: Probability distribution over all tokens
+    └─ Most likely next word: "the" (20% probability)
+```
+
+**Attention: The Key Insight**
+
+Attention lets the model understand which parts of the input are important for predicting the next word.
+
+```
+Example: "The bank account was frozen because..."
+
+Without attention: Process "bank" the same way always
+├─ Could mean: River bank? Financial bank?
+├─ Model is confused
+
+With attention: "bank" attends to nearby context
+├─ "account", "frozen" → likely FINANCIAL bank
+├─ Query: "What type of bank?" 
+├─ Attend to: "account" (0.8), "frozen" (0.7), "river" (0.1)
+└─ Result: Financial bank interpretation ✓
+```
+
+**Why context windows have limits:**
+
+```
+Attention complexity: O(n²)
+├─ n = sequence length (number of tokens)
+├─ 8K tokens = 64M attention computations
+├─ 128K tokens = 16.4B attention computations ← expensive!
+
+Memory: Each token stores vectors for every position
+├─ 4 layers × 64 heads × 128 dims × 128K tokens = 4GB RAM
+├─ At 1M tokens: 31GB RAM (beyond most GPUs)
+
+Solution: Sliding window attention (only attend to recent tokens)
+```
+
+**Real Aagam Mitra context:**
+
+We use Groq LLaMA Scout 17B, which:
+- Has 24 transformer layers
+- Runs on specialized LPU (Tensor Processing Unit, not GPU)
+- Processes tokens ~10x faster than GPU by optimizing attention math
+- Context window: 8K tokens (enough for Q&A, not dialogue history)
+
+---
+
+## Q19. What is a Vector Database and why do we need it for RAG systems?
+
+> **Why asked:** RAG is useless without vector DBs. This question tests if you understand the infrastructure behind semantic search and why it's necessary for production systems.
+
+**A Vector Database** is a specialized database optimized for storing and retrieving high-dimensional vectors (embeddings) based on similarity.
+
+**Why not just use PostgreSQL?**
+
+```
+PostgreSQL (traditional DB):
+├─ Designed for exact matches: WHERE id = 123
+├─ Not optimized for similarity: "Find vectors close to [0.5, -0.2, ...]"
+├─ Brute-force search: Compare query vector against ALL vectors
+├─ 100M vectors = 100M comparisons = 100 seconds ❌
+
+Vector Database (Pinecone, Weaviate, etc.):
+├─ Optimized for similarity search: "Find top-10 closest vectors"
+├─ Uses HNSW graph indexing
+├─ Smart search: ~670 comparisons = 50 milliseconds ✅
+```
+
+**Real-world comparison:**
+
+```
+Scenario: Search 100M scripture embeddings (2048-D each)
+
+PostgreSQL (if possible):
+├─ Create index on 100M × 2048 = 204.8B dimensions
+├─ Storage: ~800GB
+├─ Query time: 100+ seconds (brute-force)
+└─ Cost: High storage + slow queries
+
+Pinecone (Vector DB):
+├─ Store 100M embeddings with HNSW indexing
+├─ Storage: ~800GB (similar)
+├─ Query time: <50ms (indexed search)
+├─ Cost: $0.25 per million dimensions/month = $51/month
+└─ Plus: $0.04 per 1000 queries
+```
+
+**Vector Database Use Cases:**
+
+```
+Semantic Search (Aagam Mitra):
+├─ User: "What is Karma?"
+├─ Embed question → [0.5, -0.2, 0.8, ...]
+├─ Vector DB: "Find 8 closest scripture embeddings"
+└─ Return: Top 8 most similar passages
+
+Recommendation Engines:
+├─ User watched: "Harry Potter" → embedding
+├─ Vector DB: "Find 10 similar movies"
+└─ Return: Recommended movies
+
+Duplicate Detection:
+├─ User uploads document → embedding
+├─ Vector DB: "Are there similar documents already uploaded?"
+└─ Return: Potential duplicates
+
+Image Search:
+├─ Upload photo → vision model embedding
+├─ Vector DB: "Find 100 most similar photos"
+└─ Return: Photos from dataset
+```
+
+---
+
+## Q20. How do embeddings work and why are they central to vector search?
+
+> **Why asked:** Embeddings are the link between text and vector math. Understanding how embeddings work explains why RAG works, why they can be hallucinated, and how to choose embedding models.
+
+**An embedding** is a fixed-size vector of numbers (usually 256 to 2048 dimensions) that represents the semantic meaning of text.
+
+```
+Analogy: Book summary
+├─ Book: 300 pages, 80,000 words
+├─ Embedding: 1-2 paragraph summary (meaning preserved, size reduced)
+├─ Vector: 2048 numbers capturing "what the book is about"
+
+Real example: "Karma means action and its consequences"
+├─ Raw text: 56 characters
+├─ Gemini embedding: 2048 floats: [0.5, -0.2, 0.8, 0.1, ..., 0.3]
+├─ Meaning: Compressed representation of this concept
+└─ Property: Similar concepts have similar embeddings
+```
+
+**How embeddings capture meaning:**
+
+```
+Embedding space visualization (simplified to 2D):
+
+         ^
+         |  "Karma" [0.8, 0.6]
+         |      
+         |  "Action" [0.7, 0.5]
+         |  "Consequence" [0.6, 0.4]
+         |
+         |     "Love" [0.1, 0.9]
+         |     "Compassion" [0.2, 0.8]
+         |
+  -------+---------------------->
+         |
+    "Stealing" [-0.9, -0.8]
+    "Harm" [-0.8, -0.7]
+
+Key insight: 
+├─ Related concepts cluster together
+├─ "Karma" is closer to "Action" than to "Love"
+├─ Cosine similarity between Karma & Action ≈ 0.95 (very similar)
+├─ Cosine similarity between Karma & Stealing ≈ 0.10 (different)
+```
+
+**How embeddings are created:**
+
+```
+Embedding Model (e.g., Gemini Embedding-001):
+
+Input: "What is Navakar Mantra?"
+    ↓ [Tokenize]
+    tokens: [23, 65, 124, 89, ...]
+    ↓ [Transformer layers] (same as LLM)
+    Extract final layer representations
+    ↓ [Normalize]
+    Ensure vector length = 1 (for cosine similarity)
+    ↓ [Output]
+    2048-dimensional vector: [0.5, -0.2, 0.8, ..., 0.1]
+```
+
+**Why separate embedding models?**
+
+LLMs (Groq, GPT-4) are GENERATIVE: Predict next tokens
+Embedding models (Gemini, OpenAI-embed) are DISCRIMINATIVE: Represent meaning
+
+```
+For RAG, we use specialized embedding models because:
+├─ Smaller (faster embedding creation)
+├─ Cheaper (lower per-token cost)
+├─ Optimized for similarity (not generation)
+├─ Can be deployed on edge/locally
+```
+
+**Real Aagam Mitra setup:**
+
+```
+Document Embedding (at ingest time):
+├─ LLM: None (embeddings don't need generation)
+├─ Model: Gemini embedding-001
+├─ Mode: RETRIEVAL_DOCUMENT (optimized for storage)
+├─ Dims: 2048
+├─ Cost: $0.025/1M inputs
+
+Query Embedding (at search time):
+├─ Model: Gemini embedding-001
+├─ Mode: RETRIEVAL_QUERY (optimized for retrieval accuracy)
+├─ Dims: 2048
+└─ Cost: $0.025/1M inputs
+
+Why two modes? Research shows:
+├─ DOCUMENT embeddings pack information densely
+├─ QUERY embeddings optimize for retrieval
+├─ Combined: 98% retrieval accuracy
+├─ If using same mode: ~85% accuracy (waste of tokens!)
+```
+
+---
+
+## Q21. Compare vector databases: Pinecone vs Weaviate vs Qdrant vs Milvus. When would you use each?
+
+> **Why asked:** Shows you understand the vector DB landscape and can make infrastructure decisions. In production, choosing the right DB saves $1000s/month and hours of debugging.
+
+**Quick Comparison:**
+
+| Aspect | Pinecone | Weaviate | Qdrant | Milvus |
+|--------|----------|----------|--------|--------|
+| **Type** | Managed cloud | Self-hosted/cloud | Self-hosted | Open-source |
+| **Cost Model** | $ per vector dimensions + queries | One-time hardware cost | One-time hardware cost | Free (hardware only) |
+| **Indexing** | HNSW only | HNSW, flat, BQ | HNSW, flat, IVF | IVF, HNSW, ANNOY, custom |
+| **Setup** | 5 minutes (SaaS) | 30 min (Docker) | 15 min (Docker) | 1-2 hours (distributed) |
+| **Scaling** | Automatic (managed) | Manual (cluster) | Manual (cluster) | Manual (distributed) |
+| **Best For** | Small-medium, fast setup | Medium, more control | Medium, self-hosted | Large-scale, cost-critical |
+| **Learning Curve** | Easiest | Medium | Medium | Hardest |
+
+**Detailed breakdown:**
+
+**Pinecone (What Aagam Mitra uses):**
+```
+Pros:
+├─ Serverless: Zero ops, they handle scaling
+├─ Fast setup: 5 minutes to first query
+├─ 99.9% uptime SLA
+├─ Best for: Small-medium teams, time-to-market matters
+├─ Price: $0.25/M dimensions/month + $0.04/1K queries
+
+Cons:
+├─ Cost scales with vectors: 100M vectors × 2048 dims = $5K/month
+├─ No local option: All data on cloud (privacy concern for some)
+├─ Vendor lock-in: Hard to migrate out
+
+When to use:
+├─ <100M vectors
+├─ Don't want to manage infrastructure
+├─ Data privacy OK with 3rd-party cloud
+└─ Budget: Can afford $100-5000/month
+```
+
+**Weaviate (Self-hosted cloud option):**
+```
+Pros:
+├─ Flexible deployment: Local, on-prem, cloud
+├─ GraphQL API: Rich query language
+├─ Built-in RBAC: Fine-grained access control
+├─ Multiple indexing algorithms
+├─ Best for: Enterprise, need privacy + flexibility
+
+Cons:
+├─ More complex setup: K8s, monitoring, backups
+├─ Operational overhead: You manage scaling
+├─ Less mature than Pinecone in some aspects
+
+When to use:
+├─ On-prem requirement (data can't leave company)
+├─ Need advanced access control (RBAC)
+├─ >100M vectors (cost-effective)
+└─ Team comfortable with Kubernetes
+```
+
+**Qdrant (Fast, efficient self-hosted):**
+```
+Pros:
+├─ Very fast search: Optimized Rust implementation
+├─ Efficient storage: Smaller memory footprint
+├─ Point groups: Built-in support for organizing vectors
+├─ Simple setup: Single binary deployment
+├─ Best for: Speed-critical, on-prem requirement
+
+Cons:
+├─ Smaller ecosystem: Fewer integrations
+├─ Younger than Pinecone/Weaviate
+├─ Limited scaling experience (community-driven)
+
+When to use:
+├─ Need <50ms latency guaranteed
+├─ On-prem only
+├─ Team small (less ops burden)
+└─ Budget: Very limited ($0)
+```
+
+**Milvus (Massive scale, open-source):**
+```
+Pros:
+├─ Designed for billions of vectors
+├─ Open-source: Full transparency, no vendor lock-in
+├─ Distributed: Horizontal scaling built-in
+├─ Advanced algorithms: Multiple indexing strategies
+├─ Best for: Data warehouses, massive scale (>1B vectors)
+
+Cons:
+├─ Complex setup: Distributed system, Kubernetes required
+├─ Learning curve: Lots of configuration options
+├─ Operational burden: Monitoring, failover, maintenance
+├─ Community support (not commercial)
+
+When to use:
+├─ >1B vectors
+├─ On-prem required + no SaaS budget
+├─ Data warehouse scenario
+├─ Team has DevOps expertise
+└─ Cost-critical: Need free database
+```
+
+**Decision tree for Aagam Mitra:**
+
+```
+Start: "We need vector search for 100M scripture embeddings"
+  ↓
+Is data privacy critical? (Can't go to cloud)
+  YES → Weaviate (flexible) or Qdrant (faster, simpler)
+  NO → Continue
+  ↓
+Do we have DevOps/K8s expertise?
+  YES → Weaviate (more control)
+  NO → Pinecone (managed) ← CHOSE THIS
+  ↓
+Is latency critical (<50ms)?
+  YES → Qdrant or Milvus
+  NO → Pinecone OK
+  ↓
+Final: Pinecone
+├─ Reason: Time-to-market, no ops, 50ms latency acceptable
+├─ Cost: $0.25/M dims × 204.8B = $51/month + queries
+├─ Risk: Vendor lock-in (acceptable for startup)
+└─ Alternative if scale grows: Migrate to Weaviate or Qdrant
+```
+
+---
+
+## Q22. How do you design a vector database schema for a specific RAG use case?
+
+> **Why asked:** Schema design determines query performance, cost, and feature capabilities. This shows you think about infrastructure holistically, not just "throw vectors into Pinecone."
+
+**Schema Design Decisions:**
+
+```
+FOR AAGAM MITRA RAG SYSTEM:
+
+1. WHAT TO EMBED (and how)?
+   ├─ Full scripture chapters (800 characters)?
+   ├─ Smaller chunks (400 characters)?
+   ├─ Sections with metadata headers?
+   └─ Decision: 800 chars with 100 char overlap
+        Reason: Balances context (more info per vector) vs. granularity
+
+2. EMBEDDING MODEL CHOICE
+   ├─ Gemini embedding-001 (2048-D)? [chose this]
+   ├─ OpenAI text-embedding-3-large (3072-D)?
+   ├─ text-embedding-3-small (512-D, faster)?
+   └─ Tradeoff: 2048-D good accuracy without overkill
+        Cost: $0.025/M inputs
+
+3. METADATA SCHEMA (what to store with each vector)
+   ├─ text: Full chunk text (for display)
+   ├─ source: "scripture:001:vedas"
+   ├─ page: 42
+   ├─ chapter: "Chapter 5: Karma"
+   ├─ language: "sanskrit"
+   ├─ confidence: 0.95 (how confident is this chunk?)
+   └─ indexed: true (allow filtering)
+
+   Why metadata?
+   ├─ Filter by source (search only Vedas, not Upanishads)
+   ├─ Answer with citations (user can verify)
+   ├─ Track embedding confidence
+   └─ Enable hybrid search (vector + keyword)
+
+4. INDEX STRATEGY
+   ├─ Indexing algorithm: HNSW (Pinecone default)
+   ├─ ef_construction: 128 (build-time parameter)
+   ├─ ef_search: 160 (query-time parameter)
+   ├─ m (connections): 12
+   └─ Tuning if recall drops: increase ef_search/ef_construction
+
+5. PARTITIONING (if >100M vectors)
+   ├─ Namespace 1: "vedas" (older, less accessed)
+   ├─ Namespace 2: "upanishads" (popular)
+   ├─ Namespace 3: "modern-commentaries" (newest)
+   └─ Query: Specify namespace OR search all (slower)
+
+6. BATCH OPERATIONS
+   ├─ Upsert 1000 vectors at a time (not 1 at a time)
+   ├─ Cost: Same, but faster
+   ├─ Example: Upload new scripture chapter
+   │  ├─ Chunk into 500 vectors
+   │  ├─ Batch upsert in groups of 100
+   │  └─ Done in 5 seconds (not 5 minutes)
+
+7. BACKUP & RECOVERY
+   ├─ Pinecone: Auto replicated (managed)
+   ├─ Self-hosted: Periodic snapshot to S3
+   └─ Strategy: One backup per week, keep 4 weeks
+```
+
+**Real schema for Aagam Mitra in Pinecone:**
+
+```python
+# When upserting vectors:
+vectors_to_upsert = [
+    {
+        "id": "scripture:001:chunk_42",
+        "values": [0.5, -0.2, 0.8, ...],  # 2048-D embedding
+        "metadata": {
+            "text": "Karma means action and its consequences...",
+            "source": "scripture:001",
+            "source_type": "vedas",
+            "page": 42,
+            "chapter": "Chapter 5: Karma Doctrine",
+            "language": "sanskrit",
+            "translation": "english",
+            "embedding_model": "gemini-embedding-001",
+            "embedding_confidence": 0.98,
+            "ingested_at": "2025-07-14T10:30:00Z",
+            "version": "v2"  # Versioning for cache invalidation
+        }
+    },
+    ...  # 99 more vectors
+]
+
+# Upsert in batch
+pinecone_index.upsert(vectors_to_upsert, namespace="vedas")
+
+# Query with filters
+results = pinecone_index.query(
+    vector=query_embedding,
+    top_k=8,
+    namespace="vedas",  # Search only Vedas
+    filter={
+        "source_type": {"$eq": "vedas"},
+        "embedding_confidence": {"$gte": 0.90}
+    }
+)
+```
+
+**Common mistakes:**
+
+```
+❌ Storing full documents (8000+ tokens each)
+   Problem: Each document = multiple vectors, massive storage
+   Fix: Chunk into 800-char pieces
+
+❌ No metadata
+   Problem: Can't filter, can't cite sources, can't debug retrieval
+   Fix: Store source, page, chapter, language, etc.
+
+❌ Using same embedding model for everything
+   Problem: Using generic embeddings for specialized domain (Jain texts)
+   Fix: Consider domain-specific embeddings or fine-tuned models
+
+❌ Not versioning embeddings
+   Problem: Can't invalidate cache when embedding model changes
+   Fix: Store embedding_model and version in metadata
+
+❌ Forgetting about cost
+   Problem: 100M vectors × 2048 dims = $5K/month! 
+   Fix: Profile data, consider dimension reduction (512D = 75% savings)
+```
+
+---
+
 ## Summary & Interview Tips
 
-This document covers **16 Q&As across 5 domains:**
+This document covers **22 Q&As across 6 domains:**
 
 1. **Foundation Concepts** (Q1-Q4): Context window, LLM selection, AI agents, RAG
 2. **Prompt Engineering Fundamentals** (Q5-Q6): Efficient prompts, context-aware RAG
 3. **Prompt Engineering Advanced** (Q7-Q12): Structured output, versioning, few-shot, security, reasoning, evaluation, optimization
 4. **General AI Knowledge** (Q13-Q15): Hallucinations, fine-tuning vs RAG, LLM limitations
 5. **Production RAG** (Q16): Cache invalidation strategies (HDFC Bank interview question)
+6. **LLM Fundamentals Deep-Dive** (Q17-Q22): Tokenization, transformers/attention, vector DBs, embeddings, vector DB comparisons, vector DB schema design
 
 **Key Interview Narratives:**
 
