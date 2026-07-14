@@ -4574,6 +4574,68 @@ Trade-off:
 Optimization: Use lower-precision floats (float16 vs. float32) to reduce memory/compute.
 ```
 
+**Q: When would you choose HNSW vs. IVF vs. Flat indexing?**
+```
+A: Decision depends on data size, latency, and update patterns:
+
+DATA SIZE:
+├─ <1M vectors: Use Flat (brute-force is fast enough)
+├─ 1M-100M: Use HNSW (optimal zone)
+└─ >100M: Use HNSW with sharding or specialized systems
+
+LATENCY REQUIREMENT:
+├─ <50ms: HNSW only ✅
+├─ 50-200ms: HNSW or IVF-Flat
+├─ 200ms-1s: IVF-Flat is fine
+└─ >1s: Any algorithm works
+
+UPDATE PATTERN:
+├─ Append-only: HNSW excels ✅
+├─ Frequent deletes: Flat or soft-delete (HNSW deletion is O(m² log n))
+└─ Mixed: HNSW with compromise
+
+MEMORY BUDGET:
+├─ Limited: IVF-Flat (smaller index)
+├─ Moderate: HNSW (10-15% larger)
+└─ Unlimited: HNSW
+
+Example: Aagam Mitra (100M vectors, <50ms, append-heavy) → HNSW ✅
+```
+
+**Q: If we replaced Pinecone with self-hosted HNSW, what would change?**
+```
+A: Ingestion and storage strategy would change significantly:
+
+CURRENT (Pinecone manages HNSW):
+├─ Phase 1: PDF → Chunk → Embed → Upsert to Pinecone
+├─ Time: ~16.5 minutes per 100-page PDF
+└─ Pinecone handles graph building internally
+
+WITH SELF-HOSTED HNSW:
+├─ Phase 1: Same (chunk + embed) = ~16 minutes
+├─ Phase 2: NEW — Build HNSW graph
+│  ├─ For each vector: search existing graph for neighbors
+│  ├─ Add edges, update connections
+│  ├─ Time: 50-100ms per vector (scales with index size)
+│  └─ Cost: 25-50 seconds for 500 chunks
+├─ Total: ~17 minutes (acceptable)
+
+STORAGE CHANGES:
+├─ Vectors table: {id, embedding, metadata, max_level}
+├─ Edges table: {vector_id, level, neighbors[]} (NEW!)
+├─ Edges overhead: ~40GB per 100M vectors
+└─ Total: 850GB (vs 810GB with Pinecone)
+
+INGESTION SLOWDOWN OVER TIME:
+├─ After 1M vectors: new vector = 500ms (graph search slower)
+├─ After 10M vectors: new vector = 2-5 seconds
+├─ After 100M vectors: batch ingestion noticeably slower
+└─ Pinecone handles this transparently
+
+VERDICT: Self-hosted HNSW is doable for learning/control,
+         but Pinecone is worth the cost for production scale.
+```
+
 ---
 
 ## 21. Your LLM bill is $2000/month. How would you cut it in half?
