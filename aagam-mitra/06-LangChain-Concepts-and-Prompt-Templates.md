@@ -8,6 +8,22 @@
 
 > **Why asked:** LangChain is the most popular LLM framework right now. Interviewers ask this to see if you understand the problem it solves (standardization, reusability, composition) vs just knowing it exists. The clearest answer compares "before" and "after" — scattered LLM code vs organized, reusable chains.
 
+---
+
+### **LLM Standardization: One Interface for All Models**
+
+```
+Without LangChain:
+  Groq API: client.chat.completions.create(...)
+  OpenAI API: client.chat.completions.create(...)
+  Claude API: client.messages.create(...)
+  → 3 different interfaces, need adapter code
+  
+With LangChain:
+  llm.invoke(prompt)  # Same interface for all 3
+  → Swap models by changing 1 line
+```
+
 **LangChain = Framework for standardizing and composing LLM applications**
 
 It solves four key problems:
@@ -87,6 +103,21 @@ answer = qa.run("When is Diwali?")
 
 > **Why asked:** Prompt engineering is now a core skill. Interviewers want to see you understand prompts as *controlled structures* not *magic strings*. The impressive answer shows: templates keep prompts consistent, testable, and maintainable. For Aagam Mitra, you use prompt templates in every agent (system_prompt method).
 
+---
+
+### **Prompt Templates: Reuse, Test, Maintain**
+
+```
+Without templates:
+  prompt1 = "You are expert. Q: " + q  # Inconsistent
+  prompt2 = f"Expert here. Question: {q}"  # Different style
+  → Hard to test, debug, or A/B test
+
+With templates:
+  template = "You are {role}. Question: {question}"
+  → Same structure, reusable, testable
+```
+
 ### What is a prompt template?
 
 A prompt template = **reusable blueprint with placeholders**
@@ -159,6 +190,23 @@ QUALITY RULES:
 ## 3. Explain the RAG pattern (Retrieval-Augmented Generation).
 
 > **Why asked:** RAG is the most common pattern for grounding LLMs in real data. Interviewers ask this to see if you understand: retrieval alone isn't enough (must get GOOD docs), the prompt must frame context clearly, and the LLM must know to use the context. For Aagam Mitra, you use RAG in ScriptureAgent — Pinecone search + prompt injection.
+
+---
+
+### **RAG: Stop Guessing, Start Retrieving**
+
+```
+Without RAG:
+  User: "What is ahimsa?"
+  LLM: (from training data) "Ahimsa is... in Buddhism it's..."
+  Problem: Generic, might hallucinate, no source
+
+With RAG:
+  User: "What is ahimsa?"
+  Retrieve: [8 passages from Jain texts about ahimsa]
+  LLM: (grounded) "According to Jain texts, ahimsa is..."
+  Result: Specific, accurate, traceable
+```
 
 **RAG = Retrieval + Augmentation + Generation**
 
@@ -244,6 +292,25 @@ async def tool_search_jain_texts(query: str) -> dict:
 ## 4. How would you implement RAG with LangChain vs. building it yourself?
 
 > **Why asked:** This gets at the core decision: when to use a framework vs. building custom. Interviewers want to hear trade-offs: LangChain is faster to build but less flexible; building yourself takes longer but gives full control. Your answer should show you understand both paths.
+
+---
+
+### **Framework vs Custom: Build Time vs Control**
+
+```
+LangChain RAG: 5 minutes to build, limited control
+  → Pros: Fast, maintained, documented
+  → Cons: Can't enforce custom rules (min 120 words, role-based tools)
+
+Custom RAG: 2-3 weeks to build, full control
+  → Pros: Exactly what you want
+  → Cons: Longer, more bugs, more to maintain
+
+Aagam Mitra chose custom because we need:
+- Quality enforcement (120-word minimum)
+- Role-based tool access (admin vs devotee)
+- Parallel agent execution
+```
 
 ### With LangChain (Fast, less control)
 
@@ -357,6 +424,21 @@ answer = await agent.run(user_message, history, context)
 
 > **Why asked:** Chains are how LangChain models computation as a pipeline. This question tests whether you understand functional composition — connecting independent components so data flows through them. The answer should include concrete Aagam Mitra examples.
 
+---
+
+### **Chains: Functional Composition of LLM Pipelines**
+
+```
+Simple chain: prompt | llm | parser
+  Input → Format prompt → Call LLM → Extract output → Result
+
+Complex chain (Aagam Mitra):
+  User query → Detect intent → Route to agent → Execute tools → Synthesize → Return
+  
+Key insight: Each step transforms data and passes to next
+(Like Unix pipes: cat file | grep pattern | sort | uniq)
+```
+
 **A chain = series of components connected in sequence**
 
 In LangChain, you compose chains with the pipe operator `|`:
@@ -436,6 +518,21 @@ async def run(self, user_message, history, context):
 ## 6. How do you handle errors in LLM applications?
 
 > **Why asked:** LLMs fail in unique ways (hallucination, malformed tool calls, timeouts). Interviewers want to see you've thought about resilience. The impressive answer shows specific error types and concrete handling strategies.
+
+---
+
+### **LLM Errors: Always Have a Fallback**
+
+```
+Error Type                | Strategy
+Malformed JSON in tool    | try/except, use empty args
+Tool API timeout          | Retry 4× with backoff, then fail gracefully
+LLM returns blank         | Return default message ("Unable to process")
+LLM calls non-existent tool | Validate tool name first
+Agent infinite loop       | Set max_iterations cap
+
+Rule: Every error → audit log + fallback message (never crash)
+```
 
 **Common error types:**
 
