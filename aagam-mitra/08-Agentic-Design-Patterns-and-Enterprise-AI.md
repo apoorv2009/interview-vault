@@ -82,6 +82,17 @@ All answers are grounded in **Aagam Mitra's production implementation** and incl
   - Memory layer tradeoffs at scale
   - What JPMC would add
 
+### [PART 6: FINANCIAL GUARDRAILS FOR AUTONOMOUS AGENTS](#part-6-financial-guardrails-for-autonomous-agents)
+- [Q12: Designing financial guardrails for autonomous agents](#question-12-how-do-you-design-financial-guardrails-for-autonomous-agents)
+  - 5-layer defense pattern
+  - Layer 1: Transaction limits (hard caps)
+  - Layer 2: Approval workflows (human sign-off)
+  - Layer 3: Anomaly detection (unusual behavior detection)
+  - Layer 4: Audit trail (complete traceability)
+  - Layer 5: Reversibility (quick refund capability)
+  - Real-world example: $50K prompt injection
+  - Interview summary with key points
+
 ---
 
 # PART 1: AGENTIC DESIGN PATTERNS
