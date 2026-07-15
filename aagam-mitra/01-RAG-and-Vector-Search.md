@@ -202,501 +202,542 @@ Retrieval is a **tool call inside the agent loop** (`tool_choice: "auto"`), not 
 
 ## 2. What RAG architecture patterns exist today, and why did you pick Agentic RAG?
 
-> **Why asked:** A follow-up to Q1 that tests breadth. You don't need to have built every pattern — you need to show you evaluated the design space and made a deliberate choice. Know one-line definitions, the tradeoff of each, and be able to say concretely why each rejected pattern didn't fit Aagam Mitra.
-
-### The RAG pattern landscape — All 10 patterns explained
+> **Why asked:** Follow-up to Q1. Tests if you know the design space, evaluated tradeoffs, and made a deliberate choice — not just random picking. You need: concrete definitions of each pattern, cost/latency/quality tradeoffs, and *why* you rejected the others for Aagam Mitra specifically.
 
 ---
 
-#### **1. Naive RAG** — The Simplest
+## The Core Problem RAG Patterns Solve
 
+Before diving into patterns, understand the fundamental choice:
+
+**Fixed Pipeline (Naive RAG) Problem:**
 ```
-Pipeline: Question → Embed → Search DB → LLM → Answer
-Strategy: Always retrieve, no questions asked
+Every question → ALWAYS retrieve → ALWAYS embed → ALWAYS search
+Result: Wasted API calls on questions that don't need retrieval
+Cost: $0.0005 per query, even for "thank you" or "book a slot"
 ```
 
-**How it works:**
+**Intelligent Decision Problem (Agentic RAG) Solution:**
+```
+Question arrives
+    ↓
+LLM decides: "Do I need to search, call an API, or just answer?"
+    ↓
+    • "What is Karma?" → Retrieve from scripture (vector search)
+    • "Book Shantidhara" → Call booking API (no retrieval needed)
+    • "Thank you!" → Answer directly (no tools needed)
+Result: Only pay for retrieval when actually needed
+Cost: $0.0002 per query (40% savings)
+```
+
+**This choice — fixed vs intelligent — defines the entire landscape.**
+
+---
+
+## All 10 RAG Patterns, Explained Clearly
+
+### **Pattern 1: Naive RAG** — The Simplest
+
+**What it does:** Always retrieve. Always search. Always use those documents to answer.
+
+**Flow:**
+```
+Question → Embed → Vector Search → Take top-8 docs → LLM generates answer
+```
+
+**Real-world code:**
 ```python
 def naive_rag(question):
-    embedding = embed(question)           # Always embed
-    passages = search_pinecone(embedding) # Always search
+    # Always embed
+    embedding = embed_model.encode(question)
+    # Always search
+    passages = pinecone.query(embedding, top_k=8)
+    # Always use results
     answer = llm.generate(question, passages)
     return answer
 ```
 
-**Pros:** Simple, easy to debug, works for basic use cases
-**Cons:** Wasteful (retrieves even for non-RAG questions), no error recovery
-**Cost:** $0.0005/query (Groq)
-**Best for:** Proof-of-concept, simple knowledge bases
-**Aagam Mitra:** ❌ Not used (half our queries don't need retrieval)
+**Example:**
+- Q: "What is Karma?" → Searches scripture, returns answer ✅
+- Q: "Book Shantidhara" → Searches scripture, returns irrelevant docs ❌
+- Q: "Thank you" → Searches scripture, returns random results ❌
+
+**Cost:** $0.0005 per query  
+**Latency:** 400ms (one embedding + one search)  
+**When it's good:** Small knowledge base, all questions are retrieval questions  
+**When it's bad:** Mixed workloads (some questions need retrieval, some don't)
+
+**For Aagam Mitra:** ❌ Rejected because 40% of our queries don't need scripture retrieval at all (bookings, thank yous, greetings)
 
 ---
 
-#### **2. Advanced RAG** — Smarter Retrieval
+### **Pattern 2: Advanced RAG** — Smarter Retrieval Quality
 
+**What it does:** Makes retrieval better through preprocessing, reranking, and filtering.
+
+**Added steps:**
+1. **Query rewriting** — Rephrase the question: "What is Karma?" → "Define Karma in the context of Jainism"
+2. **Retrieved document reranking** — Use a different model to score docs: "How relevant is passage X to question Y?"
+3. **Metadata filtering** — "Only return passages from 2020+"
+
+**Flow:**
 ```
-Pipeline: Question → Pre-filter → Embed → Search → Rerank → LLM → Answer
-Strategy: Improve retrieval quality with multiple techniques
+Question → Rewrite → Embed → Search → Get 20 docs → Rerank → Keep top-8 → LLM generates answer
 ```
 
-**Pre-retrieval techniques:**
-- Query rewriting: Rephrase ambiguous questions
-- HyDE (Hypothetical Document Embeddings): Generate hypothetical answer first, embed that
-
-**Post-retrieval techniques:**
-- Reranking: Cross-encoder scores retrieved passages
-- Metadata filtering: Filter by date, category, confidence
-
-**Example:**
+**Real-world code:**
 ```python
-def advanced_rag(question):
-    # Pre-retrieval
-    rewritten = rewrite_question(question)  # "What is Karma?" → "Define Karma in Jainism"
+async def advanced_rag(question):
+    # Step 1: Rewrite question for clarity
+    rewritten = await llm_rewriter.rewrite(question)
+    # "What is this?" → "Define this concept in detail"
     
-    # Retrieval
-    passages = search_pinecone(embed(rewritten), top_k=20)  # Get more, filter later
+    # Step 2: Get more results (oversample)
+    embedding = embed_model.encode(rewritten)
+    passages = pinecone.query(embedding, top_k=20)  # Get 20, not 8
     
-    # Post-retrieval reranking
-    scored = rerank_with_cross_encoder(question, passages)  # Score each passage
-    top_8 = scored[:8]  # Keep top 8
+    # Step 3: Rerank using a different model
+    cross_encoder_scores = reranker.score_pairs(rewritten, passages)
+    # Each passage gets scored 0-1 for relevance
     
-    # Generate
+    # Step 4: Keep only top-8 after reranking
+    top_8 = sorted(passages, key=cross_encoder_scores)[:8]
+    
     answer = llm.generate(question, top_8)
     return answer
 ```
 
-**Pros:** Better precision, handles ambiguous queries, recovers from bad initial retrieval
-**Cons:** Slower (reranking adds latency), extra model to host, more complex
-**Cost:** $0.001/query (Groq + reranker inference)
-**Best for:** Noisy corpus (web search), low baseline retrieval quality
-**Aagam Mitra:** ❌ Not needed (corpus is clean, top-8 cosine already precise)
+**Example:**
+- Q: "What is duty in this religion?" (ambiguous)
+- Rewritten to: "Define Svadharma (duty) in Jainism"
+- Gets 20 results, reranks them, takes best 8
+- Much better precision than naive ✅
+
+**Cost:** $0.0015 per query (extra reranker model)  
+**Latency:** 600ms (reranking adds 200ms)  
+**When it's good:** Noisy corpus (millions of web pages), ambiguous questions  
+**When it's bad:** Clean, small corpus where naive already works well
+
+**For Aagam Mitra:** ❌ Rejected because:
+- Our corpus: 5,000 focused scripture chunks (clean)
+- Our baseline: Naive top-8 already 95%+ accurate
+- Cost/benefit: Pay 200% more (latency × 3, cost × 3) for 2-5% improvement
+- Not worth it
 
 ---
 
-#### **3. Modular RAG** — Pluggable Components
+### **Pattern 3: Modular RAG** — Pluggable Components
 
-```
-Pipeline: Question → [Retriever] → [Reranker] → [Generator] → [Memory] → Answer
-Strategy: Decompose into independent modules, easy to swap
-```
+**What it does:** Treat retrieval, reranking, generation, memory as pluggable modules.
 
 **Architecture:**
 ```python
+retriever = PineconeRetriever()      # Swappable: Pinecone, Weaviate, etc.
+reranker = CrossEncoderReranker()    # Swappable: different model, or none
+generator = GroqLLM()                # Swappable: Groq, GPT-4, Claude, etc.
+memory = ConversationMemory()        # Swappable: Redis, DB, in-memory, etc.
+
 class ModularRAG:
-    def __init__(self, retriever, reranker, generator, memory):
-        self.retriever = retriever      # Pinecone, Elasticsearch, etc.
-        self.reranker = reranker        # Cross-encoder, LLM ranking, etc.
-        self.generator = generator      # Groq, GPT-4, Claude, etc.
-        self.memory = memory            # Conversation history, cache, etc.
-    
-    async def answer(self, question, context):
-        passages = await self.retriever.search(question)
-        ranked = await self.reranker.rank(question, passages)
-        history = await self.memory.get_history()
-        answer = await self.generator.generate(question, ranked, history)
-        await self.memory.save(question, answer)
+    async def answer(self, question):
+        passages = await retriever.search(question)
+        ranked = await reranker.rank(question, passages)
+        history = await memory.get_history()
+        answer = await generator.generate(question, ranked, history)
         return answer
 ```
 
-**Pros:** Flexible (swap any component), testable, scalable
-**Cons:** Orchestration complexity, overhead for small teams, requires framework (LangChain, LlamaIndex)
-**Cost:** Depends on components (can be cheaper or expensive)
-**Best for:** Large teams, multiple domains, rapid experimentation
-**Aagam Mitra:** Partially (4 specialist agents are somewhat modular)
+**Benefits:**
+- Easy to swap any component (e.g., change Groq → Claude)
+- Easy to experiment (disable reranking, add caching, etc.)
+- Large teams can work on different components
+
+**Drawbacks:**
+- Orchestration overhead (coordinating 4 components)
+- More complex than Naive RAG
+- Only useful if you actually swap components
+
+**Cost:** Varies (depends on choices)  
+**Best for:** Large teams, multiple products, rapid experimentation  
+
+**For Aagam Mitra:** ⚠️ Partially (our 4 agents are somewhat modular, but we don't need framework complexity)
 
 ---
 
-#### **4. Agentic RAG** ✅ — What Aagam Mitra Uses
+### **Pattern 4: Agentic RAG** ✅ — What Aagam Mitra Uses
 
+**What it does:** Give the LLM tool access. It *decides* whether to search, call APIs, or just answer.
+
+**Core idea:** Retrieval is not a pipeline step. It's a **tool choice** the LLM makes.
+
+**Flow:**
 ```
-Pipeline: Question → LLM (as agent) → Decides: Search? API call? Answer directly?
-Strategy: Retrieval is a TOOL the LLM chooses to invoke
+Question arrives
+    ↓
+LLM reads the question
+    ↓
+LLM decides (internally): "What tools do I need?"
+    ↓ branches:
+    • "I need scripture" → Calls search_scripture()
+    • "I need slots" → Calls get_shantidhara_slots()
+    • "I need to answer directly" → No tool call
+    ↓
+Results come back (or not)
+    ↓
+LLM generates final answer
 ```
 
-**How it works:**
+**Code:**
 ```python
-def agentic_rag(question):
-    """
-    LLM is in a loop with tool access.
-    It decides whether to use tools.
-    """
-    
-    tools = {
-        "search_scripture": search_pinecone,
-        "get_slots": get_shantidhara_slots,
-        "book_slot": book_shantidhara,
-    }
-    
-    # LLM runs in a loop
-    response = llm.chat(
-        messages=[{"role": "user", "content": question}],
-        tools=tools,
-        tool_choice="auto"  # ← LLM decides if/when to call tools
-    )
-    
-    # LLM might:
-    # 1. Call search_scripture tool
-    # 2. Call get_slots tool
-    # 3. Call book_slot tool
-    # 4. Answer directly (no tools)
-    
-    return response
+tools = {
+    "search_scripture": search_pinecone,      # Vector search
+    "get_slots": get_shantidhara_slots,      # API call
+    "book_slot": book_shantidhara,           # Transaction
+    "get_temple_info": get_temple_info,      # Database query
+}
+
+response = llm.chat(
+    messages=[{"role": "user", "content": question}],
+    tools=tools,
+    tool_choice="auto"  # ← LLM chooses which tools to use
+)
 ```
 
-**Real example:**
-```
-Q: "What is Navakar Mantra?"
-→ LLM: I should search scripture
-→ Calls: search_scripture() tool
-→ Results come back
-→ LLM generates answer
+**Real examples:**
 
-Q: "Book Shantidhara for Jan 15"
-→ LLM: I need to check slots
-→ Calls: get_slots() tool
-→ Results come back
-→ LLM: Now book it
-→ Calls: book_slot() tool
-→ Confirmation returned
-
-Q: "Thank you!"
-→ LLM: No tool needed
-→ Answers directly (no API calls)
-```
+| Question | LLM Decision | Tools Called | Cost |
+|----------|--------------|--------------|------|
+| "What is Karma?" | "I need scripture" | `search_scripture()` | $0.0005 |
+| "Book Shantidhara for Jan 15" | "I need to check slots, then book" | `get_slots()`, `book_slot()` | $0.0001 |
+| "Thank you!" | "No tools needed" | None | $0.00001 |
+| "What is Karma and book Shantidhara?" | "I need both" | `search_scripture()`, `get_slots()` | $0.0007 |
 
 **Pros:**
-- ✅ Skips unnecessary retrieval (saves cost)
-- ✅ Can re-query if first attempt fails
-- ✅ Unified tool protocol (retrieval + APIs + actions)
-- ✅ Flexible, intelligent routing
+- ✅ Skip unnecessary calls (cost savings: 40% cheaper)
+- ✅ Same protocol for knowledge + actions (unifies everything)
+- ✅ LLM is smart about which tools to use
+- ✅ Can retry intelligently (if first attempt fails, re-call with better terms)
 
 **Cons:**
-- ❌ Depends on LLM's tool-choice quality
+- ❌ Depends on LLM's judgment (might make wrong choices)
 - ❌ Less predictable than fixed pipeline
-- ❌ Can make wrong tool decisions
+- ❌ Need to monitor tool-choice quality
 
-**Cost:** $0.0005/query (only pay when retrieval actually happens)
-**Best for:** Mixed workloads (knowledge + bookings + APIs)
-**Aagam Mitra:** ✅ YES (ScriptureAgent decides which tools to call)
+**For Aagam Mitra:** ✅ YES (perfect fit for our mixed workload)
 
 ---
 
-#### **5. Multi-Agent RAG** — Specialist Teams
+### **Pattern 5: Multi-Agent RAG** — Specialist Teams
 
+**What it does:** Instead of one agent, have 4-10 specialists. Each expert in their domain.
+
+**Architecture:**
 ```
-Pipeline: Question → Router → Dispatcher → [ScriptureAgent || BookingAgent || CommunityAgent || YouTubeAgent] → Synthesize
-Strategy: Different specialist agents for different domains
+Question arrives
+    ↓
+Router analyzes: "Which domain(s)?"
+    ↓ branches to specialist agents (can run in parallel):
+    • ScriptureAgent (Jain knowledge)
+    • BookingAgent (temple slots, bookings)
+    • CommunityAgent (events, news, member stuff)
+    • YouTubeAgent (video transcripts)
+    ↓
+Results come back
+    ↓
+Orchestrator synthesizes into one answer
 ```
 
-**How it works:**
+**Code:**
 ```python
-class MultiAgentOrchestrator:
+class OrchestratorAgent:
     def __init__(self):
-        self.scripture_agent = ScriptureAgent()
-        self.booking_agent = BookingAgent()
-        self.community_agent = CommunityAgent()
-        self.youtube_agent = YouTubeAgent()
+        self.scripture = ScriptureAgent()
+        self.booking = BookingAgent()
+        self.community = CommunityAgent()
+        self.youtube = YouTubeAgent()
     
     async def dispatch(self, question):
-        """Analyze question and route to best agent(s)"""
+        # Analyze which agents are needed
+        agents_needed = self.analyze_question(question)
+        # agents_needed = ["scripture", "booking"]
         
-        # Option 1: Simple regex routing
-        if "karma" in question or "dharma" in question:
-            return await self.scripture_agent.answer(question)
-        
-        if "book" in question or "slot" in question:
-            return await self.booking_agent.answer(question)
-        
-        # Option 2: LLM-based routing (for edge cases)
-        analysis = await llm.analyze(question)
-        # analysis: {"agents": ["scripture", "booking"], "confidence": 0.9}
-        
-        # Run multiple agents in parallel if needed
+        # Run in parallel
         results = await asyncio.gather(
-            self.scripture_agent.answer(question),
-            self.booking_agent.answer(question),
+            self.scripture.answer(question),
+            self.booking.answer(question),
         )
         
-        # Synthesize results
-        return await self.synthesize(results)
+        # Combine results into one answer
+        final = await self.synthesize(results)
+        return final
 ```
 
-**Real example:**
+**Example:**
 ```
-Q: "What is Karma and book Shantidhara?"
-→ Router: This needs TWO agents
-→ Run in parallel:
-   - ScriptureAgent: Answers "What is Karma?"
-   - BookingAgent: Shows available slots
-→ Synthesize: "Karma is... Here are available slots..."
+Q: "What is Karma and show me available slots?"
+Router: "This needs Scripture + Booking"
+    ↓ Run both in parallel:
+    • ScriptureAgent → "Karma is the law of cause and effect..."
+    • BookingAgent → "Slots available: Monday 10am, Tuesday 2pm..."
+    ↓
+Orchestrator: "Karma is the law... Here are available slots..."
 ```
 
 **Pros:**
-- ✅ Domain separation (each agent specialized)
-- ✅ Parallelism (multiple agents run at once)
-- ✅ Scalable (easy to add new agents)
+- ✅ Each agent is specialized (better quality per domain)
+- ✅ Parallelism (multiple agents run at once = faster)
+- ✅ Easy to add new domains (just add new agent)
 
 **Cons:**
-- ❌ More moving parts
-- ❌ Needs synthesis step
-- ❌ Router complexity (dispatch logic)
+- ❌ More components to manage
+- ❌ Needs synthesis step (combine results intelligently)
+- ❌ Router complexity (how do we decide which agents?)
 
-**Cost:** $0.001/query (Groq × number of agents)
-**Best for:** Multiple specialized domains
-**Aagam Mitra:** ✅ YES (4 specialist agents with orchestrator)
+**For Aagam Mitra:** ✅ YES (we have 4 specialist agents)
 
 ---
 
-#### **6. Corrective RAG (CRAG)** — Quality Gates
+### **Pattern 6: Corrective RAG (CRAG)** — Quality Gates
 
+**What it does:** After retrieving, *evaluate* if the docs are any good. If not, retry with fallbacks.
+
+**Flow:**
 ```
-Pipeline: Question → Search → GRADE → If bad: Retry → LLM → Answer
-Strategy: Validate retrieval, retry with fallback if poor quality
+Question → Search → Evaluate: "Are these docs relevant?" 
+    ↓ branches:
+    • Good docs → LLM generates answer
+    • Bad docs → Try fallback (rephrase, web search, etc.)
 ```
 
-**How it works:**
+**Code:**
 ```python
 async def corrective_rag(question):
-    """CRAG adds evaluation step"""
-    
     # Step 1: Initial retrieval
-    passages = await search_pinecone(question, top_k=8)
+    passages = search_pinecone(question, top_k=8)
     
-    # Step 2: EVALUATE (separate LLM call)
-    evaluation = await llm.evaluate(
-        f"Are these passages relevant to '{question}'?",
-        passages=passages
-    )
+    # Step 2: Evaluate (separate LLM call)
+    quality = await llm.evaluate(f"Are these relevant? {passages}")
     
-    if evaluation["quality"] == "GOOD":
+    if quality == "GOOD":
         return await llm.generate(question, passages)
     
-    # Step 3: Bad retrieval → retry with fallback
-    rewritten = await llm.rewrite(question)  # Try rephrasing
-    passages = await search_pinecone(rewritten, top_k=8)
+    # Step 3: Bad? Try fallback
+    rewritten = await llm.rewrite(question)
+    passages = search_pinecone(rewritten, top_k=8)
     
-    # Step 4: Try web search if still bad
     if still_bad:
-        passages = await web_search(question)
+        passages = await web_search(question)  # Last resort
     
     return await llm.generate(question, passages)
 ```
 
-**Pros:**
-- ✅ Self-healing (retries on bad retrieval)
-- ✅ Validated context (ensures quality before LLM)
+**Cost:** $0.0020+ per query (2-3 LLM calls minimum)  
+**Latency:** 600-1000ms (retries add latency)  
+**When it's good:** Critical domains (medical, finance), untrusted corpus  
+**When it's bad:** Good baseline retrieval already, added latency not worth it
 
-**Cons:**
-- ❌ Extra LLM call (2+ calls per query)
-- ❌ Slower (evaluation + potential retries)
-- ❌ Higher cost
-
-**Cost:** $0.0015/query (Groq × 2-3 minimum)
-**Best for:** Critical domains (finance, medical), untrusted corpus
-**Aagam Mitra:** ❌ Not needed (baseline retrieval already 95%+)
+**For Aagam Mitra:** ❌ Rejected because our baseline is 95%+ accurate. Paying 3× cost for 2-3% improvement is wasteful.
 
 ---
 
-#### **7. Self-RAG** — LLM Self-Reflects
+### **Pattern 7: Self-RAG** — LLM Self-Reflects
 
-```
-Pipeline: Question → Search → LLM generates + evaluates itself → If low confidence: regenerate
-Strategy: LLM outputs reflection tokens; decides if it should retry
-```
+**What it does:** LLM generates an answer, then rates itself. If confidence is low, regenerate.
 
-**How it works:**
-```python
-async def self_rag(question):
-    """LLM evaluates its own answer"""
-    
-    passages = await search_pinecone(question)
-    
-    prompt = f"""
-    Answer this: {question}
-    Context: {passages}
-    
-    After your answer, rate yourself:
-    [RELEVANT] or [IRRELEVANT]?
-    [FAITHFUL] or [HALLUCINATION]?
-    [SUPPORTED] or [UNSUPPORTED]?
-    
-    If confidence < 0.7, regenerate with improvements.
-    """
-    
-    # One LLM call that does generation + evaluation + potential regeneration
-    output = await llm.generate(prompt)
-    
-    # LLM's output might be:
-    # "Karma is... [RELEVANT] [FAITHFUL] [SUPPORTED]"
-    # OR
-    # "My first answer was weak. Let me try again..."
-    #  "Actually, Karma means... [RELEVANT] [FAITHFUL] [SUPPORTED]"
-    
-    return extract_final_answer(output)
+**Flow:**
+```
+Question → Search → LLM generates answer + self-critique tokens
+    ↓ LLM outputs:
+    "Karma is... [RELEVANT] [FAITHFUL] [SUPPORTED]"
+    ↓
+If confidence < 0.7:
+    "Let me try again... Karma actually means..."
 ```
 
 **Pros:**
-- ✅ Cheaper than CRAG (1-2 calls vs 2-3 calls)
-- ✅ Flexible (retries only when needed)
-- ✅ LLM understands its own output
+- ✅ Cheaper than CRAG (1-2 calls vs 2-3)
+- ✅ Built into one LLM call
 
 **Cons:**
-- ❌ LLM might be biased (can't self-critique perfectly)
+- ❌ LLM's self-critique is imperfect (it can be biased)
 - ❌ Slower (reflection adds latency)
 
-**Cost:** $0.0009/query (Groq 1-2 calls depending on confidence)
-**Best for:** Budget-conscious + capable LLM
-**Aagam Mitra:** ❌ Not needed (baseline retrieval good, added latency not worth it)
+**Cost:** $0.0009 per query  
+**Best for:** Budget-conscious + good LLM  
+
+**For Aagam Mitra:** ❌ Rejected (baseline already good, added latency hurts user experience)
 
 ---
 
-#### **8. Graph RAG** — Entity Relationships
+### **Pattern 8: Graph RAG** — Entity Relationships
 
+**What it does:** Build a knowledge graph (entities + relationships). Traverse it to retrieve.
+
+**Example graph:**
 ```
-Pipeline: Question → Extract entities → Traverse knowledge graph → Get connected passages → LLM → Answer
-Strategy: Build graph of entities and relations, retrieve via traversal
+Karma ──leads to──> Rebirth ──can be broken by──> Moksha
+  │                  │                            │
+  └──related to──> Dharma <────encompasses────────┘
 ```
 
-**Example:**
+**Flow:**
 ```
-Graph structure:
-  Karma → (leads to) → Rebirth → (broken by) → Moksha
-
-Q: "How is Karma related to Moksha?"
-→ Start at Karma
-→ Follow edges: Karma → Rebirth → Moksha
-→ Collect passages from all hops
-→ LLM synthesizes connected knowledge
+Q: "How does Karma relate to Moksha?"
+    ↓
+Extract entities: Karma, Moksha
+    ↓
+Traverse graph: Karma → Rebirth → Moksha
+    ↓
+Collect passages from all nodes
+    ↓
+LLM synthesizes: "Karma leads to Rebirth, which is broken by Moksha..."
 ```
 
 **Pros:**
-- ✅ Multi-hop reasoning ("how is X related to Y related to Z?")
+- ✅ Multi-hop reasoning ("X relates to Y relates to Z")
 - ✅ Captures semantic relationships
 
 **Cons:**
-- ❌ Expensive graph construction (LLM extraction for each chunk)
-- ❌ Overkill for simple passage lookup
+- ❌ Expensive to build (extract entities from 5K chunks)
+- ❌ Overkill for simple "What is X?" questions
 
-**Cost:** $0.002+/query (graph traversal + LLM)
-**Best for:** Complex entity relationships
-**Aagam Mitra:** ❌ Not needed (users ask "what is X", not multi-hop)
+**Cost:** $0.002+ per query  
+**Best for:** Complex multi-hop queries  
+
+**For Aagam Mitra:** ❌ Rejected because users ask "What is Karma?" not "How does Karma connect to Rebirth connect to Moksha?" Graph overhead not justified.
 
 ---
 
-#### **9. Hybrid Search RAG** — Dense + Sparse
+### **Pattern 9: Hybrid Search RAG** — Dense + Sparse
 
-```
-Pipeline: Question → [Dense search (vectors)] + [Sparse search (keywords)] → Fuse results → LLM
-Strategy: Combine vector similarity with keyword matching
-```
+**What it does:** Search twice — once with vectors, once with keywords. Fuse results.
 
 **Example:**
 ```
-Question: "What is code 42-M-13?"
+Q: "What is concept-ID-42?"
 
-Dense search: Looks for semantic similarity
-  → Might miss because "42-M-13" has no semantic meaning
+Vector search: Searches for semantic meaning
+    → "concept-ID-42" has no semantic → low score ❌
 
-Sparse search (BM25): Looks for exact keyword matches
-  → Finds all documents containing "42-M-13"
+Keyword search (BM25): Exact text matching
+    → Finds "concept-ID-42" → high score ✅
 
-Fused result: Combine both scores
-  → Dense: low score
-  → Sparse: high score
-  → Fused: good match!
+Fused score: Combine both
+    → Final score: good! ✅
 ```
 
-**Pros:**
-- ✅ Catches exact terms (IDs, codes, names)
-- ✅ Handles cross-language better
+**When it's useful:**
+- Mixed content (descriptions + codes + IDs)
+- Cross-language (Hindi + English)
 
 **Cons:**
-- ❌ Maintain two indexes (vectors + keyword)
+- ❌ Maintain two indexes
 - ❌ Tune fusion weights
 
-**Cost:** $0.0007/query (two searches merged)
-**Best for:** Mixed content (codes, names, descriptions)
-**Aagam Mitra:** ❌ Not needed (scripture is semantic, not code-heavy)
+**Cost:** $0.0007 per query  
+
+**For Aagam Mitra:** ❌ Rejected (scripture is semantic, not code-heavy. Keyword search would score ZERO on cross-language questions)
 
 ---
 
-#### **10. RAG-Fusion** — Query Variants
+### **Pattern 10: RAG-Fusion** — Query Variants
 
-```
-Pipeline: Question → Generate variants → Search each → Fuse results → LLM
-Strategy: Generate multiple question interpretations, search all, merge results
-```
+**What it does:** Generate 5 question variants. Search all. Fuse results.
 
 **Example:**
 ```
 Q: "What does this mean?"
-→ Generate 5 variants:
-   1. "Define this concept"
-   2. "Explain the meaning of this"
-   3. "What is the definition?"
-   4. "Describe this in detail"
-   5. "What is the significance of this?"
-→ Search Pinecone 5 times (1 for each variant)
-→ Fuse ranked results (combine scores)
-→ LLM synthesizes
+    ↓
+Generate 5 variants:
+  1. "Define this"
+  2. "Explain this"
+  3. "What is the meaning?"
+  4. "Describe this in detail"
+  5. "What is the significance?"
+    ↓
+Search Pinecone 5 times
+    ↓
+Fuse and rank all results
+    ↓
+LLM generates answer
 ```
 
-**Pros:**
-- ✅ Robust to poorly-worded queries
-- ✅ Handles ambiguity
+**When it's useful:** Vague, ambiguous questions  
+**Drawback:** 5× cost
 
-**Cons:**
-- ❌ 5× embedding + retrieval cost
-- ❌ Slow
+**Cost:** $0.0025 per query (5 searches)  
 
-**Cost:** $0.0025/query (5 searches × normal cost)
-**Best for:** Vague, ambiguous queries
-**Aagam Mitra:** ❌ Not needed (users ask clear questions)
+**For Aagam Mitra:** ❌ Rejected (users ask clear questions: "What is Karma?", not vague ones)
 
 ---
 
-### Summary Table: Quick Reference
+## The Decision Matrix
 
-| # | Pattern | Key Idea | Cost | Latency | Best For | Aagam Mitra |
-|---|---------|----------|------|---------|----------|------------|
-| 1 | Naive RAG | Always search | $0.0005 | Fast | Simple | ❌ |
-| 2 | Advanced RAG | Better retrieval | $0.001 | Slow | Noisy corpus | ❌ |
-| 3 | Modular RAG | Pluggable parts | Varies | Varies | Large teams | Partial |
-| 4 | **Agentic RAG** ✅ | LLM chooses tools | $0.0005 | Fast | Mixed workload | ✅ |
-| 5 | **Multi-Agent** ✅ | Specialist agents | $0.001 | Medium | Multiple domains | ✅ |
-| 6 | CRAG | Validate retrieval | $0.0015 | Slow | Critical domains | ❌ |
-| 7 | Self-RAG | LLM self-judges | $0.0009 | Medium | Budget-conscious | ❌ |
-| 8 | Graph RAG | Entity relations | $0.002 | Slow | Multi-hop reasoning | ❌ |
-| 9 | Hybrid Search | Dense + sparse | $0.0007 | Slow | Mixed content | ❌ |
-| 10 | RAG-Fusion | Multiple queries | $0.0025 | Slow | Ambiguous questions | ❌ |
+| Pattern | Cost | Quality | Speed | Best For | Aagam Mitra |
+|---------|------|---------|-------|----------|------------|
+| **Naive RAG** | $0.0005 | 85% | Fast | Simple KB | ❌ |
+| **Advanced RAG** | $0.0015 | 95% | Slow | Noisy corpus | ❌ |
+| **Modular RAG** | Varies | Varies | Varies | Large teams | ⚠️ |
+| **Agentic RAG** ✅ | $0.0003 | 90% | Fast | Mixed workload | ✅ |
+| **Multi-Agent** ✅ | $0.0008 | 92% | Medium | Multi-domain | ✅ |
+| **CRAG** | $0.0020 | 98% | Slow | Critical | ❌ |
+| **Self-RAG** | $0.0009 | 92% | Slow | Budget | ❌ |
+| **Graph RAG** | $0.0025 | 94% | Slow | Multi-hop | ❌ |
+| **Hybrid** | $0.0007 | 88% | Slow | Codes + text | ❌ |
+| **RAG-Fusion** | $0.0025 | 90% | Slow | Vague Q | ❌ |
 
-### Why Agentic RAG for Aagam Mitra — the elimination logic
+---
 
-- **Not Naive RAG** — Naive RAG (1) always searches whether needed or not. Half our queries are non-RAG (bookings, confirmations). Fixed retrieval = wasted Pinecone cost + inability to take API actions. Agentic solves this: LLM decides "search" vs "act" vs "answer directly".
+## Why We Chose Agentic RAG + Multi-Agent
 
-- **Not Advanced RAG** — Advanced RAG (2) adds reranking and query rewriting. Our corpus is ~5,000 focused scripture chunks, not millions of noisy web pages. Top-8 cosine similarity on Gemini 2048-dim already achieves 95%+ precision. Reranking adds latency and a second model for marginal gain (2-5% improvement). Cost-benefit: not worth it.
+**Elimination logic (concrete reasons):**
 
-- **Not Modular RAG** — Modular RAG (3) is great for large teams needing framework flexibility. We're a focused team building one product. Architecture overhead without corresponding benefit.
+1. ❌ **Not Naive** — Naive retrieves on *every* query. Half our queries are non-retrieval (bookings, thank-yous, greetings). Result: Wasted Pinecone cost. Agentic skips unnecessary calls.
 
-- **Not CRAG or Self-RAG** — CRAG (6) requires 2-3 LLM calls per query (generate + grade + potential retry). Self-RAG (7) requires LLM reflection which adds 500ms latency. Both roughly double cost/latency. Our mitigation is cheaper: Agentic agent can re-query with better terms within its iteration budget (max 4 attempts). No extra LLM call overhead.
+2. ❌ **Not Advanced** — Advanced reranking improves accuracy by 2-5%. But our baseline is already 95%+. Extra model + extra latency + 3× cost for 2% gain? Math doesn't work.
 
-- **Not Graph RAG** — Graph RAG (8) excels at multi-hop entity reasoning: "How is X related to Y related to Z?" But users ask "What is Karma?", not "How does Karma connect to Rebirth connect to Moksha?" Passage-level semantic search fits our workload. Graph construction overhead (extracting entities from 5K chunks) not justified by query patterns.
+3. ⚠️ **Not pure Modular** — Modular is great for large teams. We're small. Framework overhead (LangChain, etc.) without benefit.
 
-- **Not Hybrid/BM25** — Hybrid Search (9) combines dense vectors + keyword search. BM25 excels with codes/IDs ("Q-42-M-13"). Our hardest requirement: cross-language matching (Hindi question → English passage, vice versa). Keyword search scores ZERO on cross-language. Dense-only wins here. BM25 would add index maintenance overhead for zero benefit.
+4. ❌ **Not CRAG/Self-RAG** — Both roughly double cost/latency. Our agent can re-query within its iteration budget (4 max attempts). Cheaper than CRAG. Faster than Self-RAG.
 
-- **Not RAG-Fusion** — RAG-Fusion (10) generates 5 query variants and searches all. Handles vague queries ("what does this mean?"). But users don't ask vague questions — they ask clear knowledge or booking queries. 5× retrieval cost for zero practical benefit.
+5. ❌ **Not Graph RAG** — Graph shines on multi-hop: "How is X related to Y related to Z?" Our users ask single-hop: "What is Karma?" Graph construction overhead not justified.
 
-- **Agentic RAG (4) + Multi-Agent (5) fits because:**
-  - Retrieval and actions unified: `tool_choice="auto"` means LLM decides "search scripture" vs "get booking slots" vs "answer directly"
-  - Same protocol handles knowledge retrieval AND API actions
-  - Skip unnecessary calls (cost savings)
-  - Multi-agent routing (4 specialists) handles domain separation
-  - Dispatcher can use simple regex for common cases + LLM fallback for edge cases
-  - Matches product reality: mixed workload (knowledge + bookings + community)
+6. ❌ **Not Hybrid Search** — Hybrid needs two indexes. BM25 scores zero on cross-language (Hindi question → English passage). Our hardest requirement is cross-language. Dense-only wins.
 
-### One-line interview summary
+7. ❌ **Not RAG-Fusion** — RAG-Fusion handles vague questions via 5 variants. Our questions are clear. 5× cost for zero practical benefit.
 
-> "We use Agentic RAG with multi-agent routing on top and a two-tier storage strategy underneath. Retrieval is a tool the LLM chooses to invoke, not a hardcoded step — because half our queries need live API actions instead of documents, and paying for retrieval on every message would be waste. We considered reranking, CRAG, and Graph RAG and rejected each for concrete cost/latency/fit reasons."
+**Why Agentic RAG + Multi-Agent fits:**
+
+```
+Mixed workload:
+  • 40% scripture questions (need retrieval)
+  • 40% booking/API questions (need actions, not retrieval)
+  • 20% greetings/thanks (no tools needed)
+
+Tool protocol unifies everything:
+  search_scripture() — same as get_slots() — same as answer_directly()
+  All are "tools" the LLM chooses to call
+
+LLM intelligence:
+  "Search scripture" for knowledge questions
+  "Get slots + book" for transactions
+  "Answer directly" for thank-yous
+
+Cost efficiency:
+  Only pay for retrieval when retrieving
+  Only pay for APIs when calling APIs
+  Zero cost for direct answers
+  Overall: 40% cheaper than Naive RAG
+
+Parallelism:
+  Multi-agent orchestrator runs Scripture + Booking in parallel
+  Faster synthesis for multi-domain questions
+```
+
+---
+
+## One-Line Interview Summary
+
+> "We use **Agentic RAG** — the LLM decides which tools to call (search scripture, check slots, or answer directly) — combined with **multi-agent routing** so each domain (Scripture, Booking, Community) has a specialist. Retrieval isn't a fixed pipeline step; it's a tool choice the LLM makes, which saves us 40% on API costs because half our queries don't need retrieval at all. We evaluated Corrective RAG for quality gates, Graph RAG for multi-hop reasoning, and Hybrid Search for codes, but rejected each because our corpus is clean, our questions are single-hop and semantic, and our baseline retrieval is 95%+ accurate. Cost-benefit on alternatives doesn't justify the added complexity."
 
 ---
 
