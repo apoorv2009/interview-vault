@@ -15,7 +15,7 @@ Every answer references actual config values, library versions, design decisions
 | [01-RAG-and-Vector-Search.md](01-RAG-and-Vector-Search.md) | RAG pipeline, chunking, embeddings, Pinecone, cosine similarity, semantic search, temple knowledge sync, HNSW, prompt injection | 30 |
 | [02-LLM-and-Groq.md](02-LLM-and-Groq.md) | LLM basics, temperature, Groq API, tool-call loop, chat history, parallel execution, retry logic, orchestrator routing | 10 |
 | [03-Agents-and-Architecture.md](03-Agents-and-Architecture.md) | Agent types, 12 tools, system architecture, JWT auth, password hashing, Cloudflare tunnel, action cards, push notifications | 10 |
-| [04-Security-and-Production.md](04-Security-and-Production.md) | 4-layer security, prompt injection, graceful degradation, double-booking prevention, scaling, tricky questions, all config values | 11 |
+| [04-Security-and-Production.md](04-Security-and-Production.md) | 5-layer security (input + RBAC + system prompt + output guardrails + audit), prompt injection, graceful degradation, double-booking prevention, scaling, tricky questions, all config values | 11 |
 | [05-YouTube-Transcript-Pipeline.md](05-YouTube-Transcript-Pipeline.md) | Dual-layer extraction, Whisper ASR, LLM formatting, Shanka Samadhan vs Pravachan detection, RAG storage, live stream handling | 8 |
 
 **Subtotal: 69 detailed Q&As** (30 + 10 + 10 + 11 + 8)
@@ -120,7 +120,7 @@ Q10: How do push notifications work in the mobile app?
 
 ### 04-Security-and-Production.md (11 Q&As)
 ```
-Q1:  What is the 4-layer security pipeline?
+Q1:  What is the 5-layer security pipeline?
 Q2:  How do you prevent prompt injection attacks?
 Q3:  How do you handle edge cases gracefully?
 Q4:  How do you prevent double-booking in Shantidhara slots?
