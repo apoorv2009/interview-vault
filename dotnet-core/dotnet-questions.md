@@ -461,54 +461,541 @@ public class BankAccount : BaseEntity, IValidator, ILogger, IAuditor
 
 ---
 
-**Polymorphism** — one interface, many implementations; same method call behaves differently at runtime.
+**Polymorphism** — "poly" = many, "morph" = form. **One interface, many implementations; same method call behaves differently at runtime.**
 
-Two types:
-- **Runtime polymorphism** (overriding) — child overrides parent's virtual method; resolved at runtime
-- **Compile-time polymorphism** (overloading) — same method name, different parameters; resolved at compile time
+The power: You write code against an interface, not specific implementations. New implementations can be added without changing code that uses them.
+
+---
+
+## **Two Types of Polymorphism**
+
+### **Type 1: Compile-Time Polymorphism (Static)**
+
+Resolved at compile time. The compiler decides which method to call based on parameter types.
+
+#### **A: Method Overloading**
+
+Same method name, different parameters:
 
 ```csharp
-// Capital Access — runtime polymorphism in the Report Worker
+public class PaymentProcessor
+{
+    // Overload 1: By amount only
+    public decimal CalculateFee(decimal amount)
+    {
+        return amount * 0.02m;  // 2% fee
+    }
+    
+    // Overload 2: By amount and currency
+    public decimal CalculateFee(decimal amount, string currency)
+    {
+        if (currency == "USD") return amount * 0.02m;
+        if (currency == "INR") return amount * 0.025m;  // 2.5% for INR
+        return amount * 0.02m;
+    }
+    
+    // Overload 3: By amount, currency, and account type
+    public decimal CalculateFee(decimal amount, string currency, string accountType)
+    {
+        var baseFee = CalculateFee(amount, currency);
+        if (accountType == "Premium") return baseFee * 0.9m;  // 10% discount
+        return baseFee;
+    }
+    
+    // Overload 4: By transaction object
+    public decimal CalculateFee(Transaction transaction)
+    {
+        return CalculateFee(transaction.Amount, transaction.Currency, transaction.AccountType);
+    }
+}
+
+// Usage — compiler picks the right method at compile time
+var processor = new PaymentProcessor();
+processor.CalculateFee(1000);                              // Calls overload 1
+processor.CalculateFee(1000, "INR");                       // Calls overload 2
+processor.CalculateFee(1000, "INR", "Premium");           // Calls overload 3
+processor.CalculateFee(myTransaction);                     // Calls overload 4
+```
+
+**Real banking example:**
+```csharp
+public class BankAccount
+{
+    public void Transfer(BankAccount recipient, decimal amount) { /* to same bank */ }
+    public void Transfer(string iban, decimal amount) { /* international */ }
+    public void Transfer(string iban, decimal amount, string purpose, string reference) 
+        { /* with audit trail */ }
+}
+
+// Same semantic operation, different forms — all clear
+account.Transfer(otherAccount, 5000);
+account.Transfer("DE89370400440532013000", 5000);
+account.Transfer("DE89370400440532013000", 5000, "Invoice", "INV-001");
+```
+
+#### **B: Operator Overloading**
+
+Redefine operators like `+`, `-`, `*`, `==`:
+
+```csharp
+public class Money
+{
+    public decimal Amount { get; set; }
+    public string Currency { get; set; }
+    
+    public static Money operator +(Money left, Money right)
+    {
+        if (left.Currency != right.Currency)
+            throw new InvalidOperationException("Cannot add different currencies");
+        return new Money { Amount = left.Amount + right.Amount, Currency = left.Currency };
+    }
+    
+    public static Money operator *(Money money, decimal multiplier)
+    {
+        return new Money { Amount = money.Amount * multiplier, Currency = money.Currency };
+    }
+    
+    public static bool operator ==(Money left, Money right)
+    {
+        return left.Amount == right.Amount && left.Currency == right.Currency;
+    }
+}
+
+// Usage — looks natural
+var balance1 = new Money { Amount = 1000, Currency = "USD" };
+var balance2 = new Money { Amount = 500, Currency = "USD" };
+
+var total = balance1 + balance2;      // Uses overloaded +
+var doubled = balance1 * 2;           // Uses overloaded *
+if (balance1 == balance2) { /* ... */ }  // Uses overloaded ==
+```
+
+**Compile-time resolution:** The compiler looks at the types **at that moment** and picks the right method.
+
+---
+
+### **Type 2: Runtime Polymorphism (Dynamic)**
+
+Resolved at runtime. The actual object type determines which method executes. **This is the more powerful form.**
+
+#### **A: Virtual Methods (Override)**
+
+Parent defines a `virtual` method, child provides `override`:
+
+```csharp
+// Abstract base — defines contract
+public abstract class TradeExecutor
+{
+    public abstract void Execute(Trade trade);  // MUST implement
+    
+    public virtual void LogExecution(Trade trade)
+    {
+        Console.WriteLine($"Executing trade: {trade.Id}");  // Default implementation
+    }
+}
+
+// Different implementations for different exchanges
+public class NYSEExecutor : TradeExecutor
+{
+    public override void Execute(Trade trade)
+    {
+        Console.WriteLine("Executing on NYSE");
+        // NYSE-specific: market hours, tick sizes, order types
+        SendToNYSE(new NYSEOrder(trade));
+    }
+    
+    public override void LogExecution(Trade trade)
+    {
+        base.LogExecution(trade);  // Call parent's implementation
+        Console.WriteLine("NYSE execution logged");
+    }
+}
+
+public class NASDAQExecutor : TradeExecutor
+{
+    public override void Execute(Trade trade)
+    {
+        Console.WriteLine("Executing on NASDAQ");
+        // NASDAQ-specific: different rules, different market participants
+        SendToNASDAQ(new NASDAQOrder(trade));
+    }
+}
+
+public class OTCExecutor : TradeExecutor
+{
+    public override void Execute(Trade trade)
+    {
+        Console.WriteLine("Executing OTC");
+        // OTC-specific: dealer networks, bilateral settlement
+        SendToOTCDealer(new OTCDeal(trade));
+    }
+}
+
+// The magic: Same call, different behavior at runtime
+public class TradingDesk
+{
+    public void ExecuteTradeOnExchange(Trade trade, TradeExecutor executor)
+    {
+        // This code doesn't care if it's NYSE, NASDAQ, or OTC
+        // At RUNTIME, the actual executor type determines what happens
+        executor.Execute(trade);        // ← Polymorphic call
+        executor.LogExecution(trade);   // ← Polymorphic call
+    }
+}
+
+// Usage
+var desk = new TradingDesk();
+var trade = new Trade { Id = 1, Amount = 10000 };
+
+TradeExecutor nyseExecutor = new NYSEExecutor();
+TradeExecutor nasdaqExecutor = new NASDAQExecutor();
+TradeExecutor otcExecutor = new OTCExecutor();
+
+desk.ExecuteTradeOnExchange(trade, nyseExecutor);    // Calls NYSEExecutor.Execute()
+desk.ExecuteTradeOnExchange(trade, nasdaqExecutor);  // Calls NASDAQExecutor.Execute()
+desk.ExecuteTradeOnExchange(trade, otcExecutor);     // Calls OTCExecutor.Execute()
+```
+
+**How it works:**
+- At compile time: Checks `executor` has `Execute()` method ✓
+- At runtime: The actual object type determines which `Execute()` runs
+- Add new `ExchangeExecutor`? No changes to `TradingDesk` ✅
+
+#### **B: Interface Implementation**
+
+Implement an interface, each class provides its own behavior:
+
+```csharp
+// Pure contract — no implementation
+public interface IPaymentGateway
+{
+    Task<PaymentResult> ProcessAsync(Payment payment);
+    bool Supports(Payment payment);
+}
+
+public class CreditCardGateway : IPaymentGateway
+{
+    public async Task<PaymentResult> ProcessAsync(Payment payment)
+    {
+        // PCI compliance, tokenization, 3D Secure, encryption
+        ValidateCardNumber(payment.CardNumber);
+        var token = await _tokenization.TokenizeAsync(payment.CardNumber);
+        var result = await _cardProcessor.ChargeAsync(token, payment.Amount);
+        return result;
+    }
+    
+    public bool Supports(Payment payment) => payment.Type == "CreditCard";
+}
+
+public class BankTransferGateway : IPaymentGateway
+{
+    public async Task<PaymentResult> ProcessAsync(Payment payment)
+    {
+        // ACH routing, settlement, OFAC checks
+        var routingNumber = await _abaLookup.GetRoutingAsync(payment.BankCode);
+        return await _achProcessor.InitiateAsync(routingNumber, payment.AccountNumber, payment.Amount);
+    }
+    
+    public bool Supports(Payment payment) => payment.Type == "BankTransfer";
+}
+
+public class UPIGateway : IPaymentGateway
+{
+    public async Task<PaymentResult> ProcessAsync(Payment payment)
+    {
+        // UPI-specific: NPCI, mobile verification, instant settlement
+        await _upiVerification.VerifyPhoneAsync(payment.PhoneNumber);
+        return await _upiProcessor.SendMoneyAsync(payment.UPIHandle, payment.Amount);
+    }
+    
+    public bool Supports(Payment payment) => payment.Type == "UPI";
+}
+
+// The orchestrator
+public class PaymentOrchestrator
+{
+    private readonly IEnumerable<IPaymentGateway> _gateways;
+    
+    public async Task<PaymentResult> ProcessPaymentAsync(Payment payment)
+    {
+        // Find the right gateway at runtime
+        var gateway = _gateways.FirstOrDefault(g => g.Supports(payment));
+        if (gateway == null) throw new NotSupportedException();
+        
+        // Polymorphic call — actual gateway type determines behavior
+        return await gateway.ProcessAsync(payment);
+    }
+}
+
+// Usage
+var orchestrator = new PaymentOrchestrator(new IPaymentGateway[] {
+    new CreditCardGateway(),
+    new BankTransferGateway(),
+    new UPIGateway()
+});
+
+await orchestrator.ProcessPaymentAsync(creditCardPayment);    // Uses CreditCardGateway
+await orchestrator.ProcessPaymentAsync(bankTransferPayment);  // Uses BankTransferGateway
+```
+
+**Polymorphism benefits:**
+- Add new payment type → just add new implementation
+- Orchestrator never changes
+- No if/else chains
+- Type-safe at compile time
+
+---
+
+## **The Real Power: Open/Closed Principle**
+
+Polymorphism enables the Open/Closed Principle:
+
+```csharp
+// ❌ BAD: Violates Open/Closed Principle
+public class ReportWorker
+{
+    public byte[] GenerateReport(ReportData data, string format)
+    {
+        if (format == "PDF") { /* 200 lines of PDF logic */ }
+        else if (format == "Excel") { /* 300 lines of Excel logic */ }
+        else if (format == "CSV") { /* 150 lines of CSV logic */ }
+        // Every new format requires editing this class
+    }
+}
+
+// ✅ GOOD: Open/Closed Principle via Polymorphism
 public interface IReportGenerator
 {
     string Format { get; }
-    Task<byte[]> GenerateAsync(ReportData data);
+    byte[] Generate(ReportData data);
 }
 
 public class PdfReportGenerator : IReportGenerator
 {
     public string Format => "pdf";
-    public async Task<byte[]> GenerateAsync(ReportData data) { /* QuestPDF logic */ }
+    public byte[] Generate(ReportData data) { /* PDF logic */ }
 }
 
 public class ExcelReportGenerator : IReportGenerator
 {
     public string Format => "excel";
-    public async Task<byte[]> GenerateAsync(ReportData data) { /* EPPlus logic */ }
+    public byte[] Generate(ReportData data) { /* Excel logic */ }
 }
 
-// Orchestrator — same call, different behaviour at runtime
+public class CsvReportGenerator : IReportGenerator
+{
+    public string Format => "csv";
+    public byte[] Generate(ReportData data) { /* CSV logic */ }
+}
+
+// Add new format by adding new class — orchestrator unchanged
+public class JsonReportGenerator : IReportGenerator
+{
+    public string Format => "json";
+    public byte[] Generate(ReportData data) { /* JSON logic */ }
+}
+
 public class ReportOrchestrator
 {
     private readonly IEnumerable<IReportGenerator> _generators;
-
-    public async Task<byte[]> GenerateAsync(ReportData data, string format)
+    
+    public byte[] GenerateReport(ReportData data, string format)
     {
-        var generator = _generators.First(g => g.Format == format);
-        return await generator.GenerateAsync(data); // polymorphic — no if/else ✅
+        var generator = _generators.FirstOrDefault(g => g.Format == format);
+        return generator?.Generate(data);
+        // This code NEVER changes — OPEN for extension, CLOSED for modification ✅
     }
-}
-
-// Compile-time polymorphism (overloading):
-public class EngagementRepository
-{
-    public Task<EngagementActivity?> GetByIdAsync(Guid id) { ... }
-    public Task<EngagementActivity?> GetByIdAsync(Guid id, string tenantId) { ... }
-    public Task<List<EngagementActivity>> GetByIdAsync(List<Guid> ids) { ... }
 }
 ```
 
-> **Interview line**: "In our Report Worker, we use runtime polymorphism through IReportGenerator. The orchestrator calls GenerateAsync() without any if/else for PDF vs Excel — the DI container resolves the correct implementation. Adding CSV means adding a new class. The orchestrator doesn't change."
+**Open/Closed Principle:**
+- **Open for extension:** Add new implementations without changing orchestrator
+- **Closed for modification:** Don't edit `ReportOrchestrator` when adding JSON support
+
+Polymorphism enables this architectural pattern.
+
+---
+
+## **Late Binding: The Heart of Polymorphism**
+
+```csharp
+// At compile time: Compiler sees TradeExecutor
+// At runtime: Actually, this is a NYSEExecutor
+TradeExecutor executor = GetExecutorForExchange("NYSE");
+
+executor.Execute(trade);  // Calls NYSEExecutor.Execute(), not TradeExecutor.Execute()
+```
+
+**What happens internally:**
+1. Compile time: Compiler checks `TradeExecutor` has `Execute()` ✓
+2. Runtime: JIT compiler looks at actual object type
+3. Method dispatch: Looks at vtable (virtual method table) → executes correct method
+
+This is **late binding** — the decision about which method to call is made at runtime, not compile time.
+
+---
+
+## **Virtual vs Abstract: When to Use Which**
+
+```csharp
+// VIRTUAL = "Here's a default implementation, feel free to override"
+public class BankAccount
+{
+    public virtual void Deposit(decimal amount)
+    {
+        if (amount <= 0) throw new Exception("Invalid amount");
+        _balance += amount;
+        Console.WriteLine($"Deposited: {amount}");  // Default behavior
+    }
+}
+
+public class PremiumBankAccount : BankAccount
+{
+    public override void Deposit(decimal amount)
+    {
+        base.Deposit(amount);  // Use parent's logic
+        _balance += amount * 0.01m;  // Add 1% bonus
+    }
+}
+
+// ABSTRACT = "You MUST implement this, no default"
+public abstract class PaymentProcessor
+{
+    public abstract void Process(Payment payment);  // No body — child must implement
+}
+
+public class CreditCardProcessor : PaymentProcessor
+{
+    public override void Process(Payment payment)
+    {
+        // MUST provide implementation
+    }
+}
+```
+
+**Use virtual when:** Parent has reasonable default behavior that children might enhance.
+**Use abstract when:** No sensible default exists; each child must define its own.
+
+---
+
+## **Common Pitfalls**
+
+### **Pitfall 1: Over-Polymorphism**
+
+Not everything needs polymorphism:
+
+```csharp
+// ❌ Over-engineered
+public interface IStringTrimmer { string Trim(string s); }
+public class WhitespaceStringTrimmer : IStringTrimmer { /* ... */ }
+
+// ✅ Just use a method
+public string TrimString(string s) => s.Trim();
+```
+
+Use polymorphism when you have **multiple implementations that vary at runtime**.
+
+### **Pitfall 2: Liskov Substitution Violation**
+
+Subclass must honor parent's contract:
+
+```csharp
+// ❌ Violates LSP
+public class RestrictedReportGenerator : IReportGenerator
+{
+    public byte[] Generate(ReportData data)
+    {
+        if (data.CompanyId != "AAPL")
+            throw new NotSupportedException("Only AAPL");  // Breaks contract!
+    }
+}
+
+// ✅ Follow LSP
+public byte[] Generate(ReportData data)
+{
+    if (data.CompanyId != "AAPL") return null;  // Or clear exception
+}
+```
+
+**LSP:** A subclass must be substitutable for its parent without breaking the contract.
+
+### **Pitfall 3: Deep Inheritance Hierarchies**
+
+```csharp
+// ❌ Bad: 5 levels deep
+PaymentProcessor → BankPaymentProcessor → SecurePaymentProcessor → ...
+
+// ✅ Good: Flat with composition
+public class BankPaymentProcessor : PaymentProcessor
+{
+    private readonly IAuditor _auditor;
+    private readonly ILogger _logger;
+}
+```
+
+Keep inheritance shallow (usually 2-3 levels). Use composition for additional concerns.
+
+---
+
+## **Capital Access Example**
+
+```csharp
+// Multi-tenant engagement platform
+
+// Polymorphic notification delivery
+public interface INotificationChannel
+{
+    Task SendAsync(Notification notif);
+    bool Supports(NotificationType type);
+}
+
+public class EmailNotificationChannel : INotificationChannel
+{
+    public async Task SendAsync(Notification notif)
+        => await _emailService.SendAsync(notif.RecipientEmail, notif.Subject, notif.Body);
+    public bool Supports(NotificationType type) => type == NotificationType.Email;
+}
+
+public class SmsNotificationChannel : INotificationChannel
+{
+    public async Task SendAsync(Notification notif)
+        => await _smsService.SendAsync(notif.RecipientPhone, notif.Body);
+    public bool Supports(NotificationType type) => type == NotificationType.SMS;
+}
+
+public class InAppNotificationChannel : INotificationChannel
+{
+    public async Task SendAsync(Notification notif)
+        => await _signalRHub.SendAsync(notif.RecipientId, notif.Body);
+    public bool Supports(NotificationType type) => type == NotificationType.InApp;
+}
+
+// Polymorphic handlers — don't care about channel implementation
+public class EngagementNotificationHandler
+{
+    public async Task NotifyAsync(Notification notif, IEnumerable<INotificationChannel> channels)
+    {
+        var channel = channels.FirstOrDefault(c => c.Supports(notif.Type));
+        await channel?.SendAsync(notif);
+    }
+}
+```
+
+---
+
+## **Why Polymorphism Matters (After 16 Years)**
+
+1. **Decouples code** — Callers don't know about concrete implementations
+2. **Enables scalability** — Add new behavior without modifying existing code
+3. **Enforces contracts** — Interfaces ensure implementations follow the rules
+4. **About intent** — `IPaymentGateway` tells you "this processes payments"
+5. **Works with SOLID** — Foundation for maintainable enterprise code
+
+**The key insight:** Polymorphism is not about object orientation. It's about **design decisions that let you add features in the future without rewriting the past.**
+
+In a 10-year-old banking system with millions of lines of code, polymorphism is the difference between adding a feature in a day versus three weeks of regression testing.
+
+> **Interview line**: "Polymorphism is one interface, many implementations. Compile-time polymorphism is method overloading — the compiler picks the right method. Runtime polymorphism is virtual methods and interfaces — the actual object type determines behavior at runtime. The power is Open/Closed Principle: I can add new payment gateways, notification channels, or report formats without touching the orchestrator code. In Capital Access, we use polymorphism everywhere — different report generators, notification channels, executor types. It scales. In 16 years, I've learned that polymorphism isn't a nice-to-have; it's how you build systems that survive and evolve."
 
 ---
 
