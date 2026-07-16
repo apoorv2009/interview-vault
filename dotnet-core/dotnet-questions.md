@@ -195,42 +195,269 @@ public class OwnershipAlertHandler
 
 ---
 
-**Inheritance** — a child class inherits fields and behaviour from a parent; avoids repeating common code.
+**Inheritance** — a child class inherits fields and behaviour from a parent; avoids repeating common code. Establishes "is-a" relationships.
 
+### **What C# Supports**
+
+**Type 1: Single Inheritance** ✅
 ```csharp
-// Capital Access — BaseEntity carries fields every entity needs
+public class Vehicle { }
+public class Car : Vehicle { }  // One parent only
+```
+
+**Type 2: Multilevel Inheritance** ✅
+```csharp
+public class Animal { }
+public class Mammal : Animal { }
+public class Dog : Mammal { }  // Chain: Animal → Mammal → Dog
+```
+
+**Type 3: Hierarchical Inheritance** ✅
+```csharp
 public abstract class BaseEntity
 {
-    public Guid Id { get; protected set; } = Guid.NewGuid();
-    public string TenantId { get; protected set; } = string.Empty;
-    public DateTime CreatedAt { get; protected set; } = DateTime.UtcNow;
-    public DateTime UpdatedAt { get; protected set; } = DateTime.UtcNow;
+    public Guid Id { get; protected set; }
+    public DateTime CreatedAt { get; protected set; }
     public bool IsDeleted { get; protected set; }
 
-    public void SoftDelete()
-    {
-        IsDeleted = true;
-        UpdatedAt = DateTime.UtcNow;
-    }
+    public void SoftDelete() => IsDeleted = true;
 }
 
-// Children inherit everything — no repetition
-public class EngagementActivity : BaseEntity
-{
-    public ActivityType ActivityType { get; private set; }
-    public EngagementStatus Status { get; private set; }
-    // Id, TenantId, CreatedAt, UpdatedAt, IsDeleted, SoftDelete() — all inherited ✅
-}
+public class EngagementActivity : BaseEntity { }
+public class Transaction : BaseEntity { }
+public class Card : BaseEntity { }  // Many children from one parent — ✅
+```
 
-public class FollowUpTask : BaseEntity
+Capital Access example — every entity inherits from one base:
+```csharp
+public class Account : BaseEntity { /* inherits Id, CreatedAt, IsDeleted, SoftDelete() */ }
+public class Card : BaseEntity { /* inherits same fields */ }
+public class Movement : BaseEntity { /* inherits same fields */ }
+```
+
+---
+
+### **What C# Does NOT Support (and Why)**
+
+**Type 4: Multiple Inheritance** ❌ **NOT SUPPORTED**
+
+```csharp
+public class Bird { public virtual void Fly() { } }
+public class Mammal { public virtual void Sleep() { } }
+
+public class Eagle : Bird, Mammal  // ❌ COMPILER ERROR — ILLEGAL
 {
-    public string TaskType { get; private set; }
-    public DateTime DueDate { get; private set; }
-    // Same inherited fields — without repeating them ✅
+    // Why not supported? The Diamond Problem
 }
 ```
 
-> **Interview line**: "Every entity in our Engagement Service inherits from BaseEntity, which provides Id, TenantId, timestamps, and SoftDelete(). This is also why our EF Core global query filters work uniformly — IsDeleted and TenantId are always present on every entity."
+**The Diamond Problem — at Implementation Level:**
+
+```
+If both Bird and Mammal had a Speak() method:
+
+     Animal
+      / \
+   Fly/ \Sleep
+    /     \
+  Bird   Mammal
+    \   (both have Speak())
+     \ /
+     Eagle
+
+// Which Speak() does Eagle use?
+// Bird.Speak() or Mammal.Speak()?
+// AMBIGUOUS — compiler can't resolve!
+```
+
+**The Real Problem: Classes Have State AND Implementation**
+
+```csharp
+// ❌ Multiple inheritance nightmare
+public class ValidatorBase
+{
+    protected string _rules;        // Field
+    
+    public ValidatorBase()          // Constructor
+    {
+        _rules = "Load from DB";
+    }
+    
+    public virtual void Validate()  // Implementation
+    {
+        Console.WriteLine("Rules: " + _rules);
+    }
+}
+
+public class LoggerBase
+{
+    protected string _logPath;      // DIFFERENT field
+    
+    public LoggerBase()             // DIFFERENT constructor
+    {
+        _logPath = "C:\\Logs";
+    }
+    
+    public virtual void Log()       // DIFFERENT implementation
+    {
+        Console.WriteLine("Path: " + _logPath);
+    }
+}
+
+public class Service : ValidatorBase, LoggerBase  // ❌ ILLEGAL
+{
+    // PROBLEM 1: Which constructor runs first?
+    // ValidatorBase() or LoggerBase()?
+    // Both need to initialize!
+    
+    // PROBLEM 2: Which _rules field? Which _logPath?
+    // Do we get both? How do we access them?
+    
+    // PROBLEM 3: Memory layout is ambiguous
+    
+    // PROBLEM 4: Code breaks in subtle ways
+}
+```
+
+**Why Interfaces Don't Have This Problem:**
+
+```csharp
+// ✅ Multiple interfaces work perfectly
+public interface IValidator
+{
+    bool Validate(Payment p);      // No fields, no constructor, no implementation body
+}
+
+public interface ILogger
+{
+    void Log(string message);      // No fields, no constructor, no implementation body
+}
+
+public class PaymentService : IValidator, ILogger
+{
+    private string _rules;        // I define my own fields
+    private string _logPath;      // No conflict
+    
+    public PaymentService()        // I define my own constructor
+    {
+        _rules = "Load from DB";
+        _logPath = "C:\\Logs";
+    }
+    
+    public bool Validate(Payment p) { /* MY implementation */ }
+    public void Log(string message) { /* MY implementation */ }
+}
+
+// ✅ No ambiguity: I provide all implementations myself
+// ✅ No field conflicts: I manage my own state
+// ✅ No constructor conflicts: I decide initialization
+```
+
+**Banking Example: Why This Matters**
+
+```csharp
+// ❌ Can't do this
+public class AccountBase
+{
+    protected decimal _balance;
+    
+    public AccountBase() { _balance = 0; }
+    
+    public virtual void Deposit(decimal amount) => _balance += amount;
+}
+
+public class AuditableBase
+{
+    protected List<string> _auditLog;
+    
+    public AuditableBase() { _auditLog = new List<string>(); }
+    
+    public virtual void Deposit(decimal amount)  // Same method name!
+        => _auditLog.Add($"Deposit: {amount}");
+}
+
+public class BankAccount : AccountBase, AuditableBase  // ❌ ILLEGAL
+{
+    // Which Deposit() gets called?
+    // AccountBase.Deposit() or AuditableBase.Deposit()?
+    // Which _balance? Which _auditLog?
+    // Disaster!
+}
+
+// ✅ The C# way: One base class + Multiple interfaces
+public abstract class BaseEntity
+{
+    public Guid Id { get; protected set; }
+    public DateTime CreatedAt { get; protected set; }
+}
+
+public interface IDepositable { void Deposit(decimal amount); }
+public interface IAuditable { void RecordAudit(string action); }
+
+public class BankAccount : BaseEntity, IDepositable, IAuditable
+{
+    private decimal _balance;
+    private List<string> _auditLog = new List<string>();
+    
+    public void Deposit(decimal amount)
+    {
+        _balance += amount;
+        _auditLog.Add($"Deposit: {amount}");
+    }
+    
+    public void RecordAudit(string action) => _auditLog.Add(action);
+}
+
+// ✅ No conflicts, clear responsibilities
+```
+
+---
+
+### **Why Interfaces Work But Classes Don't**
+
+| Aspect | Interface | Class |
+|--------|-----------|-------|
+| **Has State (Fields)** | No | Yes ← Causes conflicts |
+| **Has Constructor Logic** | No | Yes ← Initialization ambiguity |
+| **Has Implementation** | No — you provide it | Yes — inherited ← Which parent's impl? |
+| **Multiple** | ✅ Safe — you implement all | ❌ Dangerous — ambiguous inheritance |
+| **Diamond Problem** | Only at contract level | At **implementation level** |
+
+---
+
+### **The C# Solution: Composition Over Multiple Inheritance**
+
+```csharp
+// ✅ Pattern: One base class + multiple interfaces + composition
+public abstract class BaseEntity
+{
+    public Guid Id { get; protected set; }
+    public DateTime CreatedAt { get; protected set; }
+}
+
+public interface IValidator { bool Validate(); }
+public interface ILogger { void Log(string msg); }
+public interface IAuditor { void Audit(string action); }
+
+public class BankAccount : BaseEntity, IValidator, ILogger, IAuditor
+{
+    private decimal _balance;
+    private List<string> _auditLog = new List<string>();
+    
+    public bool Validate() => _balance >= 0;
+    public void Log(string msg) => Console.WriteLine(msg);
+    public void Audit(string action) => _auditLog.Add(action);
+}
+```
+
+**Benefits:**
+- ✅ One base class for shared code (no field/constructor conflicts)
+- ✅ Multiple interfaces for capabilities (each segregated)
+- ✅ Clear inheritance chain
+- ✅ Zero ambiguity
+- ✅ Maintainable for 10+ years
+
+> **Interview line**: "C# doesn't support multiple class inheritance because classes carry state, constructors, and implementations — things that create the Diamond Problem at the implementation level, not just the interface level. Interfaces are pure contracts with no state, so multiple interface implementation is safe — I provide all implementations myself. The C# solution is one base class for shared code, multiple interfaces for capabilities. In Capital Access, every entity inherits from BaseEntity, but can implement multiple interfaces like IAuditable, ISoftDeletable, IVersionable. This gives us code reuse without ambiguity."
 
 ---
 
@@ -356,48 +583,143 @@ public class NASDAQExecutor : ITradeExecutor { ... }
 
 | | Abstract Class | Interface |
 |---|---|---|
-| Has fields? | Yes | No |
-| Has method bodies? | Yes (`virtual` methods) | Yes (default implementations, C# 8+) |
-| Has constructors? | Yes | No |
-| Multiple inheritance? | No — one parent class only | Yes — implement many interfaces |
-| Use when | Shared implementation + common base behaviour | Pure contract / capability across unrelated classes |
+| **Has fields?** | Yes | No |
+| **Has method bodies?** | Yes (`virtual` methods) | Yes (default implementations, C# 8+) |
+| **Has constructors?** | Yes | No |
+| **Single inheritance?** | One parent only — ✅ | — |
+| **Multiple implementation?** | No — ❌ | Yes — ✅ Unlimited |
+| **WHY no multiple inheritance?** | Classes have state, constructors, implementations → Diamond Problem at implementation level | No state/constructors/bodies → Pure contracts → No conflicts |
+| **Use when** | Shared code + common base for RELATED classes | Capabilities/contracts for UNRELATED classes |
 
+---
+
+**Why Classes Can't Do Multiple Inheritance But Interfaces Can:**
+
+**Classes = Implementation + State + Constructor Logic**
 ```csharp
-// ABSTRACT CLASS — shared implementation for related classes
-public abstract class BaseAzureService
+public class DatabaseService
 {
-    protected readonly ILogger _logger;
-    protected readonly string _tenantId;
-
-    protected BaseAzureService(ILogger logger, ICurrentTenantService tenantService)
+    private IDatabase _db;        // ← STATE
+    
+    public DatabaseService(string connStr)  // ← CONSTRUCTOR with logic
     {
-        _logger = logger;
-        _tenantId = tenantService.TenantId; // shared setup all services need
+        _db = new Database(connStr);
     }
-
-    protected void LogServiceCall(string operation)
-        => _logger.LogInformation("[{Tenant}] {Operation}", _tenantId, operation);
-
-    public abstract Task<bool> HealthCheckAsync(); // each service implements its own
+    
+    public virtual void Execute()  // ← IMPLEMENTATION body
+    {
+        _db.RunQuery();
+    }
 }
 
-public class EngagementService : BaseAzureService
+public class CacheService
 {
-    public override async Task<bool> HealthCheckAsync()
-        => await _context.Database.CanConnectAsync();
+    private ICache _cache;        // ← DIFFERENT STATE
+    
+    public CacheService(string cacheUrl)  // ← DIFFERENT CONSTRUCTOR
+    {
+        _cache = new Cache(cacheUrl);
+    }
+    
+    public virtual void Execute()  // ← DIFFERENT IMPLEMENTATION
+    {
+        _cache.Store();
+    }
 }
 
-// INTERFACE — capability shared by unrelated classes
-public interface IExportable
+// ❌ Multiple inheritance = NIGHTMARE
+public class Service : DatabaseService, CacheService
 {
-    Task<byte[]> ExportAsync(ExportFormat format);
+    // PROBLEM 1: Which constructor runs? DatabaseService() or CacheService()?
+    // PROBLEM 2: Which _db field? Which _cache field?
+    // PROBLEM 3: Which Execute() implementation? Both have one!
+    // PROBLEM 4: Memory layout is ambiguous
 }
-
-public class EngagementActivity : BaseEntity, IExportable { ... }  // entity
-public class OwnershipReport : IExportable { ... }                 // report — unrelated to entity
 ```
 
-> **Rule**: use abstract class when multiple related classes share real code. Use interface when expressing a capability that unrelated classes can implement.
+**Interfaces = Pure Contracts (No State, No Constructor, No Implementation)**
+```csharp
+public interface IRepository { void Execute(); }
+public interface ICache { void Execute(); }
+public interface IAudit { void Execute(); }
+
+// ✅ Multiple interfaces work perfectly
+public class Service : IRepository, ICache, IAudit
+{
+    private string _connStr;      // ← I define my own state
+    private string _cacheUrl;
+    private string _auditPath;
+    
+    public Service(string connStr, string cacheUrl, string auditPath)  // ← I define my own constructor
+    {
+        _connStr = connStr;
+        _cacheUrl = cacheUrl;
+        _auditPath = auditPath;
+    }
+    
+    // ← I provide the implementation for all three
+    public void Execute()
+    {
+        // All three interfaces use this same implementation
+    }
+    
+    // OR explicit implementation for different behavior per interface
+    void IRepository.Execute() { /* repository logic */ }
+    void ICache.Execute() { /* cache logic */ }
+    void IAudit.Execute() { /* audit logic */ }
+}
+```
+
+**Key Insight:** Interfaces work because they DON'T have the things that cause conflicts in classes:
+- ✅ No fields to conflict
+- ✅ No constructors to coordinate
+- ✅ No implementation bodies to choose between
+- ✅ YOU provide all implementations
+
+---
+
+**Real Banking Example:**
+
+```csharp
+// ✅ One abstract base class (for shared code)
+public abstract class BaseEntity
+{
+    public Guid Id { get; protected set; }
+    public DateTime CreatedAt { get; protected set; }
+    public string TenantId { get; protected set; }
+}
+
+// ✅ Multiple interfaces (for capabilities)
+public interface IValidatable { bool Validate(); }
+public interface IAuditable { void RecordAudit(string action); }
+public interface ISoftDeletable { void SoftDelete(); }
+
+// ✅ Combine them safely
+public class BankAccount : BaseEntity, IValidatable, IAuditable, ISoftDeletable
+{
+    private decimal _balance;
+    private List<string> _auditLog = new List<string>();
+    
+    // One constructor for initialization
+    public BankAccount(string tenantId)
+    {
+        TenantId = tenantId;
+        CreatedAt = DateTime.UtcNow;
+    }
+    
+    // Each interface gets its own implementation
+    public bool Validate() => _balance >= 0;
+    public void RecordAudit(string action) => _auditLog.Add(action);
+    public void SoftDelete() => /* mark as deleted */;
+}
+```
+
+**Pattern:**
+- One abstract class from related hierarchy (no multiple inheritance)
+- Multiple interfaces for cross-cutting capabilities
+- No ambiguity, no conflicts
+
+> **Interview line**: "Abstract classes are for 'is-a' relationships where related classes share code. Interfaces are for 'can-do' capabilities across unrelated classes. C# allows multiple interface implementation because interfaces have no state or constructors — you provide all implementations. If classes allowed multiple inheritance, we'd have the Diamond Problem: which parent's _field? Which parent's constructor? Which parent's implementation? That's why C# forces one base class + multiple interfaces. In Capital Access, every entity inherits from BaseEntity (code reuse), but implements multiple interfaces like IAuditable, ISoftDeletable (capabilities). Best of both worlds, zero conflicts."
 
 ---
 
