@@ -4728,6 +4728,13 @@ public class CreateEngagementValidator : AbstractValidator<CreateEngagementDto>
 
 ### Q64. [Topic: ASP.NET Core] [EPAM] How do you manage configuration in .NET Core? What is IOptionsMonitor vs IOptionsSnapshot?
 
+**Definition**:
+- **IOptions<T>**: Static config; loaded once at startup; doesn't react to changes.
+- **IOptionsSnapshot<T>**: Scoped config; reloaded per HTTP request; picks up changes between requests; safe for web apps.
+- **IOptionsMonitor<T>**: Singleton that watches config file for changes; notifies via `OnChange` callback; real-time updates.
+- **Configuration Sources**: appsettings.json, environment variables, Azure Key Vault, command-line args (priority stacking).
+- **Pattern**: Inject IOptions/IOptionsSnapshot into controllers/services; access `options.Value` to get config object.
+
 **Configuration priority (highest overrides lowest):**
 ```
 Azure Key Vault → Environment Variables → appsettings.{env}.json → appsettings.json
@@ -4785,6 +4792,13 @@ public class FeatureFlagService(IOptionsMonitor<FeatureFlagOptions> monitor)
 ---
 
 ### Q65. [Topic: ASP.NET Core] [EPAM] What is Azure Key Vault and why use Managed Identity instead of credentials?
+
+**Definition**:
+- **Azure Key Vault**: Secure secret storage (API keys, connection strings, certificates); accessible via Azure resource authentication.
+- **Managed Identity**: Azure feature; app authenticated as Azure identity without credentials; credentials managed by Azure.
+- **No Bootstrap Problem**: App doesn't need credentials file; Azure runtime auto-provides identity token.
+- **Configuration**: Add Key Vault provider to IConfiguration; secrets loaded at startup or cached.
+- **Best Practice**: Use Managed Identity in Azure, secrets file only for local dev (not production).
 
 **The bootstrap problem:** If you need credentials to access Key Vault, where do you safely store those credentials?
 
@@ -4849,6 +4863,8 @@ Code
 
 ### Q66. [Topic: ASP.NET Core] [EPAM] What is REST? What are the key principles?
 
+**Definition**: REST (Representational State Transfer) architectural style for APIs using HTTP; **Principles**: (1) Client-Server separation; (2) Stateless (each request self-contained); (3) Resources (URIs represent entities: `/api/engagements/123`); (4) HTTP Methods (GET=read, POST=create, PUT=update, DELETE=remove); (5) Standard Response Codes (200=OK, 201=Created, 400=BadRequest, 404=NotFound, 500=ServerError).
+
 REST = Representational State Transfer. Six constraints:
 
 | Constraint | Meaning | Capital Access |
@@ -4887,6 +4903,8 @@ DELETE /api/engagements/{id}     → delete
 ---
 
 ### Q67. [Topic: ASP.NET Core] [EPAM] How do you achieve API versioning?
+
+**Definition**: Versions allow API changes without breaking clients. **Methods**: (1) URL path (`/api/v1/engagements`, `/api/v2/engagements`); (2) Query string (`?api-version=2.0`); (3) HTTP header (`API-Version: 2.0`); (4) Content negotiation. **.NET Core**: Use `ApiVersion` attribute from `Asp.Versioning` NuGet; `[ApiVersion("1.0")]` on controllers; route to different handlers per version.
 
 ```csharp
 // Install: Microsoft.AspNetCore.Mvc.Versioning
@@ -4928,6 +4946,8 @@ public class EngagementV2Controller : ControllerBase
 
 ### Q68. [Topic: ASP.NET Core] Content Negotiation — how does it work?
 
+**Definition**: Server responds in client-requested format. **Mechanism**: Client sends `Accept: application/json` or `Accept: application/xml` header; ASP.NET Core matches to configured formatters; controller returns same object, formatter serializes to requested format. **Configuration**: `services.AddControllers().AddXmlSerializerFormatters()` enables XML; JSON default. **Capital Access**: API returns JSON by default, XML if explicitly requested.
+
 Client declares what format it accepts via `Accept` header. Server responds in best matching format.
 
 ```csharp
@@ -4960,6 +4980,8 @@ public async Task<IActionResult> DownloadReport(Guid id)
 
 ### Q69. [Topic: ASP.NET Core] How do you secure a Web API endpoint? Name all best practices.
 
+**Definition**: **Security Best Practices**: (1) HTTPS only (TLS 1.2+); (2) Authentication (`[Authorize]` with JWT); (3) Authorization (role/claim checks); (4) Input validation (FluentValidator, DataAnnotations); (5) CORS restricted origins; (6) Rate limiting; (7) Logging all access; (8) OWASP compliance (SQL injection, XSS prevention); (9) API keys for service-to-service (if not OAuth2); (10) Response headers (Content-Type, X-Frame-Options, CSP).
+
 ```
 1.  Authentication       → JWT (Okta) — every request needs valid token
 2.  Authorization        → [Authorize(Roles = "IRAdmin")] — RBAC on every endpoint
@@ -4988,6 +5010,8 @@ app.Use(async (ctx, next) =>
 
 ### Q70. [Topic: ASP.NET Core] SQL Injection — what is it and how do you prevent it?
 
+**Definition**: Attacker injects malicious SQL via input (e.g., `'; DROP TABLE users; --`). **Prevention**: (1) Parameterized queries (EF Core's Where(x => x.Id == id)); (2) Stored procedures with parameter mapping; (3) Input validation (whitelist expected formats); (4) ORMs like EF Core (automatic parameterization); (5) Never concatenate user input into SQL strings. **Capital Access**: EF Core queries are parameterized by default; never build LINQ with string concatenation.
+
 ```csharp
 // WHAT IT IS: attacker injects SQL code via user input
 string sql = $"SELECT * FROM Users WHERE Name = '{userInput}'";
@@ -5012,6 +5036,8 @@ await _context.Database.ExecuteSqlRawAsync(
 ---
 
 ### Q71. [Topic: ASP.NET Core] How do you debug a slow API response?
+
+**Definition**: **Debugging Steps**: (1) Add Application Insights or Serilog with request/response timing; (2) dotnet-trace to capture performance events; (3) Database profiling (SQL query time via EF Core logging); (4) Check N+1 query problem (use .Include() for eager loading); (5) Memory profiler for GC pauses; (6) Check external service calls (HTTP timeouts); (7) Monitor CPU and I/O. **Tools**: Application Insights, Glimpse, MiniProfiler, dotnet-trace, PerfView.
 
 ```
 Step 1 — REPRODUCE: exact endpoint, payload, tenant, time of day
@@ -5053,6 +5079,8 @@ var dtos = await _context.EngagementActivities
 ---
 
 ### Q72. [Topic: ASP.NET Core] What is Clean Architecture and what are its benefits?
+
+**Definition**: Layered design isolating concerns. **Layers**: (1) **Domain** (business rules, entities, no frameworks); (2) **Application** (use cases, DTOs, validators); (3) **Infrastructure** (EF Core, repositories, external services); (4) **Presentation** (ASP.NET Core controllers, API). **Benefits**: Testability (swap mock repos), maintainability (changes isolated to layers), framework-agnostic (swap EF Core for Dapper). **Capital Access**: Strict layer separation ensures business logic stays testable even if ASP.NET Core version changes.
 
 ```
 Domain Layer      → entities, value objects, domain events, repository INTERFACES
@@ -5109,6 +5137,8 @@ public class SqlEngagementRepository : IEngagementRepository
 ---
 
 ### Q73. [Topic: ASP.NET Core] What is your approach to migrate from .NET Framework 4.7 to .NET 8?
+
+**Definition**: **Migration Strategy**: (1) Audit dependencies (3rd-party, NuGet packages compatibility); (2) Create .NET 8 project parallel to .NET Framework; (3) Use `try-convert` tool to auto-convert project files; (4) Fix API incompatibilities (AppDomain → DependencyInjection, HttpClient → HttpClientFactory); (5) Update authentication (Cookies → JWT via IdentityServer); (6) Update configuration (web.config → appsettings.json); (7) Run parallel (Framework handles old requests, .NET 8 new), gradually migrate; (8) Test extensively. **Timeline**: 3-6 months typical for large app.
 
 **Strangler Fig Pattern — don't rewrite all at once:**
 
@@ -5175,6 +5205,8 @@ public class EngagementController : ControllerBase { }
 ---
 
 ### Q74. [Topic: ASP.NET Core] Rate Limiting — Middleware vs Infrastructure Layer
+
+**Definition**: Rate limiting restricts requests per time window. **Middleware Approach**: Early pipeline, simple counters (in-memory or Redis), global or per-route via `[RateLimit]` attributes, fast. **Infrastructure Approach**: Azure API Management, CDN, load balancer throttling; distributed, handles multi-server scenarios. **Trade-off**: Middleware is simple but doesn't scale across servers; Infrastructure scales but requires deployment complexity. **Capital Access**: Use middleware for per-user limits (100 requests/min), Infrastructure for overall API protection (1M requests/min).
 
 Both layers serve DIFFERENT purposes — they are complementary, not redundant.
 
