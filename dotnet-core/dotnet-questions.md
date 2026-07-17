@@ -1668,7 +1668,52 @@ WITHOUT DIP:                          WITH DIP:
 
 ---
 
+### **C# Language Features Section Definitions**
+
+**Value Types vs Reference Types**
+- **Value Type**: Stored on the stack; copied by value; each copy is independent.
+- **Reference Type**: Stored on the heap; copied by reference; multiple variables can point to the same object.
+
+**Generics**
+- **Definition**: A mechanism to write reusable code that works with any type while maintaining type safety. Type is specified at usage time.
+
+**Nullable Types**
+- **Definition**: Types that can hold a null value in addition to their normal range of values (e.g., `int?` can be null or an integer).
+
+**Boxing & Unboxing**
+- **Boxing**: Converting a value type to a reference type (wrapping it in an object on the heap).
+- **Unboxing**: Converting a reference type back to a value type (unwrapping the object).
+
+**Collections**
+- **Definition**: Generic or non-generic containers for storing multiple objects (List, Dictionary, HashSet, Queue, Stack, etc.).
+
+**Async/Await**
+- **Definition**: A pattern for writing asynchronous code that looks synchronous, allowing long-running operations without blocking threads.
+
+**Task.WhenAll vs Parallel.ForEach**
+- **Task.WhenAll**: Awaits multiple async operations to complete (Task-based, thread-pool friendly).
+- **Parallel.ForEach**: Runs operations in parallel across multiple threads on multi-core systems.
+
+**IDisposable Pattern**
+- **Definition**: A pattern for properly releasing unmanaged resources (files, database connections, handles) when an object is no longer needed.
+
+**Managed vs Unmanaged Memory**
+- **Managed Memory**: Memory managed by the GC (objects, strings, arrays).
+- **Unmanaged Memory**: Memory not managed by GC (file handles, native pointers, COM objects).
+
+**Deadlock**
+- **Definition**: A situation where two or more threads are waiting for each other indefinitely, causing the program to hang.
+
+---
+
 ### Q10. [Topic: C#] [EPAM] What is the difference between Value Types and Reference Types?
+
+**Definition**:
+- **Value Types**: Data types stored on the stack that are copied by value; `int`, `bool`, `struct`, `decimal`.
+- **Reference Types**: Data types stored on the heap; accessed via references; `class`, `string`, `array`, `List<T>`.
+- **Key Difference**: Modifying a value type copy doesn't affect the original; modifying a reference type affects all references to it.
+
+**Comparison**:
 
 | | Value Type | Reference Type |
 |---|---|---|
@@ -1720,6 +1765,13 @@ Money price2 = price1;  // independent copy — no shared state
 
 ### Q11. [Topic: C#] [EPAM] What are Generics? Why are they important?
 
+**Definition**:
+- **Generics**: A mechanism to write reusable, type-safe code by specifying a placeholder type `<T>` that gets replaced with an actual type at compile time.
+- **Purpose**: Achieve code reuse without boxing/unboxing, maintain type safety, and eliminate runtime casting errors.
+- **Example**: `List<T>`, `Dictionary<K,V>`, `public T GetById<T>(int id)`.
+
+**Explanation**:
+
 Generics let you write code that works with any type while remaining type-safe. The type is specified at usage time, not definition time.
 
 ```csharp
@@ -1769,6 +1821,13 @@ ApiResponse<List<ReportJob>>    jobs     = ApiResponse<List<ReportJob>>.Ok(jobLi
 
 ### Q12. [Topic: C#] [EPAM] What are Nullable types? How do you handle null safely in C#?
 
+**Definition**:
+- **Nullable Value Types**: Value types that can hold a null value using syntax `int?`, `bool?`, `DateTime?`.
+- **Nullable Reference Types** (C# 8+): Reference types explicitly marked as nullable: `string?`, `List<T>?`.
+- **Purpose**: Make null states explicit in the type system, enabling compile-time warnings when you might assign/access null improperly.
+
+**Explanation**:
+
 ```csharp
 // Nullable reference types (C# 8+, enabled in .NET 6+)
 // string  = NOT nullable — compiler warns if you assign null
@@ -1808,6 +1867,12 @@ if (activity is not null)
 
 ### Q13. [Topic: C#] [EPAM] What is Boxing and Unboxing? Why is it a performance concern?
 
+**Definition**:
+- **Boxing**: Converting a value type (e.g., `int`) to a reference type by wrapping it in an object shell on the heap.
+- **Unboxing**: Extracting the value type back from the object reference, requiring an explicit cast.
+- **Performance Impact**: Each box/unbox operation allocates heap memory and creates GC pressure; common in legacy non-generic collections (Hashtable, ArrayList).
+- **Modern Fix**: Use generic collections (Dictionary<K,V>, List<T>) which eliminate boxing entirely.
+
 ```csharp
 // BOXING — wrapping a value type in a reference type (object)
 // Value leaves the stack → copied to the heap → wrapped in object shell
@@ -1838,6 +1903,15 @@ double score = cache["AAPL"];       // no unboxing — already typed
 ---
 
 ### Q14. [Topic: C#] [EPAM] Explain the main collection types and when to use each.
+
+**Definition**:
+- **Array**: Fixed-size, indexed collection with O(1) random access; size is immutable after creation.
+- **List<T>**: Dynamic-size, generic, indexed collection with O(1) amortized add and O(1) random access.
+- **LinkedList<T>**: Doubly-linked list with O(1) insert/remove at known positions; O(n) random access.
+- **Dictionary<K,V>**: Hash table for key-value pairs with O(1) average get/set; type-safe and non-generic alternative (Hashtable) should be avoided.
+- **HashSet<T>**: Unordered collection of unique values with O(1) existence checks; ideal for deduplication.
+- **Queue<T> / Stack<T>**: FIFO and LIFO collections for enqueue/dequeue and push/pop operations.
+- **IEnumerable vs IQueryable**: IEnumerable filters in-memory; IQueryable translates to SQL and executes on the database.
 
 **Array vs List\<T> vs LinkedList\<T>:**
 
@@ -1983,6 +2057,12 @@ return await q.AsNoTracking().ToListAsync();           // SQL runs here ✅
 
 ### Q15. [Topic: C#] [EPAM] What is async/await? How is it different from creating a Thread?
 
+**Definition**:
+- **async/await**: A language pattern that allows writing asynchronous code that reads sequentially, suspending execution without blocking threads.
+- **Key Difference from Thread**: Threads are expensive (OS-level, dedicated memory); async/await reuses threadpool threads and releases them while waiting for I/O.
+- **Thread Scheduling**: Thread forces OS to context-switch and manage multiple stacks; async/await yields threadpool threads back, allowing other work to use them.
+- **Common Use**: Long-running I/O operations (HTTP calls, database queries, file I/O) that don't need dedicated threads while waiting.
+
 **The problem async solves:**
 Without async, a thread is BLOCKED waiting for I/O (database, HTTP, file). Under load, blocked threads exhaust the thread pool and the application slows down.
 
@@ -2059,6 +2139,13 @@ var activity = await _context.FindAsync(id); // 0 threads used while DB responds
 
 ### Q16. [Topic: C#] [EPAM] What is Task.WhenAll vs Parallel.ForEach? When to use each?
 
+**Definition**:
+- **Task.WhenAll**: Awaits multiple async tasks to complete; returns immediately when all complete; runs on threadpool without blocking.
+- **Parallel.ForEach**: Distributes work across multiple threads; blocks the calling thread until all iterations finish; uses ThreadPool but occupies threads during execution.
+- **Task.WhenAll Use Case**: Concurrent I/O operations (multiple HTTP requests, database queries) that can run independently.
+- **Parallel.ForEach Use Case**: CPU-bound work that benefits from multi-core parallelism (data processing, calculations).
+- **Key Distinction**: WhenAll releases threads while waiting; ForEach keeps threads engaged for computation.
+
 ```csharp
 // Task.WhenAll — async I/O operations in parallel — threads released during waits
 // Capital Access: Report Worker aggregates data from 4 services simultaneously
@@ -2104,6 +2191,13 @@ Parallel.ForEach(companyIds, async id =>
 ---
 
 ### Q17. [Topic: C#] [EPAM] What is the IDisposable pattern? Why is it needed? Explain using, destructor, and GC.SuppressFinalize.
+
+**Definition**:
+- **IDisposable Pattern**: A pattern for deterministically releasing unmanaged resources (database connections, files, network handles) by implementing the `IDisposable` interface and `Dispose()` method.
+- **using Statement**: Calls `Dispose()` automatically when exiting the using block, ensuring cleanup even if exceptions occur.
+- **Destructor (~ClassName)**: Called by the GC, but timing is unpredictable; should not be relied upon for timely resource cleanup.
+- **GC.SuppressFinalize**: Tells the GC to skip the destructor since `Dispose()` already cleaned up resources, improving GC performance.
+- **Best Practice**: Implement IDisposable, provide a using statement or try/finally with Dispose(), and call GC.SuppressFinalize in Dispose().
 
 **The problem:** The GC handles managed memory automatically. But some objects hold **unmanaged resources** — database connections, file handles, HTTP clients, network sockets. The GC doesn't know how to clean these up. You must do it explicitly.
 
@@ -2197,6 +2291,14 @@ var results = await context.EngagementActivities.ToListAsync();
 
 ### Q18. [Topic: C#] [EPAM] What is managed vs unmanaged memory? How does the GC work (Gen 0, 1, 2)?
 
+**Definition**:
+- **Managed Memory**: Memory controlled by the .NET GC; objects are allocated on the heap and automatically freed when unreachable.
+- **Unmanaged Memory**: Memory not controlled by the GC; must be explicitly freed (native pointers, COM objects, handles); includes LOH (Large Object Heap) for objects >85KB.
+- **Gen 0**: Newest objects; collected first; smallest and fastest collection.
+- **Gen 1**: Objects that survived one Gen 0 collection; intermediate promotion stage.
+- **Gen 2**: Long-lived objects; collected least frequently; includes singletons and static data.
+- **Large Object Heap (LOH)**: Objects >85KB; managed separately; use ArrayPool to avoid LOH allocations for buffers.
+
 **Managed memory** = memory the .NET GC controls. You allocate objects; GC cleans them up automatically when they have no more references.
 
 **Unmanaged memory** = memory outside the GC. Database connections, file handles, network sockets, native Windows API handles. Must be cleaned up manually via IDisposable.
@@ -2237,6 +2339,12 @@ finally { ArrayPool<byte>.Shared.Return(buffer); } // back to pool — no GC nee
 ---
 
 ### Q19. [Topic: C#] [EPAM] What is a deadlock? How do you avoid it in .NET?
+
+**Definition**:
+- **Deadlock**: A situation where two or more threads each hold a resource the other needs and both wait indefinitely, freezing the application.
+- **Root Cause**: Circular lock dependency; Thread A locks X and waits for Y; Thread B locks Y and waits for X.
+- **Prevention Strategies**: (1) Always acquire locks in the same order across all threads; (2) Use timeouts on lock acquisition; (3) Avoid nested locks; (4) Use ReaderWriterLockSlim or async/await instead of blocking locks.
+- **Detection in Capital Access**: Use thread dumps (diagnostic tools) or use ReaderWriterLockSlim with timeout to fail fast if deadlock threatens.
 
 **Deadlock:** Two or more threads each hold a resource the other needs — both wait forever, neither can proceed.
 
@@ -2317,6 +2425,13 @@ await Task.WhenAll(tasks); // 10 at a time, not 2500 simultaneously ✅
 
 ### Q20. [Topic: C#] [EPAM] Is async/await always safe? What problems can it cause?
 
+**Definition**:
+- **SynchronizationContext Mismatch**: Awaiting an async method without .ConfigureAwait(false) can cause deadlock if the sync context is blocked; always use .ConfigureAwait(false) in libraries.
+- **Async All The Way**: Mixing blocking code (Task.Result, Task.Wait) with async causes threadpool starvation; if you go async, stay async.
+- **Exception Handling**: Async void methods hide exceptions; only use async void for event handlers; always return Task or Task<T>.
+- **Cancellation**: Async operations must properly handle CancellationToken to support graceful shutdown; use CancellationTokenSource carefully.
+- **Capital Access Risk**: Awaiting operations without .ConfigureAwait(false) in shared services could deadlock the entire system under high load.
+
 async/await is the right tool for I/O-bound work, but has specific failure modes:
 
 ```csharp
@@ -2371,6 +2486,13 @@ var tasks = companies.Select(c => _api.GetScoreAsync(c.Id)); // 2500 at once ❌
 
 ### Q21. [Topic: C#] Records — Immutable Data Carriers
 
+**Definition**:
+- **Records**: Reference types (C# 9+) designed for immutability; auto-generate constructor, Equals, GetHashCode, ToString, and deconstruction.
+- **Immutability**: init-only properties prevent modification after construction; suitable for DTOs and domain value objects.
+- **Value Equality**: Records compare by value (all properties), not by reference; two records with same values are equal.
+- **Deconstruction**: Auto-generated `Deconstruct()` method allows unpacking: `var (name, age) = person;`.
+- **Use in Capital Access**: Perfect for request/response DTOs, immutable domain events, and cached data structures.
+
 Records (C# 9+) auto-generate: constructor, property getters, Equals by value, GetHashCode, ToString, and deconstruction.
 
 ```csharp
@@ -2402,6 +2524,13 @@ public record OwnershipChangedEvent(string EventId, string CompanyId, decimal Ne
 ---
 
 ### Q22. [Topic: C#] Extension Methods — Add Methods Without Modifying a Type
+
+**Definition**:
+- **Extension Methods**: Static methods defined in static classes that "extend" an existing type by adding new methods via the `this` keyword on the first parameter.
+- **Syntax**: `public static ReturnType MethodName(this ExistingType obj, ...)` in a static class.
+- **Benefit**: Add functionality to classes you don't own or can't modify (framework classes, third-party types) without inheritance or wrapper classes.
+- **Scope**: Visible only if the static class namespace is imported (using statement).
+- **Capital Access Example**: `activity.IsOverdue()` extends EngagementActivity without modifying the original class.
 
 ```csharp
 // Must be in a static class. Method must be static. First param is 'this Type'.
@@ -2451,6 +2580,14 @@ var results = await _context.EngagementActivities
 
 ### Q23. [Topic: C#] Delegates, Func\<>, Action\<> — Passing Behaviour as a Parameter
 
+**Definition**:
+- **Delegate**: A type-safe function pointer; a reference type that holds a reference to a method with a matching signature.
+- **Action<T>**: A delegate with parameters but no return value (void); used for callbacks.
+- **Func<T, TResult>**: A delegate with parameters and a return value; the last type parameter is always the return type.
+- **Use Case**: Passing behavior as a parameter (callbacks, event handlers, LINQ predicates like `.Where(x => x > 5)`).
+- **Capital Access**: Event handlers subscribe to domain events using delegates; LINQ queries use Func<T, bool> predicates for filtering.
+- **Modern Alternative**: Lambda expressions and Action/Func largely replace custom delegate declarations.
+
 ```csharp
 // DELEGATE — a type that holds a reference to a method (type-safe function pointer)
 public delegate bool EngagementFilter(EngagementActivity activity);
@@ -2490,6 +2627,13 @@ var highPriority = Filter(activities, a => a.AttendeeCount > 10);
 
 ### Q24. [Topic: C#] readonly vs const vs static readonly
 
+**Definition**:
+- **const**: Compile-time constant; value is baked into the compiled IL; must be primitive or string; per-instance (not shared).
+- **readonly**: Instance field that can be assigned only in the constructor or field initializer; prevents modification after initialization.
+- **static readonly**: Class-level field assigned once at runtime (in static constructor or inline); shared across all instances; any type allowed.
+- **Performance**: const is fastest (no runtime lookup); readonly and static readonly have minimal overhead (field access).
+- **Use**: const for fixed values (MaxRetries = 3); readonly for instance-specific immutable data; static readonly for shared configuration.
+
 ```csharp
 public class EngagementService
 {
@@ -2520,6 +2664,13 @@ public class EngagementService
 ```
 
 ### Q25. [Topic: C#] ref, out, in Parameters — Pass by Reference
+
+**Definition**:
+- **ref**: Passes a variable by reference; method can read AND write the original variable; variable must be initialized before passing.
+- **out**: Passes a variable by reference; method MUST assign a value before returning; used for methods that return multiple values.
+- **in**: Passes a variable by reference; method can ONLY read (read-only); prevents accidental modification; optimizes struct copying.
+- **Use Case**: ref/out for methods that need to modify caller's variables (TryParse, Swap); in for large structs to avoid copying overhead.
+- **Capital Access**: TryGetDictionary(out var data) returns success flag and data; Swap(ref x, ref y) exchanges values efficiently.
 
 ```csharp
 // ref — caller passes variable BY REFERENCE. Method can READ and WRITE the original.
@@ -2569,6 +2720,14 @@ CalculateScore(in m); // passed by reference, no copy, cannot be modified ✅
 ---
 
 ### Q26. [Topic: C#] Pattern Matching — switch expressions, property patterns
+
+**Definition**:
+- **Pattern Matching**: Destructuring and matching data structures against patterns; available via `is`, switch expressions (C# 8+).
+- **switch expressions**: Expression form of switch (not statement); each arm evaluates to a value; more concise than switch statements.
+- **Property Patterns**: Match based on object properties; e.g., `obj is { Name: "John", Age: > 18 }`.
+- **Type Patterns**: `obj is EngagementActivity activity` combines type check and variable assignment.
+- **Relational Patterns**: `x is > 100 and < 200` checks ranges; readable alternative to compound conditions.
+- **Capital Access**: Match on engagement status and properties to handle reporting logic; cleaner than nested if/else.
 
 ```csharp
 // IS PATTERN — type check + variable declaration in one line
@@ -2632,6 +2791,14 @@ public IReportGenerator SelectGenerator(ReportRequest req) => req switch
 ---
 
 ### Q27. [Topic: C#] Memory Leaks in .NET — Causes and How to Find Them
+
+**Definition**:
+- **Memory Leak in .NET**: Objects remain reachable (referenced) even though no longer needed; the GC cannot collect them because live references still exist.
+- **Root Cause 1 — Event Handler**: Subscriber subscribes to publisher's event but doesn't unsubscribe; publisher keeps subscriber alive forever.
+- **Root Cause 2 — Static References**: Static fields holding references to objects prevent GC collection; static state persists for app lifetime.
+- **Root Cause 3 — Circular References in Managed Code**: Two objects reference each other; GC can handle this, so actual leaks are rare.
+- **Root Cause 4 — Unmanaged Resources Not Freed**: If IDisposable not called, unmanaged handles remain open (file, connection, socket).
+- **Detection Tools**: .NET Memory Profiler (VS), dotMemory, Event Tracing for Windows (ETW), app performance counters.
 
 Even with a GC, memory leaks happen when objects stay reachable (referenced) but are no longer needed. GC cannot collect objects that still have references.
 
@@ -2742,6 +2909,14 @@ instances that should have been collected but are still referenced
 
 ### Q28. [Topic: C#] TaskCompletionSource — Bridging Callbacks to async/await
 
+**Definition**:
+- **TaskCompletionSource<T>**: A mechanism to manually control when a Task<T> completes; bridges callback-based APIs to async/await.
+- **Use Case**: Wrapping callbacks (timers, events, async SDK methods) into a Task so they can be awaited.
+- **SetResult(T)**: Completes the Task with a successful value.
+- **SetException(Exception)**: Completes the Task with an exception.
+- **SetCanceled()**: Completes the Task with cancellation.
+- **Capital Access**: Wrapping Service Bus callbacks or third-party event subscriptions into awaitable Tasks for report generation.
+
 `TaskCompletionSource<T>` lets you manually control when a Task completes. It bridges old callback-based or event-based APIs with the modern async/await model.
 
 ```csharp
@@ -2819,6 +2994,14 @@ tcs.TrySetCanceled();
 
 ### Q29. [Topic: C#] How was DI implemented before .NET Core? (.NET Framework 4.7)
 
+**Definition**:
+- **.NET Framework 4.7**: No built-in DI container; required third-party IoC (Inversion of Control) libraries.
+- **Popular IoC Containers**: Unity (Microsoft's), Autofac (most popular), Ninject, Castle Windsor, StructureMap.
+- **Manual Setup**: Each container had its own configuration API (XML or code-based); registration of services, factory methods, lifetime management.
+- **Service Locator Anti-Pattern**: Many .NET Framework apps used static service locator to retrieve dependencies (harder to test, tightly coupled).
+- **Migration to .NET Core**: Built-in DI (IServiceCollection, IServiceProvider) in Program.cs; simpler, no external dependencies.
+- **Learning Point**: Understanding legacy DI helps appreciate .NET Core's integrated approach.
+
 .NET Framework 4.7 had **no built-in DI container**. Teams used third-party IoC containers:
 
 ```
@@ -2884,6 +3067,14 @@ builder.Services.AddTransient<IEmailFormatter, HtmlEmailFormatter>();
 ---
 
 ### Q30. [Topic: C#] Default Interface Methods vs Abstract Class (C# 8+)
+
+**Definition**:
+- **Default Interface Methods (C# 8+)**: Interfaces can now provide default implementations; allows adding new methods to an interface without breaking existing implementations.
+- **Advantages**: Backward compatibility; mix of contract and implementation; allows incremental API evolution.
+- **Abstract Class**: Base class for shared implementation; forces inheritance; all subclasses inherit behavior.
+- **When to Use Interface**: Focus on contracts; multiple implementations of the same interface; mixin-like behavior.
+- **When to Use Abstract Class**: Shared state (fields), constructor logic, access modifiers (protected), single inheritance fits the design.
+- **Capital Access**: IReportGenerator with default method for ToString(); allows old implementations to still work.
 
 **Default interface methods** (C# 8+) allow an interface to provide a default implementation for a method, so existing implementations don't break when a new method is added.
 
@@ -2973,6 +3164,13 @@ public interface IExportable
 
 ### Q31. Explain Garbage Collector (GC)?
 
+**Definition**:
+- **Garbage Collector (GC)**: A component of the .NET CLR that automatically manages heap memory; allocates when objects are created and reclaims memory when objects become unreachable.
+- **Key Benefit**: Eliminates manual memory management (malloc/free); prevents memory leaks from forgotten deallocations.
+- **How It Works**: Traces object graph from root references (stack, static fields) to find live objects; deallocates unreachable objects.
+- **Generations**: Organizes heap into generations (Gen 0, 1, 2) to optimize collection frequency for short-lived vs long-lived objects.
+- **Pause Behavior**: Stops the application briefly during collection (STW — Stop-The-World); background GC in .NET Core minimizes pauses.
+
 The **Garbage Collector** is a part of the .NET CLR (Common Language Runtime) that automatically manages memory on the **managed heap**. It allocates memory when you create objects and reclaims memory when objects are no longer needed — freeing you from manual `malloc`/`free` calls (like C/C++).
 
 ```csharp
@@ -2997,6 +3195,13 @@ delete a;                                          // manual cleanup — forget 
 ---
 
 ### Q32. How Does the GC Know When to Clean Objects?
+
+**Definition**:
+- **Reachability Analysis**: The GC algorithm traces from root references; any object reachable from roots is live; unreachable objects are garbage.
+- **GC Roots**: Starting points for tracing: stack local variables, static fields, CPU registers, pinned GC handles.
+- **Mark Phase**: GC walks the object graph, marking all reachable objects.
+- **Sweep Phase**: Any unmarked object is deallocated and heap memory is reclaimed.
+- **Reference Counting Alternative**: Not used in .NET; uses mark-and-sweep/generational collection instead (more efficient, handles cycles better).
 
 The GC uses **reachability analysis** — not reference counting. It traces from **GC Roots** and marks every object it can reach. Anything NOT reachable = garbage = collected.
 
@@ -3033,6 +3238,13 @@ public static class Cache
 ---
 
 ### Q33. Is There a Way to See the Heap Memory?
+
+**Definition**:
+- **dotnet-counters**: CLI tool for real-time GC metrics (heap size, collection frequency, pause time).
+- **dotnet-dump**: Captures heap snapshots for offline analysis; allows inspecting object types, sizes, and retention paths.
+- **dotnet-trace**: Records GC events and performance data for detailed profiling.
+- **Visual Studio Diagnostics**: Memory profiler with heap snapshots and timeline view.
+- **App Insights**: Production monitoring with GC Gen2 collections, memory trends, custom metrics.
 
 Yes — multiple tools at different levels:
 
@@ -3079,6 +3291,13 @@ int gen2Collections = GC.CollectionCount(2); // if this is high → memory press
 
 ### Q34. Does GC Clean Primitive Types?
 
+**Definition**:
+- **Primitives on Stack**: Primitives (int, decimal, bool) as local variables live on the stack; automatically reclaimed when method returns.
+- **Primitives in Objects**: Primitives as fields within objects live on the heap inside the object; reclaimed when the object is collected.
+- **GC Not Involved for Stack**: Stack memory is managed by CPU (ESP/RSP register); GC only manages heap.
+- **Key Point**: The primitive's value is irrelevant; only its location (stack vs heap) matters for GC.
+- **Performance Implication**: Primitives on stack are "free" to reclaim; no GC pressure.
+
 **It depends on where they live:**
 
 ```csharp
@@ -3110,6 +3329,14 @@ object boxed = 42;  // int boxed → on heap → GC manages this
 ---
 
 ### Q35. Managed vs Unmanaged Code/Objects/Resources?
+
+**Definition**:
+- **Managed Code**: C#, VB.NET, F# code compiled to IL running under CLR; memory managed by GC.
+- **Managed Objects**: .NET class instances allocated on managed heap; GC is responsible for deallocation.
+- **Unmanaged Code**: Native code (C, C++) or P/Invoke calls; runs outside CLR control.
+- **Unmanaged Resources**: OS-level resources (file handles, sockets, database connections, COM objects) not managed by GC.
+- **Mixed Code**: Many .NET classes wrap unmanaged resources (SqlConnection wraps OS handle); GC cleans the wrapper but not the handle.
+- **Key Point**: Must implement IDisposable to manually clean unmanaged resources.
 
 ```
 MANAGED CODE / OBJECTS
@@ -3148,6 +3375,13 @@ var connection = new SqlConnection(connectionString); // wraps OS connection han
 
 ### Q36. Can GC Clean Unmanaged Code?
 
+**Definition**:
+- **Direct Cleanup**: GC cannot directly clean unmanaged resources (OS handles, file descriptors, native memory).
+- **Indirect Cleanup via Finalizers**: GC can trigger finalizer/destructor when the managed object is collected; finalizer can manually release unmanaged resources.
+- **Timing Issue**: Finalization is unpredictable; unmanaged resources may remain open longer than necessary.
+- **Best Practice**: Use IDisposable and explicit Dispose() to release unmanaged resources promptly; finalizer as a safety net.
+- **Capital Access**: SqlConnection.Dispose() releases OS connection handle; must be called explicitly for timely cleanup.
+
 **No — GC cannot clean unmanaged resources.** GC only manages the managed heap. It has no visibility into OS handles, file descriptors, or native memory.
 
 However, GC **triggers cleanup indirectly** through the **finalizer/destructor**:
@@ -3171,6 +3405,13 @@ public class SqlEngagementRepository
 
 ### Q37. Explain Generations?
 
+**Definition**:
+- **Generational Hypothesis**: Most objects die young (80–90%); only small fraction live long-term.
+- **Generational Garbage Collection**: Organizes heap into generations (Gen 0, 1, 2) to exploit this pattern.
+- **Benefit**: Collect young objects frequently and cheaply; collect old objects rarely.
+- **Promotion**: Objects that survive a collection are promoted to the next generation.
+- **Large Object Heap (LOH)**: Objects >85KB stored separately; collected with Gen 2 to avoid heap fragmentation.
+
 The managed heap is divided into **generations** based on the **Generational Hypothesis**: *most objects die young*.
 
 Research shows: in typical applications, 80–90% of objects are short-lived — created for one operation and immediately garbage. Only a small fraction live for the entire app lifetime.
@@ -3187,6 +3428,13 @@ Large Object Heap     → objects > 85KB, collected with Gen 2
 ---
 
 ### Q38. What is GC0, GC1, and GC2?
+
+**Definition**:
+- **Gen 0**: Newest objects (few MB); collected most frequently (<1ms); short-lived (request DTOs, temp strings, LINQ results).
+- **Gen 1**: Objects that survived Gen 0 collection; intermediate tier; buffer layer; less frequently collected.
+- **Gen 2**: Long-lived objects (survived Gen 0+Gen 1); collected rarely during heap pressure (10-100ms+); includes singletons, caches, static config.
+- **Large Object Heap (LOH)**: Objects >85KB; collected with Gen 2; prevents fragmentation by separate management.
+- **Collection Trigger**: Gen 0 collected when it reaches size threshold; Gen 1/2 collected on pressure or explicitly.
 
 ```
 GEN 0
@@ -3229,6 +3477,13 @@ finally { ArrayPool<byte>.Shared.Return(buffer); } // no GC cycle needed
 
 ### Q39. Why Do We Need Generations?
 
+**Definition**:
+- **Purpose**: Optimize GC efficiency by targeting short-lived objects frequently and long-lived objects rarely.
+- **Without Generations**: Scanning entire heap every collection = expensive, frequent multi-second pauses.
+- **With Generations**: Gen 0 (few MB, 90% die) collected frequently (<1ms); Gen 2 (full heap) collected rarely; massive throughput improvement.
+- **Gen 1 as Buffer**: Gives medium-lived objects (100s of ms) one more chance to die before Gen 2 promotion.
+- **Result**: Thousands of cheap Gen 0 collections between expensive Gen 2 collections.
+
 **Without generations — one big heap, one expensive GC:**
 ```
 Every GC run → scan ALL live objects on the entire heap
@@ -3251,6 +3506,13 @@ Medium-lived objects (live a few hundred ms, then die) would skip straight to Ge
 ---
 
 ### Q40. Which Is the Best Place to Clean Unmanaged Objects?
+
+**Definition**:
+- **Primary**: Dispose() method via IDisposable pattern; called immediately when done with resource; deterministic cleanup.
+- **Trigger**: using statement/declaration ensures Dispose() is called even if exceptions occur (automatic in try/finally).
+- **Backup**: Finalizer (~destructor) as safety net if Dispose() forgotten; timing is unpredictable; should only clean unmanaged resources.
+- **Pattern**: Dispose() cleans managed and unmanaged; finalizer only needed if Dispose() not called.
+- **Call GC.SuppressFinalize(this)**: In Dispose() to skip finalizer since resources already cleaned.
 
 **The `Dispose()` method via the IDisposable pattern — always.**
 
@@ -3281,6 +3543,13 @@ using var context = new EngagementDbContext(options);       // released immediat
 ---
 
 ### Q41. How Does GC Behave When We Have a Destructor?
+
+**Definition**:
+- **Without Finalizer**: Unreachable object → immediately collected (one GC cycle).
+- **With Finalizer**: Unreachable object → placed on Finalization Queue → Finalizer Thread runs finalizer → then collected (two GC cycles, delayed).
+- **Finalization Queue**: Queue of objects waiting for finalization; separate finalizer thread processes them asynchronously.
+- **Performance Cost**: Objects with finalizers survive one extra GC cycle; heap pressure increases; throughput decreases.
+- **Best Practice**: Avoid finalizers; use IDisposable instead; finalizers only as backup for unmanaged cleanup.
 
 Objects with a destructor (finalizer) go through a **two-step collection process**:
 
@@ -3323,6 +3592,13 @@ public class ExpensiveResource : IDisposable
 
 ### Q42. What Do You Think About an Empty Destructor?
 
+**Definition**:
+- **Empty Destructor**: A finalizer that does nothing; adds finalization overhead with zero benefit.
+- **Cost**: Object goes through Finalization Queue and waits for Finalizer Thread; delays collection; increases GC pressure.
+- **Why Harmful**: Even an empty finalizer prevents immediate collection; must survive Gen 1/Gen 2; memory leak potential.
+- **Rule**: Only write a finalizer if you're releasing unmanaged resources; otherwise avoid entirely.
+- **Red Flag in Code Review**: If a destructor exists but doesn't call cleanup code, it's dead code — remove it.
+
 **An empty destructor is actively harmful — never write one.**
 
 ```csharp
@@ -3350,6 +3626,14 @@ With empty destructor:
 ---
 
 ### Q43. Explain the Dispose Pattern?
+
+**Definition**:
+- **Dispose Pattern**: Standard pattern for releasing managed and unmanaged resources; implements IDisposable with Dispose() and optional finalizer.
+- **Implementation**: Dispose(bool disposing) with conditional cleanup; Dispose() calls Dispose(true); finalizer calls Dispose(false).
+- **Managed Cleanup**: Dispose(true) releases managed objects (SqlConnection, DbContext) and calls their Dispose().
+- **Unmanaged Cleanup**: Both Dispose(true) and Dispose(false) can release unmanaged resources (handles, native pointers).
+- **GC.SuppressFinalize**: Called in public Dispose() to skip finalizer since resources already cleaned.
+- **Pattern Ensures**: Deterministic cleanup via using statement; fallback via finalizer if Dispose() forgotten.
 
 The full Dispose pattern safely handles both managed and unmanaged resource cleanup, with a finalizer as a safety net:
 
@@ -3406,6 +3690,13 @@ public class EngagementExporter : IDisposable
 
 ### Q44. Finalize vs Destructor?
 
+**Definition**:
+- **Destructor (~ClassName)**: C# syntax for defining finalization logic; what developers write.
+- **Finalize()**: The method the compiler generates; override of Object.Finalize(); what the CLR calls.
+- **Same Mechanism**: Compiler converts `~ClassName()` into `protected override void Finalize()` with try/finally.
+- **Timing**: GC calls Finalize() when object is unreachable (non-deterministic).
+- **Rule**: Destructor = method written by developer; Finalize = generated CLR method; they're the same concept with different naming.
+
 They are the **same thing** in C# — different names for the same mechanism.
 
 ```csharp
@@ -3445,6 +3736,13 @@ protected override void Finalize()
 
 ### Q45. What Is the Use of the `using` Keyword?
 
+**Definition**:
+- **using Statement**: Syntactic sugar for try/finally; ensures Dispose() is called on the resource even if an exception occurs.
+- **using Declaration (C# 8+)**: Resource scope ends at end of method; cleaner syntax (no braces).
+- **Compiler Transformation**: Generates try/finally; Dispose() in finally block guarantees execution.
+- **Benefit**: Eliminates manual try/finally boilerplate; exception-safe resource cleanup.
+- **Multiple Resources**: Can nest or use multiple using declarations in one method.
+
 ```csharp
 // USING STATEMENT — ensures Dispose() is called even if exception occurs
 // Compiler generates try/finally behind the scenes
@@ -3481,6 +3779,13 @@ using Microsoft.EntityFrameworkCore;
 
 ### Q46. Can You Force the Garbage Collector?
 
+**Definition**:
+- **GC.Collect()**: Static method to force a full garbage collection immediately; blocks until collection completes.
+- **Syntax**: `GC.Collect()` (all generations) or `GC.Collect(2)` (Gen 0, 1, 2 only); `GC.Collect(2, GCCollectionMode.Forced)` (ignore Concurrent GC).
+- **Blocking**: Synchronous call; STW (Stop-The-World) pause; can be 10-100ms+.
+- **When to Use**: Very rare; only in production shutdown/cleanup scenarios or testing diagnostics.
+- **Anti-Pattern**: Using in hot paths or request handlers; destroys throughput and introduces unpredictable latency.
+
 Yes — `GC.Collect()`:
 
 ```csharp
@@ -3512,6 +3817,13 @@ GC.Collect(); // second collect picks up objects whose finalizers just ran
 ---
 
 ### Q47. Is It a Good Practice to Force GC?
+
+**Definition**:
+- **Production Code**: NO — avoid GC.Collect() in production; trust the adaptive GC scheduler; manual collection introduces unpredictable latency.
+- **Testing/Diagnostics**: OK — forcing collection before heap snapshots or performance tests to get clean baselines.
+- **Shutdown Scenarios**: MAYBE — flushing before process exit; acceptable since shutdown pause doesn't affect users.
+- **Performance Cost**: Full GC pause of 10-100ms can cause request timeouts, SLA violations, bad UX.
+- **Rule**: If you find yourself calling GC.Collect(), check for memory leaks or object churn instead of masking with forced collection.
 
 **Almost never — and definitely not in production request handling.**
 
@@ -3546,6 +3858,14 @@ var snapshot = TakeHeapSnapshot(); // now snapshot reflects true live objects
 ---
 
 ### Q48. How Can We Detect Memory Issues?
+
+**Definition**:
+- **App Insights**: Monitor managed heap size, Gen2 collection frequency, custom metrics; set alerts on heap > 1.5GB threshold.
+- **Performance Counters**: Windows/Linux system metrics for process memory, GC pauses, collection rates.
+- **dotnet-counters**: CLI tool for real-time GC stats; run `dotnet-counters monitor --process-id <pid> System.Runtime`.
+- **Memory Profiler**: VS Diagnostic Tools or dotMemory; snapshot-based heap analysis; visual object retention.
+- **Load Testing**: Sustained load (JMeter, k6) to expose memory issues that don't appear in unit testing.
+- **Red Flags**: Heap monotonically increasing, frequent Gen2 collections, rising memory despite low throughput.
 
 ```csharp
 // 1. From within the app — basic monitoring
@@ -3586,6 +3906,14 @@ public class MemoryHealthCheck : IHealthCheck
 ---
 
 ### Q49. How Can We Know the Exact Source of Memory Issues?
+
+**Definition**:
+- **dotnet-dump**: Captures heap snapshot from running process; offline analysis via dump analyzer.
+- **dumpheap -stat**: Lists all object types on heap with total byte count; shows what's eating memory.
+- **dumpheap -type EngagementActivity**: Finds all instances of a specific type; shows count and total memory.
+- **gcroot <object-address>**: Shows retention path — why this object is kept alive (root reference chain).
+- **Visual Studio Memory Profiler**: GUI-based heap analysis; visual object graph; retention tree.
+- **Capital Access Example**: Found 50,000 EngagementActivity instances unexpectedly cached; gcroot showed unexpected event subscription holding references.
 
 **The dotnet-dump workflow — most powerful:**
 
@@ -3631,6 +3959,13 @@ dotnet-dump analyze engagement-service.dmp
 
 ### Q50. What Is a Memory Leak?
 
+**Definition**:
+- **Memory Leak**: Memory allocated but never freed; grows over time; eventually exhausts available memory and crashes process.
+- **In Managed Code**: Objects remain reachable (referenced) even though no longer needed; GC cannot collect because live references exist.
+- **Common Causes**: Event subscriptions without unsubscribe, static caches without eviction, circular references (rare in GC), unmanaged resource handles not disposed.
+- **Symptom**: Managed heap size monotonically increases under constant load; Gen2 collections frequent but don't reduce heap size.
+- **Capital Access**: Found unsubscribed event handlers in Service Bus subscribers kept 50MB+ of EngagementActivity objects alive indefinitely.
+
 A **memory leak** occurs when memory is allocated but never freed, and the amount grows over time — eventually exhausting available memory and crashing the process.
 
 ```
@@ -3665,6 +4000,13 @@ public class NotificationPanel
 
 ### Q51. Can a .NET Application Have Memory Leaks Even With GC?
 
+**Definition**:
+- **Yes**: GC cannot collect objects that remain reachable (referenced); memory leaks occur when objects are no longer needed but still referenced.
+- **GC Limitation**: GC only manages the managed heap; cannot detect "logical" leaks (object still referenced but no longer useful).
+- **Root Causes**: Event subscriptions (publisher holds subscriber reference), static caches without eviction, circular references with finalizers, unmanaged resource handles.
+- **Unmanaged Leaks**: Even worse; unmanaged resource handles never reclaimed by GC (file, socket, connection); must be manually disposed.
+- **Capital Access**: Event handler subscriptions were the #1 memory leak cause; after subscribing, never unsubscribing meant subscribers stayed in memory forever.
+
 **Yes — absolutely.** GC only collects objects with **no references**. If your code accidentally keeps references to objects it no longer needs, GC cannot help.
 
 ```
@@ -3693,6 +4035,13 @@ private static Dictionary<string, CompanyData> _cache = new();
 ---
 
 ### Q52. How to Detect Memory Leaks in .NET Applications?
+
+**Definition**:
+- **Step 1 — Suspect**: Monitor memory growth over 2-4 hours with dotnet-counters; leak = monotonic growth that never decreases after GC.
+- **Step 2 — Identify Type**: dotnet-dump → dumpheap -stat → sort by TotalSize; identify object type with unexpected high count.
+- **Step 3 — Find Root**: gcroot <address> shows reference chain keeping object alive; identify root reference.
+- **Step 4 — Code Review**: Search for unsubscribed events, unbounded static caches, missing Dispose, closures.
+- **Step 5 — Fix & Verify**: Deploy fix → monitor 24h → confirm memory stable.
 
 ```
 STEP 1 — CONFIRM it is a leak (not just expected growth)
@@ -3731,6 +4080,13 @@ STEP 5 — FIX and VERIFY
 ---
 
 ### Q53. Explain Weak and Strong References?
+
+**Definition**:
+- **Strong Reference**: Normal reference (`var obj = new MyClass()`); keeps object alive; GC will NOT collect while strong reference exists.
+- **Weak Reference**: `WeakReference<T>` or `WeakReference`; does NOT prevent GC collection; object can be collected even if WeakReference exists.
+- **Use Case**: Caches that should allow GC to reclaim memory when needed; event handler collections that shouldn't prevent cleanup.
+- **Syntax**: `WeakReference<T> wr = new(obj);` then `if (wr.TryGetTarget(out var target)) { use target; }` — target might be null if collected.
+- **Capital Access**: Store event handlers as WeakReference in callback dictionaries to avoid memory leaks from underegistered callbacks.
 
 ```csharp
 // STRONG REFERENCE — normal reference. Keeps object alive. GC will NOT collect.
@@ -3774,6 +4130,14 @@ Weak Reference:
 ---
 
 ### Q54. When Will You Use Weak References?
+
+**Definition**:
+- **Primary Use**: Memory-sensitive caches where data can be regenerated if GC collects it.
+- **Benefit**: Cache holds data but doesn't prevent GC cleanup under memory pressure.
+- **Example**: Report PDF cache; weak references allow GC to evict PDFs when heap fills, avoiding OOM.
+- **Drawback**: Cache misses increase when GC collects; need fallback logic to regenerate data.
+- **Capital Access**: Tenant feature flag cache, report caches, computed summary objects stored as WeakReference<T>.
+- **Alternative**: IMemoryCache with expiration policy is often simpler than manual WeakReference management.
 
 **Scenario 1 — Memory-sensitive cache (most common):**
 ```csharp
@@ -3845,6 +4209,14 @@ Do NOT use WeakReference for:
 ---
 
 ### Q55. [Topic: ASP.NET Core] [EPAM] What is the request lifecycle in ASP.NET Core?
+
+**Definition**:
+- **Request Pipeline**: HTTP request flows through middleware chain (Program.cs order) in sequence.
+- **Middleware Ordering**: Custom middleware is executed in the order configured in builder.Use(); matters for logging, authentication, CORS.
+- **Endpoint Routing**: Middleware determines which controller/action or Minimal API endpoint handles the request.
+- **Execution**: Controller action or Minimal API handler executes, returning response.
+- **Response Pipeline**: Response travels back through middleware in reverse order (like onion layers).
+- **Key Point**: Middleware added earlier in Program.cs wraps later middleware; execution is nested (before → endpoint → after).
 
 Every HTTP request travels through this exact pipeline — order matters:
 
@@ -3925,6 +4297,13 @@ public async Task<IActionResult> Get(
 
 ### Q56. [Topic: ASP.NET Core] [EPAM] What is middleware? List all built-in middleware.
 
+**Definition**:
+- **Middleware**: Request/response component in the pipeline; each calls `next()` to pass control to the next middleware.
+- **Pattern**: `async (HttpContext ctx, RequestDelegate next) => { /* before */ await next(ctx); /* after */ }`.
+- **Built-in Middleware**: Authentication, CORS, Routing, Authorization, Exception Handling, Compression, Response Caching, HTTPS Redirection, Serving Static Files.
+- **Order Matters**: Middleware order in Program.cs determines execution sequence; authentication before authorization.
+- **Capital Access**: Custom middleware for tenant context extraction (middleware runs before endpoint).
+
 Middleware is a component in the request pipeline that processes requests and responses. Each middleware calls the next one, forming a chain.
 
 ```csharp
@@ -3951,6 +4330,13 @@ app.MapHealthChecks("/health")  // health check endpoint
 ---
 
 ### Q57. [Topic: ASP.NET Core] [EPAM] How do you create custom middleware? Give a real example.
+
+**Definition**:
+- **Custom Middleware**: Class with constructor taking `RequestDelegate next` and `InvokeAsync(HttpContext ctx)` method.
+- **Dependency Injection**: Middleware ctor can receive ILogger, IRepository, services; those are injected by DI.
+- **Pipeline**: Call `await next(ctx)` to pass control to next middleware; code before awaits runs before endpoint, after awaits runs after response generated.
+- **Use in Program.cs**: `app.UseMiddleware<CustomMiddleware>();` registers it in the pipeline.
+- **Capital Access Example**: Correlation ID middleware adds X-Correlation-Id header to all requests for tracing across microservices.
 
 ```csharp
 // Capital Access — Correlation ID middleware
@@ -4013,6 +4399,13 @@ public class CorrelationIdDelegatingHandler : DelegatingHandler
 
 ### Q58. [Topic: ASP.NET Core] [EPAM] Middleware vs Action Filters — difference and when to use each?
 
+**Definition**:
+- **Middleware**: Runs for every request; before routing; can access raw HttpContext; use for cross-cutting concerns (auth, logging, CORS).
+- **Action Filters**: Run after routing, before/after action execution; access ActionContext, ModelState, result; per-endpoint or global.
+- **Middleware Scope**: Entire pipeline (includes static files, health checks, 404s); cannot skip middleware for specific routes.
+- **Filter Scope**: Only controller actions or Minimal APIs with filters applied; can be selective.
+- **Choice Rule**: Middleware for global/early processing; filters for MVC-specific, action-scoped logic.
+
 | | Middleware | Action Filter |
 |---|---|---|
 | Scope | Entire pipeline — every request | MVC layer only — controller actions |
@@ -4064,6 +4457,13 @@ public class EngagementController : ControllerBase { }
 ---
 
 ### Q59. [Topic: ASP.NET Core] [EPAM] What is DI? What are service lifetimes? What is the captive dependency trap?
+
+**Definition**:
+- **Dependency Injection**: Framework creates and injects dependencies; configured in Program.cs.
+- **Transient**: New instance every time; stateless services like formatters, utilities.
+- **Scoped**: One instance per HTTP request; perfect for DbContext, repositories (isolation per request).
+- **Singleton**: One instance for app lifetime; shared state; use for caches, configuration.
+- **Captive Dependency Trap**: Scoped service injected into singleton → scoped stays alive for app lifetime (memory leak); avoid by injecting IServiceProvider into singleton to create scoped instances on-demand.
 
 **Dependency Injection** — the framework creates and injects dependencies; classes don't create their own. Wired in Program.cs.
 
@@ -4124,6 +4524,14 @@ public class ReportOrchestrator
 
 ### Q60. [Topic: ASP.NET Core] [EPAM] What is JWT authentication? Explain the full validation flow.
 
+**Definition**:
+- **JWT (JSON Web Token)**: Three-part token (Header.Payload.Signature); stateless authentication.
+- **Issuance**: Identity provider (Okta, Azure AD) validates credentials and issues JWT with claims (sub, roles, exp).
+- **Storage**: Client stores in memory (never localStorage → XSS risk).
+- **Transmission**: Client sends `Authorization: Bearer <token>` with each request.
+- **Validation**: ASP.NET Core extracts token, verifies signature (using issuer's public key), validates expiry, issues, audience, populates HttpContext.User.
+- **Authorization**: `[Authorize]` and `[Authorize(Roles = "...")]` attributes check claims from JWT.
+
 ```
 1. User logs in → Angular calls Okta /authorize
 2. Okta validates credentials → issues JWT:
@@ -4174,6 +4582,13 @@ public async Task<IActionResult> CreateEngagement([FromBody] CreateEngagementDto
 
 ### Q61. [Topic: ASP.NET Core] [EPAM] What is CORS and how do you configure it?
 
+**Definition**:
+- **CORS**: Browser security; prevents JS from calling different domain/port; requires explicit Allow-Origin headers from server.
+- **Same-Origin**: Protocol + domain + port must match (https://api.myapp.com ≠ https://myapp.com on port 3000).
+- **Configuration**: `builder.Services.AddCors()` in Program.cs; `app.UseCors("policyName")` in middleware pipeline.
+- **Policy Settings**: AllowedOrigins, AllowedMethods (GET, POST, etc.), AllowedHeaders, AllowCredentials, ExposeHeaders.
+- **Capital Access**: Allow only tenant-specific frontends, deny external origins.
+
 CORS = Cross-Origin Resource Sharing. A **browser** security mechanism that prevents JavaScript from calling a different domain than the page was served from.
 
 ```csharp
@@ -4202,6 +4617,13 @@ app.UseCors("CapitalAccessPolicy"); // before UseAuthentication
 ---
 
 ### Q62. [Topic: ASP.NET Core] [EPAM] What is your error handling strategy in .NET Core?
+
+**Definition**:
+- **Global Exception Handler**: Middleware catching all unhandled exceptions; registered first in pipeline.
+- **Structured Logging**: Log exception, stack trace, context (user, request ID) to Application Insights or Serilog.
+- **User Response**: Return user-friendly 500 response (never expose stack traces to clients); log technical details server-side.
+- **Specific Handlers**: ValidationException → 400 with model errors; UnauthorizedException → 401; ForbiddenException → 403.
+- **Capital Access**: ProblemDetails standardized error format; includes correlation ID for tracing.
 
 ```csharp
 // Global exception handler — registered FIRST in pipeline
@@ -4245,6 +4667,13 @@ public class EngagementNotFoundException : NotFoundException
 ---
 
 ### Q63. [Topic: ASP.NET Core] [EPAM] How do you validate models in ASP.NET Core?
+
+**Definition**:
+- **Data Annotations**: `[Required]`, `[StringLength]`, `[Range]`, `[EmailAddress]` attributes on DTO properties; automatic validation.
+- **ModelState**: Controller receives `ModelState.IsValid`; if false, ASP.NET Core auto-returns 400 with errors.
+- **FluentValidation**: Library for complex, reusable validators; separate Validator classes for each DTO.
+- **Custom Validators**: Implement `IValidatableObject` or custom `IAsyncValidator` for complex business rules.
+- **Capital Access**: Each DTO has a FluentValidator checking business constraints (e.g., engagement date > today).
 
 ```csharp
 // Data annotations on DTO
