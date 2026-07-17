@@ -5276,6 +5276,8 @@ Attack 2 — Valid enterprise tenant hammering reports:
 
 ### Q75. What is EF Core and why use it?
 
+**Definition**: ORM mapping .NET objects to relational database. **Why**: (1) No SQL strings (parameterized automatically); (2) LINQ querying; (3) Change tracking; (4) Migrations for schema evolution; (5) Lazy/eager loading; (6) Database-agnostic (swappable). **Capital Access**: All queries through EngagementDbContext; automatic parameter binding prevents SQL injection.
+
 EF Core is an **Object-Relational Mapper** — it maps your C# classes to database tables and lets you query and update data using C# instead of raw SQL. You work with strongly-typed C# objects, and EF Core translates your LINQ queries into the correct SQL for your database — SQL Server, PostgreSQL, SQLite, etc.
 
 The benefit is productivity and safety. You get compile-time checking on your queries, no raw SQL string concatenation, automatic change tracking, and built-in protection against SQL injection since all values are parameterized. In Capital Access, the Engagement/Activity service uses EF Core 8 with Azure SQL — every database operation goes through EF Core.
@@ -5306,6 +5308,8 @@ public class CapitalAccessDbContext : DbContext
 
 ### Q76. Code-First vs Database-First in EF Core?
 
+**Definition**: **Code-First**: Define entities in C#, generate database via Migrations (preferred, version-controlled schema). **Database-First**: Existing database, scaffold entities via `dotnet ef dbcontext scaffold`. **Choice**: Code-First for greenfield projects, Database-First for legacy apps. **Capital Access**: Pure Code-First; DbContext and entities define schema; Migrations track changes in git.
+
 **Code-First** — you write C# entity classes, and EF Core generates the database schema from them via migrations. You own the schema. Migrations are tracked in git alongside code. This is the standard for greenfield projects.
 
 **Database-First** — the database already exists (owned by a DBA), and you scaffold C# classes from it using the EF Core CLI. You do NOT manage the schema — you just consume it.
@@ -5334,6 +5338,8 @@ dotnet ef dbcontext scaffold "Server=...;Database=CA" \
 
 ### Q77. What is the N+1 problem and how do you fix it?
 
+**Definition**: Loading parent (1 query) then child per parent (N queries) = N+1 queries. **Example**: Load 100 engagements (1 query) + load attendees per engagement (100 queries) = 101 queries. **Fix**: Use `.Include(x => x.Attendees)` for eager loading in single query. **Capital Access**: Always identify Engagement→Attendees relationships upfront; use Include or AsNoTracking depending on read-only vs updates.
+
 The N+1 problem is one of the most common EF Core performance bugs. It happens when you load a list of entities and then access a navigation property on each one — EF Core fires a separate SQL query for each row. So if you load 100 engagements and access `e.Company.Name` on each, you fire 1 query to get the engagements plus 100 more to get each company — 101 queries total.
 
 The fix is **eager loading** with `Include()` — EF Core writes a single SQL JOIN query that fetches everything in one round trip. In Capital Access, we caught an N+1 in the engagement list endpoint during load testing — it was making 500 queries per page. Adding `Include()` collapsed it to 1.
@@ -5360,6 +5366,8 @@ var list = await _context.EngagementActivities
 ---
 
 ### Q78. What is AsNoTracking and when do you use it?
+
+**Definition**: Disables change tracking for entities; reduces memory; faster. **When**: Read-only queries (reporting, list views); never for updates. **Trade-off**: Can't call SaveChanges on untracked entities. **Capital Access**: Reports and list pages use `.AsNoTracking()`, detail/edit pages don't (need tracking for SaveChanges).
 
 By default, EF Core tracks every entity it loads — it takes a snapshot of the original values so it can detect changes and generate UPDATE statements when you call `SaveChanges()`. This tracking has a memory and CPU cost.
 
@@ -5396,6 +5404,8 @@ await _context.EngagementActivities
 
 ### Q79. What are the top EF Core performance rules?
 
+**Definition**: (1) Use `.Include()` to fix N+1; (2) `.AsNoTracking()` for read-only; (3) `.Select()` to fetch only needed columns; (4) Batch updates with `ExecuteUpdate()`; (5) Avoid `.ToList().Where()` (runs in-memory); (6) Use `INNER JOIN` via navigation properties, not cross-join; (7) Pagination `.Skip().Take()`; (8) SQL logging in dev to catch bad queries.
+
 Five rules that matter most in production:
 
 1. **Always use `AsNoTracking()` on read-only queries** — removes snapshot overhead
@@ -5423,6 +5433,8 @@ var pending = await _context.EngagementActivities
 
 ### Q80. What is LINQ and what are method vs query syntax?
 
+**Definition**: LINQ (Language Integrated Query) unified API for querying collections/databases. **Query Syntax**: `from x in list where x.Age > 18 select x` (SQL-like). **Method Syntax**: `list.Where(x => x.Age > 18).Select(x => x.Name)` (functional). **Both equivalent**: Compiler converts query to method syntax. **Preference**: Method syntax for straightforward, query syntax for complex joins.
+
 LINQ is a feature of C# that lets you query collections — arrays, lists, database tables — using a consistent syntax that works the same whether the data is in memory or in a database. It integrates querying directly into the C# language with full IntelliSense and compile-time type checking.
 
 There are two syntaxes: **method syntax** uses extension methods chained together — this is what you use in practice. **Query syntax** looks like SQL — useful for understanding but rarely used in modern C# code. Both produce identical results.
@@ -5446,6 +5458,8 @@ var result = from e in _context.EngagementActivities
 ---
 
 ### Q81. What is deferred vs immediate execution in LINQ?
+
+**Definition**: **Deferred**: `.Where()`, `.Select()` don't execute until `.ToList()`, `.First()`, or foreach. **Immediate**: `.ToList()`, `.Count()`, `.Any()`, `.First()` execute the query NOW. **Example**: `var q = list.Where(x => x.Age > 18);` doesn't filter yet; `var l = q.ToList();` filters. **Gotcha**: If list changes between Where() and ToList(), results differ.
 
 This is the most important LINQ concept. When you write a LINQ query, **nothing executes immediately** — the query is just a description. It only runs when you **force execution** by calling `.ToList()`, `.Count()`, `.FirstOrDefault()` etc. This is called deferred execution.
 
@@ -5471,6 +5485,8 @@ var results = await q.AsNoTracking().ToListAsync();  // ONE SQL query with all f
 ---
 
 ### Q82. IQueryable vs IEnumerable — what is the difference?
+
+**Definition**: **IEnumerable**: In-memory enumeration; all items loaded. **IQueryable**: Deferred; builds expression tree; translated to SQL. **Impact**: IEnumerable.Where() filters in C# (all data loaded); IQueryable.Where() filters in database (only matching rows). **Rule**: Use IQueryable for EF Core (database filtering), IEnumerable for in-memory LINQ (LINQ-to-Objects).
 
 `IQueryable` keeps the query in SQL — any further filters you add are translated to SQL and run in the database. `IEnumerable` brings all data into C# memory first — any further filters run in C# on the already-loaded data.
 
@@ -5500,6 +5516,8 @@ var result = e.Where(x => x.AttendeeCount > 10).ToList(); // filtered in C# ❌
 ---
 
 ### Q83. What are the key LINQ operators?
+
+**Definition**: **Filtering**: `.Where()`, `.Distinct()`, `.OfType<T>()`. **Transformation**: `.Select()`, `.SelectMany()`. **Aggregation**: `.Sum()`, `.Count()`, `.Average()`, `.Min()`, `.Max()`. **Ordering**: `.OrderBy()`, `.ThenBy()`, `.Reverse()`. **Joining**: `.Join()`, `.GroupJoin()`. **Grouping**: `.GroupBy()`. **Set ops**: `.Union()`, `.Intersect()`, `.Except()`. **Limiting**: `.Take()`, `.Skip()`, `.TakeWhile()`. **Inspection**: `.Any()`, `.All()`, `.First()`, `.FirstOrDefault()`, `.Single()`.
 
 ```csharp
 // FILTERING
@@ -5557,6 +5575,8 @@ int sumDivBy3 = numbers.Where(n => n % 3 == 0).Sum();   // 165
 
 ### Q84. What is a Correlation ID and why is it important?
 
+**Definition**: Unique ID assigned per request; propagated across all services/logs for tracing. **Why**: Debugging distributed systems; find all logs for one request across microservices. **Implementation**: Middleware generates `X-Correlation-Id` header, passes to downstream services. **Capital Access**: Every request tagged with correlation ID; all logs include it; queries filter by correlation ID to debug end-to-end flows.
+
 A Correlation ID is a unique identifier — typically a GUID — attached to every incoming HTTP request and carried through every downstream service call, log entry, and message. Its purpose is **distributed tracing** — when something goes wrong in a system with many microservices, you can filter all logs by a single Correlation ID to see the complete picture of what happened, across every service involved, in one search.
 
 Without Correlation IDs, debugging a failure means searching through logs from 6 different services with no way to connect them. With it, one `grep` on the ID shows you the full request journey.
@@ -5593,6 +5613,8 @@ public class CorrelationIdMiddleware
 
 ### Q85. What is a SQL View and when would you use it?
 
+**Definition**: Virtual table; stored SELECT query; appears like table but computed on-the-fly. **Use**: Complex joins reused in multiple queries, security (restrict columns), reporting queries. **EF Core**: Map view to DbSet; query like table. **Trade-off**: View logic in database (reusable) but hard to version-control vs application logic in C# (testable).
+
 A SQL View is a **stored SELECT query** that behaves like a virtual table. You query it like a table, but there is no separate physical storage — it runs the underlying SELECT every time you query it.
 
 Views are useful for three scenarios: **simplifying complex joins** so application code doesn't repeat the same JOIN logic everywhere, **security** by exposing only specific columns to certain users, and **backwards compatibility** when you rename a table but need to keep old queries working.
@@ -5627,6 +5649,8 @@ CREATE UNIQUE CLUSTERED INDEX IX_EngagementSummary ON vw_EngagementSummary(Id);
 
 ### Q86. How do you scale a .NET microservice?
 
+**Definition**: **Vertical**: Bigger machine (CPU, RAM); cheaper but limited. **Horizontal**: More instances + load balancer; unlimited. **Patterns**: Stateless services (cloud-friendly), session affinity if needed, shared database/cache (Redis), async messaging (Service Bus). **Capital Access**: Stateless EngagementService across 10 instances behind load balancer; shared EngagementDbContext (scoped per request).
+
 There are two dimensions of scaling: **vertical** (bigger machine — more CPU/RAM) and **horizontal** (more instances behind a load balancer). Vertical has a ceiling and is a single point of failure. Horizontal is the right approach for production systems — but it requires services to be **stateless**, meaning any instance can handle any request with no dependency on local memory.
 
 In Capital Access, all microservices are stateless and run on Azure Kubernetes Service — AKS auto-scales pods based on CPU and memory. JWT carries auth state, Redis holds shared cache, and Azure Service Bus decouples async processing.
@@ -5656,6 +5680,8 @@ HttpContext.Session.SetString("userId", id);
 
 ### Q87. What is MCP (Model Context Protocol)?
 
+**Definition**: Protocol for LLMs to interact with external systems (files, databases, APIs). **Use**: AI agents calling business logic, querying databases, accessing files safely. **Benefit**: AI systems can perform real work, access data without hallucination. **Capital Access**: MCP allows AI to query EngagementService, fetch reports, audit logs.
+
 MCP is an open protocol created by Anthropic that lets AI assistants connect to external tools and data sources in a standardised way. Without MCP, an AI assistant only has its training data. With MCP, it can connect to your live database, file system, APIs — and act on them with proper tool calls.
 
 The architecture is: AI model ↔ MCP Client ↔ MCP Server ↔ Your tool or data source. The MCP Server exposes three things: **Tools** (functions the AI can call), **Resources** (data the AI can read), and **Prompts** (reusable prompt templates).
@@ -5680,6 +5706,8 @@ server.tool("getEngagementsByTenant", async ({ tenantId }) => {
 ---
 
 ### Q88. What is Observability in microservices?
+
+**Definition**: Three pillars: **Logs** (events, errors, context), **Metrics** (counters, gauges, histograms), **Traces** (request flow across services). **Tools**: Serilog (logging), Prometheus (metrics), Application Insights (all three). **Capital Access**: Structured logging with correlation ID, request/response timing metrics, distributed traces from frontend through 7 backend services.
 
 Observability is your ability to understand what is happening inside a system from the outside — without having to add more instrumentation every time something goes wrong. It has three pillars: **Logs** (what happened), **Metrics** (how is the system performing), and **Traces** (where did the time go across services).
 
@@ -5709,6 +5737,8 @@ app.MapHealthChecks("/health/ready");   // is app ready for traffic?
 ---
 
 ### Q89. How do you track and debug issues in production?
+
+**Definition**: **Monitoring**: Application Insights alerts (error rate, latency, memory). **Logging**: Structured logs with correlation ID, severity levels. **Tracing**: Request flow across services. **Profiling**: dotnet-trace captures CPU, memory, GC events. **Post-mortems**: Root cause analysis. **Capital Access**: Alerts trigger on Gen2 heap >1.5GB, latency >1s, error rate >1%; investigation via correlation ID + logs + traces.
 
 Production debugging has a process — not guesswork. The key is having the right instrumentation in place before the incident happens. In Capital Access, every incident starts with the Correlation ID from the error report.
 
@@ -5747,6 +5777,8 @@ dotnet-counters monitor --process-id <pid> System.Runtime
 
 ### Q90. What is .NET Standard? When and why would you use it?
 
+**Definition**: Interface spec; allows library to work on multiple .NET implementations (.NET Framework, .NET Core, Mono). **When**: Multi-platform library (NuGet package), shared code for desktop+web+mobile. **.NET 5+**: .NET Standard less relevant; use `.NET 8` (unified platform). **Rule**: New projects target .NET 8 directly; older projects use .NET Standard.
+
 .NET Standard is a formal API specification — a contract — that all .NET implementations agree to support. Writing a library that targets .NET Standard means it can run on .NET Framework 4.7+, .NET Core, .NET 5/6/7/8, Xamarin, and UWP without change.
 
 Before .NET Standard, a library written for .NET Framework couldn't run in Xamarin or UWP. .NET Standard solved this by defining a common API surface. The higher the version number, the more APIs but the fewer platforms support it. .NET Standard 2.0 is the sweet spot — broad compatibility with a rich API surface.
@@ -5782,6 +5814,8 @@ Today, if all your targets are .NET 5+, you can target `net8.0` directly. .NET S
 ---
 
 ### Q91. Explicit interface implementation — what happens when two interfaces have the same method signature?
+
+**Definition**: Two interfaces with same method; class implements both; need to disambiguate via `InterfaceName.MethodName()`. **Example**: IReportGenerator and IEventHandler both have `Execute()`; class implements both via `IReportGenerator.Execute()` and `IEventHandler.Execute()` separately.
 
 When two interfaces declare a method with the same name and signature, a class cannot implement both with a single method — the compiler cannot tell which interface contract you are satisfying. C# solves this with explicit interface implementation: you prefix the method name with the interface name. The method has no access modifier and is only callable through a typed interface reference, not through the class reference directly.
 
@@ -5821,6 +5855,8 @@ public class SecureService : IDisposable
 
 ### Q92. What is Lazy<T>? How does lazy initialization work?
 
+**Definition**: Defers object creation until first access; thread-safe; useful for expensive initialization. **Use**: `var lazy = new Lazy<ExpensiveService>(() => new ExpensiveService()); var svc = lazy.Value;` (creates only when .Value accessed). **Benefit**: Avoid initialization cost if object never used; still pay cost once.
+
 `Lazy<T>` defers creation of an expensive object until the first time `.Value` is accessed. After the first access, the same instance is returned on every subsequent call. By default it is thread-safe — only one thread creates the object even if multiple threads access `.Value` simultaneously.
 
 Use `Lazy<T>` for objects that are: expensive to create, might never be needed in some code paths, or must be created exactly once.
@@ -5858,6 +5894,8 @@ var fastLazy   = new Lazy<Engine>(() => new Engine(), LazyThreadSafetyMode.None)
 ---
 
 ### Q93. What is the difference between Mutex, Semaphore, and SemaphoreSlim?
+
+**Definition**: **Mutex**: Binary lock (owned/not owned); one thread at a time; use for critical sections. **Semaphore**: Counted resource; N threads allowed; use for thread pool limits. **SemaphoreSlim**: Lightweight; async-friendly; prefer in async code. **Choice**: Mutex for exclusive access, Semaphore for throttling.
 
 All three prevent concurrent access to a shared resource, but they differ in scope, capacity, and overhead.
 
@@ -5909,6 +5947,8 @@ public async Task<ReportDto> FetchReportAsync(string reportId)
 
 ### Q94. If a struct has a string property, where is the string stored in memory?
 
+**Definition**: Struct lives on stack; string is reference type; string reference lives ON THE STACK (as part of struct), actual string data on HEAP. **Key**: Struct is value type but contains reference; reference goes on stack, data on heap.
+
 The **struct** is a value type — it lives on the stack (when declared as a local variable). But **string** is a reference type — it always lives on the heap.
 
 So the struct on the stack contains an 8-byte reference (a pointer) to the string data on the heap. The struct does NOT contain the character data inline — it contains the memory address that points to it. The GC traces through the struct's reference fields to reach the heap string and keep it alive.
@@ -5948,6 +5988,8 @@ object boxed = h;
 ---
 
 ### Q95. Why must DbContext be Scoped and NOT Singleton? What breaks if you use Singleton?
+
+**Definition**: DbContext not thread-safe; Singleton shared across requests = concurrent access = race condition. **If Singleton**: Stale data (first request's DbContext caches objects), concurrency exception. **Scoped**: One DbContext per request = isolated, safe. **Captive Dependency**: Scoped DbContext injected into Singleton service prevents cleanup; memory leak.
 
 DbContext implements the **Unit of Work** pattern. It holds a change tracker that records which entities were added, modified, or deleted within a single logical operation (one HTTP request). The design contract is: create → use → SaveChanges → dispose — all within one request.
 
@@ -5995,6 +6037,8 @@ builder.Services.AddSingleton<IReportOrchestrator, ReportOrchestrator>();
 ---
 
 ### Q96. What is distributed caching? How does Redis work? When do you choose Redis over IMemoryCache?
+
+**Definition**: **IMemoryCache**: In-process; lost on restart; not shared across instances. **Redis**: Distributed; persistent; shared across servers. **Redis**: In-memory key-value store; fast (microseconds), Pub/Sub, expiration. **Choice**: IMemoryCache for single-server, Redis for multi-server/persistence. **Capital Access**: Tenant feature flags cached in Redis (survives service restart, shared across 10 instances).
 
 **IMemoryCache** stores data in the process's own memory — fast, but local to that one instance. If you have three pods running your API, each has its own separate cache. Pod A caches a company report; Pods B and C don't know about it.
 
