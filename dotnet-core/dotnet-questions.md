@@ -34,7 +34,16 @@ The four pillars are **Encapsulation, Abstraction, Inheritance, and Polymorphism
 
 ---
 
-**Encapsulation** — bundle data and behaviour in one class; hide internal state so it can only be changed through controlled methods. It's about **HIDING IMPLEMENTATION DETAILS and CONTROLLING ACCESS to data**.
+## **DEFINITIONS**
+
+**Encapsulation** 
+- **Definition**: The bundling of data (fields) and methods (behavior) into a single unit (class), with the hiding of internal state so it can only be changed through controlled methods.
+- **Purpose**: Protect object state integrity, enforce business rules, and enable controlled access to data.
+- **In one sentence**: Hide what shouldn't be exposed, expose only what should be public.
+
+**Encapsulation — Detailed Explanation**
+
+Bundle data and behaviour in one class; hide internal state so it can only be changed through controlled methods. It's about **HIDING IMPLEMENTATION DETAILS and CONTROLLING ACCESS to data**.
 
 Real-world banking example:
 ```csharp
@@ -103,7 +112,14 @@ public class EngagementActivity
 
 ---
 
-**Abstraction** — hide implementation complexity behind a simplified interface; expose only what the caller needs to know. It's about **HIDING COMPLEXITY and SHOWING ONLY THE CONTRACT**.
+**Abstraction**
+- **Definition**: The process of hiding the complex implementation details of an object and exposing only its essential features through a simplified interface.
+- **Purpose**: Reduce complexity, allow callers to work with objects without understanding internal mechanics, enable different implementations of the same interface.
+- **In one sentence**: Show only what's needed, hide how it works.
+
+**Abstraction — Detailed Explanation**
+
+Hide implementation complexity behind a simplified interface; expose only what the caller needs to know. It's about **HIDING COMPLEXITY and SHOWING ONLY THE CONTRACT**.
 
 Real-world banking example — Different payment methods, same interface:
 ```csharp
@@ -196,6 +212,17 @@ public class OwnershipAlertHandler
 ---
 
 **Inheritance** — a child class inherits fields and behaviour from a parent; avoids repeating common code. Establishes "is-a" relationships.
+
+---
+
+**Inheritance**
+- **Definition**: A mechanism that allows a child class to inherit fields, properties, and methods from a parent class, establishing an "is-a" relationship.
+- **Purpose**: Enable code reuse, establish class hierarchies, share common implementation across related classes.
+- **In one sentence**: A child class inherits code and behavior from a parent class, avoiding duplication.
+
+**Inheritance — Detailed Explanation**
+
+A child class inherits fields, properties, and methods from a parent class. Establishes "is-a" relationships.
 
 ### **What C# Supports**
 
@@ -461,7 +488,17 @@ public class BankAccount : BaseEntity, IValidator, ILogger, IAuditor
 
 ---
 
-**Polymorphism** — "poly" = many, "morph" = form. **One interface, many implementations; same method call behaves differently at runtime.**
+---
+
+**Polymorphism**
+- **Definition**: The ability of objects to take on multiple forms. One method call can behave differently depending on the object type.
+- **Types**: Compile-time (method overloading) and runtime (virtual methods, interface implementation).
+- **Purpose**: Enable flexible code that works with different object types, support Open/Closed Principle, reduce if/else chains.
+- **In one sentence**: Same interface, many implementations; behavior determined at compile-time or runtime.
+
+**Polymorphism — Detailed Explanation**
+
+"Poly" = many, "morph" = form. **One interface, many implementations; same method call behaves differently at runtime.**
 
 The power: You write code against an interface, not specific implementations. New implementations can be added without changing code that uses them.
 
@@ -1001,6 +1038,13 @@ In a 10-year-old banking system with millions of lines of code, polymorphism is 
 
 ### Q2. [Topic: OOP] [EPAM] Why do Encapsulation and Abstraction sound similar? What is the real difference?
 
+**Definition Clarification**:
+- **Encapsulation**: Hides **data** and controls who can read/write it within a single class.
+- **Abstraction**: Hides **complexity** and implementation details behind a simplified interface, possibly across multiple classes.
+- **Why they sound similar**: Both involve "hiding" something, but they hide different things at different scopes.
+
+**Key Difference**:
+
 Both involve "hiding" something — but they hide **different things**.
 
 | Aspect | Encapsulation | Abstraction |
@@ -1067,6 +1111,14 @@ public class NASDAQExecutor : ITradeExecutor { ... }
 ---
 
 ### Q3. [Topic: OOP] [EPAM] When do you use an Abstract Class vs an Interface?
+
+**Definitions**:
+- **Abstract Class**: A class that cannot be instantiated and is meant to be inherited. It can have fields, constructors, and method implementations. Used for related classes sharing common code.
+- **Interface**: A contract that specifies what methods/properties must exist. Has no fields, no constructors, no implementation bodies (except default implementations in C# 8+). Used for unrelated classes implementing the same capability.
+- **When to use Abstract Class**: "Is-a" relationships, shared code, shared state.
+- **When to use Interface**: "Can-do" capabilities, unrelated classes, multiple implementations.
+
+**Comparison Table**:
 
 | | Abstract Class | Interface |
 |---|---|---|
@@ -1211,6 +1263,35 @@ public class BankAccount : BaseEntity, IValidatable, IAuditable, ISoftDeletable
 ---
 
 ## 3. SOLID Principles
+
+---
+
+### **SOLID Principles Definitions**
+
+**S - Single Responsibility Principle (SRP)**
+- **Definition**: A class should have exactly one reason to change; it should have only one job or responsibility.
+- **Purpose**: Make code easier to maintain, test, and understand.
+- **Violation**: A class handling database access, business logic, and logging simultaneously.
+
+**O - Open/Closed Principle (OCP)**
+- **Definition**: Software entities should be open for extension (adding new functionality) but closed for modification (not changing existing code).
+- **Purpose**: Enable adding new features without breaking existing code.
+- **Violation**: Adding new report types requires modifying the existing ReportGenerator class.
+
+**L - Liskov Substitution Principle (LSP)**
+- **Definition**: Objects of a superclass should be replaceable with objects of its subclasses without breaking the application.
+- **Purpose**: Ensure subclasses honor the parent's contract, making code predictable and safe.
+- **Violation**: A Square subclass of Rectangle changes width/height behavior unexpectedly.
+
+**I - Interface Segregation Principle (ISP)**
+- **Definition**: Clients should not be forced to depend on interfaces they do not use. Prefer narrow, focused interfaces over fat, general-purpose ones.
+- **Purpose**: Reduce coupling, avoid forcing implementations of unnecessary methods.
+- **Violation**: An IWorker interface forcing Robot to implement Eat() and Sleep() when it only works.
+
+**D - Dependency Inversion Principle (DIP)**
+- **Definition**: High-level modules should not depend on low-level modules; both should depend on abstractions. Depend on interfaces, not concrete implementations.
+- **Purpose**: Reduce coupling between modules, enable swapping implementations easily.
+- **Violation**: OrderProcessor directly creating StripeProcessor instead of depending on IPaymentProcessor interface.
 
 ---
 
