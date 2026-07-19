@@ -6110,6 +6110,8 @@ public class ReportCacheService(IDistributedCache cache, IReportRepository repo)
 
 ### Q97. [Topic: OOP] Abstract class vs Interface — real-time scenario?
 
+**Definition**: Abstract class = base shared behavior (fields, constructors, state); Interface = contract only. **Scenario**: Report generator base class (shared retry logic), IReportGenerator interface (contract). Use abstract for "is-a", interface for "can-do".
+
 **Abstract class**: partial implementation + shared state. Use when subclasses share common behaviour/fields and you want to avoid duplication.
 
 **Interface**: pure contract, no implementation (default interface methods aside). Use to define a capability multiple unrelated classes can implement.
