@@ -1864,38 +1864,125 @@ Anti-Pattern:   A commonly-repeated "solution" that looks reasonable but is
 
 Code smells are symptoms of poor design — they don't break code immediately but make it fragile and hard to maintain.
 
+**Fowler's 5 categories — recite the category, not just a random list, to show you know the taxonomy, not just some names:**
 ```
-God Object:          One class knows/does everything
-                     Symptom: EngagementService that validates + notifies + logs + reports
-                     Fix: split into focused, single-responsibility classes
+1. BLOATERS               → things that grew too large to manage
+2. OBJECT-ORIENTATION ABUSERS → OOP used incorrectly or incompletely
+3. CHANGE PREVENTERS       → smells that make future changes expensive
+4. DISPENSABLES            → things that add no value and should be removed
+5. COUPLERS                → excessive coupling between classes
+```
 
-Anemic Domain:       Entities are bags of properties, all logic in Service classes
-                     Symptom: activity.Status = "Completed" in the service instead of
-                              activity.Complete() in the entity
-                     Fix: move business rules INTO the entity
+---
 
-Long Method:         Method does too much — hard to name, hard to test
-                     Fix: extract smaller, named methods
+**1. Bloaters**
 
-Long Parameter List: Method with 6+ params
-                     Symptom: CreateReport(id, tenantId, format, from, to, null, true, "pdf")
-                     Fix: parameter object (Command/DTO) or Builder
+```
+Long Method:          Method does too much — hard to name, hard to test
+                      Fix: extract smaller, named methods
+
+Long Parameter List:  Method with 6+ params
+                      Symptom: CreateReport(id, tenantId, format, from, to, null, true, "pdf")
+                      Fix: parameter object (Command/DTO) or Builder (Q4)
+
+Primitive Obsession:  string for email, string for tenantId — no validation guarantee
+                      Fix: Value Objects (record with validation in the constructor)
+
+Data Clumps:          Same group of fields travels together everywhere
+                      Symptom: street, city, zip passed as 3 separate params in 6 methods
+                      Fix: extract into one Address class/record
+
+Large Class / God Object: One class knows/does everything
+                      Symptom: EngagementService that validates + notifies + logs + reports
+                      Fix: split into focused, single-responsibility classes
+```
+
+**2. Object-Orientation Abusers**
+
+```
+Switch Statements:    Giant if-else/switch on type, grows with every new case
+                      Symptom: if (channel == "email") ... else if (channel == "sms") ...
+                      Fix: Strategy pattern (Q13) — polymorphism replaces the branching
+
+Refused Bequest:      Subclass inherits methods/fields it doesn't want, overrides them
+                      to throw NotImplementedException
+                      Signal: inheritance hierarchy is wrong — violates Liskov Substitution
+                      Fix: favour composition, or restructure the hierarchy
+
+Temporary Field:      A field only set/used in SOME method calls, null/empty the rest
+                      Signal: the class is doing two jobs that should be split
+
+Alternative Classes with Different Interfaces:
+                      Two classes do the same conceptual thing but expose differently
+                      named methods (Cancel() vs Abort()) — can't be used interchangeably
+                      Fix: rename to a shared interface
+```
+
+**3. Change Preventers**
+
+```
+Shotgun Surgery:      One logical change requires touching 10 files
+                      Fix: consolidate related responsibility (Facade, Q8)
+
+Divergent Change:     One class gets modified for many UNRELATED reasons
+                      Symptom: a DB field change AND a new email template BOTH touch
+                      the same class
+                      Signal: violates Single Responsibility — split it
+
+Parallel Inheritance Hierarchies:
+                      Adding a subclass in one hierarchy forces a matching subclass in
+                      another (PdfReportGenerator forces a matching PdfReportValidator)
+                      Fix: merge the hierarchies or compose instead of inheriting
+```
+
+**4. Dispensables**
+
+```
+Duplicate Code:       Same logic in 3 places — bug fixed in one, broken in two others
+                      Fix: extract to shared method / Repository / base class
+
+Dead Code:            Unused methods, unreachable branches, commented-out "just in case"
+                      Fix: delete it — git history is the safety net, not a comment block
+
+Speculative Generality: Abstraction built for a future requirement that never arrives
+                      Symptom: IReportGenerator<TFormat, TOptions, TContext> with ONE
+                      implementation ever
+                      Fix: YAGNI — start simple, refactor when the pattern earns its place
+
+Lazy Class:           Class does so little it's not earning its complexity cost
+                      Fix: fold it into its caller
 
 Magic Numbers/Strings: if (status == 3) or if (type == "pdf")
-                     Fix: enum, named constant
+                      Fix: enum, named constant
 
-Duplicate Code:      Same logic in 3 places — bug fixed in one, broken in two others
-                     Fix: extract to shared method / Repository / base class
+Comments (as a smell): A comment explaining WHAT confusing code does is often covering
+                      for code that should be self-explanatory instead
+                      Fix: extract a well-named method rather than commenting the unclear one
+```
 
-Feature Envy:        Method uses another class's data more than its own
-                     Symptom: EngagementService.Calculate() reads 5 fields from Activity
-                     Fix: move the method INTO Activity
+**5. Couplers**
 
-Shotgun Surgery:     One change requires touching 10 files
-                     Fix: consolidate related responsibilities
+```
+Feature Envy:         Method uses another class's data more than its own
+                      Symptom: EngagementService.Calculate() reads 5 fields from Activity
+                      Fix: move the method INTO Activity ("tell, don't ask")
+                      → often co-occurs with Anemic Domain Model (see below)
 
-Primitive Obsession: string for email, string for tenantId — no validation guarantee
-                     Fix: Value Objects
+Inappropriate Intimacy: Two classes reach into each other's private internals far more
+                      than their public contract intends — can't change independently
+
+Message Chains:       order.Customer.Address.City.Name — breaks if ANY link changes
+                      Fix: Law of Demeter — add order.GetCustomerCity() to hide the chain
+
+Middle Man:           A class that does nothing but delegate every call to another class
+                      Signal: 90% one-line pass-through methods
+                      Fix: remove the middle man, call the real object directly
+                      (flip side of Decorator/Facade — indirection with no added value)
+
+Anemic Domain Model:  Entities are bags of properties, all logic in Service classes
+                      Symptom: activity.Status = "Completed" in the service instead of
+                              activity.Complete() in the entity
+                      Fix: move business rules INTO the entity
 ```
 
 ```csharp
@@ -1924,7 +2011,29 @@ public void SendReport(TenantId tenantId, Email email) { }
 // Self-validating. Type system enforces correctness. ✅
 ```
 
-**Anti-patterns (wrong solutions applied to real problems):**
+```csharp
+// SMELL: Message Chain — Law of Demeter violation
+var city = order.Customer.Address.City.Name; // breaks if ANY link in the chain changes ❌
+
+// ✅ Fix: hide the chain behind a method on the object you already have
+public class Order
+{
+    public string GetCustomerCity() => Customer.Address.City.Name;
+}
+var city = order.GetCustomerCity(); // caller no longer knows the internal shape ✅
+```
+
+**Detection in practice — tools vs judgment:**
+```
+SonarQube:            duplicate code, complexity thresholds, maintainability rating
+Roslyn Analyzers /
+ReSharper:            long methods, unused code, naming — inline in the IDE
+Cyclomatic complexity: flags Long Method / God Object indirectly via branching count
+Code review (human):  Feature Envy, Anemic Domain Model, God Object — the "judgment
+                      call" smells tools can't fully catch on their own
+```
+
+**Anti-patterns (wrong solutions applied to real problems — different from a smell: this is a *repeated mistake*, not just a design symptom):**
 ```
 Singleton Abuse:         Everything is Singleton → hidden global state → untestable
 Premature Abstraction:   Add pattern because it "feels right" — not because problem exists
@@ -1932,6 +2041,8 @@ Premature Abstraction:   Add pattern because it "feels right" — not because pr
 Copy-Paste Programming:  Same logic in 3 places → bug fixed in one, broken in two
 Magic String Factory:    if (type == "pdf") scattered everywhere → typo-prone
 ```
+
+**Why this matters beyond naming them**: a code smell isn't inherently "wrong" — it's a heuristic flag, not a rule. What separates a senior answer from a junior one isn't the list — it's judgment about *when* a smell is worth fixing now vs. accepted as a pragmatic trade-off (a Long Parameter List in a rarely-touched internal script isn't worth a Builder). Explaining that trade-off, not just naming the smell, is the answer that lands.
 
 ---
 
