@@ -230,6 +230,7 @@ public static void PrintSameNumberTriangle(int num)
 ## 5. Floyd's Triangle
 
 **Difficulty:** Easy
+**Date:** 2026-07-21
 
 ### Pattern
 
@@ -246,16 +247,30 @@ Given `n`, print Floyd's triangle — consecutive numbers starting from 1, filli
 
 ### Approach
 
-_To be added_
+Declare a counter outside both loops. Inner loop prints the counter and increments it — counter never resets so it keeps going across all rows.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintFloydTriangle(int num)
+{
+    int count = 1;
+    for (int i = 1; i <= num; i++)
+    {
+        for (int j = 1; j <= i; j++)
+        {
+            Console.Write(count + " ");
+            count++;
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
