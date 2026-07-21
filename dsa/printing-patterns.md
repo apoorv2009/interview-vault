@@ -92,6 +92,7 @@ public static void PrintRightTriangle(int num)
 ## 2. Inverted Right Triangle
 
 **Difficulty:** Easy
+**Date:** 2026-07-21
 
 ### Pattern
 
@@ -109,16 +110,28 @@ Given `n`, print an inverted right-angled triangle. Row `i` has `(n - i + 1)` st
 
 ### Approach
 
-_To be added_
+Outer loop runs 1 to n. Inner loop starts at n and goes down to i — so row 1 prints n stars, row 2 prints n-1 stars, decreasing each time.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintInvertedRightTriangle(int num)
+{
+    for (int i = 1; i <= num; i++)
+    {
+        for (int j = num; j >= i; j--)
+        {
+            Console.Write("*");
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
