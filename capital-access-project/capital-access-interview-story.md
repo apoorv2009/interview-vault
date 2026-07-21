@@ -786,10 +786,91 @@ Answer:
 
         The one limitation of this stateless JWT approach is revocation — since validation is local, a stolen token stays valid until it expires. That's why access tokens are kept short-lived (15 to 60 minutes) and we use a refresh token to silently get a new access token before expiry. Short lifetime = small window of risk if a token is compromised.
 
+**Q: What does APIM's actual JWT validation policy look like — not just the concept?**
+
+Answer:
+        This is the `validate-jwt` inbound policy applied at the Gateway:
+```xml
+<inbound>
+    <validate-jwt header-name="Authorization" failed-validation-httpcode="401"
+                  require-expiration-time="true" require-signed-tokens="true">
+        <openid-config url="https://spglobal.okta.com/oauth2/default/.well-known/openid-configuration" />
+        <audiences>
+            <audience>api://capital-access</audience>
+        </audiences>
+        <issuers>
+            <issuer>https://spglobal.okta.com/oauth2/default</issuer>
+        </issuers>
+        <required-claims>
+            <claim name="tenantId" match="any" />
+        </required-claims>
+    </validate-jwt>
+</inbound>
+```
+        The `<openid-config url="...openid-configuration">` element is what lets APIM auto-discover Okta's JWKS endpoint — I don't hardcode the JWKS URL directly, APIM resolves it from the standard OIDC discovery document, fetches Okta's public signing keys, and caches them. `require-signed-tokens="true"` rejects any unsigned/`alg: none` token outright — closing off a classic JWT vulnerability where an attacker submits a token with the signature algorithm set to "none" hoping the verifier skips the check.
+
 **Q: Q: If the Gateway already validates the JWT, why do individual microservices still validate it too?**
 
 Answer:
         Defense-in-depth. For SPA-originated traffic, the Azure API Management Gateway validates the JWT signature, issuer, expiry, and tenant/role claims before routing the request — microservices trust that for traffic that came through the Gateway. But not all traffic comes through the Gateway: the Report Worker (Azure Function) calls Targeting, Profiles, and Contacts services directly, server-to-server, to aggregate report data — that path never touches the Gateway. So every service still fetches Okta's JWKS (JSON Web Key Set) at startup and can independently validate a JWT's signature, issuer, expiry, and audience claim locally and statelessly. That means a service never blindly trusts an inbound request just because it's on the internal network — it can always verify the token itself, whether the caller is the Gateway-fronted SPA or another service calling it directly.
+
+**Q: What does a microservice's own JWT validation actually look like in code, and what does it do beyond just validating?**
+
+Answer:
+        Every microservice — not just the Gateway — configures ASP.NET Core's JWT Bearer middleware the same way:
+```csharp
+// Program.cs — every microservice does this independently
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = "https://spglobal.okta.com/oauth2/default";
+        options.Audience  = "api://capital-access";
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer           = true,
+            ValidateAudience         = true,
+            ValidateLifetime         = true,
+            ValidateIssuerSigningKey = true,
+            ClockSkew = TimeSpan.FromMinutes(1)
+        };
+    });
+```
+        Setting `options.Authority` is enough — ASP.NET Core auto-discovers Okta's OpenID configuration and JWKS endpoint from it, exactly like APIM does, and caches the public keys in memory with zero per-request calls to Okta.
+
+        But validation is only step one. Once the token is verified, the service actually **uses** the claims for real authorization and data isolation, which is more than APIM does:
+```csharp
+[Authorize(Roles = "IRAdmin")]                          // role check enforced here
+[HttpPost]
+public async Task<IActionResult> CreateEngagement([FromBody] CreateEngagementDto dto)
+{
+    var tenantId = User.FindFirst("tenantId")?.Value;   // custom Okta claim
+    var userId   = User.FindFirst(ClaimTypes.NameIdentifier)?.Value; // maps to "sub"
+    // All DB queries auto-filtered to tenantId via EF Core global query filter ✅
+}
+```
+        `tenantId` feeds an EF Core global query filter, so every query this service issues is automatically scoped to that tenant without a developer needing to remember a `.Where()` clause on each one — that's the actual boundary preventing Client A from ever seeing Client B's data, not just the token check itself.
+
+**Q: How does the system identify that a specific request belongs to a specific user — not just a specific tenant?**
+
+Answer:
+        Through the `sub` (subject) claim — the OIDC-standard identity claim, distinct from `tid` (which only says *which company*). Okta assigns `sub` once, at account creation, and it never changes even if the person's email or name changes later:
+```
+{
+  "sub": "00u1a2b3c4d5e6f7g8h9",   ← unique, permanent user ID — "who"
+  "tid": "spg-001",                ← which tenant — "which company"
+  "roles": ["IRAdmin"]
+}
+```
+        It can't be spoofed for the same reason nothing else in the token can: Okta only puts a given `sub` in a token after that specific user actually authenticates (password + MFA), and the entire payload — `sub` included — is signed with Okta's private key. Tamper with it and the signature no longer matches. Because the `Authorization: Bearer <token>` header travels on every single request rather than a server-side session, each call independently re-proves "this is user X" — that statelessness is also why the architecture scales horizontally with no session affinity needed. Once validated, ASP.NET Core exposes `sub` as `User.FindFirst(ClaimTypes.NameIdentifier)`, which we use for audit fields like `CreatedBy` and for authorization checks throughout the service.
+
+**Q: If a JWT can be read and decoded by anyone, how is it actually secure?**
+
+Answer:
+        Because a JWT is *signed*, not *encrypted* — those are different properties, and the confusion usually comes from conflating them with Base64 encoding too. The header and payload are only Base64URL-**encoded**, which is trivially reversible by anyone with no key at all — paste any JWT into jwt.io and every claim decodes instantly. That's by design, not a flaw.
+
+        The security guarantee a JWT gives isn't "nobody can see what's inside" — it's "this payload has not been altered since Okta signed it, and it genuinely came from Okta." Okta signs with RS256: its private key produces the signature, and the matching public key (published via JWKS) verifies it. If anyone modifies a claim after issuance — say, escalating their own `roles` — the signature no longer matches the altered payload, and APIM/the microservice rejects the token outright. You'd need Okta's private key, which never leaves Okta, to forge a token that still verifies.
+
+        The practical consequence: nothing sensitive ever goes in a JWT payload — no passwords, no account numbers — since it's fully readable by anyone who intercepts it. Actual confidentiality in transit comes from a separate layer entirely: TLS/HTTPS, which encrypts the whole request including the `Authorization` header. Signing protects against tampering; TLS protects against eavesdropping — two different threats, two different mechanisms, and conflating them is the exact misconception this question is testing for.
 
 **Q: Q: How does Redis caching work in the Targeting Service? What about stale data?**
 
