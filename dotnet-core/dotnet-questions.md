@@ -11,17 +11,17 @@
 ## Table of Contents
 
 1. [OOP Fundamentals (Q1–Q9)](#1-oop-fundamentals)
-2. [C# Language Features (Q10–Q30)](#2-c-language-features)
+2. [C# Language Features (Q10–Q31)](#2-c-language-features)
 3. [SOLID Principles (Q4–Q9)](#3-solid-principles)
-4. [Garbage Collection (Q31–Q54)](#4-garbage-collection-deep-dive)
-5. [.NET Core & ASP.NET Core (Q55–Q74)](#5-net-core--aspnet-core)
-6. [Entity Framework Core (Q75–Q79)](#6-entity-framework-core)
-7. [LINQ (Q80–Q83)](#7-linq)
-8. [Additional Topics (Q84–Q89)](#8-additional-topics)
-9. [Platform, DI & Caching Deep Dive (Q90–Q96)](#9-platform-di--caching-deep-dive)
-10. [Interview Rounds — Additional Q&A (Q97–Q134)](#10-interview-rounds--additional-qa)
-11. [Core ASP.NET & Validation Topics (Q135–Q140)](#11-core-aspnet--validation-topics)
-12. [Concurrency & Threading Deep Dive (Q141–Q143)](#12-concurrency--threading-deep-dive)
+4. [Garbage Collection (Q32–Q55)](#4-garbage-collection-deep-dive)
+5. [.NET Core & ASP.NET Core (Q56–Q75)](#5-net-core--aspnet-core)
+6. [Entity Framework Core (Q76–Q80)](#6-entity-framework-core)
+7. [LINQ (Q81–Q84)](#7-linq)
+8. [Additional Topics (Q85–Q90)](#8-additional-topics)
+9. [Platform, DI & Caching Deep Dive (Q91–Q97)](#9-platform-di--caching-deep-dive)
+10. [Interview Rounds — Additional Q&A (Q98–Q135)](#10-interview-rounds--additional-qa)
+11. [Core ASP.NET & Validation Topics (Q136–Q141)](#11-core-aspnet--validation-topics)
+12. [Concurrency & Threading Deep Dive (Q142–Q144)](#12-concurrency--threading-deep-dive)
 
 ---
 
@@ -1764,8 +1764,60 @@ Money price2 = price1;  // independent copy — no shared state
 
 ---
 
-### Q11. [Topic: C#] [EPAM] What are Generics? Why are they important?
+### Q11. [Topic: C#] `var a = 10;` vs `int a = 10;` — which is better, and why?
 
+**Definition**:
+- **var**: Compile-time type inference, NOT dynamic typing. The compiler determines the type from the right-hand side at compile time; from that point, the variable is statically locked to that type.
+- **Key fact**: `var a = 10;` and `int a = 10;` produce **byte-for-byte identical IL** — zero runtime or performance difference. The choice is purely about readability.
+- **Restrictions**: `var` requires initialization at declaration, cannot be used for class fields (locals only), and cannot be assigned `null` without a cast (no type to infer).
+
+**Proving it's compile-time, not dynamic:**
+```csharp
+var a = 10;        // compiler infers System.Int32
+int a = 10;         // explicit System.Int32 — IDENTICAL compiled IL either way
+
+var b = 10;
+b = "hello"; // ❌ CS0029 — proves b is statically int, not "whatever you assign later"
+```
+
+**When `var` is preferred — type is obvious, or there's no name to write:**
+```csharp
+var repo = new SqlEngagementRepository();          // type is right there — explicit would be redundant
+foreach (var activity in activities) { }            // idiomatic in C#
+
+// MANDATORY for anonymous types — no explicit type name exists
+var result = engagements.Select(e => new { e.Id, e.CompanyName });
+```
+
+**When explicit typing is preferred — the right-hand side hides the type:**
+```csharp
+var data = GetEngagementData();          // ❌ what type IS this? must go find the method signature
+List<EngagementDto> data = GetEngagementData(); // ✅ type visible without navigating away
+```
+
+**The real trap — numeric literal defaults (relevant for financial code):**
+```csharp
+var price = 10;      // inferred as int    ❌ — probably meant money
+var rate  = 10.5;     // inferred as double ❌ — imprecise for financial math
+var total = 10.5m;    // inferred as decimal ✅ — 'm' suffix forces decimal
+
+decimal amount = 10;  // explicit — correct and unambiguous at a glance
+var amount = 10;      // int — WRONG type for currency, and easy to miss in review
+```
+For monetary values, explicit `decimal` removes any risk of an `int` or `double` silently sneaking into a financial calculation — a real bug class in banking software, not a style nitpick.
+
+**Rules & restrictions:**
+```csharp
+var a;                       // ❌ CS0818 — must be initialized at declaration
+var b = null;                 // ❌ CS0815 — null has no inferable type
+public class Foo { var x; }   // ❌ var is illegal for class fields — locals only
+```
+
+> **Interview line**: "There's no performance difference — var is compile-time type inference in a statically-typed language, not dynamic typing, and the IL output is identical either way. It's purely a readability call: I use var when the type is obvious from the right-hand side or when there's no nameable type at all, like LINQ projections into anonymous types. I go explicit when the right-hand side hides the type, or for numeric literals in financial code, where var's default literal inference can silently give you int or double instead of decimal — a real bug risk, not a style nitpick."
+
+---
+
+### Q12. [Topic: C#] [EPAM] What are Generics? Why are they important?
 **Definition**:
 - **Generics**: A mechanism to write reusable, type-safe code by specifying a placeholder type `<T>` that gets replaced with an actual type at compile time.
 - **Purpose**: Achieve code reuse without boxing/unboxing, maintain type safety, and eliminate runtime casting errors.
@@ -1820,8 +1872,7 @@ ApiResponse<List<ReportJob>>    jobs     = ApiResponse<List<ReportJob>>.Ok(jobLi
 
 ---
 
-### Q12. [Topic: C#] [EPAM] What are Nullable types? How do you handle null safely in C#?
-
+### Q13. [Topic: C#] [EPAM] What are Nullable types? How do you handle null safely in C#?
 **Definition**:
 - **Nullable Value Types**: Value types that can hold a null value using syntax `int?`, `bool?`, `DateTime?`.
 - **Nullable Reference Types** (C# 8+): Reference types explicitly marked as nullable: `string?`, `List<T>?`.
@@ -1866,8 +1917,7 @@ if (activity is not null)
 
 ---
 
-### Q13. [Topic: C#] [EPAM] What is Boxing and Unboxing? Why is it a performance concern?
-
+### Q14. [Topic: C#] [EPAM] What is Boxing and Unboxing? Why is it a performance concern?
 **Definition**:
 - **Boxing**: Converting a value type (e.g., `int`) to a reference type by wrapping it in an object shell on the heap.
 - **Unboxing**: Extracting the value type back from the object reference, requiring an explicit cast.
@@ -1903,8 +1953,7 @@ double score = cache["AAPL"];       // no unboxing — already typed
 
 ---
 
-### Q14. [Topic: C#] [EPAM] Explain the main collection types and when to use each.
-
+### Q15. [Topic: C#] [EPAM] Explain the main collection types and when to use each.
 **Definition**:
 - **Array**: Fixed-size, indexed collection with O(1) random access; size is immutable after creation.
 - **List<T>**: Dynamic-size, generic, indexed collection with O(1) amortized add and O(1) random access.
@@ -2056,8 +2105,7 @@ return await q.AsNoTracking().ToListAsync();           // SQL runs here ✅
 
 ---
 
-### Q15. [Topic: C#] [EPAM] What is async/await? How is it different from creating a Thread?
-
+### Q16. [Topic: C#] [EPAM] What is async/await? How is it different from creating a Thread?
 **Definition**:
 - **async/await**: A language pattern that allows writing asynchronous code that reads sequentially, suspending execution without blocking threads.
 - **Key Difference from Thread**: Threads are expensive (OS-level, dedicated memory); async/await reuses threadpool threads and releases them while waiting for I/O.
@@ -2138,8 +2186,7 @@ var activity = await _context.FindAsync(id); // 0 threads used while DB responds
 
 ---
 
-### Q16. [Topic: C#] [EPAM] What is Task.WhenAll vs Parallel.ForEach? When to use each?
-
+### Q17. [Topic: C#] [EPAM] What is Task.WhenAll vs Parallel.ForEach? When to use each?
 **Definition**:
 - **Task.WhenAll**: Awaits multiple async tasks to complete; returns immediately when all complete; runs on threadpool without blocking.
 - **Parallel.ForEach**: Distributes work across multiple threads; blocks the calling thread until all iterations finish; uses ThreadPool but occupies threads during execution.
@@ -2191,8 +2238,7 @@ Parallel.ForEach(companyIds, async id =>
 
 ---
 
-### Q17. [Topic: C#] [EPAM] What is the IDisposable pattern? Why is it needed? Explain using, destructor, and GC.SuppressFinalize.
-
+### Q18. [Topic: C#] [EPAM] What is the IDisposable pattern? Why is it needed? Explain using, destructor, and GC.SuppressFinalize.
 **Definition**:
 - **IDisposable Pattern**: A pattern for deterministically releasing unmanaged resources (database connections, files, network handles) by implementing the `IDisposable` interface and `Dispose()` method.
 - **using Statement**: Calls `Dispose()` automatically when exiting the using block, ensuring cleanup even if exceptions occur.
@@ -2290,8 +2336,7 @@ var results = await context.EngagementActivities.ToListAsync();
 
 ---
 
-### Q18. [Topic: C#] [EPAM] What is managed vs unmanaged memory? How does the GC work (Gen 0, 1, 2)?
-
+### Q19. [Topic: C#] [EPAM] What is managed vs unmanaged memory? How does the GC work (Gen 0, 1, 2)?
 **Definition**:
 - **Managed Memory**: Memory controlled by the .NET GC; objects are allocated on the heap and automatically freed when unreachable.
 - **Unmanaged Memory**: Memory not controlled by the GC; must be explicitly freed (native pointers, COM objects, handles); includes LOH (Large Object Heap) for objects >85KB.
@@ -2339,8 +2384,7 @@ finally { ArrayPool<byte>.Shared.Return(buffer); } // back to pool — no GC nee
 
 ---
 
-### Q19. [Topic: C#] [EPAM] What is a deadlock? How do you avoid it in .NET?
-
+### Q20. [Topic: C#] [EPAM] What is a deadlock? How do you avoid it in .NET?
 **Definition**:
 - **Deadlock**: A situation where two or more threads each hold a resource the other needs and both wait indefinitely, freezing the application.
 - **Root Cause**: Circular lock dependency; Thread A locks X and waits for Y; Thread B locks Y and waits for X.
@@ -2424,8 +2468,7 @@ await Task.WhenAll(tasks); // 10 at a time, not 2500 simultaneously ✅
 
 ---
 
-### Q20. [Topic: C#] [EPAM] Is async/await always safe? What problems can it cause?
-
+### Q21. [Topic: C#] [EPAM] Is async/await always safe? What problems can it cause?
 **Definition**:
 - **SynchronizationContext Mismatch**: Awaiting an async method without .ConfigureAwait(false) can cause deadlock if the sync context is blocked; always use .ConfigureAwait(false) in libraries.
 - **Async All The Way**: Mixing blocking code (Task.Result, Task.Wait) with async causes threadpool starvation; if you go async, stay async.
@@ -2485,8 +2528,7 @@ var tasks = companies.Select(c => _api.GetScoreAsync(c.Id)); // 2500 at once ❌
 
 ---
 
-### Q21. [Topic: C#] Records — Immutable Data Carriers
-
+### Q22. [Topic: C#] Records — Immutable Data Carriers
 **Definition**:
 - **Records**: Reference types (C# 9+) designed for immutability; auto-generate constructor, Equals, GetHashCode, ToString, and deconstruction.
 - **Immutability**: init-only properties prevent modification after construction; suitable for DTOs and domain value objects.
@@ -2524,8 +2566,7 @@ public record OwnershipChangedEvent(string EventId, string CompanyId, decimal Ne
 
 ---
 
-### Q22. [Topic: C#] Extension Methods — Add Methods Without Modifying a Type
-
+### Q23. [Topic: C#] Extension Methods — Add Methods Without Modifying a Type
 **Definition**:
 - **Extension Methods**: Static methods defined in static classes that "extend" an existing type by adding new methods via the `this` keyword on the first parameter.
 - **Syntax**: `public static ReturnType MethodName(this ExistingType obj, ...)` in a static class.
@@ -2579,8 +2620,7 @@ var results = await _context.EngagementActivities
 
 ---
 
-### Q23. [Topic: C#] Delegates, Func\<>, Action\<> — Passing Behaviour as a Parameter
-
+### Q24. [Topic: C#] Delegates, Func\<>, Action\<> — Passing Behaviour as a Parameter
 **Definition**:
 - **Delegate**: A type-safe function pointer; a reference type that holds a reference to a method with a matching signature.
 - **Action<T>**: A delegate with parameters but no return value (void); used for callbacks.
@@ -2626,8 +2666,7 @@ var highPriority = Filter(activities, a => a.AttendeeCount > 10);
 
 ---
 
-### Q24. [Topic: C#] readonly vs const vs static readonly
-
+### Q25. [Topic: C#] readonly vs const vs static readonly
 **Definition**:
 - **const**: Compile-time constant; value is baked into the compiled IL; must be primitive or string; per-instance (not shared).
 - **readonly**: Instance field that can be assigned only in the constructor or field initializer; prevents modification after initialization.
@@ -2664,8 +2703,7 @@ public class EngagementService
 // readonly → runtime, any type, per-instance, set in constructor only
 ```
 
-### Q25. [Topic: C#] ref, out, in Parameters — Pass by Reference
-
+### Q26. [Topic: C#] ref, out, in Parameters — Pass by Reference
 **Definition**:
 - **ref**: Passes a variable by reference; method can read AND write the original variable; variable must be initialized before passing.
 - **out**: Passes a variable by reference; method MUST assign a value before returning; used for methods that return multiple values.
@@ -2720,8 +2758,7 @@ CalculateScore(in m); // passed by reference, no copy, cannot be modified ✅
 
 ---
 
-### Q26. [Topic: C#] Pattern Matching — switch expressions, property patterns
-
+### Q27. [Topic: C#] Pattern Matching — switch expressions, property patterns
 **Definition**:
 - **Pattern Matching**: Destructuring and matching data structures against patterns; available via `is`, switch expressions (C# 8+).
 - **switch expressions**: Expression form of switch (not statement); each arm evaluates to a value; more concise than switch statements.
@@ -2791,8 +2828,7 @@ public IReportGenerator SelectGenerator(ReportRequest req) => req switch
 
 ---
 
-### Q27. [Topic: C#] Memory Leaks in .NET — Causes and How to Find Them
-
+### Q28. [Topic: C#] Memory Leaks in .NET — Causes and How to Find Them
 **Definition**:
 - **Memory Leak in .NET**: Objects remain reachable (referenced) even though no longer needed; the GC cannot collect them because live references still exist.
 - **Root Cause 1 — Event Handler**: Subscriber subscribes to publisher's event but doesn't unsubscribe; publisher keeps subscriber alive forever.
@@ -2908,8 +2944,7 @@ instances that should have been collected but are still referenced
 
 ---
 
-### Q28. [Topic: C#] TaskCompletionSource — Bridging Callbacks to async/await
-
+### Q29. [Topic: C#] TaskCompletionSource — Bridging Callbacks to async/await
 **Definition**:
 - **TaskCompletionSource<T>**: A mechanism to manually control when a Task<T> completes; bridges callback-based APIs to async/await.
 - **Use Case**: Wrapping callbacks (timers, events, async SDK methods) into a Task so they can be awaited.
@@ -2993,8 +3028,7 @@ tcs.TrySetCanceled();
 
 ---
 
-### Q29. [Topic: C#] How was DI implemented before .NET Core? (.NET Framework 4.7)
-
+### Q30. [Topic: C#] How was DI implemented before .NET Core? (.NET Framework 4.7)
 **Definition**:
 - **.NET Framework 4.7**: No built-in DI container; required third-party IoC (Inversion of Control) libraries.
 - **Popular IoC Containers**: Unity (Microsoft's), Autofac (most popular), Ninject, Castle Windsor, StructureMap.
@@ -3067,8 +3101,7 @@ builder.Services.AddTransient<IEmailFormatter, HtmlEmailFormatter>();
 
 ---
 
-### Q30. [Topic: C#] Default Interface Methods vs Abstract Class (C# 8+)
-
+### Q31. [Topic: C#] Default Interface Methods vs Abstract Class (C# 8+)
 **Definition**:
 - **Default Interface Methods (C# 8+)**: Interfaces can now provide default implementations; allows adding new methods to an interface without breaking existing implementations.
 - **Advantages**: Backward compatibility; mix of contract and implementation; allows incremental API evolution.
@@ -3163,8 +3196,7 @@ public interface IExportable
 
 ---
 
-### Q31. Explain Garbage Collector (GC)?
-
+### Q32. Explain Garbage Collector (GC)?
 **Definition**:
 - **Garbage Collector (GC)**: A component of the .NET CLR that automatically manages heap memory; allocates when objects are created and reclaims memory when objects become unreachable.
 - **Key Benefit**: Eliminates manual memory management (malloc/free); prevents memory leaks from forgotten deallocations.
@@ -3195,8 +3227,7 @@ delete a;                                          // manual cleanup — forget 
 
 ---
 
-### Q32. How Does the GC Know When to Clean Objects?
-
+### Q33. How Does the GC Know When to Clean Objects?
 **Definition**:
 - **Reachability Analysis**: The GC algorithm traces from root references; any object reachable from roots is live; unreachable objects are garbage.
 - **GC Roots**: Starting points for tracing: stack local variables, static fields, CPU registers, pinned GC handles.
@@ -3238,8 +3269,7 @@ public static class Cache
 
 ---
 
-### Q33. Is There a Way to See the Heap Memory?
-
+### Q34. Is There a Way to See the Heap Memory?
 **Definition**:
 - **dotnet-counters**: CLI tool for real-time GC metrics (heap size, collection frequency, pause time).
 - **dotnet-dump**: Captures heap snapshots for offline analysis; allows inspecting object types, sizes, and retention paths.
@@ -3290,8 +3320,7 @@ int gen2Collections = GC.CollectionCount(2); // if this is high → memory press
 
 ---
 
-### Q34. Does GC Clean Primitive Types?
-
+### Q35. Does GC Clean Primitive Types?
 **Definition**:
 - **Primitives on Stack**: Primitives (int, decimal, bool) as local variables live on the stack; automatically reclaimed when method returns.
 - **Primitives in Objects**: Primitives as fields within objects live on the heap inside the object; reclaimed when the object is collected.
@@ -3329,8 +3358,7 @@ object boxed = 42;  // int boxed → on heap → GC manages this
 
 ---
 
-### Q35. Managed vs Unmanaged Code/Objects/Resources?
-
+### Q36. Managed vs Unmanaged Code/Objects/Resources?
 **Definition**:
 - **Managed Code**: C#, VB.NET, F# code compiled to IL running under CLR; memory managed by GC.
 - **Managed Objects**: .NET class instances allocated on managed heap; GC is responsible for deallocation.
@@ -3374,8 +3402,7 @@ var connection = new SqlConnection(connectionString); // wraps OS connection han
 
 ---
 
-### Q36. Can GC Clean Unmanaged Code?
-
+### Q37. Can GC Clean Unmanaged Code?
 **Definition**:
 - **Direct Cleanup**: GC cannot directly clean unmanaged resources (OS handles, file descriptors, native memory).
 - **Indirect Cleanup via Finalizers**: GC can trigger finalizer/destructor when the managed object is collected; finalizer can manually release unmanaged resources.
@@ -3404,8 +3431,7 @@ public class SqlEngagementRepository
 
 ---
 
-### Q37. Explain Generations?
-
+### Q38. Explain Generations?
 **Definition**:
 - **Generational Hypothesis**: Most objects die young (80–90%); only small fraction live long-term.
 - **Generational Garbage Collection**: Organizes heap into generations (Gen 0, 1, 2) to exploit this pattern.
@@ -3428,8 +3454,7 @@ Large Object Heap     → objects > 85KB, collected with Gen 2
 
 ---
 
-### Q38. What is GC0, GC1, and GC2?
-
+### Q39. What is GC0, GC1, and GC2?
 **Definition**:
 - **Gen 0**: Newest objects (few MB); collected most frequently (<1ms); short-lived (request DTOs, temp strings, LINQ results).
 - **Gen 1**: Objects that survived Gen 0 collection; intermediate tier; buffer layer; less frequently collected.
@@ -3476,8 +3501,7 @@ finally { ArrayPool<byte>.Shared.Return(buffer); } // no GC cycle needed
 
 ---
 
-### Q39. Why Do We Need Generations?
-
+### Q40. Why Do We Need Generations?
 **Definition**:
 - **Purpose**: Optimize GC efficiency by targeting short-lived objects frequently and long-lived objects rarely.
 - **Without Generations**: Scanning entire heap every collection = expensive, frequent multi-second pauses.
@@ -3506,8 +3530,7 @@ Medium-lived objects (live a few hundred ms, then die) would skip straight to Ge
 
 ---
 
-### Q40. Which Is the Best Place to Clean Unmanaged Objects?
-
+### Q41. Which Is the Best Place to Clean Unmanaged Objects?
 **Definition**:
 - **Primary**: Dispose() method via IDisposable pattern; called immediately when done with resource; deterministic cleanup.
 - **Trigger**: using statement/declaration ensures Dispose() is called even if exceptions occur (automatic in try/finally).
@@ -3543,8 +3566,7 @@ using var context = new EngagementDbContext(options);       // released immediat
 
 ---
 
-### Q41. How Does GC Behave When We Have a Destructor?
-
+### Q42. How Does GC Behave When We Have a Destructor?
 **Definition**:
 - **Without Finalizer**: Unreachable object → immediately collected (one GC cycle).
 - **With Finalizer**: Unreachable object → placed on Finalization Queue → Finalizer Thread runs finalizer → then collected (two GC cycles, delayed).
@@ -3591,8 +3613,7 @@ public class ExpensiveResource : IDisposable
 
 ---
 
-### Q42. What Do You Think About an Empty Destructor?
-
+### Q43. What Do You Think About an Empty Destructor?
 **Definition**:
 - **Empty Destructor**: A finalizer that does nothing; adds finalization overhead with zero benefit.
 - **Cost**: Object goes through Finalization Queue and waits for Finalizer Thread; delays collection; increases GC pressure.
@@ -3626,8 +3647,7 @@ With empty destructor:
 
 ---
 
-### Q43. Explain the Dispose Pattern?
-
+### Q44. Explain the Dispose Pattern?
 **Definition**:
 - **Dispose Pattern**: Standard pattern for releasing managed and unmanaged resources; implements IDisposable with Dispose() and optional finalizer.
 - **Implementation**: Dispose(bool disposing) with conditional cleanup; Dispose() calls Dispose(true); finalizer calls Dispose(false).
@@ -3689,8 +3709,7 @@ public class EngagementExporter : IDisposable
 
 ---
 
-### Q44. Finalize vs Destructor?
-
+### Q45. Finalize vs Destructor?
 **Definition**:
 - **Destructor (~ClassName)**: C# syntax for defining finalization logic; what developers write.
 - **Finalize()**: The method the compiler generates; override of Object.Finalize(); what the CLR calls.
@@ -3735,8 +3754,7 @@ protected override void Finalize()
 
 ---
 
-### Q45. What Is the Use of the `using` Keyword?
-
+### Q46. What Is the Use of the `using` Keyword?
 **Definition**:
 - **using Statement**: Syntactic sugar for try/finally; ensures Dispose() is called on the resource even if an exception occurs.
 - **using Declaration (C# 8+)**: Resource scope ends at end of method; cleaner syntax (no braces).
@@ -3778,8 +3796,7 @@ using Microsoft.EntityFrameworkCore;
 
 ---
 
-### Q46. Can You Force the Garbage Collector?
-
+### Q47. Can You Force the Garbage Collector?
 **Definition**:
 - **GC.Collect()**: Static method to force a full garbage collection immediately; blocks until collection completes.
 - **Syntax**: `GC.Collect()` (all generations) or `GC.Collect(2)` (Gen 0, 1, 2 only); `GC.Collect(2, GCCollectionMode.Forced)` (ignore Concurrent GC).
@@ -3817,8 +3834,7 @@ GC.Collect(); // second collect picks up objects whose finalizers just ran
 
 ---
 
-### Q47. Is It a Good Practice to Force GC?
-
+### Q48. Is It a Good Practice to Force GC?
 **Definition**:
 - **Production Code**: NO — avoid GC.Collect() in production; trust the adaptive GC scheduler; manual collection introduces unpredictable latency.
 - **Testing/Diagnostics**: OK — forcing collection before heap snapshots or performance tests to get clean baselines.
@@ -3858,8 +3874,7 @@ var snapshot = TakeHeapSnapshot(); // now snapshot reflects true live objects
 
 ---
 
-### Q48. How Can We Detect Memory Issues?
-
+### Q49. How Can We Detect Memory Issues?
 **Definition**:
 - **App Insights**: Monitor managed heap size, Gen2 collection frequency, custom metrics; set alerts on heap > 1.5GB threshold.
 - **Performance Counters**: Windows/Linux system metrics for process memory, GC pauses, collection rates.
@@ -3906,8 +3921,7 @@ public class MemoryHealthCheck : IHealthCheck
 
 ---
 
-### Q49. How Can We Know the Exact Source of Memory Issues?
-
+### Q50. How Can We Know the Exact Source of Memory Issues?
 **Definition**:
 - **dotnet-dump**: Captures heap snapshot from running process; offline analysis via dump analyzer.
 - **dumpheap -stat**: Lists all object types on heap with total byte count; shows what's eating memory.
@@ -3958,8 +3972,7 @@ dotnet-dump analyze engagement-service.dmp
 
 ---
 
-### Q50. What Is a Memory Leak?
-
+### Q51. What Is a Memory Leak?
 **Definition**:
 - **Memory Leak**: Memory allocated but never freed; grows over time; eventually exhausts available memory and crashes process.
 - **In Managed Code**: Objects remain reachable (referenced) even though no longer needed; GC cannot collect because live references exist.
@@ -3999,8 +4012,7 @@ public class NotificationPanel
 
 ---
 
-### Q51. Can a .NET Application Have Memory Leaks Even With GC?
-
+### Q52. Can a .NET Application Have Memory Leaks Even With GC?
 **Definition**:
 - **Yes**: GC cannot collect objects that remain reachable (referenced); memory leaks occur when objects are no longer needed but still referenced.
 - **GC Limitation**: GC only manages the managed heap; cannot detect "logical" leaks (object still referenced but no longer useful).
@@ -4035,8 +4047,7 @@ private static Dictionary<string, CompanyData> _cache = new();
 
 ---
 
-### Q52. How to Detect Memory Leaks in .NET Applications?
-
+### Q53. How to Detect Memory Leaks in .NET Applications?
 **Definition**:
 - **Step 1 — Suspect**: Monitor memory growth over 2-4 hours with dotnet-counters; leak = monotonic growth that never decreases after GC.
 - **Step 2 — Identify Type**: dotnet-dump → dumpheap -stat → sort by TotalSize; identify object type with unexpected high count.
@@ -4080,8 +4091,7 @@ STEP 5 — FIX and VERIFY
 
 ---
 
-### Q53. Explain Weak and Strong References?
-
+### Q54. Explain Weak and Strong References?
 **Definition**:
 - **Strong Reference**: Normal reference (`var obj = new MyClass()`); keeps object alive; GC will NOT collect while strong reference exists.
 - **Weak Reference**: `WeakReference<T>` or `WeakReference`; does NOT prevent GC collection; object can be collected even if WeakReference exists.
@@ -4130,8 +4140,7 @@ Weak Reference:
 
 ---
 
-### Q54. When Will You Use Weak References?
-
+### Q55. When Will You Use Weak References?
 **Definition**:
 - **Primary Use**: Memory-sensitive caches where data can be regenerated if GC collects it.
 - **Benefit**: Cache holds data but doesn't prevent GC cleanup under memory pressure.
@@ -4209,8 +4218,7 @@ Do NOT use WeakReference for:
 
 ---
 
-### Q55. [Topic: ASP.NET Core] [EPAM] What is the request lifecycle in ASP.NET Core?
-
+### Q56. [Topic: ASP.NET Core] [EPAM] What is the request lifecycle in ASP.NET Core?
 **Definition**:
 - **Request Pipeline**: HTTP request flows through middleware chain (Program.cs order) in sequence.
 - **Middleware Ordering**: Custom middleware is executed in the order configured in builder.Use(); matters for logging, authentication, CORS.
@@ -4296,8 +4304,7 @@ public async Task<IActionResult> Get(
 
 ---
 
-### Q56. [Topic: ASP.NET Core] [EPAM] What is middleware? List all built-in middleware.
-
+### Q57. [Topic: ASP.NET Core] [EPAM] What is middleware? List all built-in middleware.
 **Definition**:
 - **Middleware**: Request/response component in the pipeline; each calls `next()` to pass control to the next middleware.
 - **Pattern**: `async (HttpContext ctx, RequestDelegate next) => { /* before */ await next(ctx); /* after */ }`.
@@ -4330,8 +4337,7 @@ app.MapHealthChecks("/health")  // health check endpoint
 
 ---
 
-### Q57. [Topic: ASP.NET Core] [EPAM] How do you create custom middleware? Give a real example.
-
+### Q58. [Topic: ASP.NET Core] [EPAM] How do you create custom middleware? Give a real example.
 **Definition**:
 - **Custom Middleware**: Class with constructor taking `RequestDelegate next` and `InvokeAsync(HttpContext ctx)` method.
 - **Dependency Injection**: Middleware ctor can receive ILogger, IRepository, services; those are injected by DI.
@@ -4398,8 +4404,7 @@ public class CorrelationIdDelegatingHandler : DelegatingHandler
 
 ---
 
-### Q58. [Topic: ASP.NET Core] [EPAM] Middleware vs Action Filters — difference and when to use each?
-
+### Q59. [Topic: ASP.NET Core] [EPAM] Middleware vs Action Filters — difference and when to use each?
 **Definition**:
 - **Middleware**: Runs for every request; before routing; can access raw HttpContext; use for cross-cutting concerns (auth, logging, CORS).
 - **Action Filters**: Run after routing, before/after action execution; access ActionContext, ModelState, result; per-endpoint or global.
@@ -4457,8 +4462,7 @@ public class EngagementController : ControllerBase { }
 
 ---
 
-### Q59. [Topic: ASP.NET Core] [EPAM] What is DI? What are service lifetimes? What is the captive dependency trap?
-
+### Q60. [Topic: ASP.NET Core] [EPAM] What is DI? What are service lifetimes? What is the captive dependency trap?
 **Definition**:
 - **Dependency Injection**: Framework creates and injects dependencies; configured in Program.cs.
 - **Transient**: New instance every time; stateless services like formatters, utilities.
@@ -4523,8 +4527,7 @@ public class ReportOrchestrator
 
 ---
 
-### Q60. [Topic: ASP.NET Core] [EPAM] What is JWT authentication? Explain the full validation flow.
-
+### Q61. [Topic: ASP.NET Core] [EPAM] What is JWT authentication? Explain the full validation flow.
 **Definition**:
 - **JWT (JSON Web Token)**: Three-part token (Header.Payload.Signature); stateless authentication.
 - **Issuance**: Identity provider (Okta, Azure AD) validates credentials and issues JWT with claims (sub, roles, exp).
@@ -4581,8 +4584,7 @@ public async Task<IActionResult> CreateEngagement([FromBody] CreateEngagementDto
 
 ---
 
-### Q61. [Topic: ASP.NET Core] [EPAM] What is CORS and how do you configure it?
-
+### Q62. [Topic: ASP.NET Core] [EPAM] What is CORS and how do you configure it?
 **Definition**:
 - **CORS**: Browser security; prevents JS from calling different domain/port; requires explicit Allow-Origin headers from server.
 - **Same-Origin**: Protocol + domain + port must match (https://api.myapp.com ≠ https://myapp.com on port 3000).
@@ -4617,8 +4619,7 @@ app.UseCors("CapitalAccessPolicy"); // before UseAuthentication
 
 ---
 
-### Q62. [Topic: ASP.NET Core] [EPAM] What is your error handling strategy in .NET Core?
-
+### Q63. [Topic: ASP.NET Core] [EPAM] What is your error handling strategy in .NET Core?
 **Definition**:
 - **Global Exception Handler**: Middleware catching all unhandled exceptions; registered first in pipeline.
 - **Structured Logging**: Log exception, stack trace, context (user, request ID) to Application Insights or Serilog.
@@ -4667,8 +4668,7 @@ public class EngagementNotFoundException : NotFoundException
 
 ---
 
-### Q63. [Topic: ASP.NET Core] [EPAM] How do you validate models in ASP.NET Core?
-
+### Q64. [Topic: ASP.NET Core] [EPAM] How do you validate models in ASP.NET Core?
 **Definition**:
 - **Data Annotations**: `[Required]`, `[StringLength]`, `[Range]`, `[EmailAddress]` attributes on DTO properties; automatic validation.
 - **ModelState**: Controller receives `ModelState.IsValid`; if false, ASP.NET Core auto-returns 400 with errors.
@@ -4727,8 +4727,7 @@ public class CreateEngagementValidator : AbstractValidator<CreateEngagementDto>
 
 ---
 
-### Q64. [Topic: ASP.NET Core] [EPAM] How do you manage configuration in .NET Core? What is IOptionsMonitor vs IOptionsSnapshot?
-
+### Q65. [Topic: ASP.NET Core] [EPAM] How do you manage configuration in .NET Core? What is IOptionsMonitor vs IOptionsSnapshot?
 **Definition**:
 - **IOptions<T>**: Static config; loaded once at startup; doesn't react to changes.
 - **IOptionsSnapshot<T>**: Scoped config; reloaded per HTTP request; picks up changes between requests; safe for web apps.
@@ -4792,8 +4791,7 @@ public class FeatureFlagService(IOptionsMonitor<FeatureFlagOptions> monitor)
 
 ---
 
-### Q65. [Topic: ASP.NET Core] [EPAM] What is Azure Key Vault and why use Managed Identity instead of credentials?
-
+### Q66. [Topic: ASP.NET Core] [EPAM] What is Azure Key Vault and why use Managed Identity instead of credentials?
 **Definition**:
 - **Azure Key Vault**: Secure secret storage (API keys, connection strings, certificates); accessible via Azure resource authentication.
 - **Managed Identity**: Azure feature; app authenticated as Azure identity without credentials; credentials managed by Azure.
@@ -4862,8 +4860,7 @@ Code
 
 ---
 
-### Q66. [Topic: ASP.NET Core] [EPAM] What is REST? What are the key principles?
-
+### Q67. [Topic: ASP.NET Core] [EPAM] What is REST? What are the key principles?
 **Definition**: REST (Representational State Transfer) architectural style for APIs using HTTP; **Principles**: (1) Client-Server separation; (2) Stateless (each request self-contained); (3) Resources (URIs represent entities: `/api/engagements/123`); (4) HTTP Methods (GET=read, POST=create, PUT=update, DELETE=remove); (5) Standard Response Codes (200=OK, 201=Created, 400=BadRequest, 404=NotFound, 500=ServerError).
 
 REST = Representational State Transfer. Six constraints:
@@ -4903,8 +4900,7 @@ DELETE /api/engagements/{id}     → delete
 
 ---
 
-### Q67. [Topic: ASP.NET Core] [EPAM] How do you achieve API versioning?
-
+### Q68. [Topic: ASP.NET Core] [EPAM] How do you achieve API versioning?
 **Definition**: Versions allow API changes without breaking clients. **Methods**: (1) URL path (`/api/v1/engagements`, `/api/v2/engagements`); (2) Query string (`?api-version=2.0`); (3) HTTP header (`API-Version: 2.0`); (4) Content negotiation. **.NET Core**: Use `ApiVersion` attribute from `Asp.Versioning` NuGet; `[ApiVersion("1.0")]` on controllers; route to different handlers per version.
 
 ```csharp
@@ -4945,8 +4941,7 @@ public class EngagementV2Controller : ControllerBase
 
 ---
 
-### Q68. [Topic: ASP.NET Core] Content Negotiation — how does it work?
-
+### Q69. [Topic: ASP.NET Core] Content Negotiation — how does it work?
 **Definition**: Server responds in client-requested format. **Mechanism**: Client sends `Accept: application/json` or `Accept: application/xml` header; ASP.NET Core matches to configured formatters; controller returns same object, formatter serializes to requested format. **Configuration**: `services.AddControllers().AddXmlSerializerFormatters()` enables XML; JSON default. **Capital Access**: API returns JSON by default, XML if explicitly requested.
 
 Client declares what format it accepts via `Accept` header. Server responds in best matching format.
@@ -4979,8 +4974,7 @@ public async Task<IActionResult> DownloadReport(Guid id)
 
 ---
 
-### Q69. [Topic: ASP.NET Core] How do you secure a Web API endpoint? Name all best practices.
-
+### Q70. [Topic: ASP.NET Core] How do you secure a Web API endpoint? Name all best practices.
 **Definition**: **Security Best Practices**: (1) HTTPS only (TLS 1.2+); (2) Authentication (`[Authorize]` with JWT); (3) Authorization (role/claim checks); (4) Input validation (FluentValidator, DataAnnotations); (5) CORS restricted origins; (6) Rate limiting; (7) Logging all access; (8) OWASP compliance (SQL injection, XSS prevention); (9) API keys for service-to-service (if not OAuth2); (10) Response headers (Content-Type, X-Frame-Options, CSP).
 
 ```
@@ -5009,8 +5003,7 @@ app.Use(async (ctx, next) =>
 
 ---
 
-### Q70. [Topic: ASP.NET Core] SQL Injection — what is it and how do you prevent it?
-
+### Q71. [Topic: ASP.NET Core] SQL Injection — what is it and how do you prevent it?
 **Definition**: Attacker injects malicious SQL via input (e.g., `'; DROP TABLE users; --`). **Prevention**: (1) Parameterized queries (EF Core's Where(x => x.Id == id)); (2) Stored procedures with parameter mapping; (3) Input validation (whitelist expected formats); (4) ORMs like EF Core (automatic parameterization); (5) Never concatenate user input into SQL strings. **Capital Access**: EF Core queries are parameterized by default; never build LINQ with string concatenation.
 
 ```csharp
@@ -5036,8 +5029,7 @@ await _context.Database.ExecuteSqlRawAsync(
 
 ---
 
-### Q71. [Topic: ASP.NET Core] How do you debug a slow API response?
-
+### Q72. [Topic: ASP.NET Core] How do you debug a slow API response?
 **Definition**: **Debugging Steps**: (1) Add Application Insights or Serilog with request/response timing; (2) dotnet-trace to capture performance events; (3) Database profiling (SQL query time via EF Core logging); (4) Check N+1 query problem (use .Include() for eager loading); (5) Memory profiler for GC pauses; (6) Check external service calls (HTTP timeouts); (7) Monitor CPU and I/O. **Tools**: Application Insights, Glimpse, MiniProfiler, dotnet-trace, PerfView.
 
 ```
@@ -5079,8 +5071,7 @@ var dtos = await _context.EngagementActivities
 
 ---
 
-### Q72. [Topic: ASP.NET Core] What is Clean Architecture and what are its benefits?
-
+### Q73. [Topic: ASP.NET Core] What is Clean Architecture and what are its benefits?
 **Definition**: Layered design isolating concerns. **Layers**: (1) **Domain** (business rules, entities, no frameworks); (2) **Application** (use cases, DTOs, validators); (3) **Infrastructure** (EF Core, repositories, external services); (4) **Presentation** (ASP.NET Core controllers, API). **Benefits**: Testability (swap mock repos), maintainability (changes isolated to layers), framework-agnostic (swap EF Core for Dapper). **Capital Access**: Strict layer separation ensures business logic stays testable even if ASP.NET Core version changes.
 
 ```
@@ -5137,8 +5128,7 @@ public class SqlEngagementRepository : IEngagementRepository
 
 ---
 
-### Q73. [Topic: ASP.NET Core] What is your approach to migrate from .NET Framework 4.7 to .NET 8?
-
+### Q74. [Topic: ASP.NET Core] What is your approach to migrate from .NET Framework 4.7 to .NET 8?
 **Definition**: **Migration Strategy**: (1) Audit dependencies (3rd-party, NuGet packages compatibility); (2) Create .NET 8 project parallel to .NET Framework; (3) Use `try-convert` tool to auto-convert project files; (4) Fix API incompatibilities (AppDomain → DependencyInjection, HttpClient → HttpClientFactory); (5) Update authentication (Cookies → JWT via IdentityServer); (6) Update configuration (web.config → appsettings.json); (7) Run parallel (Framework handles old requests, .NET 8 new), gradually migrate; (8) Test extensively. **Timeline**: 3-6 months typical for large app.
 
 **Strangler Fig Pattern — don't rewrite all at once:**
@@ -5205,8 +5195,7 @@ public class EngagementController : ControllerBase { }
 
 ---
 
-### Q74. [Topic: ASP.NET Core] Rate Limiting — Middleware vs Infrastructure Layer
-
+### Q75. [Topic: ASP.NET Core] Rate Limiting — Middleware vs Infrastructure Layer
 **Definition**: Rate limiting restricts requests per time window. **Middleware Approach**: Early pipeline, simple counters (in-memory or Redis), global or per-route via `[RateLimit]` attributes, fast. **Infrastructure Approach**: Azure API Management, CDN, load balancer throttling; distributed, handles multi-server scenarios. **Trade-off**: Middleware is simple but doesn't scale across servers; Infrastructure scales but requires deployment complexity. **Capital Access**: Use middleware for per-user limits (100 requests/min), Infrastructure for overall API protection (1M requests/min).
 
 Both layers serve DIFFERENT purposes — they are complementary, not redundant.
@@ -5275,8 +5264,7 @@ Attack 2 — Valid enterprise tenant hammering reports:
 
 ## 6. Entity Framework Core
 
-### Q75. What is EF Core and why use it?
-
+### Q76. What is EF Core and why use it?
 **Definition**: ORM mapping .NET objects to relational database. **Why**: (1) No SQL strings (parameterized automatically); (2) LINQ querying; (3) Change tracking; (4) Migrations for schema evolution; (5) Lazy/eager loading; (6) Database-agnostic (swappable). **Capital Access**: All queries through EngagementDbContext; automatic parameter binding prevents SQL injection.
 
 EF Core is an **Object-Relational Mapper** — it maps your C# classes to database tables and lets you query and update data using C# instead of raw SQL. You work with strongly-typed C# objects, and EF Core translates your LINQ queries into the correct SQL for your database — SQL Server, PostgreSQL, SQLite, etc.
@@ -5307,8 +5295,7 @@ public class CapitalAccessDbContext : DbContext
 
 ---
 
-### Q76. Code-First vs Database-First in EF Core?
-
+### Q77. Code-First vs Database-First in EF Core?
 **Definition**: **Code-First**: Define entities in C#, generate database via Migrations (preferred, version-controlled schema). **Database-First**: Existing database, scaffold entities via `dotnet ef dbcontext scaffold`. **Choice**: Code-First for greenfield projects, Database-First for legacy apps. **Capital Access**: Pure Code-First; DbContext and entities define schema; Migrations track changes in git.
 
 **Code-First** — you write C# entity classes, and EF Core generates the database schema from them via migrations. You own the schema. Migrations are tracked in git alongside code. This is the standard for greenfield projects.
@@ -5337,8 +5324,7 @@ dotnet ef dbcontext scaffold "Server=...;Database=CA" \
 
 ---
 
-### Q77. What is the N+1 problem and how do you fix it?
-
+### Q78. What is the N+1 problem and how do you fix it?
 **Definition**: Loading parent (1 query) then child per parent (N queries) = N+1 queries. **Example**: Load 100 engagements (1 query) + load attendees per engagement (100 queries) = 101 queries. **Fix**: Use `.Include(x => x.Attendees)` for eager loading in single query. **Capital Access**: Always identify Engagement→Attendees relationships upfront; use Include or AsNoTracking depending on read-only vs updates.
 
 The N+1 problem is one of the most common EF Core performance bugs. It happens when you load a list of entities and then access a navigation property on each one — EF Core fires a separate SQL query for each row. So if you load 100 engagements and access `e.Company.Name` on each, you fire 1 query to get the engagements plus 100 more to get each company — 101 queries total.
@@ -5366,8 +5352,7 @@ var list = await _context.EngagementActivities
 
 ---
 
-### Q78. What is AsNoTracking and when do you use it?
-
+### Q79. What is AsNoTracking and when do you use it?
 **Definition**: Disables change tracking for entities; reduces memory; faster. **When**: Read-only queries (reporting, list views); never for updates. **Trade-off**: Can't call SaveChanges on untracked entities. **Capital Access**: Reports and list pages use `.AsNoTracking()`, detail/edit pages don't (need tracking for SaveChanges).
 
 By default, EF Core tracks every entity it loads — it takes a snapshot of the original values so it can detect changes and generate UPDATE statements when you call `SaveChanges()`. This tracking has a memory and CPU cost.
@@ -5403,8 +5388,7 @@ await _context.EngagementActivities
 
 ---
 
-### Q79. What are the top EF Core performance rules?
-
+### Q80. What are the top EF Core performance rules?
 **Definition**: (1) Use `.Include()` to fix N+1; (2) `.AsNoTracking()` for read-only; (3) `.Select()` to fetch only needed columns; (4) Batch updates with `ExecuteUpdate()`; (5) Avoid `.ToList().Where()` (runs in-memory); (6) Use `INNER JOIN` via navigation properties, not cross-join; (7) Pagination `.Skip().Take()`; (8) SQL logging in dev to catch bad queries.
 
 Five rules that matter most in production:
@@ -5432,8 +5416,7 @@ var pending = await _context.EngagementActivities
 
 ## 7. LINQ (Language Integrated Query)
 
-### Q80. What is LINQ and what are method vs query syntax?
-
+### Q81. What is LINQ and what are method vs query syntax?
 **Definition**: LINQ (Language Integrated Query) unified API for querying collections/databases. **Query Syntax**: `from x in list where x.Age > 18 select x` (SQL-like). **Method Syntax**: `list.Where(x => x.Age > 18).Select(x => x.Name)` (functional). **Both equivalent**: Compiler converts query to method syntax. **Preference**: Method syntax for straightforward, query syntax for complex joins.
 
 LINQ is a feature of C# that lets you query collections — arrays, lists, database tables — using a consistent syntax that works the same whether the data is in memory or in a database. It integrates querying directly into the C# language with full IntelliSense and compile-time type checking.
@@ -5458,8 +5441,7 @@ var result = from e in _context.EngagementActivities
 
 ---
 
-### Q81. What is deferred vs immediate execution in LINQ?
-
+### Q82. What is deferred vs immediate execution in LINQ?
 **Definition**: **Deferred**: `.Where()`, `.Select()` don't execute until `.ToList()`, `.First()`, or foreach. **Immediate**: `.ToList()`, `.Count()`, `.Any()`, `.First()` execute the query NOW. **Example**: `var q = list.Where(x => x.Age > 18);` doesn't filter yet; `var l = q.ToList();` filters. **Gotcha**: If list changes between Where() and ToList(), results differ.
 
 This is the most important LINQ concept. When you write a LINQ query, **nothing executes immediately** — the query is just a description. It only runs when you **force execution** by calling `.ToList()`, `.Count()`, `.FirstOrDefault()` etc. This is called deferred execution.
@@ -5485,8 +5467,7 @@ var results = await q.AsNoTracking().ToListAsync();  // ONE SQL query with all f
 
 ---
 
-### Q82. IQueryable vs IEnumerable — what is the difference?
-
+### Q83. IQueryable vs IEnumerable — what is the difference?
 **Definition**: **IEnumerable**: In-memory enumeration; all items loaded. **IQueryable**: Deferred; builds expression tree; translated to SQL. **Impact**: IEnumerable.Where() filters in C# (all data loaded); IQueryable.Where() filters in database (only matching rows). **Rule**: Use IQueryable for EF Core (database filtering), IEnumerable for in-memory LINQ (LINQ-to-Objects).
 
 `IQueryable` keeps the query in SQL — any further filters you add are translated to SQL and run in the database. `IEnumerable` brings all data into C# memory first — any further filters run in C# on the already-loaded data.
@@ -5516,8 +5497,7 @@ var result = e.Where(x => x.AttendeeCount > 10).ToList(); // filtered in C# ❌
 
 ---
 
-### Q83. What are the key LINQ operators?
-
+### Q84. What are the key LINQ operators?
 **Definition**: **Filtering**: `.Where()`, `.Distinct()`, `.OfType<T>()`. **Transformation**: `.Select()`, `.SelectMany()`. **Aggregation**: `.Sum()`, `.Count()`, `.Average()`, `.Min()`, `.Max()`. **Ordering**: `.OrderBy()`, `.ThenBy()`, `.Reverse()`. **Joining**: `.Join()`, `.GroupJoin()`. **Grouping**: `.GroupBy()`. **Set ops**: `.Union()`, `.Intersect()`, `.Except()`. **Limiting**: `.Take()`, `.Skip()`, `.TakeWhile()`. **Inspection**: `.Any()`, `.All()`, `.First()`, `.FirstOrDefault()`, `.Single()`.
 
 ```csharp
@@ -5574,8 +5554,7 @@ int sumDivBy3 = numbers.Where(n => n % 3 == 0).Sum();   // 165
 
 ## 8. Additional Topics
 
-### Q84. What is a Correlation ID and why is it important?
-
+### Q85. What is a Correlation ID and why is it important?
 **Definition**: Unique ID assigned per request; propagated across all services/logs for tracing. **Why**: Debugging distributed systems; find all logs for one request across microservices. **Implementation**: Middleware generates `X-Correlation-Id` header, passes to downstream services. **Capital Access**: Every request tagged with correlation ID; all logs include it; queries filter by correlation ID to debug end-to-end flows.
 
 A Correlation ID is a unique identifier — typically a GUID — attached to every incoming HTTP request and carried through every downstream service call, log entry, and message. Its purpose is **distributed tracing** — when something goes wrong in a system with many microservices, you can filter all logs by a single Correlation ID to see the complete picture of what happened, across every service involved, in one search.
@@ -5612,8 +5591,7 @@ public class CorrelationIdMiddleware
 
 ---
 
-### Q85. What is a SQL View and when would you use it?
-
+### Q86. What is a SQL View and when would you use it?
 **Definition**: Virtual table; stored SELECT query; appears like table but computed on-the-fly. **Use**: Complex joins reused in multiple queries, security (restrict columns), reporting queries. **EF Core**: Map view to DbSet; query like table. **Trade-off**: View logic in database (reusable) but hard to version-control vs application logic in C# (testable).
 
 A SQL View is a **stored SELECT query** that behaves like a virtual table. You query it like a table, but there is no separate physical storage — it runs the underlying SELECT every time you query it.
@@ -5648,8 +5626,7 @@ CREATE UNIQUE CLUSTERED INDEX IX_EngagementSummary ON vw_EngagementSummary(Id);
 
 ---
 
-### Q86. How do you scale a .NET microservice?
-
+### Q87. How do you scale a .NET microservice?
 **Definition**: **Vertical**: Bigger machine (CPU, RAM); cheaper but limited. **Horizontal**: More instances + load balancer; unlimited. **Patterns**: Stateless services (cloud-friendly), session affinity if needed, shared database/cache (Redis), async messaging (Service Bus). **Capital Access**: Stateless EngagementService across 10 instances behind load balancer; shared EngagementDbContext (scoped per request).
 
 There are two dimensions of scaling: **vertical** (bigger machine — more CPU/RAM) and **horizontal** (more instances behind a load balancer). Vertical has a ceiling and is a single point of failure. Horizontal is the right approach for production systems — but it requires services to be **stateless**, meaning any instance can handle any request with no dependency on local memory.
@@ -5679,8 +5656,7 @@ HttpContext.Session.SetString("userId", id);
 
 ---
 
-### Q87. What is MCP (Model Context Protocol)?
-
+### Q88. What is MCP (Model Context Protocol)?
 **Definition**: Protocol for LLMs to interact with external systems (files, databases, APIs). **Use**: AI agents calling business logic, querying databases, accessing files safely. **Benefit**: AI systems can perform real work, access data without hallucination. **Capital Access**: MCP allows AI to query EngagementService, fetch reports, audit logs.
 
 MCP is an open protocol created by Anthropic that lets AI assistants connect to external tools and data sources in a standardised way. Without MCP, an AI assistant only has its training data. With MCP, it can connect to your live database, file system, APIs — and act on them with proper tool calls.
@@ -5706,8 +5682,7 @@ server.tool("getEngagementsByTenant", async ({ tenantId }) => {
 
 ---
 
-### Q88. What is Observability in microservices?
-
+### Q89. What is Observability in microservices?
 **Definition**: Three pillars: **Logs** (events, errors, context), **Metrics** (counters, gauges, histograms), **Traces** (request flow across services). **Tools**: Serilog (logging), Prometheus (metrics), Application Insights (all three). **Capital Access**: Structured logging with correlation ID, request/response timing metrics, distributed traces from frontend through 7 backend services.
 
 Observability is your ability to understand what is happening inside a system from the outside — without having to add more instrumentation every time something goes wrong. It has three pillars: **Logs** (what happened), **Metrics** (how is the system performing), and **Traces** (where did the time go across services).
@@ -5737,8 +5712,7 @@ app.MapHealthChecks("/health/ready");   // is app ready for traffic?
 
 ---
 
-### Q89. How do you track and debug issues in production?
-
+### Q90. How do you track and debug issues in production?
 **Definition**: **Monitoring**: Application Insights alerts (error rate, latency, memory). **Logging**: Structured logs with correlation ID, severity levels. **Tracing**: Request flow across services. **Profiling**: dotnet-trace captures CPU, memory, GC events. **Post-mortems**: Root cause analysis. **Capital Access**: Alerts trigger on Gen2 heap >1.5GB, latency >1s, error rate >1%; investigation via correlation ID + logs + traces.
 
 Production debugging has a process — not guesswork. The key is having the right instrumentation in place before the incident happens. In Capital Access, every incident starts with the Correlation ID from the error report.
@@ -5776,8 +5750,7 @@ dotnet-counters monitor --process-id <pid> System.Runtime
 
 ## 9. Platform, DI & Caching Deep Dive
 
-### Q90. What is .NET Standard? When and why would you use it?
-
+### Q91. What is .NET Standard? When and why would you use it?
 **Definition**: Interface spec; allows library to work on multiple .NET implementations (.NET Framework, .NET Core, Mono). **When**: Multi-platform library (NuGet package), shared code for desktop+web+mobile. **.NET 5+**: .NET Standard less relevant; use `.NET 8` (unified platform). **Rule**: New projects target .NET 8 directly; older projects use .NET Standard.
 
 .NET Standard is a formal API specification — a contract — that all .NET implementations agree to support. Writing a library that targets .NET Standard means it can run on .NET Framework 4.7+, .NET Core, .NET 5/6/7/8, Xamarin, and UWP without change.
@@ -5814,8 +5787,7 @@ Today, if all your targets are .NET 5+, you can target `net8.0` directly. .NET S
 
 ---
 
-### Q91. Explicit interface implementation — what happens when two interfaces have the same method signature?
-
+### Q92. Explicit interface implementation — what happens when two interfaces have the same method signature?
 **Definition**: Two interfaces with same method; class implements both; need to disambiguate via `InterfaceName.MethodName()`. **Example**: IReportGenerator and IEventHandler both have `Execute()`; class implements both via `IReportGenerator.Execute()` and `IEventHandler.Execute()` separately.
 
 When two interfaces declare a method with the same name and signature, a class cannot implement both with a single method — the compiler cannot tell which interface contract you are satisfying. C# solves this with explicit interface implementation: you prefix the method name with the interface name. The method has no access modifier and is only callable through a typed interface reference, not through the class reference directly.
@@ -5854,8 +5826,7 @@ public class SecureService : IDisposable
 
 ---
 
-### Q92. What is Lazy<T>? How does lazy initialization work?
-
+### Q93. What is Lazy<T>? How does lazy initialization work?
 **Definition**: Defers object creation until first access; thread-safe; useful for expensive initialization. **Use**: `var lazy = new Lazy<ExpensiveService>(() => new ExpensiveService()); var svc = lazy.Value;` (creates only when .Value accessed). **Benefit**: Avoid initialization cost if object never used; still pay cost once.
 
 `Lazy<T>` defers creation of an expensive object until the first time `.Value` is accessed. After the first access, the same instance is returned on every subsequent call. By default it is thread-safe — only one thread creates the object even if multiple threads access `.Value` simultaneously.
@@ -5894,8 +5865,7 @@ var fastLazy   = new Lazy<Engine>(() => new Engine(), LazyThreadSafetyMode.None)
 
 ---
 
-### Q93. What is the difference between Mutex, Semaphore, and SemaphoreSlim?
-
+### Q94. What is the difference between Mutex, Semaphore, and SemaphoreSlim?
 **Definition**: **Mutex**: Binary lock (owned/not owned); one thread at a time; use for critical sections. **Semaphore**: Counted resource; N threads allowed; use for thread pool limits. **SemaphoreSlim**: Lightweight; async-friendly; prefer in async code. **Choice**: Mutex for exclusive access, Semaphore for throttling.
 
 All three prevent concurrent access to a shared resource, but they differ in scope, capacity, and overhead.
@@ -5946,8 +5916,7 @@ public async Task<ReportDto> FetchReportAsync(string reportId)
 
 ---
 
-### Q94. If a struct has a string property, where is the string stored in memory?
-
+### Q95. If a struct has a string property, where is the string stored in memory?
 **Definition**: Struct lives on stack; string is reference type; string reference lives ON THE STACK (as part of struct), actual string data on HEAP. **Key**: Struct is value type but contains reference; reference goes on stack, data on heap.
 
 The **struct** is a value type — it lives on the stack (when declared as a local variable). But **string** is a reference type — it always lives on the heap.
@@ -5988,8 +5957,7 @@ object boxed = h;
 
 ---
 
-### Q95. Why must DbContext be Scoped and NOT Singleton? What breaks if you use Singleton?
-
+### Q96. Why must DbContext be Scoped and NOT Singleton? What breaks if you use Singleton?
 **Definition**: DbContext not thread-safe; Singleton shared across requests = concurrent access = race condition. **If Singleton**: Stale data (first request's DbContext caches objects), concurrency exception. **Scoped**: One DbContext per request = isolated, safe. **Captive Dependency**: Scoped DbContext injected into Singleton service prevents cleanup; memory leak.
 
 DbContext implements the **Unit of Work** pattern. It holds a change tracker that records which entities were added, modified, or deleted within a single logical operation (one HTTP request). The design contract is: create → use → SaveChanges → dispose — all within one request.
@@ -6037,8 +6005,7 @@ builder.Services.AddSingleton<IReportOrchestrator, ReportOrchestrator>();
 
 ---
 
-### Q96. What is distributed caching? How does Redis work? When do you choose Redis over IMemoryCache?
-
+### Q97. What is distributed caching? How does Redis work? When do you choose Redis over IMemoryCache?
 **Definition**: **IMemoryCache**: In-process; lost on restart; not shared across instances. **Redis**: Distributed; persistent; shared across servers. **Redis**: In-memory key-value store; fast (microseconds), Pub/Sub, expiration. **Choice**: IMemoryCache for single-server, Redis for multi-server/persistence. **Capital Access**: Tenant feature flags cached in Redis (survives service restart, shared across 10 instances).
 
 **IMemoryCache** stores data in the process's own memory — fast, but local to that one instance. If you have three pods running your API, each has its own separate cache. Pod A caches a company report; Pods B and C don't know about it.
@@ -6109,8 +6076,7 @@ public class ReportCacheService(IDistributedCache cache, IReportRepository repo)
 
 *Sourced from live interview rounds: Wipro (R1, R2), Decos Global (R1), HCL (R1), Infosys (R1), Virtusa (R1). Framed through the Entity Management System project (Grant Thornton, healthcare domain) — tracking business entities, shareholding %, and partnerships.*
 
-### Q97. [Topic: OOP] Abstract class vs Interface — real-time scenario?
-
+### Q98. [Topic: OOP] Abstract class vs Interface — real-time scenario?
 **Definition**: Abstract class = base shared behavior (fields, constructors, state); Interface = contract only. **Scenario**: Report generator base class (shared retry logic), IReportGenerator interface (contract). Use abstract for "is-a", interface for "can-do".
 
 **Abstract class**: partial implementation + shared state. Use when subclasses share common behaviour/fields and you want to avoid duplication.
@@ -6143,8 +6109,7 @@ I used an abstract `RepositoryBase` to avoid duplicating `SaveChanges`/transacti
 
 ---
 
-### Q98. [Topic: C# Language] Delegates — real-time scenario?
-
+### Q99. [Topic: C# Language] Delegates — real-time scenario?
 A delegate is a type-safe function pointer — it holds a reference to a method matching its signature and can invoke it indirectly. Used for event callbacks and as the foundation of LINQ predicates.
 
 ```csharp
@@ -6166,8 +6131,7 @@ public event ShareholdingChangedHandler? OnShareholdingChanged;
 
 ---
 
-### Q99. [Topic: LINQ] First vs FirstOrDefault vs Single vs SingleOrDefault?
-
+### Q100. [Topic: LINQ] First vs FirstOrDefault vs Single vs SingleOrDefault?
 | Method | Empty sequence | >1 match | Use when |
 |---|---|---|---|
 | `First()` | Throws | Returns 1st | You know at least one exists |
@@ -6185,8 +6149,7 @@ I use `Single`/`SingleOrDefault` whenever uniqueness is a schema/business invari
 
 ---
 
-### Q100. [Topic: C# Language] readonly vs const vs static?
-
+### Q101. [Topic: C# Language] readonly vs const vs static?
 - **`const`** — compile-time constant, baked into IL at every call site, implicitly `static`. Only primitives/strings.
 - **`readonly`** — assigned only in the constructor (or field initializer), evaluated at runtime. Can differ per instance.
 - **`static`** — belongs to the type, not an instance; one shared value across all instances.
@@ -6207,8 +6170,7 @@ Rule of thumb: `const` for values that will **never** change even across recompi
 
 ---
 
-### Q101. [Topic: C# Language] String vs StringBuilder?
-
+### Q102. [Topic: C# Language] String vs StringBuilder?
 `string` is immutable — every concatenation allocates a **new** string object and copies both operands. In a loop, this is O(n²) and creates heavy GC pressure. `StringBuilder` uses a mutable internal buffer — appends are amortized O(1).
 
 ```csharp
@@ -6226,8 +6188,7 @@ Use `StringBuilder` for loops, large/unknown-size concatenation, or building CSV
 
 ---
 
-### Q102. [Topic: ASP.NET Core] Middleware, custom middleware, and global exception handling?
-
+### Q103. [Topic: ASP.NET Core] Middleware, custom middleware, and global exception handling?
 Middleware is a pipeline component: each one can inspect/modify the request, call `next()` to continue, or short-circuit the response. Order in `Program.cs` is critical — exception handling must be **outermost** (registered first) so it can catch everything downstream, including auth failures.
 
 ```csharp
@@ -6276,8 +6237,7 @@ Centralising exception handling in one middleware means no controller needs try/
 
 ---
 
-### Q103. [Topic: ASP.NET Core] What is the Kestrel server?
-
+### Q104. [Topic: ASP.NET Core] What is the Kestrel server?
 Kestrel is the cross-platform HTTP server built into .NET Core — it can serve requests directly (edge deployment) or sit behind a reverse proxy (Nginx, IIS, Azure App Service's front end) which adds TLS termination, request buffering, and additional hardening.
 
 ```csharp
@@ -6294,8 +6254,7 @@ In Azure App Service, Kestrel runs behind the platform's front-end proxy — I s
 
 ---
 
-### Q104. [Topic: ASP.NET Core] Session handling in .NET Core?
-
+### Q105. [Topic: ASP.NET Core] Session handling in .NET Core?
 ```csharp
 // Program.cs
 builder.Services.AddDistributedMemoryCache(); // or AddStackExchangeRedisCache for distributed
@@ -6316,8 +6275,7 @@ For a single instance, in-memory session is fine. For a scaled-out API (multiple
 
 ---
 
-### Q105. [Topic: ASP.NET Core] API Versioning?
-
+### Q106. [Topic: ASP.NET Core] API Versioning?
 ```csharp
 builder.Services.AddApiVersioning(options =>
 {
@@ -6340,8 +6298,7 @@ Three strategies: URL segment (`/api/v1/`), query string (`?api-version=1.0`), o
 
 ---
 
-### Q106. [Topic: ASP.NET Core] Content Negotiation?
-
+### Q107. [Topic: ASP.NET Core] Content Negotiation?
 Content negotiation is the process by which client and server agree on a response representation — the client sends an `Accept` header (e.g., `application/json`, `application/xml`), and ASP.NET Core's **output formatters** pick a matching serializer.
 
 ```csharp
@@ -6357,14 +6314,12 @@ JSON is the default and only formatter unless you explicitly add others — most
 
 ---
 
-### Q107. [Topic: SOLID] Single Responsibility Principle — real example?
-
+### Q108. [Topic: SOLID] Single Responsibility Principle — real example?
 A class should have only one reason to change. In the Entity Management System: `EntityService` holds business rules (validation, shareholding computation triggers), `EntityRepository` holds only data access (EF queries), and `EntitiesController` holds only HTTP concerns (model binding, status codes). A schema change touches only the repository; a validation-rule change touches only the service.
 
 ---
 
-### Q108. [Topic: SOLID] Liskov Substitution Principle — real example?
-
+### Q109. [Topic: SOLID] Liskov Substitution Principle — real example?
 Subtypes must be substitutable for their base type without breaking correctness. Classic violation: if `Square` extends `Rectangle` and overrides the `Width` setter to also change `Height` (to stay square), any code that does `rect.Width = 5; Assert(rect.Area == 5 * rect.Height_before)` breaks for a `Square` instance — the subtype silently changed the contract's behaviour.
 
 ```csharp
@@ -6381,8 +6336,7 @@ public class Square : Rectangle
 
 ---
 
-### Q109. [Topic: SOLID] Dependency Injection — why constructor injection?
-
+### Q110. [Topic: SOLID] Dependency Injection — why constructor injection?
 Inject dependencies via the constructor rather than `new`-ing them up inside the class. This enables unit testing (mock injection), loose coupling to concrete implementations, and centralised lifetime management.
 
 ```csharp
@@ -6400,8 +6354,7 @@ public class EntityService
 
 ---
 
-### Q110. [Topic: SOLID] Transient vs Scoped vs Singleton — and the captive dependency bug?
-
+### Q111. [Topic: SOLID] Transient vs Scoped vs Singleton — and the captive dependency bug?
 - **Transient** — new instance every time it's requested.
 - **Scoped** — one instance per HTTP request (ideal for `DbContext`).
 - **Singleton** — one instance for the app's entire lifetime (caches, config objects).
@@ -6427,8 +6380,7 @@ public class ReportOrchestrator(IServiceScopeFactory scopeFactory)
 
 ---
 
-### Q111. [Topic: SOLID] Open/Closed Principle — payment options design?
-
+### Q112. [Topic: SOLID] Open/Closed Principle — payment options design?
 Open for extension, closed for modification. Define an `IPaymentProcessor` interface with a `Process(PaymentRequest)` method; concrete classes (`CreditCardProcessor`, `DebitCardProcessor`, `VoucherProcessor`) each implement it, and a `PaymentFactory` maps a payment-type enum to the right implementation.
 
 ```csharp
@@ -6448,8 +6400,7 @@ public class CashProcessor : IPaymentProcessor { public PaymentType SupportedTyp
 
 ---
 
-### Q112. [Topic: Security] Authentication & Authorization mechanism (JWT)?
-
+### Q113. [Topic: Security] Authentication & Authorization mechanism (JWT)?
 JWT Bearer tokens. On login, the server issues a signed JWT (`header.payload.signature`). The Angular client attaches it as `Authorization: Bearer <token>` on every request; the API validates it via `AddAuthentication().AddJwtBearer(...)`.
 
 ```csharp
@@ -6488,8 +6439,7 @@ public class EntitiesController : ControllerBase
 
 ---
 
-### Q113. [Topic: Security] How do you generate a JWT?
-
+### Q114. [Topic: Security] How do you generate a JWT?
 ```csharp
 public string GenerateToken(User user)
 {
@@ -6518,8 +6468,7 @@ Uses `System.IdentityModel.Tokens.Jwt` — build a `SecurityTokenDescriptor`/`Jw
 
 ---
 
-### Q114. [Topic: EF Core] Eager vs Explicit vs Lazy Loading?
-
+### Q115. [Topic: EF Core] Eager vs Explicit vs Lazy Loading?
 - **Eager** — `.Include()`; loads related data in a single JOIN query. Preferred default.
 - **Lazy** — related data loads automatically on property access; requires `virtual` navigation properties + proxies. Easy to trigger accidental N+1.
 - **Explicit** — manually call `.Load()` when you need related data on demand, without lazy-loading side effects everywhere else.
@@ -6531,8 +6480,7 @@ var entities = await _db.Entities.Include(e => e.Shareholders).ToListAsync();
 
 ---
 
-### Q115. [Topic: EF Core] N+1 query problem — how do you find and fix it?
-
+### Q116. [Topic: EF Core] N+1 query problem — how do you find and fix it?
 One query fetches N parent rows, then N more queries each fetch a child — typically from lazy loading or looping and querying per item. On the Entity Management System, a dashboard was firing ~100 individual `SELECT`s per page load (one per entity to compute shareholding %), each fast (<50ms) but summing to ~5–8 seconds.
 
 **Diagnosis**: SQL Server Profiler + Application Insights showed the dashboard's SQL dependency time dominated the request, and Profiler showed the same query shape repeated ~100 times with only the parameter changing.
@@ -6554,8 +6502,7 @@ Result: execution plan went from ~100× Index Seek + Key Lookup to a single Hash
 
 ---
 
-### Q116. [Topic: Architecture] Clean Architecture vs Layered vs Traditional Three-Layer?
-
+### Q117. [Topic: Architecture] Clean Architecture vs Layered vs Traditional Three-Layer?
 **Traditional Three-Layer**: Presentation → Business → Data, dependencies flow strictly downward; the business layer knows about the data layer directly.
 
 **Layered Architecture**: stricter version — each layer only talks to the layer directly below it (Presentation → Application → Domain → Infrastructure). Simpler than Clean Architecture but still separates concerns.
@@ -6579,8 +6526,7 @@ For the Entity Management System's Web API: Angular SPA → Controllers → Serv
 
 ---
 
-### Q117. [Topic: Architecture] Creating a new module (e.g., Customer) — what files/layers do you create?
-
+### Q118. [Topic: Architecture] Creating a new module (e.g., Customer) — what files/layers do you create?
 ```
 Controller:       CustomerController.cs           (HTTP endpoints)
 DTOs:             CustomerDto, CreateCustomerRequest
@@ -6596,8 +6542,7 @@ Each new business capability follows the same Controller → Service → Reposit
 
 ---
 
-### Q118. [Topic: ASP.NET Core] Where do connection strings and secrets live?
-
+### Q119. [Topic: ASP.NET Core] Where do connection strings and secrets live?
 Non-secret config lives in `appsettings.json` under `ConnectionStrings`, read via `IConfiguration`/`IOptions<T>`. Secrets never go in source control:
 
 ```csharp
@@ -6611,8 +6556,7 @@ builder.Configuration.AddAzureKeyVault(keyVaultUri, new DefaultAzureCredential()
 
 ---
 
-### Q119. [Topic: LINQ] 3rd highest salary — LINQ, and how do you handle ties?
-
+### Q120. [Topic: LINQ] 3rd highest salary — LINQ, and how do you handle ties?
 ```csharp
 var thirdHighest = employees
     .OrderByDescending(e => e.Salary)
@@ -6626,8 +6570,7 @@ Without `.Distinct()`, if two employees share the 3rd salary, `Skip(2)` lands on
 
 ---
 
-### Q120. [Topic: LINQ] IEnumerable vs IQueryable?
-
+### Q121. [Topic: LINQ] IEnumerable vs IQueryable?
 `IQueryable` builds an expression tree — filters/sorts/projections are translated to SQL and executed on the database server; execution is deferred until enumeration. `IEnumerable` executes immediately and operates on data already loaded into memory (LINQ-to-Objects).
 
 ```csharp
@@ -6645,8 +6588,7 @@ Rule: return/compose `IQueryable` inside repositories and only call `.ToListAsyn
 
 ---
 
-### Q121. [Topic: C# Language] Generics — why prefer them over arrays/ArrayList?
-
+### Q122. [Topic: C# Language] Generics — why prefer them over arrays/ArrayList?
 Generics (`List<T>`, `Dictionary<K,V>`) give compile-time type safety and avoid boxing/unboxing for value types. A non-generic `ArrayList` stores `object`, so every `int` added is boxed (heap-allocated) and every read is unboxed (cast).
 
 ```csharp
@@ -6663,8 +6605,7 @@ In production I profiled an old report service using `ArrayList` for numeric agg
 
 ---
 
-### Q122. [Topic: C# Language] Generic vs Non-Generic Collections?
-
+### Q123. [Topic: C# Language] Generic vs Non-Generic Collections?
 | | Non-Generic (`System.Collections`) | Generic (`System.Collections.Generic`) |
 |---|---|---|
 | Examples | `ArrayList`, `Hashtable` | `List<T>`, `Dictionary<K,V>`, `HashSet<T>` |
@@ -6678,8 +6619,7 @@ In the Entity Management System: `List<EntityDto>` for in-memory collections, `D
 
 ---
 
-### Q123. [Topic: C# Language] Boxing and unboxing — cost, and how to avoid it?
-
+### Q124. [Topic: C# Language] Boxing and unboxing — cost, and how to avoid it?
 **Boxing**: converting a value type to `object` — allocates on the heap, adds GC pressure. **Unboxing**: casting back to the value type — a runtime type-check plus copy.
 
 ```csharp
@@ -6692,8 +6632,7 @@ Avoidance checklist: (1) use generics — `T` is resolved at compile time so no 
 
 ---
 
-### Q124. [Topic: C# Language] ref vs out parameters?
-
+### Q125. [Topic: C# Language] ref vs out parameters?
 Both pass by reference, but with different contracts:
 
 | | `ref` | `out` |
@@ -6716,8 +6655,7 @@ if (int.TryParse(input, out int entityId))
 
 ---
 
-### Q125. [Topic: C# Language] Swap two objects — without a third variable?
-
+### Q126. [Topic: C# Language] Swap two objects — without a third variable?
 ```csharp
 // Tuple deconstruction (C# 7+) — no temp variable needed
 var a = new Entity { Id = 1, Name = "Alpha" };
@@ -6733,8 +6671,7 @@ For reference types, the swap exchanges which variable *points to* which object 
 
 ---
 
-### Q126. [Topic: ASP.NET Core] What does WebApplicationBuilder / the generic host set up?
-
+### Q127. [Topic: ASP.NET Core] What does WebApplicationBuilder / the generic host set up?
 `WebApplicationBuilder` (via `WebApplication.CreateBuilder(args)`) wires up: the Kestrel server, the DI container, the middleware pipeline, configuration sources (`appsettings.json`, environment variables, user secrets, Key Vault), logging providers, and app lifecycle management.
 
 ```csharp
@@ -6752,8 +6689,7 @@ app.Run();                                        // starts listening
 
 ---
 
-### Q127. [Topic: Design Patterns] Which design patterns have you used in a real project?
-
+### Q128. [Topic: Design Patterns] Which design patterns have you used in a real project?
 - **Repository** — abstracts EF Core/DbContext access behind `IRepository<T>`, so services depend on an interface, not `DbContext` directly.
 - **Singleton** — shared, stateless services (config accessors, in-memory cache wrappers) registered once for the app's lifetime.
 - **Factory** — resolves the correct concrete implementation at runtime, e.g. a `PaymentFactory` mapping a payment-type enum to an `IPaymentProcessor`.
@@ -6761,8 +6697,7 @@ app.Run();                                        // starts listening
 
 ---
 
-### Q128. [Topic: C# Language] async/await — how does it keep an API responsive?
-
+### Q129. [Topic: C# Language] async/await — how does it keep an API responsive?
 `async` marks a method as asynchronous; `await` suspends the method at that point without blocking the calling thread — the thread is released back to the thread pool to do other work while the awaited `Task` (typically I/O: DB call, HTTP call) completes. Critical for API throughput under load, since blocking threads on I/O starves the thread pool.
 
 ```csharp
@@ -6777,8 +6712,7 @@ public Entity? GetByIdSync(int id) =>
 
 ---
 
-### Q129. [Topic: EF Core] Code First vs DB First — which is more efficient, and why?
-
+### Q130. [Topic: EF Core] Code First vs DB First — which is more efficient, and why?
 **Code First**: define C# entities + `DbContext`, EF Core generates migrations that create/update the schema. **DB First**: the schema already exists; `Scaffold-DbContext` reverse-engineers entities from it.
 
 **Code First advantages** (my default for greenfield work): schema is versioned in source control — migrations *are* the Git history of DB changes; schema changes are reviewable in PRs; no manual code/DB sync; easy to spin up fresh environments with `Update-Database`, which fits CI/CD well.
@@ -6789,8 +6723,7 @@ On the Entity Management System: Code First with migrations — every sprint's s
 
 ---
 
-### Q130. [Topic: Performance] How do you identify and resolve a performance issue, end to end?
-
+### Q131. [Topic: Performance] How do you identify and resolve a performance issue, end to end?
 I follow **Identify → Isolate → Fix → Verify** across every layer:
 
 - **Identify** — Frontend: Chrome DevTools Performance tab for long tasks/re-renders. Backend: Application Insights → slowest requests, correlated with SQL dependency duration. Database: Profiler/Extended Events, `sys.dm_exec_query_stats` for top CPU/IO consumers.
@@ -6800,8 +6733,7 @@ I follow **Identify → Isolate → Fix → Verify** across every layer:
 
 ---
 
-### Q131. [Topic: C# Runtime] Why does .NET Core/.NET run faster than .NET Framework?
-
+### Q132. [Topic: C# Runtime] Why does .NET Core/.NET run faster than .NET Framework?
 - **Modular, lean runtime** — Framework shipped everything (WCF, WebForms); .NET Core only deploys what you reference, reducing startup time and memory.
 - **RyuJIT compiler** — replaced the old 64-bit JIT; better codegen, SIMD intrinsics, improved throughput.
 - **`Span<T>`/`Memory<T>`** — slice arrays/strings without heap allocation; e.g. CSV parsing with `Span<T>` eliminated thousands of intermediate string allocations per request.
@@ -6813,8 +6745,7 @@ Real observation: migrating a service from .NET Framework 4.6 to .NET 6 dropped 
 
 ---
 
-### Q132. [Topic: OOP] Four pillars of OOP — an alternate real-project example
-
+### Q133. [Topic: OOP] Four pillars of OOP — an alternate real-project example
 *(See also Q1 for the Capital Access framing — same concepts, different project story for interview variety.)*
 
 - **Encapsulation** — `Entity` exposes properties via controlled getters/setters; the shareholding computation formula (`CalculatePercentage()`) is private, invoked only through a service method. Changed the formula once without touching any consumer.
@@ -6824,8 +6755,7 @@ Real observation: migrating a service from .NET Framework 4.6 to .NET 6 dropped 
 
 ---
 
-### Q133. [Topic: Security] How do you secure some API endpoints while keeping others open?
-
+### Q134. [Topic: Security] How do you secure some API endpoints while keeping others open?
 `[Authorize]` at the controller level (secure by default), with `[AllowAnonymous]` on specific public actions, plus role- or policy-based authorization for finer-grained rules:
 
 ```csharp
@@ -6851,8 +6781,7 @@ Applying `[Authorize]` at the controller level means a newly-added action is aut
 
 ---
 
-### Q134. [Topic: ASP.NET Core] How do you document API endpoints?
-
+### Q135. [Topic: ASP.NET Core] How do you document API endpoints?
 Three layers: **Swagger/OpenAPI** (primary, auto-generated) via Swashbuckle, **XML doc comments** on controllers/DTOs that Swagger surfaces in its UI, and **README/Confluence** for cross-cutting context (auth flow, rate limits, pagination conventions) that Swagger can't express.
 
 ```csharp
@@ -6876,8 +6805,11 @@ Senior point worth stating out loud: Swagger UI should be disabled or locked beh
 
 ---
 
-### Q135. [Topic: Validation] Custom Validators — FluentValidation and DataAnnotations in C#?
+## 11. Core ASP.NET & Validation Topics
 
+---
+
+### Q136. [Topic: Validation] Custom Validators — FluentValidation and DataAnnotations in C#?
 Two approaches: **Data Annotations** (built-in, simple) and **Fluent Validation** (expressive, complex rules).
 
 **Data Annotations** — declarative, on DTOs:
@@ -6949,8 +6881,7 @@ I prefer Fluent Validation for production APIs — it keeps validation logic cen
 
 ---
 
-### Q136. [Topic: ASP.NET Core] What is CORS and what is its purpose?
-
+### Q137. [Topic: ASP.NET Core] What is CORS and what is its purpose?
 **CORS** (Cross-Origin Resource Sharing) is a security mechanism that controls which origins (domains) can make requests to your API from a browser. Without CORS, browsers block cross-origin requests by default (Same-Origin Policy).
 
 **Why it matters**: If your Angular SPA is on `https://app.example.com` and your API is on `https://api.example.com`, the browser blocks the request unless CORS explicitly allows it.
@@ -6995,8 +6926,7 @@ public IActionResult CreateEntity() => Ok(...);
 
 ---
 
-### Q137. [Topic: EF Core] What is Change Tracking in Entity Framework Core?
-
+### Q138. [Topic: EF Core] What is Change Tracking in Entity Framework Core?
 Change tracking is EF Core's mechanism to monitor which entities have been added, modified, or deleted since they were loaded, so it knows which entities to insert/update/delete when `SaveChangesAsync()` is called.
 
 ```csharp
@@ -7034,8 +6964,7 @@ _db.Entities.Remove(entity); // track for deletion
 
 ---
 
-### Q138. [Topic: EF Core] What are Entity States in Entity Framework Core?
-
+### Q139. [Topic: EF Core] What are Entity States in Entity Framework Core?
 Entity states represent the current lifecycle status of an entity in EF Core's change tracker:
 
 | State | Description | SaveChanges behavior |
@@ -7076,8 +7005,7 @@ Console.WriteLine(_db.Entry(detached).State);  // Detached (never added to conte
 
 ---
 
-### Q139. [Topic: Performance] What are the different ways to optimize a Web API?
-
+### Q140. [Topic: Performance] What are the different ways to optimize a Web API?
 A tiered approach across all layers:
 
 **1. Database layer:**
@@ -7123,8 +7051,7 @@ Example from production: dashboard took 8s → Profiler showed N+1 queries → r
 
 ---
 
-### Q140. [Topic: ASP.NET Core] What is Dependency Injection (DI) and why is it important?
-
+### Q141. [Topic: ASP.NET Core] What is Dependency Injection (DI) and why is it important?
 **DI** is a pattern where a class receives its dependencies (collaborators) from the outside rather than creating them internally. Instead of `new`-ing up objects, you let a container construct and inject them.
 
 ```csharp
@@ -7192,8 +7119,7 @@ public class EntityController
 
 ---
 
-### Q141. [Topic: Concurrency] What is the difference between Thread and Task? Does a Task decide internally whether to run on a single thread or multiple threads?
-
+### Q142. [Topic: Concurrency] What is the difference between Thread and Task? Does a Task decide internally whether to run on a single thread or multiple threads?
 > **Say this first (formal definition):** Thread is the core unit of execution provided by the **OS** — a real, OS-scheduled worker. Task is a **library-level abstraction** (part of the Task Parallel Library, `System.Threading.Tasks`) representing a unit of work and its eventual result — backed by a ThreadPool thread when there's CPU work to run, but backed by **nothing at all** (just a registered completion callback) while purely waiting on I/O.
 
 **The core distinction:**
@@ -7264,8 +7190,7 @@ Saying "Task is an abstraction *on top of* Thread" is imprecise — it implies a
 
 ---
 
-### Q142. [Topic: Concurrency] Is async/await a feature of TPL?
-
+### Q143. [Topic: Concurrency] Is async/await a feature of TPL?
 > **Say this first (formal definition):** No — **TPL is a library** (`System.Threading.Tasks`, .NET 4.0, 2010) giving you `Task`/`Task<T>`. **async/await is a C# language/compiler feature** (C# 5.0, .NET 4.5, 2012) — two years later — that rewrites your method into a state machine. They're related but architecturally distinct layers.
 
 **The timeline proves they're separate:**
@@ -7311,8 +7236,7 @@ TAP:          the NAMING CONVENTION connecting them.
 
 ---
 
-### Q143. [Topic: Concurrency] What is the difference between Threading, Concurrency, and Parallelism?
-
+### Q144. [Topic: Concurrency] What is the difference between Threading, Concurrency, and Parallelism?
 > **Say this first (formal definition):** **Concurrency** is a *property of program structure* — dealing with multiple tasks in progress over overlapping time periods, not necessarily at the same instant. **Threading** is one *mechanism* — OS-level threads — used to achieve concurrency. **Parallelism** is a *property of execution* — actually doing multiple things at the exact same instant, which requires multiple CPU cores.
 
 **Rob Pike's framing**: *"Concurrency is about dealing with lots of things at once. Parallelism is about doing lots of things at once."* Threading is just one tool that can produce either.
