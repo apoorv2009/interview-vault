@@ -21,6 +21,7 @@
 9. [Platform, DI & Caching Deep Dive (Q90–Q96)](#9-platform-di--caching-deep-dive)
 10. [Interview Rounds — Additional Q&A (Q97–Q134)](#10-interview-rounds--additional-qa)
 11. [Core ASP.NET & Validation Topics (Q135–Q140)](#11-core-aspnet--validation-topics)
+12. [Concurrency & Threading Deep Dive (Q141–Q143)](#12-concurrency--threading-deep-dive)
 
 ---
 
@@ -7184,5 +7185,186 @@ public class EntityController
 2. **Loose coupling** — swap implementations without changing dependent code
 3. **Lifecycle management** — container controls when objects are created/disposed
 4. **Single Responsibility** — classes focus on their job, not constructing dependencies
+
+---
+
+## 12. Concurrency & Threading Deep Dive
+
+---
+
+### Q141. [Topic: Concurrency] What is the difference between Thread and Task? Does a Task decide internally whether to run on a single thread or multiple threads?
+
+> **Say this first (formal definition):** Thread is the core unit of execution provided by the **OS** — a real, OS-scheduled worker. Task is a **library-level abstraction** (part of the Task Parallel Library, `System.Threading.Tasks`) representing a unit of work and its eventual result — backed by a ThreadPool thread when there's CPU work to run, but backed by **nothing at all** (just a registered completion callback) while purely waiting on I/O.
+
+**The core distinction:**
+```
+Thread:  "Here is a worker." — you manage the WORKER itself. Heavy. Always
+         occupies an OS thread, whether computing or just blocked waiting.
+
+Task:    "Here is a promise this work will complete." — you manage the WORK,
+         not the worker. The runtime decides how (or whether) a thread backs it.
+```
+
+**Side-by-side:**
+
+| | Thread | Task |
+|---|---|---|
+| Level | OS-level primitive | Library abstraction (TPL) |
+| Cost to create | Heavy — ~1MB stack, real context-switch overhead | Cheap — a lightweight managed object |
+| Execution | Always maps to exactly one OS thread | ThreadPool thread, or **no thread at all** during async I/O |
+| Return value | No built-in support | `Task<TResult>` — built-in |
+| Composition | Manual (`Join()`, manual signaling) | `await`, `Task.WhenAll`, `Task.WhenAny`, `ContinueWith` |
+| Cancellation | Roll your own | Built-in `CancellationToken` |
+| Best for | Rare — dedicated, long-lived OS thread | Virtually everything else |
+
+```csharp
+// THREAD — you own the OS resource directly
+var thread = new Thread(() => ComputeReportSummary());
+thread.Start();
+thread.Join(); // blocks until done — no built-in return value
+
+// TASK — you describe work, runtime manages execution
+Task<ReportSummary> task = Task.Run(() => ComputeReportSummary());
+var summary = await task; // return value flows naturally
+```
+
+**Does a Task decide internally to "go multi-threaded"? No — never for its own code.** A single Task's body never runs on two threads *at the same time*. What it CAN do is **hop between different threads across `await` boundaries** — that's not the Task "deciding" anything, it's the scheduler/SynchronizationContext machinery around it.
+
+```csharp
+public async Task DemonstrateThreadHopAsync()
+{
+    Console.WriteLine($"Before await: Thread {Environment.CurrentManagedThreadId}"); // e.g. Thread 4
+    await Task.Delay(1000); // async I/O — thread released here, NOT occupied while waiting
+    Console.WriteLine($"After await: Thread {Environment.CurrentManagedThreadId}");  // e.g. Thread 11 — often DIFFERENT
+}
+// Sequential execution, just physically relocated across time.
+// At no point do two parts of THIS ONE Task's code run simultaneously.
+```
+
+Who decides where execution resumes: (1) the compiler-generated async **state machine** (numbered resume points at each `await`), (2) the **SynchronizationContext** if one exists (e.g. WPF/WinForms marshal back to the UI thread — ASP.NET Core has none by default), (3) the **TaskScheduler** — the default `ThreadPoolTaskScheduler` just grabs any available pool thread, no guarantee of same-thread continuation.
+
+**True multi-threaded parallelism only happens with *multiple* Task objects**, not one Task splitting itself:
+```csharp
+await Task.WhenAll(
+    FetchOwnershipDataAsync(portfolioId),   // Task A
+    FetchTargetingDataAsync(portfolioId)    // Task B
+); // A and B may genuinely execute concurrently on different ThreadPool threads
+```
+
+**Refined mental model — Task is not strictly "an abstraction on Thread":**
+```
+Thread is the core unit of execution provided by the OS. Task is a library-level
+abstraction .NET provides to represent a unit of work — used both for asynchronous
+(non-blocking, I/O-bound) work and for offloading CPU-bound work to the ThreadPool
+— without requiring a dedicated OS thread per unit of work like Thread does.
+```
+Saying "Task is an abstraction *on top of* Thread" is imprecise — it implies a thread always sits underneath. During genuine async I/O (`await client.GetByteArrayAsync(url)`), the Task exists but is attached to **zero threads** for the duration of the wait — proven by the fact thousands of pending Tasks can exist with only a handful of real OS threads in the process.
+
+> **Interview line**: "Thread is the OS's core execution primitive — heavyweight, one-to-one with a real OS thread. Task is .NET's library-level abstraction for a unit of work — it borrows a ThreadPool thread when there's actual CPU work to run, but for I/O-bound async work it can be pending with no thread attached at all, just a completion callback. A single Task's code never runs on two threads simultaneously; it can only hop between threads at await boundaries, and that's the scheduler's decision, not the Task's. True parallelism requires multiple separate Task objects — Task.WhenAll or Parallel.ForEach — not one Task fanning itself out."
+
+---
+
+### Q142. [Topic: Concurrency] Is async/await a feature of TPL?
+
+> **Say this first (formal definition):** No — **TPL is a library** (`System.Threading.Tasks`, .NET 4.0, 2010) giving you `Task`/`Task<T>`. **async/await is a C# language/compiler feature** (C# 5.0, .NET 4.5, 2012) — two years later — that rewrites your method into a state machine. They're related but architecturally distinct layers.
+
+**The timeline proves they're separate:**
+```
+2010 — .NET 4.0 ships TPL. Task exists, but consumed manually:
+        task.ContinueWith(t => DoNextThing(t.Result)); // clunky, nested callbacks
+
+2012 — C# 5.0 ships async/await, TWO YEARS LATER, to make TPL's Task
+        pleasant to consume:
+        var result = await task;
+        DoNextThing(result); // reads like synchronous code ✅
+```
+
+**Proof `await` doesn't require `Task` at all — it works with anything satisfying the "awaitable pattern":**
+```csharp
+// ValueTask<T> — not part of TPL's original Task hierarchy, still awaitable
+public async ValueTask<int> GetCachedCountAsync() => await SomeValueTaskMethod();
+
+// A custom, hand-rolled awaitable — nothing to do with TPL
+public class CustomAwaitable
+{
+    public CustomAwaiter GetAwaiter() => new CustomAwaiter();
+}
+public struct CustomAwaiter : INotifyCompletion
+{
+    public bool IsCompleted => true;
+    public void OnCompleted(Action continuation) => continuation();
+    public void GetResult() { }
+}
+await new CustomAwaitable(); // ✅ compiles — no Task anywhere
+```
+
+The compiler requires a `GetAwaiter()` method returning a type with `IsCompleted`, `OnCompleted()`, `GetResult()` — duck-typed, not tied to `Task` specifically. `Task`/`Task<T>` are just the overwhelmingly common awaitable, by a naming convention called the **Task-based Asynchronous Pattern (TAP)**.
+
+```
+TPL:          the LIBRARY — gives you Task as a representation of async work.
+async/await:  the LANGUAGE SYNTAX — lets you consume any awaitable (usually Task)
+              as if it were sequential code, via compiler-generated state machines.
+TAP:          the NAMING CONVENTION connecting them.
+```
+
+> **Interview line**: "No — TPL and async/await are two layers shipped two years apart. TPL is the library, from .NET 4.0, giving you Task and Task<T>. async/await is a C# 5.0 language feature — pure compiler syntax that transforms a method into a state machine. The proof they're separate: await doesn't actually require Task — it works with anything implementing the awaitable pattern. Task just happens to be the overwhelmingly common awaitable by convention, which is why people conflate the two."
+
+---
+
+### Q143. [Topic: Concurrency] What is the difference between Threading, Concurrency, and Parallelism?
+
+> **Say this first (formal definition):** **Concurrency** is a *property of program structure* — dealing with multiple tasks in progress over overlapping time periods, not necessarily at the same instant. **Threading** is one *mechanism* — OS-level threads — used to achieve concurrency. **Parallelism** is a *property of execution* — actually doing multiple things at the exact same instant, which requires multiple CPU cores.
+
+**Rob Pike's framing**: *"Concurrency is about dealing with lots of things at once. Parallelism is about doing lots of things at once."* Threading is just one tool that can produce either.
+
+**The hierarchy — most people get this backwards:**
+```
+CONCURRENCY (the goal/property — "many things in flight")
+  ├── achieved via THREADING          → multiple OS threads, true multitasking
+  ├── achieved via ASYNC/AWAIT        → single/few threads, cooperative, non-blocking I/O
+  ├── achieved via MULTIPLE PROCESSES → OS-level isolation, heavier
+  └── achieved via COROUTINES/ACTORS  → language/framework cooperative model
+
+PARALLELISM (actual simultaneous execution — requires multiple CPU cores)
+  → a possible OUTCOME of concurrency, not the same thing as it
+```
+
+**Proof: concurrency without threading**
+```csharp
+// 10,000 "concurrent" downloads — but NOT 10,000 threads
+public async Task<List<byte[]>> DownloadAllReportsAsync(List<string> urls)
+{
+    var tasks = urls.Select(url => httpClient.GetByteArrayAsync(url));
+    return (await Task.WhenAll(tasks)).ToList();
+}
+// All 10,000 downloads are IN FLIGHT concurrently. But during each await,
+// no thread is occupied. Maybe 4-8 ThreadPool threads handle the brief
+// CPU bursts. Genuine CONCURRENCY with almost no THREADING involved.
+```
+
+```csharp
+// TRUE PARALLELISM — requires actual threading, multiple cores doing CPU work AT ONCE
+Parallel.ForEach(companies, company => ComputeEngagementScore(company));
+```
+
+**Side-by-side:**
+
+| | Concurrency | Threading | Parallelism |
+|---|---|---|---|
+| What it is | Property/goal | Mechanism/tool | Property of execution |
+| Requires multiple cores? | No | Not to create threads, but to run truly simultaneously, yes | Yes |
+| Example | 10,000 in-flight async I/O ops on 4 threads | `new Thread()`, `Task.Run` | `Parallel.ForEach` genuinely running on multiple cores |
+
+**Why the distinction matters — the classic interview trap:**
+```
+Wrong instinct: "handle more concurrent requests" → "add more threads" ❌
+                (threads are expensive; most of the wait is I/O, not CPU)
+
+Right instinct: "handle more concurrent requests" → "ensure I/O is truly
+                async (await, not .Result/.Wait())" → same small thread
+                pool now serves far more concurrent work ✅
+```
+
+> **Interview line**: "Concurrency is a property of the program's structure — dealing with multiple tasks in progress over overlapping time. Threading is one mechanism to get there — real OS threads. Parallelism is genuinely doing multiple things at the exact same instant, which requires multiple cores. They're not the same: async/await gives massive concurrency using very few threads, because most of that 'concurrent' work is just waiting on I/O with no thread attached. So the hierarchy is — concurrency is the goal, threading is one tool to get it, parallelism is what happens when concurrent work also happens to run simultaneously."
 
 ---
