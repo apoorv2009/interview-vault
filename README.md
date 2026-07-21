@@ -23,6 +23,7 @@ My interview prep notes, organized by topic. Most answers are framed around the 
 | [system-design-interview-playbook](https://github.com/apoorv2009/interview-vault/tree/main/system-design-interview-playbook) | System design Q&A at Staff/Principal depth | 24+ questions |
 | [aagam-mitra](https://github.com/apoorv2009/interview-vault/tree/main/aagam-mitra) | Production agentic AI system: RAG, LLMs, multi-agent orchestration, enterprise governance, prompt engineering, cache invalidation | 107 questions |
 | [angular-interview-prep-app](https://github.com/apoorv2009/interview-vault/tree/main/angular-interview-prep-app) | Hands-on Angular 19 app for practising concepts | App |
+| [mock-interview-debrief](https://github.com/apoorv2009/interview-vault/tree/main/mock-interview-debrief) | Verdicts and targeted drill sets from real interview recordings | Per-recording |
 
 ---
 
