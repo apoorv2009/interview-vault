@@ -220,6 +220,8 @@ Azure App Service is the compute tier where all 6 microservices (Ownership, Prof
 - VMs force you to manage infrastructure — provisioning, decommissioning, networking — that scales linearly with team size
 - **App Service abstracts the OS away:** Microsoft patches automatically, certification is simpler, and you focus on code
 
+> **Anticipate this follow-up:** *"But Virtual Machine Scale Sets (VMSS) can autoscale too — so why not VMs?"* — True, and worth saying so directly rather than getting caught out by it. VMSS gives metric-based and schedule-based autoscaling structurally similar to App Service's. **Autoscaling capability was never the differentiator.** The actual reason is *operational ownership of the layer underneath the scaling*: with VMSS you still own OS patching, VM image management, and networking/NSG configuration yourself. With App Service, Microsoft owns everything below the application layer. For a team serving 2,500+ regulated clients, that patching/compliance ownership — not scaling — is what tips the decision toward App Service.
+
 **Compared to AKS (Azure Kubernetes Service):**
 - AKS is optimized for systems with 50+ microservices, complex inter-service networking, and polyglot workloads
 - Capital Access has 6 microservices, all C# / .NET — we don't need Kubernetes's flexibility
