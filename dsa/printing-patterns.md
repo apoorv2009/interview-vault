@@ -69,7 +69,7 @@ Outer loop runs from 1 to n (rows). Inner loop runs from 0 to i (columns) — pr
 ### Solution
 
 ```csharp
-public static void PrintRightTriangle(int num)
+public static void PrintPattern(int num)
 {
     for (int i = 1; i <= num; i++)
     {
@@ -115,7 +115,7 @@ Outer loop runs 1 to n. Inner loop starts at n and goes down to i — so row 1 p
 ### Solution
 
 ```csharp
-public static void PrintInvertedRightTriangle(int num)
+public static void PrintPattern(int num)
 {
     for (int i = 1; i <= num; i++)
     {
@@ -161,7 +161,7 @@ Same structure as Right Triangle. Inner loop runs 0 to i, but instead of printin
 ### Solution
 
 ```csharp
-public static void PrintNumberTriangle(int num)
+public static void PrintPattern(int num)
 {
     for (int i = 1; i <= num; i++)
     {
@@ -207,7 +207,7 @@ Same structure as Number Triangle but print `i` instead of `j` — the row numbe
 ### Solution
 
 ```csharp
-public static void PrintSameNumberTriangle(int num)
+public static void PrintPattern(int num)
 {
     for (int i = 1; i <= num; i++)
     {
@@ -252,7 +252,7 @@ Declare a counter outside both loops. Inner loop prints the counter and incremen
 ### Solution
 
 ```csharp
-public static void PrintFloydTriangle(int num)
+public static void PrintPattern(int num)
 {
     int count = 1;
     for (int i = 1; i <= num; i++)
