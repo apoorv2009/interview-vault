@@ -138,6 +138,7 @@ public static void PrintInvertedRightTriangle(int num)
 ## 3. Number Triangle
 
 **Difficulty:** Easy
+**Date:** 2026-07-21
 
 ### Pattern
 
@@ -155,16 +156,28 @@ Given `n`, print a triangle where row `i` prints numbers `1` to `i`.
 
 ### Approach
 
-_To be added_
+Same structure as Right Triangle. Inner loop runs 0 to i, but instead of printing `*` print `j+1` to get numbers 1, 2, 3...
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintNumberTriangle(int num)
+{
+    for (int i = 1; i <= num; i++)
+    {
+        for (int j = 0; j < i; j++)
+        {
+            Console.Write(j + 1 + " ");
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
