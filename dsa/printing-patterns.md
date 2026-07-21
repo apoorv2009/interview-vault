@@ -46,6 +46,7 @@ for row = 1 to n:
 ## 1. Right Triangle
 
 **Difficulty:** Easy
+**Date:** 2026-07-21
 
 ### Pattern
 
@@ -63,16 +64,28 @@ Given `n`, print a right-angled triangle of stars with `n` rows. Row `i` has exa
 
 ### Approach
 
-_To be added_
+Outer loop runs from 1 to n (rows). Inner loop runs from 0 to i (columns) — prints i stars on row i. After inner loop, print newline to move to next row.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintRightTriangle(int num)
+{
+    for (int i = 1; i <= num; i++)
+    {
+        for (int j = 0; j < i; j++)
+        {
+            Console.Write("*");
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²) — outer loop n times, inner loop up to n times
+- **Space:** O(1)
 
 ---
 
