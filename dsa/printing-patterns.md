@@ -184,6 +184,7 @@ public static void PrintNumberTriangle(int num)
 ## 4. Same Number Triangle
 
 **Difficulty:** Easy
+**Date:** 2026-07-21
 
 ### Pattern
 
@@ -201,16 +202,28 @@ Given `n`, print a triangle where row `i` prints the number `i` exactly `i` time
 
 ### Approach
 
-_To be added_
+Same structure as Number Triangle but print `i` instead of `j` — the row number is constant throughout each row.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintSameNumberTriangle(int num)
+{
+    for (int i = 1; i <= num; i++)
+    {
+        for (int j = 1; j <= i; j++)
+        {
+            Console.Write(i + " ");
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
