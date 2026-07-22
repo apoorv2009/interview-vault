@@ -566,16 +566,36 @@ Given `n`, print a centered pyramid where only the border stars are printed and 
 
 ### Approach
 
-_To be added_
+Leading spaces = `" "` (single space), inner gap = `"  "` (two spaces) to match `"* "` width. First and last rows print all stars. Middle rows print `*` only at j==1 and j==i (edges).
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = 1; i <= n; i++)
+    {
+        for (int s = 0; s < n - i; s++)
+            Console.Write(" ");
+
+        for (int j = 1; j <= i; j++)
+        {
+            if (i == 1 || i == n)
+                Console.Write("* ");
+            else if (j == 1 || j == i)
+                Console.Write("* ");
+            else
+                Console.Write("  ");
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
