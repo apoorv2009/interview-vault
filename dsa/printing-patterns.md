@@ -925,6 +925,7 @@ _To be added_
 ## 20. Number Increasing Reverse Pyramid
 
 **Difficulty:** Medium
+**Date:** 2026-07-22
 
 ### Pattern
 
@@ -942,16 +943,28 @@ Given `n`, print a triangle where row `i` prints numbers 1 to (n-i+1), decreasin
 
 ### Approach
 
-_To be added_
+Outer loop i from 0 to n. Inner loop j from 1 to n-i — prints 1,2,3... up to n-i numbers per row.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = 0; i < n; i++)
+    {
+        for (int j = 1; j <= n - i; j++)
+        {
+            Console.Write(j + " ");
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
