@@ -385,6 +385,7 @@ public static void PrintPattern(int num)
 ## 8. Hollow Rectangle
 
 **Difficulty:** Medium
+**Date:** 2026-07-21
 
 ### Pattern
 
@@ -401,16 +402,31 @@ Given `rows` and `cols`, print a rectangle of stars where only the border cells 
 
 ### Approach
 
-_To be added_
+Single nested loop. At each cell (i, j) print `*` if it's on the border (first row, last row, first col, last col), otherwise print space.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int length, int width)
+{
+    for (int i = 0; i < width; i++)
+    {
+        for (int j = 0; j < length; j++)
+        {
+            if (i == 0 || i == width - 1 || j == 0 || j == length - 1)
+                Console.Write("*");
+            else
+                Console.Write(" ");
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(rows × cols)
+- **Space:** O(1)
 
 ---
 
