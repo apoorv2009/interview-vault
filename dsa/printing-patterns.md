@@ -44,6 +44,20 @@ for row = 1 to n:
 | 12 | [Hollow Pyramid](#12-hollow-pyramid) | Medium |
 | 13 | [Sandglass](#13-sandglass) | Medium |
 | 14 | [Cross](#14-cross) | Medium |
+| 15 | [Multiplication Table](#15-multiplication-table) | Easy |
+| 16 | [Checkerboard](#16-checkerboard) | Easy |
+| 17 | [Hollow Right Triangle](#17-hollow-right-triangle) | Medium |
+| 18 | [Hollow Inverted Triangle](#18-hollow-inverted-triangle) | Medium |
+| 19 | [Reverse Left Half Pyramid](#19-reverse-left-half-pyramid) | Medium |
+| 20 | [Number Increasing Reverse Pyramid](#20-number-increasing-reverse-pyramid) | Medium |
+| 21 | [Hollow Diamond](#21-hollow-diamond) | Hard |
+| 22 | [Right Arrow Pattern](#22-right-arrow-pattern) | Hard |
+| 23 | [K Pattern](#23-k-pattern) | Hard |
+| 24 | [Hollow Reverse Triangle](#24-hollow-reverse-triangle) | Medium |
+| 25 | [Zero-One Triangle](#25-zero-one-triangle) | Hard |
+| 26 | [Palindrome Triangular](#26-palindrome-triangular) | Hard |
+| 27 | [Reverse Number Triangle](#27-reverse-number-triangle) | Medium |
+| 28 | [Hollow Hourglass](#28-hollow-hourglass) | Hard |
 
 ---
 
@@ -674,6 +688,475 @@ public static void PrintPattern(int n)
 ### Problem Statement
 
 Given `n` (odd), print a cross/plus shape where the middle row and middle column are filled with stars.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 15. Multiplication Table
+
+**Difficulty:** Easy
+
+### Pattern
+
+```
+1 2 3 4 5
+2 4 6 8 10
+3 6 9 12 15
+4 8 12 16 20
+5 10 15 20 25
+```
+
+### Problem Statement
+
+Given `n`, print an n×n multiplication table where cell (i,j) = i × j.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 16. Checkerboard
+
+**Difficulty:** Easy
+
+### Pattern
+
+```
+* * * * *
+ * * * * *
+* * * * *
+ * * * * *
+* * * * *
+```
+
+### Problem Statement
+
+Given `n`, print a checkerboard where even rows have a leading space offset.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 17. Hollow Right Triangle
+
+**Difficulty:** Medium
+
+### Pattern
+
+```
+*
+**
+* *
+*  *
+*   *
+```
+
+### Problem Statement
+
+Given `n`, print a hollow right triangle — border stars only, interior is spaces.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 18. Hollow Inverted Triangle
+
+**Difficulty:** Medium
+
+### Pattern
+
+```
+*****
+*   *
+*  *
+* *
+*
+```
+
+### Problem Statement
+
+Given `n`, print a hollow inverted triangle — first row solid, last column solid, left edge solid, interior spaces.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 19. Reverse Left Half Pyramid
+
+**Difficulty:** Medium
+
+### Pattern
+
+```
+* * * * *
+  * * * *
+    * * *
+      * *
+        *
+```
+
+### Problem Statement
+
+Given `n`, print an inverted pyramid that is right-aligned — spaces increase from left as rows decrease.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 20. Number Increasing Reverse Pyramid
+
+**Difficulty:** Medium
+
+### Pattern
+
+```
+1 2 3 4 5
+1 2 3 4
+1 2 3
+1 2
+1
+```
+
+### Problem Statement
+
+Given `n`, print a triangle where row `i` prints numbers 1 to (n-i+1), decreasing each row.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 21. Hollow Diamond
+
+**Difficulty:** Hard
+
+### Pattern
+
+```
+    *
+   * *
+  *   *
+   * *
+    *
+```
+
+### Problem Statement
+
+Given `n`, print a hollow diamond — only border stars, interior spaces.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 22. Right Arrow Pattern
+
+**Difficulty:** Hard
+
+### Pattern
+
+```
+* * * * *
+  * * * *
+    * * *
+      * *
+        *
+      * *
+    * * *
+  * * * *
+* * * * *
+```
+
+### Problem Statement
+
+Given `n`, print a right-pointing arrow — top half decreases from left, bottom half mirrors it.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 23. K Pattern
+
+**Difficulty:** Hard
+
+### Pattern
+
+```
+*     *
+*   *
+* *
+*   *
+*     *
+```
+
+### Problem Statement
+
+Given `n`, print a K shape — left vertical line with stars spreading outward then inward.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 24. Hollow Reverse Triangle
+
+**Difficulty:** Medium
+
+### Pattern
+
+```
+* * * * *
+*     *
+*   *
+* *
+*
+```
+
+### Problem Statement
+
+Given `n`, print a hollow inverted right triangle — first row solid, then only border stars on left and right edges.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 25. Zero-One Triangle
+
+**Difficulty:** Hard
+
+### Pattern
+
+```
+1
+0 1
+1 0 1
+0 1 0 1
+1 0 1 0 1
+```
+
+### Problem Statement
+
+Given `n`, print a triangle where values alternate between 0 and 1. First value of row i is `i % 2` (or `(i+1) % 2`).
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 26. Palindrome Triangular
+
+**Difficulty:** Hard
+
+### Pattern
+
+```
+1
+1 2 1
+1 2 3 2 1
+1 2 3 4 3 2 1
+1 2 3 4 5 4 3 2 1
+```
+
+### Problem Statement
+
+Given `n`, print a palindrome triangle — row i prints 1 to i then i-1 down to 1.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 27. Reverse Number Triangle
+
+**Difficulty:** Medium
+
+### Pattern
+
+```
+1 2 3 4
+2 3 4
+3 4
+4
+```
+
+### Problem Statement
+
+Given `n`, print a triangle where row i starts from i and prints up to n.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 28. Hollow Hourglass
+
+**Difficulty:** Hard
+
+### Pattern
+
+```
+* * * * * * * * *
+  * * * * * * *
+    * * * * *
+      * * *
+        *
+      * * *
+    * * * * *
+  * * * * * * *
+* * * * * * * * *
+```
+
+### Problem Statement
+
+Given `n`, print a hollow hourglass — same as sandglass but only border stars, interior spaces.
 
 ### Approach
 
