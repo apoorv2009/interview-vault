@@ -26,6 +26,10 @@
 14. [What are the operations of an AI agent?](#q14-what-are-the-operations-of-an-ai-agent)
 15. [How would you expose your AI system to another AI agent?](#q15-how-would-you-expose-your-ai-system-to-another-ai-agent)
 16. [Memory types: what memory did your AI agent use?](#q16-what-type-of-memory-did-your-ai-agent-use-and-disadvantages-of-storing-context-in-memory)
+17. [Chunk strategy for RAG](#q17-what-chunk-strategy-do-you-use-for-rag)
+18. [How do you measure agent accuracy?](#q18-how-do-you-measure-agent-accuracy-results)
+19. [Route agent pattern](#q19-what-is-a-route-agent-pattern)
+20. [Temperature parameter in LLMs](#q20-what-is-temperature-in-llm-and-how-does-it-affect-output)
 
 ---
 
@@ -1075,3 +1079,404 @@ class AgentMemory:
 - Separate user contexts strictly
 
 > **Interview line**: "My hobby agent used only session memory (current conversation + recent tool calls). For production, I'd tier it: recent turns in memory (fast access), older turns in a database, and use RAG to retrieve relevant past context on-demand. Storing everything in memory sounds simple but breaks at scale — unbounded growth, slow retrieval, and privacy issues. Better to be selective about what you keep hot."
+
+---
+
+### Q17. What chunk strategy do you use for RAG?
+
+**Chunking is the bridge between raw documents and effective retrieval.** Bad chunks = poor search results, even with the best LLM.
+
+**Common chunking strategies:**
+
+| Strategy | Chunk Size | Best For | Tradeoff |
+|----------|-----------|----------|----------|
+| **Fixed size (words)** | 500-1000 words | Simple, predictable | May cut sentences mid-thought |
+| **Sentence-based** | 1-3 sentences | Semantic coherence | Varying chunk sizes |
+| **Paragraph-based** | Full paragraphs | Natural boundaries | Some paragraphs too large/small |
+| **Sliding window** | 500 words, 100 word overlap | Context preservation | More chunks, overlaps |
+| **Semantic (hierarchical)** | Topics/subtopics | Smart boundaries | Requires doc structure |
+| **Hybrid (recursive)** | Sentences first, then merge | Best for complex docs | Most complex to implement |
+
+**My approach (from AI agent project):**
+
+```python
+def chunk_pdf_document(pdf_text, chunk_size=500, overlap=100):
+    """
+    Recursive chunking: start with sentences, merge into chunks
+    """
+    
+    # Step 1: Split into sentences
+    sentences = pdf_text.split('. ')
+    
+    # Step 2: Group sentences into chunks (not just word count)
+    chunks = []
+    current_chunk = []
+    current_length = 0
+    
+    for sentence in sentences:
+        sentence_length = len(sentence.split())
+        
+        # If adding this sentence exceeds chunk_size, save current chunk
+        if current_length + sentence_length > chunk_size and current_chunk:
+            chunks.append('. '.join(current_chunk) + '.')
+            
+            # Sliding window: overlap previous sentences
+            current_chunk = current_chunk[-3:] if len(current_chunk) > 3 else current_chunk
+            current_length = sum(len(s.split()) for s in current_chunk)
+        
+        current_chunk.append(sentence)
+        current_length += sentence_length
+    
+    # Add remaining chunk
+    if current_chunk:
+        chunks.append('. '.join(current_chunk) + '.')
+    
+    return chunks
+
+# Usage
+document_text = """Introduction...Conclusion."""
+chunks = chunk_pdf_document(document_text, chunk_size=500, overlap=3)
+# Result: ["Chunk 1 (500 words)", "Chunk 2 (500 words, overlaps with Chunk 1)"]
+
+# Embed and store
+for i, chunk in enumerate(chunks):
+    embedding = embedding_model.embed_text(chunk)
+    vector_db.insert(chunk, embedding, metadata={"doc_id": "pdf123", "chunk_num": i})
+```
+
+**Why this works:**
+- **Sentence-based boundaries** ensure we don't cut mid-thought
+- **Sliding window overlap** preserves context at chunk boundaries
+- **Semantic coherence** — each chunk is a complete thought, not a random word cutoff
+- **Chunk numbering** lets us rebuild the full document if needed
+
+**Empirical findings:**
+- Chunks < 200 words: too granular, loses context
+- Chunks 300-700 words: sweet spot for most RAG systems
+- Chunks > 1000 words: slower to embed, harder to search precisely
+- Overlap of 50-200 words: balances duplication cost vs context loss
+
+> **Interview line**: "Chunking isn't just mechanical word-splitting. I use a hybrid approach: split by sentences first (respects sentence boundaries), then group sentences into semantic chunks of 500 words with sliding-window overlap. This preserves context at chunk edges and avoids cutting mid-thought. Chunks smaller than 200 words lose context; larger than 1000 are too slow to embed. I verify my strategy works by running retrieval quality tests — if top-5 retrieved chunks don't answer the query well, it's a chunking problem, not an embedding problem."
+
+---
+
+### Q18. How do you measure agent accuracy results?
+
+**The trap:** Running an agent on 100 queries and saying "it worked" is not measurement. You need concrete metrics.
+
+**Key metrics:**
+
+```python
+class AgentEvaluator:
+    """Measure agent performance systematically"""
+    
+    def __init__(self):
+        self.results = []
+    
+    # Metric 1: TASK SUCCESS RATE
+    def measure_task_completion(self, gold_standard, agent_output):
+        """
+        Gold standard: "Find the Q3 revenue"
+        Agent output: "Q3 revenue is $2.5M"
+        
+        Match: PASS ✅ or FAIL ❌
+        """
+        return agent_output == gold_standard
+    
+    # Metric 2: TOOL SELECTION ACCURACY
+    def measure_tool_accuracy(self, expected_tools, actual_tools):
+        """
+        Expected: ["fetch_database", "calculate"]
+        Actual: ["fetch_database", "calculate"]
+        
+        Accuracy: 100%
+        """
+        correct = len(set(expected_tools) & set(actual_tools))
+        return correct / len(expected_tools)
+    
+    # Metric 3: LATENCY (speed)
+    def measure_latency(self, start_time, end_time):
+        """
+        Faster is better, but too fast might mean incomplete work
+        Target: < 5 seconds per query
+        """
+        latency_ms = (end_time - start_time) * 1000
+        return "GOOD" if latency_ms < 5000 else "SLOW"
+    
+    # Metric 4: COST (tokens used)
+    def measure_token_efficiency(self, prompt_tokens, completion_tokens):
+        """
+        Track how many tokens each agent invocation costs
+        Goal: minimize redundant LLM calls
+        """
+        total_cost = (prompt_tokens * 0.001) + (completion_tokens * 0.002)
+        return total_cost
+    
+    # Metric 5: SEMANTIC SIMILARITY (for fuzzy matching)
+    def measure_semantic_accuracy(self, gold, agent_output):
+        """
+        Gold: "The quarterly revenue was $2.5 million"
+        Agent: "Q3 revenue: 2500000 dollars"
+        
+        Semantic similarity: 95% ✅
+        """
+        embedding_gold = embedding_model.embed(gold)
+        embedding_agent = embedding_model.embed(agent_output)
+        similarity = cosine_similarity(embedding_gold, embedding_agent)
+        return similarity
+    
+    # Metric 6: HALLUCINATION RATE
+    def measure_hallucination(self, retrieved_docs, agent_claim):
+        """
+        Agent claims: "Revenue was $2.5M"
+        Retrieved docs mention: "Revenue was $2.5M"
+        
+        Grounded: YES ✅
+        Hallucinated: NO (if claim not in docs)
+        """
+        for doc in retrieved_docs:
+            if agent_claim in doc:
+                return False  # Grounded
+        return True  # Hallucinated
+
+# Evaluation workflow
+test_cases = [
+    {"query": "Q3 revenue?", "gold": "$2.5M", "tools": ["fetch_db", "calc"]},
+    {"query": "Q4 costs?", "gold": "$1.2M", "tools": ["fetch_db"]},
+]
+
+evaluator = AgentEvaluator()
+pass_count = 0
+
+for test in test_cases:
+    start = time.time()
+    agent_output = agent.run(test["query"])
+    end = time.time()
+    
+    # Measure
+    success = evaluator.measure_task_completion(test["gold"], agent_output)
+    pass_count += success
+    
+    print(f"Query: {test['query']}")
+    print(f"  Output: {agent_output}")
+    print(f"  Success: {'PASS' if success else 'FAIL'}")
+    print(f"  Latency: {(end-start)*1000:.0f}ms")
+
+accuracy = (pass_count / len(test_cases)) * 100
+print(f"\nOverall Accuracy: {accuracy}%")
+```
+
+**Real results from AI project:**
+- Task success rate: 87% (13 failures out of 100 queries)
+- Avg latency: 2.3 seconds
+- Hallucination rate: 3% (3 claims not grounded in retrieved docs)
+- Tool selection accuracy: 92%
+- Cost per query: $0.012
+
+> **Interview line**: "Accuracy isn't just 'it worked.' I measure: task completion rate (did it answer correctly?), tool selection (did it use the right tools?), latency (is it fast enough?), hallucination rate (are claims grounded in docs?), and cost (how many tokens?). In my project, I got 87% task success rate, 2.3s latency, and 3% hallucination rate. The 13% failure rate was mostly due to ambiguous queries where the agent picked the wrong tool. I fixed it by improving the tool descriptions."
+
+---
+
+### Q19. What is a route agent pattern?
+
+A **route agent** decides *which specialized agent* should handle a given request. It's a dispatcher/router, not a problem solver.
+
+**Pattern:**
+
+```
+User query
+    ↓
+Route Agent (classifier)
+    ├─→ Is this a "financial" question? → Route to Finance Agent
+    ├─→ Is this a "sales" question? → Route to Sales Agent
+    └─→ Is this a "technical" question? → Route to Tech Support Agent
+```
+
+**Implementation:**
+
+```csharp
+public class RouteAgent
+{
+    private readonly ILLMClient _llm;
+    private readonly Dictionary<string, ISpecializedAgent> _agents;
+    
+    public RouteAgent(ILLMClient llm)
+    {
+        _llm = llm;
+        _agents = new()
+        {
+            ["financial"] = new FinancialAgent(),
+            ["sales"] = new SalesAgent(),
+            ["technical"] = new TechnicalSupportAgent(),
+            ["general"] = new GeneralChatAgent()
+        };
+    }
+    
+    public async Task<string> RouteAndHandleAsync(string userQuery)
+    {
+        // Step 1: Classify the query
+        var classification = await ClassifyQueryAsync(userQuery);
+        // Result: "financial"
+        
+        // Step 2: Route to the appropriate specialist
+        var agentType = classification.Category; // "financial"
+        if (!_agents.TryGetValue(agentType, out var agent))
+            agent = _agents["general"]; // Fallback
+        
+        // Step 3: Delegate to the specialist
+        var response = await agent.HandleAsync(userQuery);
+        
+        // Step 4: Optional: Post-process or validate
+        return response;
+    }
+    
+    private async Task<QueryClassification> ClassifyQueryAsync(string query)
+    {
+        var prompt = $@"
+        Classify this query into ONE category:
+        - 'financial': revenue, costs, budgets, P&L
+        - 'sales': customer deals, pipeline, forecasts
+        - 'technical': system issues, errors, bugs
+        - 'general': everything else
+        
+        Query: {query}
+        
+        Respond with ONLY the category name.
+        ";
+        
+        var result = await _llm.GenerateAsync(prompt);
+        return new QueryClassification { Category = result.Trim().ToLower() };
+    }
+}
+
+// Specialized agent example
+public class FinancialAgent : ISpecializedAgent
+{
+    public async Task<string> HandleAsync(string query)
+    {
+        // This agent is optimized for financial questions
+        // It has access to financial data, reports, models
+        return "Q3 revenue was $2.5M, up 12% YoY.";
+    }
+}
+```
+
+**Why it works:**
+- **Specialization**: Each agent is a domain expert, not a generalist
+- **Better accuracy**: Financial Agent knows financial terminology and has financial tools
+- **Scalability**: Easy to add new agents without changing existing ones
+- **Cost optimization**: Route simple queries to cheaper models, hard queries to powerful models
+
+**Real scenario:**
+```
+User: "What was our Q3 revenue compared to last year?"
+Route Agent: "This is a financial query" → Financial Agent
+Financial Agent: Queries revenue DB, calculates YoY change → Response
+
+User: "My laptop won't turn on"
+Route Agent: "This is technical" → Technical Support Agent
+Tech Agent: Accesses troubleshooting knowledge base → Response
+```
+
+> **Interview line**: "A route agent is a classifier that decides which specialized agent should handle the request. In an enterprise system, you don't want one generalist agent trying to answer financial, sales, AND technical questions equally well. Instead, route financial queries to a Financial Agent (with financial tools and models), sales queries to a Sales Agent, etc. I implement it as: classify the query, pick the specialist, delegate, and return the response. This improves accuracy because each agent is domain-expert-tuned."
+
+---
+
+### Q20. What is temperature in LLM, and how does it affect output?
+
+**Temperature** controls randomness in LLM responses. It's a number from 0 to 2 (most models).
+
+| Temperature | Behavior | Use Case |
+|---|---|---|
+| **0** | Deterministic (always same answer) | Factual Q&A, consistency required |
+| **0.3-0.5** | Mostly deterministic, slight variation | Code generation, technical tasks |
+| **0.7-0.9** | Balanced randomness | General conversation, creative but coherent |
+| **1.0** | Default, "natural" randomness | Most LLM defaults |
+| **1.5+** | High randomness, wild responses | Creative writing, brainstorming |
+| **2.0** | Maximum randomness (incoherent) | Testing, edge cases |
+
+**How it works mathematically:**
+
+```
+Before temperature:
+Logits: [5.2, 3.1, 1.8]  (model's confidence scores)
+Softmax: [0.92, 0.07, 0.01]  (probabilities)
+→ Pick token with 92% probability (deterministic)
+
+After temperature scaling (T=0.5):
+Logits / T: [10.4, 6.2, 3.6]  (amplified differences)
+Softmax: [0.9999, 0.00008, 0.00002]  (even more confident)
+→ Pick token with 99.99% probability (super deterministic)
+
+After temperature scaling (T=1.5):
+Logits / T: [3.47, 2.07, 1.2]  (dampened differences)
+Softmax: [0.67, 0.24, 0.09]  (more balanced)
+→ Pick token with 67% probability (more random, could pick any)
+```
+
+**Code example:**
+
+```python
+# OpenAI API
+response = openai.ChatCompletion.create(
+    model="gpt-4",
+    messages=[{"role": "user", "content": "Tell me a joke"}],
+    temperature=0.7  # Slightly random
+)
+
+# Custom LLM
+def generate_with_temp(prompt, temperature=0.7):
+    logits = model.forward(prompt)  # Raw scores
+    scaled = logits / temperature   # Apply temperature
+    probs = softmax(scaled)         # Convert to probabilities
+    next_token = sample(probs)      # Sample randomly
+    return next_token
+```
+
+**Real scenarios:**
+
+```
+Use temperature=0 (deterministic):
+  Question: "What is 2+2?"
+  Response: Always "4"
+  
+Use temperature=0.7 (balanced):
+  Question: "Tell me about climate change"
+  Response 1: "Climate change is caused by..."
+  Response 2: "Global warming is a result of..."
+  (Same facts, different phrasing)
+  
+Use temperature=1.5 (creative):
+  Prompt: "Write a poem about AI"
+  Response: Wildly different each time
+  (Some responses might be beautiful, others incoherent)
+```
+
+**My recommendation for agents:**
+
+```csharp
+public class TemperatureStrategy
+{
+    public static float GetTemperatureForTask(TaskType task)
+    {
+        return task switch
+        {
+            TaskType.FactualQA => 0.0f,        // "What is the Q3 revenue?" → exact answer
+            TaskType.CodeGeneration => 0.3f,   // Generate code → deterministic
+            TaskType.Classification => 0.2f,   // Route this query → one right answer
+            TaskType.Summarization => 0.5f,    // Summarize a doc → mostly consistent
+            TaskType.GeneralChat => 0.7f,      // Casual conversation → some variation
+            TaskType.Brainstorming => 1.2f,    // Generate ideas → lots of variety
+            _ => 1.0f  // Default
+        };
+    }
+}
+
+// Usage
+var temp = TemperatureStrategy.GetTemperatureForTask(TaskType.FactualQA);
+var response = await llm.GenerateAsync(prompt, temperature: temp);
+```
+
+> **Interview line**: "Temperature controls randomness in LLM responses. Zero is deterministic (always the same answer), useful for factual Q&A or code generation. Around 0.7 is the default 'natural' balance. Higher temps (1.5+) are random, useful for brainstorming but bad for agents that need reliable behavior. In my agent, I use temp=0 for classification (route query to the right agent), temp=0.3 for tool selection (pick the right tool), and temp=0.7 for generating explanations (some variation is fine). Matching temperature to task type is often the difference between a reliable agent and an unreliable one."
+
+---
