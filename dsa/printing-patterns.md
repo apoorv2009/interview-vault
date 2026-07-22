@@ -684,6 +684,7 @@ public static void PrintPattern(int n)
 ## 14. Cross
 
 **Difficulty:** Medium
+**Date:** 2026-07-22
 
 ### Pattern (n=5)
 
@@ -701,16 +702,31 @@ Given `n` (odd), print a plus/cross shape — only the middle row and middle col
 
 ### Approach
 
-_To be added_
+Single nested loop. Print `*` if `i == n/2` (middle row) OR `j == n/2` (middle column), else print two spaces.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = 0; i < n; i++)
+    {
+        for (int j = 0; j < n; j++)
+        {
+            if (i == n / 2 || j == n / 2)
+                Console.Write("* ");
+            else
+                Console.Write("  ");
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
