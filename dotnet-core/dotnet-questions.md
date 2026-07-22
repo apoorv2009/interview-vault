@@ -7292,3 +7292,126 @@ Right instinct: "handle more concurrent requests" → "ensure I/O is truly
 > **Interview line**: "Concurrency is a property of the program's structure — dealing with multiple tasks in progress over overlapping time. Threading is one mechanism to get there — real OS threads. Parallelism is genuinely doing multiple things at the exact same instant, which requires multiple cores. They're not the same: async/await gives massive concurrency using very few threads, because most of that 'concurrent' work is just waiting on I/O with no thread attached. So the hierarchy is — concurrency is the goal, threading is one tool to get it, parallelism is what happens when concurrent work also happens to run simultaneously."
 
 ---
+
+## Q137. What is the output of uninitialized local variables in C#?
+
+**Trick question from EPAM interview — I got this wrong initially.**
+
+In C#, **you cannot use uninitialized local variables. The compiler forces you to initialize them before use.**
+
+```csharp
+int x;
+Console.WriteLine(x);  // ❌ COMPILE ERROR: "Use of unassigned local variable 'x'"
+
+// You MUST initialize before use
+int x = 0;
+Console.WriteLine(x);  // ✅ OK: prints 0
+```
+
+**However, there IS a difference in CLASS members (fields):**
+
+```csharp
+public class MyClass
+{
+    public int x;  // ✅ OK: class field, default value is 0 (implicit)
+    public string name;  // ✅ OK: class field, default value is null (implicit)
+}
+
+var obj = new MyClass();
+Console.WriteLine(obj.x);      // 0 (default value for int)
+Console.WriteLine(obj.name);   // null (default value for string)
+```
+
+**Summary:**
+- **Local variables**: Must be explicitly initialized. Compiler error if not.
+- **Class fields**: Implicitly initialized to default values (0 for int, null for reference types, false for bool, etc.)
+- **Struct fields**: Same as class fields (default-initialized)
+- **Static fields**: Same as class fields (default-initialized)
+
+> **Interview line**: "Local variables must be initialized before use, or the compiler throws an error. Class fields and struct fields are automatically initialized to their default values (0 for int, null for reference types). The confusion often comes from this difference between local variables (strict, error if not initialized) and class members (permissive, defaults to zero/null)."
+
+---
+
+## Q138. Can .NET call a Python FastAPI service?
+
+**Yes, absolutely.** .NET (C#) can call any HTTP service, including Python FastAPI.
+
+**From .NET, call Python FastAPI:**
+
+```csharp
+using System.Net.Http;
+using System.Text.Json;
+
+public class PythonServiceClient
+{
+    private readonly HttpClient _httpClient;
+    
+    public PythonServiceClient(HttpClient httpClient)
+    {
+        _httpClient = httpClient;
+        _httpClient.BaseAddress = new Uri("http://python-service:8000");
+    }
+    
+    public async Task<PredictionResult> GetPredictionAsync(int input_value)
+    {
+        var request = new { value = input_value };
+        
+        var json = JsonSerializer.Serialize(request);
+        var content = new StringContent(json, Encoding.UTF8, "application/json");
+        
+        var response = await _httpClient.PostAsync("/predict", content);
+        response.EnsureSuccessStatusCode();
+        
+        var resultJson = await response.Content.ReadAsStringAsync();
+        var result = JsonSerializer.Deserialize<PredictionResult>(resultJson);
+        
+        return result;
+    }
+}
+
+public class PredictionResult
+{
+    public double Prediction { get; set; }
+    public double Confidence { get; set; }
+}
+```
+
+**From Python FastAPI side:**
+
+```python
+from fastapi import FastAPI
+from pydantic import BaseModel
+
+app = FastAPI()
+
+class PredictionRequest(BaseModel):
+    value: int
+
+class PredictionResponse(BaseModel):
+    prediction: float
+    confidence: float
+
+@app.post("/predict")
+async def predict(request: PredictionRequest) -> PredictionResponse:
+    prediction = some_model.predict(request.value)
+    confidence = some_model.get_confidence(request.value)
+    return PredictionResponse(prediction=prediction, confidence=confidence)
+```
+
+**Registration in ASP.NET Core DI:**
+
+```csharp
+// Program.cs
+builder.Services.AddHttpClient<PythonServiceClient>()
+    .ConfigureHttpClient(client => client.BaseAddress = new Uri("http://localhost:8000"));
+```
+
+**Key considerations:**
+- **Serialization**: .NET and Python must agree on JSON format
+- **Error handling**: Handle HTTP errors, timeouts, network issues
+- **Performance**: Calling across the network is slower than in-process
+- **Deployment**: Ensure network connectivity between services (Docker Compose, Kubernetes)
+
+> **Interview line**: "Yes, .NET calls any HTTP service. If you need a Python ML model, expose it as a FastAPI endpoint, and your .NET code makes an HTTP POST call. The cost is network latency, but the benefit is you don't need to port the Python model to .NET. In the AI agent project, we used this pattern: .NET orchestrates, Python handles ML predictions."
+
+---
