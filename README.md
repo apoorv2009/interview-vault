@@ -2,6 +2,8 @@
 
 My interview prep notes, organized by topic. Most answers are framed around the **Capital Access** project at S&P Global; a subset (clearly labeled "Interview Rounds" / "Other Company Rounds" sections) is sourced from live interview rounds at other companies and framed around the **Entity Management System** project instead — kept separate rather than blended since the two report different tenure and a different most-recent project.
 
+**Latest addition:** The `aagam-mitra` folder now contains **107 Q&As** on production agentic AI systems, prompt engineering, and LLM fundamentals — from foundation concepts to expert-level deep-dives on design patterns, RAG at scale, enterprise governance, memory architectures, and cache invalidation strategies (including real questions from HDFC Bank). Tailored for VP-level interviews on AI/ML leadership roles.
+
 ## Structure
 
 | Folder | Description | Coverage |
@@ -12,7 +14,6 @@ My interview prep notes, organized by topic. Most answers are framed around the 
 | [design-patterns](https://github.com/apoorv2009/interview-vault/tree/main/design-patterns) | GoF design patterns with real .NET examples | 17 questions |
 | [unit-testing](https://github.com/apoorv2009/interview-vault/tree/main/unit-testing) | Unit & integration testing — NUnit, xUnit, Moq | Reference |
 | [coding-tasks](https://github.com/apoorv2009/interview-vault/tree/main/coding-tasks) | C# and SQL live coding challenges | 55+ tasks |
-| [ai-llm](https://github.com/apoorv2009/interview-vault/tree/main/ai-llm) | AI/LLM concepts — context window, RAG, agents, prompting | 5 questions |
 | [SQL&Postgres](https://github.com/apoorv2009/interview-vault/tree/main/SQL%26Postgres) | SQL & PostgreSQL interview prep | 35 questions |
 | [agile](https://github.com/apoorv2009/interview-vault/tree/main/agile) | Agile methodology interview Q&A | Reference |
 | [azure-revision-notes](https://github.com/apoorv2009/interview-vault/tree/main/azure-revision-notes) | Azure services revision — Service Bus, Functions, Redis, Key Vault | Reference |
@@ -20,7 +21,9 @@ My interview prep notes, organized by topic. Most answers are framed around the 
 | [behavioural](https://github.com/apoorv2009/interview-vault/tree/main/behavioural) | Behavioural interview STAR answers (two tracks: EPAM/Architect + other-company Full Stack) | Reference |
 | [capital-access-project](https://github.com/apoorv2009/interview-vault/tree/main/capital-access-project) | Real-project deep dive: S&P Global, Capital Access | Reference |
 | [system-design-interview-playbook](https://github.com/apoorv2009/interview-vault/tree/main/system-design-interview-playbook) | System design Q&A at Staff/Principal depth | 24+ questions |
+| [aagam-mitra](https://github.com/apoorv2009/interview-vault/tree/main/aagam-mitra) | Production agentic AI system: RAG, LLMs, multi-agent orchestration, enterprise governance, prompt engineering, cache invalidation | 107 questions |
 | [angular-interview-prep-app](https://github.com/apoorv2009/interview-vault/tree/main/angular-interview-prep-app) | Hands-on Angular 19 app for practising concepts | App |
+| [mock-interview-debrief](https://github.com/apoorv2009/interview-vault/tree/main/mock-interview-debrief) | Verdicts and targeted drill sets from real interview recordings | Per-recording |
 
 ---
 
@@ -153,6 +156,42 @@ Interview prep tied to my current role: S&P Global, Lead Software Development En
 24+ advanced system design Q&As at Staff/Principal Engineer depth — one file per scenario. Covers: distributed systems & scale, reliability & incident response, security, concurrency, RAG/AI systems, and engineering practice.
 
 See its own `README.md` and `CLAUDE.md` for authoring conventions.
+
+---
+
+## aagam-mitra
+
+**106 Q&As** covering production agentic AI systems, prompt engineering, and LLM fundamentals. All answers grounded in real code, config values, and production patterns from the Aagam Mitra system (built for a Jain temple community platform).
+
+**10 files organized in 5 tiers:**
+
+**Foundation (Files 01–05):** 67 Q&As
+- RAG pipeline, vector embeddings, semantic search (28 Q&As)
+- LLM selection, temperature tuning, tool-calling loops, chat history management (10 Q&As)
+- Multi-agent orchestration (4 specialist agents, 12 tools) (10 Q&As)
+- System architecture, JWT auth, Cloudflare tunnel, push notifications (11 Q&As)
+- 4-layer security pipeline, YouTube transcript extraction (8 Q&As)
+
+**Framework & Patterns (Files 06–07):** 12 Q&As
+- LangChain principles, prompt templates, RAG pattern (6 Q&As)
+- LangGraph concepts, state management, agent reasoning loops (6 Q&As)
+
+**Expert Deep-Dive (File 08):** 12 Q&As ⭐ *VP-level agentic system interviews*
+- 5 agentic design patterns + LangGraph migration story
+- Advanced RAG: quality metrics, freshness strategies
+- Enterprise AI: regulatory compliance, model governance, fairness testing
+- Production governance: observability, cost optimization, testing
+- Memory architecture: 4-layer design (working, conversational, semantic, episodic)
+
+**General AI & Prompt Engineering (File 10):** 16 Q&As ⭐ *Prompt engineering + production RAG*
+- Foundation concepts: context window, LLM selection, agents, RAG (Q1-Q4)
+- Prompt engineering: efficient prompts, context-aware RAG, advanced techniques (Q5-Q12)
+- General AI: hallucinations, fine-tuning, LLM limitations (Q13-Q15)
+- Production RAG: cache invalidation strategies, versioning, dependency mapping (Q16 - HDFC Bank question)
+
+**Key numbers:** 17B LLM, 2048-dim embeddings, 8-passage retrieval, 25%→2% hallucination reduction via RAG, custom 40-line agent loop, **107 interview Q&As** (including real questions from HDFC Bank).
+
+See the folder `README.md` for detailed breakdown.
 
 ---
 

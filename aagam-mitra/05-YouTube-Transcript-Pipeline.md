@@ -2,9 +2,41 @@
 
 ---
 
+## Quick Navigation
+
+| Q | Topic |
+|---|---|
+| [1](#1-how-does-the-youtube-transcript-extraction-work) | Transcript extraction |
+| [2](#2-what-is-whisper-asr-and-why-use-it-for-audio) | Whisper ASR |
+| [3](#3-how-do-you-distinguish-between-shanka-samadhan-and-pravachan-videos) | Video classification |
+| [4](#4-how-do-you-format-llm-cleaned-transcripts-into-structured-summaries) | Transcript formatting |
+| [5](#5-how-do-you-handle-live-streams-that-are-still-being-recorded) | Live stream handling |
+| [6](#6-how-do-you-deduplicate-transcript-chunks-before-storage) | Deduplication |
+| [7](#7-what-metadata-do-you-extract-from-each-video) | Metadata extraction |
+| [8](#8-how-do-you-integrate-transcripts-into-the-main-rag-pipeline) | RAG integration |
+
+---
+
 ## 1. How does the YouTube transcript extraction work?
 
 > **Why asked:** Building something on top of YouTube's transcript system is a real engineering challenge because it can fail in many ways — no captions, live stream, private video, language not available. Having a fallback strategy (Layer 2 with Whisper) shows you thought about reliability, not just the happy path. The dual-layer approach is the most interesting architectural decision here and should be the centrepiece of your answer.
+
+---
+
+### **Dual-Layer Fallback Strategy: Fast + Reliable**
+
+```
+Layer 1: YouTube API (200-500ms)
+  → Works if captions exist
+  → Fails if no captions (private, live, etc)
+  
+Layer 2: yt-dlp + Whisper (30-120s)
+  → Falls back on Layer 1 failure
+  → Downloads audio, transcribes locally
+  → Works on ANY video with sound
+  
+Result: Never return "unable to extract" (or only as last resort)
+```
 
 The system uses a **dual-layer strategy** — Layer 1 is fast, Layer 2 is the fallback:
 
@@ -47,6 +79,17 @@ raw_text = result["text"]
 
 > **Why asked:** The raw transcript from either layer (especially Whisper) is messy — repeated words, filler sounds, no paragraph breaks, wrong spellings of Jain Prakrit terms. Passing it through a low-temperature LLM is an elegant solution that cleans the text without losing meaning. The temperature choice (0.2 — the lowest in the system) is what shows you understand the difference between generation tasks and transcription tasks.
 
+---
+
+### **Low Temperature (0.2) for Transcription ≠ Generation**
+
+```
+Generation task (high temp): "Write a blog post about Karma" → T=0.7-0.9
+Transcription task (low temp): "Clean up messy transcript" → T=0.2
+  Why low? Don't add creativity, just fix spelling/remove fillers
+  Never paraphrase, never summarize
+```
+
 After extracting `raw_text`, we pass it through Groq for cleanup:
 
 ```python
@@ -81,6 +124,18 @@ Higher temperature would introduce creative variation — exactly what we don't 
 
 > **Why asked:** This is a domain-specific design decision. The interviewer wants to see that you've understood the actual use case well enough to implement type detection. The key insight: we detect from the *user's message text* (not the video title or content) — because the user tells us what kind of video it is when they share it. This is simpler and more reliable than trying to analyse the video.
 
+---
+
+### **Content-Type Detection: Ask User, Don't Analyze**
+
+```
+Bad: Try to analyze video content to guess if it's Q&A or lecture
+Good: User tells us in their message ("shanka samadhan" or not)
+  → Detect from text: regex for keywords
+  → Use different format prompts per type
+  → Shanka Samadhan has labels (शंका: / समाधान:), Pravachan is verbatim
+```
+
 ```python
 _SHANKA_KEYWORDS = re.compile(
     r"shanka[\s_-]?samadhan|jigyasa[\s_-]?samadhan"
@@ -111,6 +166,21 @@ User: "Can you get the transcript of this: https://youtu.be/xyz789"
 
 > **Why asked:** Having type-specific prompts instead of one generic prompt is good design — different content types need different formatting rules. Interviewers asking this want to see that you've thought carefully about what rules matter for each type. The anti-repetition rule in the Shanka Samadhan prompt is particularly worth mentioning — Whisper often repeats words when audio quality is poor, and you need to explicitly tell the LLM to collapse those.
 
+---
+
+### **Type-Specific Formatting: Shanka vs Pravachan**
+
+```
+Shanka Samadhan: Label Q&A format
+  शंका: (question) / समाधान: (answer)
+  Anti-repetition rule (Whisper echo fix)
+  
+Pravachan: Verbatim transcription
+  No labels, just clean original text
+  Correct Jain spellings (णमो अरिहंताणं)
+  Preserve mix of Sanskrit/Prakrit/Hindi
+```
+
 ### SHANKA_SAMADHAN_PROMPT — Key rules:
 1. Label every question as `शंका:` — label every answer as `समाधान:`
 2. Never invent or restructure questions — preserve interrogative structure exactly
@@ -132,6 +202,17 @@ User: "Can you get the transcript of this: https://youtu.be/xyz789"
 ## 5. Why is the raw transcript stored separately from the formatted transcript?
 
 > **Why asked:** This data storage decision shows you understand the difference between "display data" and "retrieval data." The formatted text is good for reading — filler words removed, labels added — but it has less information than the raw text. For follow-up RAG queries ("what did he say about karma at the 10-minute mark?"), the raw text is better. Mentioning this tradeoff signals you think about downstream uses, not just the immediate task.
+
+---
+
+### **Two Versions: UI Display vs RAG Retrieval**
+
+```
+Formatted: Clean, labeled, no filler → Display in UI
+Raw: Full original text, all filler → Use in RAG searches
+Why both? Formatted loses info (filler=temporal markers)
+RAG needs max text for retrieval quality
+```
 
 ```python
 # After extraction:
@@ -157,6 +238,20 @@ context.context["youtube_url"]        = youtube_url
 ## 6. How do you extract video IDs from different YouTube URL formats?
 
 > **Why asked:** Users paste URLs in many formats — short links, shorts, embeds, standard watch URLs. If you only handle `youtube.com/watch?v=`, you'll break on `youtu.be/` links. Interviewers use this to check whether you handled edge cases. The key fact: YouTube video IDs are always exactly 11 characters (alphanumeric + `-` and `_`).
+
+---
+
+### **URL Format Handling: 4 Regex Patterns**
+
+```
+Formats to handle:
+- youtube.com/watch?v=ID
+- youtu.be/ID
+- youtube.com/shorts/ID
+- youtube.com/embed/ID
+
+Video ID always: [a-zA-Z0-9_-] × 11 chars
+```
 
 ```python
 @staticmethod
@@ -192,6 +287,18 @@ def _extract_youtube_url(text: str) -> str | None:
 
 > **Why asked:** Error handling quality separates good engineers from great ones. The interviewer is checking whether you return a generic "error occurred" or an actually helpful message. The live stream case is interesting because it's a *predictable* failure — we know exactly what it means and can give the user a specific time estimate and action to take.
 
+---
+
+### **Error Handling: Specific > Generic**
+
+```
+Bad: "Could not extract transcript. Try again."
+Good: "This is a live stream. Transcripts available after YouTube processes (usually within a few hours). Share link again when ready."
+
+Check for: "live or archived live stream" error string
+Return actionable guidance with time estimate
+```
+
 ```python
 except Exception as e:
     error_msg = str(e)
@@ -226,6 +333,21 @@ Both Layer 1 (youtube-transcript-api) and Layer 2 (yt-dlp) fail on live streams 
 ## 8. Where are transcripts saved and why?
 
 > **Why asked:** Persistence decisions show you think about performance and reuse. If someone sends the same YouTube URL twice, re-downloading and re-transcribing wastes 30–120 seconds and bandwidth. Saving to disk with a predictable filename (by video ID) means you can check if it already exists before re-processing. Mentioning the Docker volume means you know data persists across container restarts.
+
+---
+
+### **Caching: Reuse Transcripts by Video ID**
+
+```
+Save to: /data/youtube_transcripts/  (Docker volume = persistent)
+Pattern: transcript_{video_id}.txt, transcript_{video_id}.pdf
+
+Why? 
+1. Cache hit → skip 30-120s extraction (same video sent twice)
+2. Download → admin/devotee can download formatted PDF
+3. Audit trail → temple reviews past transcripts
+4. Persistence → data survives container restarts
+```
 
 ```python
 # Saved to Docker volume:

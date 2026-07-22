@@ -29,14 +29,14 @@ Concise, interview-ready deep-dives on system design, distributed systems, and e
 ### Microservices
 - [What Microservice Architecture Do Companies Actually Use in Real Projects?**](microservices-real-world-patterns.md)
 
-### Other
-- [System Design & Microservices — Revision Notes](system-design-revision-notes.md)
-
 ### Payments
 - [A passenger swipes their card on a flight with no internet and the bank cannot be contacted. How do you approve the payment without a balance check and prevent fraud in an offline payment system?](payments-offline-approval.md)
 
 ### Pricing
 - [A user thinks airlines hike prices because they searched again. As a software engineer, explain why the price actually changed.](pricing-dynamic-airline.md)
+
+### Principal Engineer / Architecture
+- [Principal Engineer / Solution Architect — Enterprise Architecture Interview Bank (JPMC-style)](principal-engineer-architecture-questions.md)
 
 ### RAG
 - [Your client gives you 5000 PDFs with text, tables, charts and scanned images. Build a RAG chatbot that answers accurately.](rag-pdf-ingestion-pipeline.md)
@@ -80,6 +80,7 @@ Files follow a `<topic>-<slug>.md` naming convention so a flat directory listing
 | `microservices` | Microservices |
 | `payments` | Payments |
 | `pricing` | Pricing |
+| `principal-engineer` | Principal Engineer / Architecture |
 | `rag` | RAG |
 | `reliability` | Reliability |
 | `scaling` | Scaling |
