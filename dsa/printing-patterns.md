@@ -780,6 +780,7 @@ public static void PrintPattern(int n)
 ## 16. Checkerboard
 
 **Difficulty:** Easy
+**Date:** 2026-07-22
 
 ### Pattern
 
@@ -797,16 +798,28 @@ Given `n`, print a checkerboard where even rows have a leading space offset.
 
 ### Approach
 
-_To be added_
+Print leading space before inner loop if `i % 2 == 0`. Inner loop just prints stars — no condition needed inside.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = 0; i < n; i++)
+    {
+        if (i % 2 == 0)
+            Console.Write(" ");
+        for (int j = 0; j < n; j++)
+            Console.Write("*");
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
