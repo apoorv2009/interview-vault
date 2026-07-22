@@ -1173,6 +1173,7 @@ _To be added_
 ## 27. Reverse Number Triangle
 
 **Difficulty:** Medium
+**Date:** 2026-07-22
 
 ### Pattern
 
@@ -1189,16 +1190,28 @@ Given `n`, print a triangle where row i starts from i and prints up to n.
 
 ### Approach
 
-_To be added_
+Outer loop i from 0 to n-1. Inner loop j from i+1 to n — prints i+1, i+2... n per row.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = 0; i < n; i++)
+    {
+        for (int j = i + 1; j <= n; j++)
+        {
+            Console.Write(j + " ");
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
