@@ -210,3 +210,53 @@ Framework: **Detect → Contain → Diagnose → Fix → Post-Mortem.**
 **Post-mortem**: added a memory-usage alert (>80% for 3 minutes) to Azure Monitor, added a code-review checklist item ("all EF Core queries must have pagination or an explicit count justification"), and documented the timeline/root cause/fix/prevention in Confluence.
 
 **Guiding principle to state out loud**: fix availability first (scale out), diagnose second, fix root cause third — never debug directly in a live, still-failing production system.
+
+---
+
+### Q: Your main experience is in .NET. AI is relatively new for you. How do you justify your AI experience?
+
+**Framing (what NOT to say):**
+- ❌ "I'm not really an AI expert, but I built a hobby project"
+- ❌ "I taught myself last month" (sounds like shallow learning)
+- ❌ Overselling depth you don't have
+
+**Framing (what TO say):**
+- ✅ "I have hands-on experience building and shipping an LLM-powered system end-to-end"
+- ✅ "I went deep on the parts that mattered: architecture, safety, evaluation, not on ML theory"
+- ✅ "I learned by building, not by taking a course"
+
+**The Story:**
+
+"My background is 16 years in .NET backend systems, so AI was new territory. But when I started the community Q&A AI project, I committed to understanding the full stack end-to-end, not just gluing together libraries.
+
+**What I actually did:**
+1. **Architecture**: I designed the agent orchestration from scratch — observe-decide-act loop, tool execution, state management, memory tiers. No framework, just core principles. This forced me to understand what agents actually do.
+
+2. **Safety**: I implemented tracing, error handling, infinite-loop detection, context window management. In AI, 'it seems to work' is dangerous — I built mechanisms to validate that queries were actually correct before returning them to users.
+
+3. **Evaluation**: I didn't just launch the project and hope. I tracked which queries failed, why the LLM chose certain tools, where tracing showed bottlenecks. I used this feedback to tune prompts and model selection.
+
+4. **Constraints**: I chose tools specifically (ChromaDB for embeddings, Gemini for generation, LLM for orchestration) based on trade-offs, not defaults.
+
+**Why this counts as real experience:**
+- I shipped a working system users interact with daily
+- I made production decisions (Cosmos vs PostgreSQL, HTTP API vs MCP, when to use embeddings vs full-text)
+- I hit real problems (.NET calling Python FastAPI, token counting, context window management) and solved them
+- I read research (RAG techniques, CQRS for eventual consistency, prompt engineering)
+
+**Where I'm NOT an expert:**
+- I'm not a machine learning researcher (no model training)
+- I'm not competing on latency benchmarks
+- I haven't scaled to millions of queries
+
+**Why .NET depth helps:**
+- Systems thinking: I understand async/await, cancellation tokens, error handling at scale
+- I know how to build reliable APIs that call unreliable downstream services (the LLM)
+- I'm disciplined about testing, tracing, observability — things AI projects often skip
+
+So my AI experience is: **deep on systems, wide on tools, honest about boundaries.**"
+
+**Close with:**
+"I'm not claiming to be an AI expert, but I have hands-on experience shipping a production AI system, end-to-end. I learned AI by building, not by theory. Where I need deeper ML knowledge, I'll learn quickly because I have the foundation."
+
+> **Interview line**: "My AI experience is new but real — I built a complete LLM application end-to-end, from orchestration to safety to deployment. I didn't just glue libraries together; I understood the architecture, implemented tracing and validation, and made platform trade-offs (Cosmos vs SQL, ChromaDB vs PostgreSQL). I'm not an ML researcher, but I'm a systems engineer who built and shipped AI software. My 16 years in .NET meant I brought production-grade thinking to an unfamiliar domain."
