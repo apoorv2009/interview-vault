@@ -58,6 +58,16 @@ for row = 1 to n:
 | 26 | [Palindrome Triangular](#26-palindrome-triangular) | Hard |
 | 27 | [Reverse Number Triangle](#27-reverse-number-triangle) | Medium |
 | 28 | [Hollow Hourglass](#28-hollow-hourglass) | Hard |
+| 29 | [Normal Left-Aligned Triangle](#29-normal-left-aligned-triangle) | Easy |
+| 30 | [Hollow Number Pyramid](#30-hollow-number-pyramid) | Medium |
+| 31 | [Hollow Number Staircase](#31-hollow-number-staircase) | Medium |
+| 32 | [Left Half Pyramid](#32-left-half-pyramid) | Medium |
+| 33 | [Mirror Image Triangle](#33-mirror-image-triangle) | Medium |
+| 34 | [Normal Diamond](#34-normal-diamond) | Hard |
+| 35 | [Diamond/Arrow Pattern (Odd)](#35-diamondarrow-pattern-odd) | Hard |
+| 36 | [Diamond/Arrow Pattern (Even)](#36-diamondarrow-pattern-even) | Hard |
+| 37 | [Rhombus Pattern](#37-rhombus-pattern) | Hard |
+| 38 | [Right Pascal's Triangle](#38-right-pascals-triangle) | Hard |
 
 ---
 
@@ -1157,6 +1167,348 @@ _To be added_
 ### Problem Statement
 
 Given `n`, print a hollow hourglass — same as sandglass but only border stars, interior spaces.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 29. Normal Left-Aligned Triangle
+
+**Difficulty:** Easy
+
+### Pattern
+
+```
+    *
+   **
+  ***
+ ****
+*****
+```
+
+### Problem Statement
+
+Given `n`, print a right triangle that is left-aligned (right-justified) — leading spaces decrease as stars increase.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 30. Hollow Number Pyramid
+
+**Difficulty:** Medium
+
+### Pattern
+
+```
+1
+1 2
+1   3
+1     4
+1       5
+```
+
+### Problem Statement
+
+Given `n`, print a hollow number pyramid — first and last number of each row printed, interior filled with spaces.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 31. Hollow Number Staircase
+
+**Difficulty:** Medium
+
+### Pattern
+
+```
+1
+2 2
+3   3
+4     4
+5       5
+```
+
+### Problem Statement
+
+Given `n`, print a hollow staircase — row `i` prints `i` on both edges, spaces in between.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 32. Left Half Pyramid
+
+**Difficulty:** Medium
+
+### Pattern
+
+```
+    *
+  * *
+* * *
+  * *
+    *
+```
+
+### Problem Statement
+
+Given `n`, print a left half pyramid — top half grows left, bottom half shrinks. Middle row is widest.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 33. Mirror Image Triangle
+
+**Difficulty:** Medium
+
+### Pattern
+
+```
+        1
+      1 2
+    1 2 3
+  1 2 3 4
+1 2 3 4 5
+```
+
+### Problem Statement
+
+Given `n`, print a right-aligned number triangle — leading spaces decrease, numbers 1 to i printed per row.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 34. Normal Diamond
+
+**Difficulty:** Hard
+
+### Pattern
+
+```
+  *
+ ***
+*****
+ ***
+  *
+```
+
+### Problem Statement
+
+Given `n`, print a diamond where row `i` has `2*i-1` stars (top half) and mirrors on bottom. Stars are consecutive with no spaces between them.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 35. Diamond/Arrow Pattern (Odd)
+
+**Difficulty:** Hard
+
+### Pattern (input 11)
+
+```
+*
+* * * * *
+* * * * * * * * *
+* * * * * * * * * * * * *
+* * * * * * * * * * *
+* * * * *
+*
+```
+
+### Problem Statement
+
+Given odd `n`, print a diamond/arrow where rows expand by 4 stars each step to widest then shrink symmetrically.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 36. Diamond/Arrow Pattern (Even)
+
+**Difficulty:** Hard
+
+### Pattern (input 12)
+
+```
+* *
+* * * * * *
+* * * * * * * * * * * *
+* * * * * * * * * * * * * *
+* * * * * * * * * * * *
+* * * * * *
+* *
+```
+
+### Problem Statement
+
+Given even `n`, print a diamond/arrow starting with 2 stars, expanding by 4 each step to widest then shrinking symmetrically.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 37. Rhombus Pattern
+
+**Difficulty:** Hard
+
+### Pattern
+
+```
+    *
+   * *
+  * * *
+ * * * *
+* * * * *
+ * * * *
+  * * *
+   * *
+    *
+```
+
+### Problem Statement
+
+Given `n`, print a rhombus (diamond shape with spaces between stars) — pyramid on top, inverted pyramid on bottom.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 38. Right Pascal's Triangle
+
+**Difficulty:** Hard
+
+### Pattern
+
+```
+1
+1 1
+1 2 1
+1 3 3 1
+1 4 6 4 1
+1 3 3 1
+1 2 1
+1 1
+1
+```
+
+### Problem Statement
+
+Given `n`, print Pascal's triangle mirrored — top half expands (normal Pascal's), bottom half shrinks back to single 1.
 
 ### Approach
 
