@@ -277,6 +277,7 @@ public static void PrintPattern(int num)
 ## 6. Pyramid (Centered)
 
 **Difficulty:** Medium
+**Date:** 2026-07-21
 
 ### Pattern
 
@@ -294,16 +295,32 @@ Given `n`, print a centered pyramid. Row `i` has `(n - i)` leading spaces follow
 
 ### Approach
 
-_To be added_
+Two inner loops per row — first loop prints `n - i` spaces (decreasing), second loop prints `i` stars (increasing).
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int num)
+{
+    for (int i = 1; i <= num; i++)
+    {
+        for (int s = 0; s < num - i; s++)
+        {
+            Console.Write(" ");
+        }
+        for (int j = 0; j < i; j++)
+        {
+            Console.Write("*");
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
