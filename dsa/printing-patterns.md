@@ -503,6 +503,7 @@ _To be added_
 ## 11. Square
 
 **Difficulty:** Easy
+**Date:** 2026-07-21
 
 ### Pattern
 
@@ -520,16 +521,28 @@ Given `n`, print a solid square of stars with `n` rows and `n` columns.
 
 ### Approach
 
-_To be added_
+Both loops run 0 to n — every cell prints a star.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = 0; i < n; i++)
+    {
+        for (int j = 0; j < n; j++)
+        {
+            Console.Write("* ");
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
