@@ -40,6 +40,10 @@ for row = 1 to n:
 | 8 | [Hollow Rectangle](#8-hollow-rectangle) | Medium |
 | 9 | [Butterfly Pattern](#9-butterfly-pattern) | Medium |
 | 10 | [Pascal's Triangle](#10-pascals-triangle) | Medium |
+| 11 | [Square](#11-square) | Easy |
+| 12 | [Hollow Pyramid](#12-hollow-pyramid) | Medium |
+| 13 | [Sandglass](#13-sandglass) | Medium |
+| 14 | [Cross](#14-cross) | Medium |
 
 ---
 
@@ -480,6 +484,175 @@ _To be added_
 ### Problem Statement
 
 Given `n`, print Pascal's Triangle with `n` rows. Each number equals the sum of the two numbers directly above it. The first and last element of every row is always `1`.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 11. Square
+
+**Difficulty:** Easy
+**Date:** 2026-07-21
+
+### Pattern
+
+```
+* * * * *
+* * * * *
+* * * * *
+* * * * *
+* * * * *
+```
+
+### Problem Statement
+
+Given `n`, print a solid square of stars with `n` rows and `n` columns.
+
+### Approach
+
+Both loops run 0 to n — every cell prints a star.
+
+### Solution
+
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = 0; i < n; i++)
+    {
+        for (int j = 0; j < n; j++)
+        {
+            Console.Write("* ");
+        }
+        Console.WriteLine();
+    }
+}
+```
+
+### Complexity
+
+- **Time:** O(n²)
+- **Space:** O(1)
+
+---
+
+## 12. Hollow Pyramid
+
+**Difficulty:** Medium
+
+### Pattern
+
+```
+    *
+   * *
+  *   *
+ *     *
+* * * * *
+```
+
+### Problem Statement
+
+Given `n`, print a centered pyramid where only the border stars are printed and interior is spaces. First and last rows are solid, middle rows print only the two edge stars.
+
+### Approach
+
+Leading spaces = `" "` (single space), inner gap = `"  "` (two spaces) to match `"* "` width. First and last rows print all stars. Middle rows print `*` only at j==1 and j==i (edges).
+
+### Solution
+
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = 1; i <= n; i++)
+    {
+        for (int s = 0; s < n - i; s++)
+            Console.Write(" ");
+
+        for (int j = 1; j <= i; j++)
+        {
+            if (i == 1 || i == n)
+                Console.Write("* ");
+            else if (j == 1 || j == i)
+                Console.Write("* ");
+            else
+                Console.Write("  ");
+        }
+        Console.WriteLine();
+    }
+}
+```
+
+### Complexity
+
+- **Time:** O(n²)
+- **Space:** O(1)
+
+---
+
+## 13. Sandglass
+
+**Difficulty:** Medium
+
+### Pattern
+
+```
+* * * * *
+ * * * *
+  * * *
+   * *
+    *
+   * *
+  * * *
+ * * * *
+* * * * *
+```
+
+### Problem Statement
+
+Given `n`, print a sandglass — inverted pyramid on top, pyramid on bottom. Middle row has 1 star.
+
+### Approach
+
+_To be added_
+
+### Solution
+
+_To be added_
+
+### Complexity
+
+- **Time:** -
+- **Space:** -
+
+---
+
+## 14. Cross
+
+**Difficulty:** Medium
+
+### Pattern (n=5)
+
+```
+    *
+  * * *
+* * * * *
+  * * *
+    *
+```
+
+### Problem Statement
+
+Given `n` (odd), print a cross/plus shape where the middle row and middle column are filled with stars.
 
 ### Approach
 
