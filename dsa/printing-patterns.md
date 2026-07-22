@@ -733,6 +733,7 @@ public static void PrintPattern(int n)
 ## 15. Multiplication Table
 
 **Difficulty:** Easy
+**Date:** 2026-07-22
 
 ### Pattern
 
@@ -750,16 +751,29 @@ Given `n`, print an n×n multiplication table where cell (i,j) = i × j.
 
 ### Approach
 
-_To be added_
+Nested loop. Cell value = `(i+1) * (j+1)` since loops start from 0.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = 0; i < n; i++)
+    {
+        for (int j = 0; j < n; j++)
+        {
+            int number = (i + 1) * (j + 1);
+            Console.Write(number + " ");
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
