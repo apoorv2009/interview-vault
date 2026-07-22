@@ -684,54 +684,33 @@ public static void PrintPattern(int n)
 ## 14. Cross
 
 **Difficulty:** Medium
-**Date:** 2026-07-22
 
-### Pattern (n=3)
+### Pattern (n=5)
 
 ```
     *
-  * * *
+    *
 * * * * *
-  * * *
+    *
     *
 ```
 
 ### Problem Statement
 
-Given `n`, print a cross/plus shape. Row `i` has `2*i-1` stars centered. Top half expands, bottom half shrinks.
+Given `n` (odd), print a plus/cross shape — only the middle row and middle column have stars, everything else is space.
 
 ### Approach
 
-Same as Diamond. Two loops — top: i=1 to n, bottom: i=n-1 to 1. Stars per row = `2*i-1`. Spaces = `n-i`.
+_To be added_
 
 ### Solution
 
-```csharp
-public static void PrintPattern(int n)
-{
-    for (int i = 1; i <= n; i++)
-    {
-        for (int j = 0; j < n - i; j++)
-            Console.Write(" ");
-        for (int k = 0; k < 2 * i - 1; k++)
-            Console.Write("* ");
-        Console.WriteLine();
-    }
-    for (int i = n - 1; i >= 1; i--)
-    {
-        for (int j = 0; j < n - i; j++)
-            Console.Write(" ");
-        for (int k = 0; k < 2 * i - 1; k++)
-            Console.Write("* ");
-        Console.WriteLine();
-    }
-}
-```
+_To be added_
 
 ### Complexity
 
-- **Time:** O(n²)
-- **Space:** O(1)
+- **Time:** -
+- **Space:** -
 
 ---
 
@@ -1372,6 +1351,7 @@ _To be added_
 ## 34. Normal Diamond
 
 **Difficulty:** Hard
+**Date:** 2026-07-22
 
 ### Pattern
 
@@ -1389,16 +1369,36 @@ Given `n`, print a diamond where row `i` has `2*i-1` stars (top half) and mirror
 
 ### Approach
 
-_To be added_
+Two loops. Top: i=1 to n, print n-i spaces then 2*i-1 stars. Bottom: i=n-1 to 1, same logic. Start bottom from n-1 to avoid repeating middle row.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = 1; i <= n; i++)
+    {
+        for (int j = 0; j < n - i; j++)
+            Console.Write(" ");
+        for (int k = 0; k < 2 * i - 1; k++)
+            Console.Write("* ");
+        Console.WriteLine();
+    }
+    for (int i = n - 1; i >= 1; i--)
+    {
+        for (int j = 0; j < n - i; j++)
+            Console.Write(" ");
+        for (int k = 0; k < 2 * i - 1; k++)
+            Console.Write("* ");
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
