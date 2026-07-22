@@ -602,6 +602,7 @@ public static void PrintPattern(int n)
 ## 13. Sandglass
 
 **Difficulty:** Medium
+**Date:** 2026-07-21
 
 ### Pattern
 
@@ -623,16 +624,36 @@ Given `n`, print a sandglass — inverted pyramid on top, pyramid on bottom. Mid
 
 ### Approach
 
-_To be added_
+Two loops. Top half: i goes n down to 1 (inverted pyramid). Bottom half: i goes 2 to n (pyramid, skipping middle row to avoid duplicate).
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = n; i >= 1; i--)
+    {
+        for (int k = 0; k < n - i; k++)
+            Console.Write(" ");
+        for (int l = 0; l < i; l++)
+            Console.Write("* ");
+        Console.WriteLine();
+    }
+    for (int i = 2; i <= n; i++)
+    {
+        for (int k = 0; k < n - i; k++)
+            Console.Write(" ");
+        for (int l = 0; l < i; l++)
+            Console.Write("* ");
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
