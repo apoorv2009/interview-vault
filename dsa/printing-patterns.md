@@ -684,8 +684,9 @@ public static void PrintPattern(int n)
 ## 14. Cross
 
 **Difficulty:** Medium
+**Date:** 2026-07-22
 
-### Pattern (n=5)
+### Pattern (n=3)
 
 ```
     *
@@ -697,20 +698,40 @@ public static void PrintPattern(int n)
 
 ### Problem Statement
 
-Given `n` (odd), print a cross/plus shape where the middle row and middle column are filled with stars.
+Given `n`, print a cross/plus shape. Row `i` has `2*i-1` stars centered. Top half expands, bottom half shrinks.
 
 ### Approach
 
-_To be added_
+Same as Diamond. Two loops — top: i=1 to n, bottom: i=n-1 to 1. Stars per row = `2*i-1`. Spaces = `n-i`.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = 1; i <= n; i++)
+    {
+        for (int j = 0; j < n - i; j++)
+            Console.Write(" ");
+        for (int k = 0; k < 2 * i - 1; k++)
+            Console.Write("* ");
+        Console.WriteLine();
+    }
+    for (int i = n - 1; i >= 1; i--)
+    {
+        for (int j = 0; j < n - i; j++)
+            Console.Write(" ");
+        for (int k = 0; k < 2 * i - 1; k++)
+            Console.Write("* ");
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
