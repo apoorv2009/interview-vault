@@ -1421,6 +1421,7 @@ _To be added_
 ## 33. Mirror Image Triangle
 
 **Difficulty:** Medium
+**Date:** 2026-07-23
 
 ### Pattern
 
@@ -1438,16 +1439,28 @@ Given `n`, print a right-aligned number triangle — leading spaces decrease, nu
 
 ### Approach
 
-_To be added_
+Two inner loops per row — first prints n-i leading spaces, second prints numbers 1 to i.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = 1; i <= n; i++)
+    {
+        for (int j = 0; j <= n - i; j++)
+            Console.Write(" ");
+        for (int k = 1; k <= i; k++)
+            Console.Write(k + " ");
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
