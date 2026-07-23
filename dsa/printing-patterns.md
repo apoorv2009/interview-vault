@@ -859,6 +859,7 @@ _To be added_
 ## 18. Hollow Inverted Triangle
 
 **Difficulty:** Medium
+**Date:** 2026-07-23
 
 ### Pattern
 
@@ -872,20 +873,35 @@ _To be added_
 
 ### Problem Statement
 
-Given `n`, print a hollow inverted triangle — first row solid, last column solid, left edge solid, interior spaces.
+Given `n`, print a hollow inverted triangle — first row solid, left edge and right edge only, interior spaces.
 
 ### Approach
 
-_To be added_
+Inner loop j from 1 to n-i. Print `*` if first row (i==1), left edge (j==1), or right edge (j==n-i). Else print space.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = 1; i <= n; i++)
+    {
+        for (int j = 1; j <= n - i; j++)
+        {
+            if (i == 1 || j == 1 || j == n - i)
+                Console.Write("* ");
+            else
+                Console.Write("  ");
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
