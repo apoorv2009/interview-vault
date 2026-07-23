@@ -1300,6 +1300,7 @@ _To be added_
 ## 29. Normal Left-Aligned Triangle
 
 **Difficulty:** Easy
+**Date:** 2026-07-23
 
 ### Pattern
 
@@ -1313,20 +1314,32 @@ _To be added_
 
 ### Problem Statement
 
-Given `n`, print a right triangle that is left-aligned (right-justified) — leading spaces decrease as stars increase.
+Given `n`, print a right triangle that is right-justified — leading spaces decrease as stars increase.
 
 ### Approach
 
-_To be added_
+Two inner loops — first prints n-r leading spaces, second prints r stars.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int r = 1; r <= n; r++)
+    {
+        for (int c = 0; c < n - r; c++)
+            Console.Write(" ");
+        for (int j = 0; j < r; j++)
+            Console.Write("*");
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
