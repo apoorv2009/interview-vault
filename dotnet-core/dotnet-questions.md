@@ -20,8 +20,8 @@
 8. [Additional Topics (Q85–Q90)](#8-additional-topics)
 9. [Platform, DI & Caching Deep Dive (Q91–Q97)](#9-platform-di--caching-deep-dive)
 10. [Interview Rounds — Additional Q&A (Q98–Q135)](#10-interview-rounds--additional-qa)
-11. [Core ASP.NET & Validation Topics (Q136–Q141)](#11-core-aspnet--validation-topics)
-12. [Concurrency & Threading Deep Dive (Q142–Q144)](#12-concurrency--threading-deep-dive)
+11. [Core ASP.NET & Validation Topics (Q136–Q142)](#11-core-aspnet--validation-topics)
+12. [Middlewares, Lifetimes, EF Core & Azure (Q139–Q142)](#12-middlewares-lifetimes-ef-core--azure)
 
 ---
 
@@ -7413,5 +7413,340 @@ builder.Services.AddHttpClient<PythonServiceClient>()
 - **Deployment**: Ensure network connectivity between services (Docker Compose, Kubernetes)
 
 > **Interview line**: "Yes, .NET calls any HTTP service. If you need a Python ML model, expose it as a FastAPI endpoint, and your .NET code makes an HTTP POST call. The cost is network latency, but the benefit is you don't need to port the Python model to .NET. In the AI agent project, we used this pattern: .NET orchestrates, Python handles ML predictions."
+
+---
+
+## Q139: What are Middlewares? Write a custom error handling middleware.
+
+**Middlewares** are components that form a pipeline in ASP.NET Core — each middleware can process an incoming request, pass it to the next middleware, and then process the outgoing response. They execute in a specific order (FIFO for requests, LIFO for responses).
+
+**Common middlewares:**
+- Authentication/Authorization
+- Logging
+- CORS
+- Request/response compression
+- Error handling
+- Custom business logic
+
+**Building a custom error handling middleware:**
+
+```csharp
+public class ErrorHandlingMiddleware
+{
+    private readonly RequestDelegate _next;
+    private readonly ILogger<ErrorHandlingMiddleware> _logger;
+    
+    public ErrorHandlingMiddleware(RequestDelegate next, ILogger<ErrorHandlingMiddleware> logger)
+    {
+        _next = next;
+        _logger = logger;
+    }
+    
+    public async Task InvokeAsync(HttpContext context)
+    {
+        try
+        {
+            await _next(context);
+        }
+        catch (Exception ex)
+        {
+            await HandleExceptionAsync(context, ex);
+        }
+    }
+    
+    private static Task HandleExceptionAsync(HttpContext context, Exception exception)
+    {
+        context.Response.ContentType = "application/json";
+        
+        var response = new ErrorResponse
+        {
+            Message = "An internal error occurred",
+            StatusCode = StatusCodes.Status500InternalServerError
+        };
+        
+        if (exception is ArgumentException)
+        {
+            context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            response.StatusCode = StatusCodes.Status400BadRequest;
+            response.Message = exception.Message;
+        }
+        else if (exception is KeyNotFoundException)
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            response.StatusCode = StatusCodes.Status404NotFound;
+            response.Message = "Resource not found";
+        }
+        else
+        {
+            context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+        }
+        
+        return context.Response.WriteAsJsonAsync(response);
+    }
+}
+
+public class ErrorResponse
+{
+    public string Message { get; set; }
+    public int StatusCode { get; set; }
+}
+```
+
+**Register in Program.cs:**
+
+```csharp
+app.UseMiddleware<ErrorHandlingMiddleware>();
+app.MapControllers();
+```
+
+**Why middleware over try-catch everywhere?**
+- Single place to handle errors consistently
+- Cleaner code — no error handling scattered across controllers
+- Easier to add logging, monitoring, correlation IDs
+- Works across all endpoints automatically
+
+> **Interview line**: "Middlewares form an ASP.NET request pipeline. I've built custom error handling middleware that catches all exceptions, maps them to proper HTTP status codes, logs with correlation IDs, and returns structured error responses. This eliminates try-catch clutter in every controller."
+
+---
+
+## Q140: What are lifetime scopes (Singleton, Scoped, Transient)? What happens if you change them in production?
+
+**The three lifetimes in ASP.NET Core Dependency Injection:**
+
+| Lifetime | Instance Count | Use Case | Thread Safe? |
+|----------|---|---|---|
+| **Transient** | New per request | Stateless services, lightweight | ✅ Yes (new each time) |
+| **Scoped** | New per HTTP request | Stateful within request, EF DbContext, Unit of Work | ⚠️ Per-request only |
+| **Singleton** | Single instance for app lifetime | Shared configuration, caches, expensive resources | ❌ Must be thread-safe |
+
+**Real-world example from Capital Access:**
+
+```csharp
+// Program.cs
+builder.Services.AddTransient<IValidator, FluentValidator>();       // New per injection
+builder.Services.AddScoped<IUnitOfWork, CapitalAccessDbContext>();  // New per HTTP request
+builder.Services.AddSingleton<ICache, RedisCache>();                // One instance, always
+builder.Services.AddScoped<IEngagementService, EngagementService>(); // New per request
+```
+
+**What happens if you change lifetime declarations in production:**
+
+**Scenario 1: Change Transient → Singleton (IValidator)**
+```csharp
+// WRONG: Validator now shared across all requests
+builder.Services.AddSingleton<IValidator, FluentValidator>(); 
+```
+❌ **Problem**: Validators often hold state. A shared instance might cache rules from one tenant and apply to another.
+
+**Scenario 2: Change Scoped → Transient (DbContext)**
+```csharp
+// WRONG: DbContext created multiple times per request
+builder.Services.AddTransient<IDbContext, CapitalAccessDbContext>();
+```
+❌ **Problem**: 
+- Multiple database connections per request (high CPU/memory)
+- Change tracking loses scope (SaveChanges() in one instance doesn't see changes from another)
+- Unit of Work pattern breaks
+
+**Scenario 3: Change Singleton → Transient (RedisCache)**
+```csharp
+// WRONG: Cache created per injection, no shared state
+builder.Services.AddTransient<ICache, RedisCache>();
+```
+❌ **Problem**: 
+- Redis connection created hundreds of times per second
+- Connection pool exhaustion
+- Massive CPU spike
+
+**Real incident:**
+At Capital Access, a junior developer changed `AddScoped<DbContext>` to `AddTransient` to "test something." The result:
+- 30 simultaneous connections to Azure SQL per request (vs. 1-2 before)
+- CPU hit 95% within minutes
+- Database throttling kicked in
+- API timeouts, alerts fired
+
+**The fix**: Revert the change and redeploy.
+
+> **Interview line**: "Lifetime scopes are critical. Transient is for stateless services, Scoped is for per-request state (like EF DbContext), and Singleton for expensive shared resources. Changing a Scoped DbContext to Transient causes multiple DB connections per request, exhausting the connection pool. I learned this the hard way when a test change leaked to production."
+
+---
+
+## Q141: EF Core application cases — When should you use EF Core? Writing joins.
+
+**When to use EF Core:**
+- ✅ Standard CRUD applications
+- ✅ Complex business logic on objects (tax calculations, inventory rules)
+- ✅ Multi-tenant applications (global query filters)
+- ✅ Applications needing N+1 prevention (Include() / ThenInclude())
+- ✅ Microservices with simple to moderate query patterns
+
+**When NOT to use EF Core:**
+- ❌ Heavy analytical queries (use raw SQL or stored procedures)
+- ❌ Mass bulk operations (Insert 1M rows) — use SqlBulkCopy + raw SQL
+- ❌ Complex reporting with window functions, CTEs, subqueries
+- ❌ Real-time dashboards (read stale is OK, use caching)
+
+**Writing joins in EF Core:**
+
+**1. Inner Join (most common)**
+```csharp
+// Get all engagements with investor details
+var engagements = dbContext.Engagements
+    .Include(e => e.Investor)  // Left join (includes nulls)
+    .Where(e => e.Investor != null)  // Filter to inner join semantics
+    .Select(e => new 
+    { 
+        e.Id, 
+        e.Title,
+        InvestorName = e.Investor.Name 
+    })
+    .ToList();
+```
+
+**2. Multiple joins**
+```csharp
+var result = dbContext.Engagements
+    .Include(e => e.Investor)        // Join Investor
+    .Include(e => e.Company)         // Join Company
+    .Where(e => e.Status == "Active")
+    .Select(e => new 
+    {
+        e.Id,
+        InvestorName = e.Investor.Name,
+        CompanyName = e.Company.Name,
+        e.EngagementDate
+    })
+    .ToList();
+```
+
+**3. Join with filtering in the join**
+```csharp
+var result = dbContext.Engagements
+    .Include(e => e.Investor.TieredInvestments.Where(t => t.Year == 2024))  // Filtered join
+    .ToList();
+```
+
+**4. Manual join with SelectMany (cross-join alternative)**
+```csharp
+var result = dbContext.Engagements
+    .SelectMany(e => dbContext.Companies
+        .Where(c => c.Id == e.CompanyId)
+        .Select(c => new 
+        {
+            Engagement = e,
+            Company = c
+        })
+    )
+    .ToList();
+```
+
+**5. Left join (Investor may be null)**
+```csharp
+var result = dbContext.Engagements
+    .GroupJoin(
+        dbContext.Investors,
+        e => e.InvestorId,
+        i => i.Id,
+        (engagement, investors) => new
+        {
+            Engagement = engagement,
+            Investor = investors.FirstOrDefault()
+        }
+    )
+    .ToList();
+```
+
+**Performance tip: Always use AsNoTracking() for read-only queries**
+```csharp
+var result = dbContext.Engagements
+    .AsNoTracking()  // Don't track changes, faster
+    .Include(e => e.Investor)
+    .Where(e => e.Status == "Active")
+    .ToList();
+```
+
+> **Interview line**: "EF Core is great for CRUD and complex business logic, but not for analytical queries. For joins, use Include() for one-to-many, and SelectMany/GroupJoin for complex relationships. Always use AsNoTracking() for reads. For bulk operations or window functions, drop to raw SQL or stored procedures."
+
+---
+
+## Q142: What is APIM (Azure API Management)? Why do you use it?
+
+**APIM (Azure API Management)** is a fully managed service that sits between clients and backend APIs. It's like a reverse proxy on steroids.
+
+**Architecture:**
+```
+Client → APIM Gateway → Your Backend Services
+```
+
+**Key features:**
+
+| Feature | Benefit | Example |
+|---|---|---|
+| **Rate Limiting** | Protect backend from overload | 1000 req/min per API key |
+| **Authentication** | Centralized auth (JWT, OAuth, API keys) | Validate tokens once, not in every service |
+| **Versioning** | Multiple API versions simultaneously | /v1/users, /v2/users |
+| **Throttling** | Prevent abuse, cost control | 10 req/sec per tier |
+| **Caching** | Reduce backend load | Cache GET /products for 5 min |
+| **Analytics** | Monitor traffic, latency, errors | Which endpoints are slow? |
+| **Developer Portal** | Self-service API documentation | Customers can explore your APIs |
+| **Transformation** | Modify requests/responses | Rename fields, add headers |
+
+**Real Capital Access example:**
+
+**Before APIM** (bad):
+- Angular front-end calls 6 microservices directly
+- No rate limiting → 1 bad actor overloads Engagement service
+- No versioning → breaking changes force all clients to update immediately
+- Authentication logic duplicated in every service (auth dependency in Ownership, Profiles, Contacts, etc.)
+
+**After APIM** (good):
+```
+Angular → APIM → [Rate Limited] → [Auth Validated] → Ownership/Profiles/Contacts/etc
+```
+
+Benefits:
+- ✅ Rate limit: 1000 req/min per tenant
+- ✅ Auth: APIM validates JWT, passes to backend with `X-Tenant-Id` header
+- ✅ Versioning: Route /v1/engagements to old service, /v2/engagements to new
+- ✅ Monitoring: Dashboard shows which endpoints customers use most
+- ✅ Cost: Slow clients (bots) throttled before they reach expensive backend
+
+**APIM policy (XML) to rate limit:**
+
+```xml
+<policies>
+    <inbound>
+        <rate-limit-by-key calls="100" renewal-period="60" counter-key="@(context.Request.Headers.GetValueOrDefault("X-API-Key"))" />
+        <validate-jwt token-value="@(context.Request.Headers.GetValueOrDefault("Authorization"))" />
+    </inbound>
+    <backend>
+        <forward-request />
+    </backend>
+    <outbound>
+        <set-header name="X-API-Version" exists-action="override">
+            <value>v2.0</value>
+        </set-header>
+    </outbound>
+</policies>
+```
+
+**Why APIM over load balancers?**
+
+| Aspect | Load Balancer (Azure Front Door) | APIM |
+|---|---|---|
+| **Layer** | L7 (HTTP) | L7 (HTTP) |
+| **Rate Limiting** | ❌ Basic | ✅ Advanced (per customer, per endpoint) |
+| **Auth** | ❌ No | ✅ JWT, OAuth, API keys |
+| **Versioning** | ❌ No | ✅ Yes, multiple versions |
+| **Caching** | ❌ No | ✅ Response caching |
+| **Cost** | $$ | $$$ |
+| **Use case** | Geographic distribution, SSL/TLS | API governance, multi-tenant SaaS |
+
+**At Capital Access:**
+- Front Door handles geographic routing and SSL
+- APIM sits behind Front Door for API governance
+- Both are needed for enterprise SaaS
+
+> **Interview line**: "APIM is API governance — rate limiting, versioning, auth, and monitoring in one place. We use it at Capital Access to protect our 6 microservices from bad actors, enforce usage quotas per customer, and maintain multiple API versions without breaking existing clients. It's not just a load balancer; it's a policy enforcement layer."
 
 ---

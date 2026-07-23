@@ -567,6 +567,230 @@ EXEC usp_GetEngagements @TenantId = 101, @Status = 'Completed'; -- filtered
 
 ---
 
+## Q24: How to optimize a stored procedure — Real application case
+
+**The Problem:**
+Your dashboard stored procedure runs for 30 seconds. It's called every time a user loads the dashboard, affecting 500 concurrent users. You need to cut it down to < 2 seconds.
+
+**Bad (Original) Stored Procedure:**
+
+```sql
+-- ❌ BAD: Table scan on EngagementActivities (no index)
+-- ❌ BAD: Multiple loops, no batching
+-- ❌ BAD: Calculates same aggregate repeatedly
+-- ❌ BAD: Returns way too much data
+
+CREATE PROCEDURE usp_DashboardMetrics @TenantId INT
+AS
+BEGIN
+    -- Loop approach — inefficient
+    DECLARE @CompanyId INT, @Count INT, @LastDate DATE;
+    DECLARE company_cursor CURSOR FOR
+        SELECT DISTINCT CompanyId FROM EngagementActivities WHERE TenantId = @TenantId;
+    
+    OPEN company_cursor;
+    FETCH NEXT FROM company_cursor INTO @CompanyId;
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        SELECT @Count = COUNT(*) FROM EngagementActivities 
+        WHERE TenantId = @TenantId AND CompanyId = @CompanyId;
+        -- ... process each company one by one
+        FETCH NEXT FROM company_cursor INTO @CompanyId;
+    END;
+    CLOSE company_cursor;
+    DEALLOCATE company_cursor;
+END;
+```
+
+**Performance issues:**
+- ❌ Cursor loop (N+1 queries)
+- ❌ No indexes on (TenantId, CompanyId)
+- ❌ Fetches entire rows when only aggregates needed
+- ❌ Repeated calculations
+
+**Good (Optimized) Stored Procedure:**
+
+```sql
+-- ✅ GOOD: Set-based operations, indexed query, returns only what's needed
+CREATE PROCEDURE usp_DashboardMetrics @TenantId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Single query, set-based aggregation
+    -- Uses indexes on (TenantId) and (Status)
+    SELECT
+        CompanyId,
+        COUNT(*) AS TotalEngagements,
+        SUM(CASE WHEN Status = 'Completed' THEN 1 ELSE 0 END) AS CompletedCount,
+        SUM(CASE WHEN Status = 'Scheduled' THEN 1 ELSE 0 END) AS ScheduledCount,
+        MAX(ScheduledAt) AS MostRecentEngagement,
+        AVG(CAST(AttendeeCount AS FLOAT)) AS AvgAttendees
+    FROM EngagementActivities
+    WHERE TenantId = @TenantId
+        AND ScheduledAt >= DATEADD(MONTH, -3, GETDATE())  -- Last 3 months only
+    GROUP BY CompanyId
+    HAVING COUNT(*) > 0;  -- Filter groups after aggregation
+END;
+```
+
+**Indexes to add:**
+
+```sql
+-- Create indexes that support the WHERE clause + GROUP BY
+CREATE NONCLUSTERED INDEX idx_EngagementActivities_TenantId_ScheduledAt
+    ON EngagementActivities (TenantId, ScheduledAt)
+    INCLUDE (CompanyId, Status, AttendeeCount);
+
+CREATE NONCLUSTERED INDEX idx_EngagementActivities_Status
+    ON EngagementActivities (Status, TenantId);
+```
+
+**Performance comparison:**
+
+| Aspect | Before (Bad) | After (Good) | Improvement |
+|---|---|---|---|
+| **Execution time** | 30 seconds | 200ms | **150x faster** |
+| **CPU** | 85% | 5% | **17x less** |
+| **Memory** | 2GB (cursor overhead) | 50MB | **40x less** |
+| **Scalability** | Fails at 500 users | Handles 5000+ | **10x better** |
+
+**Real Capital Access incident:**
+The dashboard was timing out during quarter-end reporting. We had 50,000 companies and the cursor was looping through each one. Optimization: single CTE with window functions, added indexes, cut query time from 2 minutes to 3 seconds.
+
+**Optimization checklist:**
+
+✅ **Use set-based operations** (GROUP BY, window functions) instead of loops  
+✅ **Add appropriate indexes** on WHERE + GROUP BY columns  
+✅ **Return only needed columns** (SELECT CompanyId, COUNT instead of SELECT *)  
+✅ **Filter early** (WHERE before aggregation)  
+✅ **Use HAVING after GROUP BY** for aggregate filters  
+✅ **Avoid scalar subqueries** (SELECT (SELECT ...) — replace with JOIN)  
+✅ **Check execution plan** (CTRL+L in SSMS) for table scans  
+✅ **Use stored procedures** for complex logic (pre-compiled, cached)  
+✅ **Monitor with sp_who2** to find blocking queries  
+
+> **Interview line**: "I optimized a dashboard SP from 30 seconds to 200ms by removing a cursor loop, consolidating into a single set-based aggregation, and adding indexes on the WHERE columns. The key: think in sets, not rows. Window functions and CTEs solve most 'complex query' problems faster than procedural code."
+
+---
+
+## Q25: Write SQL queries that demonstrate advanced patterns
+
+**Scenario:** You're building a reporting system for Capital Access. Here are real queries you'd write.
+
+**Query 1: Top 3 companies by total engagement attendees (with ties handled):**
+
+```sql
+WITH RankedCompanies AS (
+    SELECT
+        CompanyId,
+        TenantId,
+        SUM(AttendeeCount) AS TotalAttendees,
+        DENSE_RANK() OVER (PARTITION BY TenantId ORDER BY SUM(AttendeeCount) DESC) AS Rank
+    FROM EngagementActivities
+    WHERE Status = 'Completed'
+    GROUP BY CompanyId, TenantId
+)
+SELECT CompanyId, TenantId, TotalAttendees
+FROM RankedCompanies
+WHERE Rank <= 3
+ORDER BY TenantId, Rank;
+```
+
+**Query 2: Month-over-month engagement growth:**
+
+```sql
+WITH MonthlyCounts AS (
+    SELECT
+        YEAR(ScheduledAt) AS Year,
+        MONTH(ScheduledAt) AS Month,
+        COUNT(*) AS EngagementCount,
+        LAG(COUNT(*)) OVER (ORDER BY YEAR(ScheduledAt), MONTH(ScheduledAt)) AS PrevMonthCount
+    FROM EngagementActivities
+    WHERE TenantId = 101
+    GROUP BY YEAR(ScheduledAt), MONTH(ScheduledAt)
+)
+SELECT
+    Year, Month, EngagementCount,
+    PrevMonthCount,
+    CASE 
+        WHEN PrevMonthCount IS NULL THEN 'First month'
+        ELSE CONCAT(CAST(ROUND((EngagementCount - PrevMonthCount) * 100.0 / PrevMonthCount, 2) AS VARCHAR), '%')
+    END AS GrowthRate
+FROM MonthlyCounts
+ORDER BY Year, Month;
+```
+
+**Query 3: Find companies with no engagement in the last 60 days (churn risk):**
+
+```sql
+WITH RecentEngagements AS (
+    SELECT DISTINCT CompanyId
+    FROM EngagementActivities
+    WHERE TenantId = 101
+        AND ScheduledAt >= DATEADD(DAY, -60, GETDATE())
+)
+SELECT CompanyId
+FROM Companies  -- assume this table exists
+WHERE TenantId = 101
+    AND CompanyId NOT IN (SELECT CompanyId FROM RecentEngagements)
+ORDER BY CompanyId;
+```
+
+**Query 4: Running total of attendees by engagement type (cumulative):**
+
+```sql
+SELECT
+    ScheduledAt,
+    Type,
+    AttendeeCount,
+    SUM(AttendeeCount) OVER (PARTITION BY Type ORDER BY ScheduledAt ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS CumulativeAttendees
+FROM EngagementActivities
+WHERE TenantId = 101
+ORDER BY Type, ScheduledAt;
+```
+
+**Query 5: Find employees (from Employees table) who are not managers:**
+
+```sql
+SELECT e.EmpId, e.Name, e.Department
+FROM Employees e
+WHERE NOT EXISTS (
+    SELECT 1 FROM Employees mgr WHERE mgr.ManagerId = e.EmpId
+)
+ORDER BY e.Department;
+```
+
+**Query 6: Compare salary to department average (analytics query):**
+
+```sql
+SELECT
+    EmpId,
+    Name,
+    Department,
+    Salary,
+    AVG(Salary) OVER (PARTITION BY Department) AS DeptAvgSalary,
+    Salary - AVG(Salary) OVER (PARTITION BY Department) AS DifferenceToDeptAvg
+FROM Employees
+WHERE Salary IS NOT NULL
+ORDER BY Department, Salary DESC;
+```
+
+**Pattern Summary:**
+
+| Pattern | Use Case | Query Above |
+|---|---|---|
+| **CTE + DENSE_RANK** | Top N with ties | Q1 |
+| **LAG() / LEAD()** | Previous/next row comparisons | Q2 |
+| **NOT IN vs NOT EXISTS** | Exclusion queries (prefer NOT EXISTS) | Q3 |
+| **SUM() OVER (...ROWS BETWEEN...)** | Running totals | Q4 |
+| **NOT EXISTS** | Anti-join (check non-existence) | Q5 |
+| **Window functions with PARTITION BY** | Analytics, comparisons | Q6 |
+
+> **Interview line**: "I write analytical queries often — CTEs for readability, window functions for running totals and rankings, and set-based logic instead of loops. I prefer NOT EXISTS over NOT IN for safety when NULLs might be present. At Capital Access, these patterns power the engagement dashboards and investor analytics."
+
+---
+
 ## Quick Pattern Reference
 
 ```
@@ -574,13 +798,14 @@ GROUP BY + HAVING          → filter aggregated groups (Q6, Q16, Q20)
 DENSE_RANK() OVER          → Nth highest salary, handles ties (Q1, Q2, Q3)
 ROW_NUMBER() OVER PARTITION → top 1 per group, delete duplicates (Q7, Q8, Q15)
 PARTITION BY X ORDER BY Y  → window restarts for each X value
-LAG() / LEAD()             → previous/next row value in ordered set (Q10, Q22)
-SUM() OVER (ORDER BY ...)  → running total / cumulative sum (Q9)
+LAG() / LEAD()             → previous/next row value in ordered set (Q10, Q22, Q25-Q2)
+SUM() OVER (ORDER BY ...)  → running total / cumulative sum (Q9, Q25-Q4)
 Self-join (e JOIN e m)     → employee-manager comparison (Q4)
-NOT EXISTS                 → safer than NOT IN when NULLs possible (Q5, Q18)
-CASE WHEN in SUM()         → conditional count / pivot rows to columns (Q14)
+NOT EXISTS                 → safer than NOT IN when NULLs possible (Q5, Q18, Q25-Q3, Q25-Q5)
+CASE WHEN in SUM()         → conditional count / pivot rows to columns (Q14, Q25-Q2)
 INTERSECT                  → rows present in both result sets (Q20)
 ISNULL / COALESCE          → NULL handling (Q23)
-DATEADD(DAY, -N, GETDATE()) → date range filter (Q12)
-CTE (WITH x AS (...))      → readable multi-step queries (Q3, Q7, Q15)
+DATEADD(DAY, -N, GETDATE()) → date range filter (Q12, Q25-Q3)
+CTE (WITH x AS (...))      → readable multi-step queries (Q3, Q7, Q15, Q25-Q1, Q25-Q2)
+Window functions with PARTITION BY → analytics and comparisons (Q25-Q6)
 ```

@@ -5554,3 +5554,333 @@ describe('EngagementService', () => {
     });
 });
 ```
+
+---
+
+## Q83. What are Angular Signals? How do they differ from Observables/RxJS?
+
+**Angular Signals** (introduced in Angular 16) are a new primitive for reactive state management — simpler and more performant than Observables for component-local state.
+
+**Signals vs Observables:**
+
+| Aspect | Signals | Observables |
+|---|---|---|
+| **Synchronous** | ✅ Yes (no subscription needed) | ❌ Lazy, need subscription |
+| **Learning curve** | ✅ Easy | ❌ Steep (operators, merging, unsubscribe) |
+| **Component state** | ✅ Best fit | ⚠️ Overkill for local state |
+| **Async data** | ❌ Not for API calls | ✅ Built for async/HTTP |
+| **Change detection** | ✅ Automatic (Signal.set()) | ⚠️ Requires OnPush strategy |
+| **Memory safety** | ✅ No manual unsubscribe | ❌ Memory leak risk if not unsubscribed |
+| **Performance** | ✅ O(n) fine-grained | ⚠️ Broadcast entire stream |
+
+**Creating and using signals:**
+
+```typescript
+import { signal, computed, effect } from '@angular/core';
+
+export class EngagementComponent {
+  // Signal: mutable reactive value
+  count = signal(0);
+  
+  // Computed: derives from signals (like memo in React)
+  doubled = computed(() => this.count() * 2);
+  
+  constructor() {
+    // Effect: side effect when signal changes (like useEffect)
+    effect(() => {
+      console.log(`Count is now ${this.count()}`);
+    });
+  }
+  
+  increment() {
+    this.count.set(this.count() + 1);  // Update signal
+    // OR
+    this.count.update(c => c + 1);     // Functional update
+  }
+}
+```
+
+**In the template:**
+
+```html
+<!-- Signals are called like functions in templates -->
+<p>Count: {{ count() }}</p>
+<p>Doubled: {{ doubled() }}</p>
+<button (click)="increment()">+</button>
+```
+
+**Signals for form state (replacing Reactive Forms for simple cases):**
+
+```typescript
+export class EntityFormComponent {
+  formData = signal({ name: '', email: '', status: 'active' });
+  isLoading = signal(false);
+  errors = signal<{ [key: string]: string }>({});
+  
+  updateField(field: string, value: any) {
+    this.formData.update(form => ({ ...form, [field]: value }));
+  }
+  
+  async submit() {
+    this.isLoading.set(true);
+    try {
+      await this.api.post('/entities', this.formData()).toPromise();
+    } catch (err) {
+      this.errors.set(err);
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
+}
+```
+
+**When to use each:**
+
+| Use Signals when | Use Observables when |
+|---|---|
+| Component local state (form, UI flags) | API calls, WebSocket streams |
+| User input handlers | Multiple data sources combining |
+| Simple computed values | Operators (map, filter, switchMap) needed |
+| No external data dependency | Cancellation/unsubscribe patterns |
+
+**At Capital Access:**
+- Angular Reactive Forms still uses Observables (valueChanges, statusChanges)
+- Component local UI state (pagination, sorting filters) switched to Signals
+- HTTP responses still come as Observables, but wrapped in Signals for display
+
+> **Interview line**: "Signals are Angular's answer to fine-grained reactivity — they're synchronous, no subscription needed, and automatically trigger change detection. Perfect for component state. Observables are still essential for async/HTTP, but for local form state and UI flags, Signals are simpler and more performant than Observable + subscription boilerplate."
+
+---
+
+## Q84. How do you communicate with APIs from Angular? Real example with error handling and loading states.
+
+**API communication pattern in Capital Access:**
+
+**1. Service layer (HttpClient + Observables):**
+
+```typescript
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, throwError } from 'rxjs';
+import { catchError, tap, finalize } from 'rxjs/operators';
+import { environment } from '../environments/environment';
+
+@Injectable({ providedIn: 'root' })
+export class EngagementService {
+  private api = `${environment.apiUrl}/api/engagements`;
+  
+  constructor(private http: HttpClient) {}
+  
+  getAll(page: number, size: number): Observable<PaginatedResult<EngagementDto>> {
+    return this.http.get<PaginatedResult<EngagementDto>>(
+      `${this.api}?page=${page}&size=${size}`
+    ).pipe(
+      tap(result => console.log(`Loaded ${result.items.length} engagements`)),
+      catchError(err => this.handleError(err))
+    );
+  }
+  
+  getById(id: string): Observable<EngagementDto> {
+    return this.http.get<EngagementDto>(`${this.api}/${id}`).pipe(
+      catchError(err => this.handleError(err))
+    );
+  }
+  
+  create(dto: CreateEngagementDto): Observable<EngagementDto> {
+    return this.http.post<EngagementDto>(this.api, dto).pipe(
+      tap(result => console.log('Engagement created:', result.id)),
+      catchError(err => this.handleError(err))
+    );
+  }
+  
+  update(id: string, dto: UpdateEngagementDto): Observable<EngagementDto> {
+    return this.http.put<EngagementDto>(`${this.api}/${id}`, dto).pipe(
+      catchError(err => this.handleError(err))
+    );
+  }
+  
+  delete(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.api}/${id}`).pipe(
+      tap(() => console.log('Engagement deleted')),
+      catchError(err => this.handleError(err))
+    );
+  }
+  
+  private handleError(error: any): Observable<never> {
+    let errorMsg = 'An error occurred';
+    
+    if (error.status === 401) {
+      errorMsg = 'Unauthorized — please log in again';
+      // Redirect to login
+    } else if (error.status === 403) {
+      errorMsg = 'Forbidden — you do not have permission';
+    } else if (error.status === 404) {
+      errorMsg = 'Not found';
+    } else if (error.status >= 500) {
+      errorMsg = 'Server error — please try again later';
+    } else if (error.error?.message) {
+      errorMsg = error.error.message;
+    }
+    
+    console.error('API Error:', errorMsg, error);
+    return throwError(() => new Error(errorMsg));
+  }
+}
+
+export interface EngagementDto {
+  id: string;
+  title: string;
+  status: 'Pending' | 'Confirmed' | 'Completed';
+  engagementDate: Date;
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  totalCount: number;
+  page: number;
+  size: number;
+}
+```
+
+**2. Component using Signals + Observables:**
+
+```typescript
+import { Component, OnInit, OnDestroy, signal } from '@angular/core';
+import { takeUntil } from 'rxjs/operators';
+import { Subject } from 'rxjs';
+
+@Component({
+  selector: 'app-engagement-list',
+  template: `
+    <div>
+      <!-- Loading state -->
+      @if (isLoading()) {
+        <p>Loading...</p>
+      }
+      
+      <!-- Error state -->
+      @if (error()) {
+        <div class="error">{{ error() }}</div>
+      }
+      
+      <!-- Data state -->
+      @if (engagements()) {
+        <table>
+          <tr *ngFor="let eng of engagements()">
+            <td>{{ eng.title }}</td>
+            <td>{{ eng.status }}</td>
+          </tr>
+        </table>
+      }
+      
+      <!-- Pagination -->
+      <button (click)="previousPage()" [disabled]="currentPage() === 1">Previous</button>
+      <span>Page {{ currentPage() }} of {{ totalPages() }}</span>
+      <button (click)="nextPage()" [disabled]="currentPage() >= totalPages()">Next</button>
+    </div>
+  `
+})
+export class EngagementListComponent implements OnInit, OnDestroy {
+  engagements = signal<EngagementDto[]>([]);
+  isLoading = signal(false);
+  error = signal<string | null>(null);
+  currentPage = signal(1);
+  pageSize = signal(20);
+  totalCount = signal(0);
+  totalPages = signal(0);
+  
+  private destroy$ = new Subject<void>();
+  
+  constructor(private engagementService: EngagementService) {}
+  
+  ngOnInit() {
+    this.loadEngagements();
+  }
+  
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+  
+  loadEngagements() {
+    this.isLoading.set(true);
+    this.error.set(null);
+    
+    this.engagementService
+      .getAll(this.currentPage(), this.pageSize())
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (result) => {
+          this.engagements.set(result.items);
+          this.totalCount.set(result.totalCount);
+          this.totalPages.set(Math.ceil(result.totalCount / this.pageSize()));
+          this.isLoading.set(false);
+        },
+        error: (err: Error) => {
+          this.error.set(err.message);
+          this.isLoading.set(false);
+        }
+      });
+  }
+  
+  nextPage() {
+    this.currentPage.update(p => p + 1);
+    this.loadEngagements();
+  }
+  
+  previousPage() {
+    this.currentPage.update(p => Math.max(1, p - 1));
+    this.loadEngagements();
+  }
+}
+```
+
+**3. HTTP Interceptor (add auth headers automatically):**
+
+```typescript
+import { Injectable } from '@angular/core';
+import { HttpInterceptor, HttpRequest, HttpHandler, HttpEvent } from '@angular/common/http';
+import { Observable } from 'rxjs';
+
+@Injectable()
+export class AuthInterceptor implements HttpInterceptor {
+  constructor(private authService: AuthService) {}
+  
+  intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    const token = this.authService.getToken();
+    
+    if (token) {
+      req = req.clone({
+        setHeaders: { Authorization: `Bearer ${token}` }
+      });
+    }
+    
+    return next.handle(req);
+  }
+}
+```
+
+**Register in AppConfig:**
+
+```typescript
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideHttpClient(
+      withInterceptors([authInterceptor])  // Angular 15+ standalone
+    )
+  ]
+};
+```
+
+**Key patterns:**
+- ✅ Service layer handles HTTP, error mapping, logging
+- ✅ Signals for UI state (loading, error, data)
+- ✅ Observables for API responses
+- ✅ takeUntil(destroy$) for cleanup
+- ✅ Interceptors for auth (no manual Authorization headers per call)
+- ✅ environment.ts for base URL (dev vs prod)
+- ✅ Typed DTOs catch breaking changes at compile time
+
+> **Interview line**: "Angular API communication uses HttpClient Observables in services, with Signals for UI state (loading, error). I use interceptors to automatically attach auth headers, tap() for logging, catchError() for error mapping, and takeUntil() to prevent memory leaks. Separating service logic from component state makes code testable and reusable."
+
+---
