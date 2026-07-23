@@ -461,6 +461,7 @@ public static void PrintPattern(int length, int width)
 ## 9. Butterfly Pattern
 
 **Difficulty:** Medium
+**Date:** 2026-07-23
 
 ### Pattern
 
@@ -478,16 +479,40 @@ Given `n`, print a butterfly pattern. Row `i` has `i` stars, then `2*(n-i)` spac
 
 ### Approach
 
-_To be added_
+Three inner loops per row — left wing (r stars), middle spaces (2*(n-r)), right wing (r stars). Two outer loops — top half i=1 to n, bottom half i=n-1 to 1.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int r = 1; r <= n; r++)
+    {
+        for (int c = 0; c < r; c++)
+            Console.Write("* ");
+        for (int c = 0; c < 2 * (n - r); c++)
+            Console.Write(" ");
+        for (int c = 0; c < r; c++)
+            Console.Write("* ");
+        Console.WriteLine();
+    }
+    for (int r = n - 1; r >= 1; r--)
+    {
+        for (int c = 0; c < r; c++)
+            Console.Write("* ");
+        for (int c = 0; c < 2 * (n - r); c++)
+            Console.Write(" ");
+        for (int c = 0; c < r; c++)
+            Console.Write("* ");
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
