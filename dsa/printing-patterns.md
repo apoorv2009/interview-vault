@@ -1321,6 +1321,7 @@ _To be added_
 ## 31. Hollow Number Staircase
 
 **Difficulty:** Medium
+**Date:** 2026-07-23
 
 ### Pattern
 
@@ -1338,16 +1339,31 @@ Given `n`, print a hollow staircase — row `i` prints `i` on both edges, spaces
 
 ### Approach
 
-_To be added_
+Inner loop j from 1 to i. Print `i` if j==1 or j==i (edges), else print space.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = 1; i <= n; i++)
+    {
+        for (int j = 1; j <= i; j++)
+        {
+            if (j == 1 || j == i)
+                Console.Write(i);
+            else
+                Console.Write(" ");
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
