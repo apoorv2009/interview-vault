@@ -1152,6 +1152,7 @@ _To be added_
 ## 25. Zero-One Triangle
 
 **Difficulty:** Hard
+**Date:** 2026-07-23
 
 ### Pattern
 
@@ -1169,16 +1170,31 @@ Given `n`, print a triangle where values alternate between 0 and 1. First value 
 
 ### Approach
 
-_To be added_
+Use `(r + c) % 2 == 0` to decide 1 or 0. When row+col is even print 1, else print 0. This naturally alternates both across columns and across rows.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int r = 1; r <= n; r++)
+    {
+        for (int c = 0; c < r; c++)
+        {
+            if ((r + c) % 2 == 0)
+                Console.Write(1);
+            else
+                Console.Write(0);
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
