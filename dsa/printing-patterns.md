@@ -826,6 +826,7 @@ public static void PrintPattern(int n)
 ## 17. Hollow Right Triangle
 
 **Difficulty:** Medium
+**Date:** 2026-07-23
 
 ### Pattern
 
@@ -843,16 +844,31 @@ Given `n`, print a hollow right triangle — border stars only, interior is spac
 
 ### Approach
 
-_To be added_
+Inner loop j from 1 to i. Print `*` if j==1 (left edge) or j==i (right edge), else print space.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = 1; i <= n; i++)
+    {
+        for (int j = 1; j <= i; j++)
+        {
+            if (j == 1 || j == i)
+                Console.Write("* ");
+            else
+                Console.Write("  ");
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
