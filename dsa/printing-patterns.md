@@ -1201,6 +1201,7 @@ public static void PrintPattern(int n)
 ## 26. Palindrome Triangular
 
 **Difficulty:** Hard
+**Date:** 2026-07-23
 
 ### Pattern
 
@@ -1218,16 +1219,28 @@ Given `n`, print a palindrome triangle — row i prints 1 to i then i-1 down to 
 
 ### Approach
 
-_To be added_
+Two inner loops per row — first goes 1 to r (ascending), second goes r-1 down to 1 (descending).
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int r = 1; r <= n; r++)
+    {
+        for (int c = 1; c <= r; c++)
+            Console.Write(c);
+        for (int c = r - 1; c >= 1; c--)
+            Console.Write(c);
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
