@@ -1288,6 +1288,7 @@ _To be added_
 ## 30. Hollow Number Pyramid
 
 **Difficulty:** Medium
+**Date:** 2026-07-23
 
 ### Pattern
 
@@ -1305,16 +1306,33 @@ Given `n`, print a hollow number pyramid — first and last number of each row p
 
 ### Approach
 
-_To be added_
+Inner loop j from 1 to i. Print 1 if j==1 (left edge), print i if j==i (right edge), else print space.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = 1; i <= n; i++)
+    {
+        for (int j = 1; j <= i; j++)
+        {
+            if (j == 1)
+                Console.Write(1 + " ");
+            else if (j == i)
+                Console.Write(i + " ");
+            else
+                Console.Write(" ");
+        }
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
