@@ -892,6 +892,7 @@ _To be added_
 ## 19. Reverse Left Half Pyramid
 
 **Difficulty:** Medium
+**Date:** 2026-07-23
 
 ### Pattern
 
@@ -909,16 +910,28 @@ Given `n`, print an inverted pyramid that is right-aligned — spaces increase f
 
 ### Approach
 
-_To be added_
+Two inner loops — first prints `2*(i-1)` spaces (increasing), second prints `n-i+1` stars (decreasing).
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int i = 1; i <= n; i++)
+    {
+        for (int k = 0; k < 2 * (i - 1); k++)
+            Console.Write(" ");
+        for (int j = 0; j < n - i + 1; j++)
+            Console.Write("* ");
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
