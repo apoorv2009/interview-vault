@@ -1433,6 +1433,7 @@ public static void PrintPattern(int n)
 ## 32. Left Half Pyramid
 
 **Difficulty:** Medium
+**Date:** 2026-07-23
 
 ### Pattern
 
@@ -1450,16 +1451,36 @@ Given `n`, print a left half pyramid — top half grows left, bottom half shrink
 
 ### Approach
 
-_To be added_
+Two loops. Top: r=1 to n, print n-r spaces then r stars. Bottom: r=n-1 to 1, same logic. Middle row prints once from top loop.
 
 ### Solution
 
-_To be added_
+```csharp
+public static void PrintPattern(int n)
+{
+    for (int r = 1; r <= n; r++)
+    {
+        for (int c = 0; c < n - r; c++)
+            Console.Write(" ");
+        for (int j = 0; j < r; j++)
+            Console.Write("*");
+        Console.WriteLine();
+    }
+    for (int r = n - 1; r >= 1; r--)
+    {
+        for (int c = 0; c < n - r; c++)
+            Console.Write(" ");
+        for (int j = 0; j < r; j++)
+            Console.Write("*");
+        Console.WriteLine();
+    }
+}
+```
 
 ### Complexity
 
-- **Time:** -
-- **Space:** -
+- **Time:** O(n²)
+- **Space:** O(1)
 
 ---
 
