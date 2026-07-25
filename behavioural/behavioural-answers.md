@@ -260,3 +260,102 @@ So my AI experience is: **deep on systems, wide on tools, honest about boundarie
 "I'm not claiming to be an AI expert, but I have hands-on experience shipping a production AI system, end-to-end. I learned AI by building, not by theory. Where I need deeper ML knowledge, I'll learn quickly because I have the foundation."
 
 > **Interview line**: "My AI experience is new but real — I built a complete LLM application end-to-end, from orchestration to safety to deployment. I didn't just glue libraries together; I understood the architecture, implemented tracing and validation, and made platform trade-offs (Cosmos vs SQL, ChromaDB vs PostgreSQL). I'm not an ML researcher, but I'm a systems engineer who built and shipped AI software. My 16 years in .NET meant I brought production-grade thinking to an unfamiliar domain."
+
+---
+
+## Solera — Principal Software Engineer Track (16 yrs, Architect narrative)
+
+*Use the EPAM/Architect track above (16-yr Apoorv Jain, Capital Access) as the base identity — Solera's JD asks for 12+ years and Principal-Engineer/Lead-Architect scope, which matches that track, not the 9-yr "Ankit" track. Where a technique below is adapted from the Entity Management System section, that's flagged inline — swap in a real Capital Access/Wipro/AIS incident if you have one, rather than importing that narrative's specific facts under the 16-yr identity.*
+
+The JD leans hard on two things simultaneously: **AI-led engineering leadership** and **deep enterprise .NET/Angular modernization**. The strongest answers below pivot between the two in the same breath — that pivot is itself the signal Solera is screening for.
+
+### Quick map — Solera's 43 questions → material
+
+| # | Question (short) | Source |
+|---|---|---|
+| 1 | Drove adoption despite resistance | New — Story A (AI validation discipline) |
+| 2 | Spotted AI/automation opportunity in a workflow | Existing — Aagam Mitra (career journey + AI-justification Q&A) |
+| 3 | Guardrails before tech scaled out of control | Existing — Aagam Mitra 4-layer security model (docs/interview) |
+| 4 | AI-assisted approach measurably improved delivery | Existing — "What AI tools have you used" Q&A |
+| 5 | Balanced short-term delivery vs. long-term architecture | Existing — .NET Framework→modern .NET phased approach |
+| 6 | Architectural decision others had to align to | New — Story B (Engagement/Activity service + Service Bus contract) |
+| 7 | Evolved monolith/legacy → API-first/event-driven | Existing — .NET Framework 4.7→modern .NET (Strangler Fig) |
+| 8 | Most complex feature owned end-to-end | New — Story C (Engagement/Activity service + Durable Functions report flow) |
+| 9 | Debugged critical production issue across layers | Existing — "How do you track issues in production" + technique from Entity Management incident |
+| 10 | Unblocked a stuck engineer/team | FILL IN |
+| 11 | Refactored legacy into modular/testable | Existing — .NET Framework migration (Phase 4: DI, config, async) |
+| 12 | Improved observability, later caught a problem | Existing — Correlation ID / Application Insights Q&A |
+| 13 | Introduced a standard adopted beyond your team | New — Story D (AIS: Angular standards across 6 teams) |
+| 14 | Mentored a senior engineer through a hard decision | FILL IN |
+| 15 | Influenced across teams without formal authority | New — Story D, needs a resistance beat filled in |
+| 16 | Disagreement with another architect/lead | FILL IN |
+| 17 | Reusable pattern/framework you created, adopted broadly | New — Story D |
+| 18 | Architectural bet with incomplete information | New — Story E (JTI-TERA offline-first sync, 20 markets) |
+| 19 | Said no to product/leadership to protect platform health | FILL IN |
+| 20 | Acted as trusted technical advisor to leadership | FILL IN |
+| 21 | Translated technical constraint into business terms | Existing — "What value does your project bring to the client" |
+| 22 | Unclear/shifting requirements → scalable solution | New — Story C |
+| 23 | A championed decision turned out wrong | FILL IN |
+| 24 | Production outage you owned | Existing — technique from Entity Management incident (Detect→Contain→Diagnose→Fix→Post-mortem) — needs a Capital Access/Wipro/AIS-real incident swapped in |
+| 25 | AI/automation that didn't deliver expected value | Existing — AI tools Q&A (Durable Functions retry-pattern catch is a near-miss, not a full miss — see note) |
+| 26 | Peer strongly disagreed with your design | FILL IN |
+| 27 | Leadership wanted to move faster than safe | FILL IN |
+| 28 | Pushed back on AI/Copilot for security/compliance | Existing — AI tools Q&A ("zero AI code goes in unreviewed" for auth/JWT/SQL) |
+| 29 | Chose between two high-impact initiatives | FILL IN |
+| 30 | Balanced tech debt paydown vs. feature velocity | Existing — AIS SQL Server → Azure SQL Managed Instance migration (40% cost reduction) |
+| 31 | Scoped down to hit a deadline, protected what mattered | FILL IN |
+| 32 | Diagnosed a systemic reliability issue | New — Story E |
+| 33 | WebHook/event-driven integration failing silently | New — Story B (Service Bus domain events to Notifications/Reports) |
+| 34 | Background job/worker system for scale/reliability | Existing — technique from Entity Management incident (unbounded background job → OOM → pagination fix) |
+| 35 | Onboarded team to new tech/pattern (AngularJS→Angular, sync→event-driven) | New — Story D + FILL IN for a literal AngularJS→Angular migration if you've done one |
+| 36 | Gave difficult feedback to a senior/peer | FILL IN |
+| 37 | Changed your own thinking from junior's feedback | FILL IN |
+| 38 | Defined architecture/roadmap with little direction | New — Story E |
+| 39 | Explained complex trade-off to non-technical exec | Existing — "What value does your project bring to the client" |
+| 40 | Technical recommendation was rejected | FILL IN |
+| 41 | Walk through a RAG/LLM system — hardest problems | Existing — Aagam Mitra 4-layer security + RAG config (chunking/top-K/threshold — see docs/interview/01-RAG-and-Vector-Search.md) |
+| 42 | Guardrails before an AI feature went to production | Existing — Aagam Mitra 4-layer security model |
+| 43 | How you measure if AI tooling actually helps | Existing — "What AI tools have you used" Q&A (validation strategy, not "it feels faster") |
+
+---
+
+### Story A — AI adoption discipline, not blind trust
+*Q1, Q28*
+
+I use AI tools for roughly 40-50% of my coding time (Claude for architecture/reasoning, Copilot for inline completions, Cursor for refactors — see AI tools Q&A above), but the adoption story isn't "I turned it on and it worked" — it's the validation discipline that made it safe to lean on: every suggestion reviewed against our architecture patterns, logic-heavy output traced manually or covered by a test, and a hard line that zero AI-generated code touches auth/JWT/SQL unreviewed. The concrete proof point is the Durable Functions orchestrator: Claude scaffolded it and saved ~2 hours of boilerplate, but it used a retry pattern that didn't hold up against our Service Bus exactly-once semantics — caught in review, not in production. That's the pitch for both "drove adoption despite skepticism" (the skepticism was mine, and the discipline is what earned the trust) and "pushed back on AI for security reasons" (the auth/JWT/SQL line).
+
+### Story B — Engagement/Activity service as the platform contract
+*Q6, Q33*
+
+On Capital Access I designed the Engagement/Activity service: it owns CRUD for engagement events and attendee tracking, and publishes domain events to Azure Service Bus that Notifications and Reports consume downstream. That event contract *is* the architectural decision other teams had to align to — once Notifications and Reports build against a published event schema instead of being called directly, the Engagement service can evolve its internals without breaking either consumer, but it also means a schema change on my side is a cross-team negotiation, not a unilateral edit. `[FILL IN: a specific time a downstream consumer broke silently on an event-shape change, or a specific negotiation over the event contract — sharpens this into a real Q33 "failed silently" story rather than the architecture description alone.]`
+
+### Story C — Report generation via Durable Functions
+*Q8, Q22*
+
+The report download flow integrates with Azure Durable Functions for long-running PDF generation — a feature that had to handle unclear-up-front requirements (how long is "too long" to block a request, what happens if generation fails mid-way, how does the client know when it's ready) by moving from a synchronous request to an orchestrated async pattern with status polling. `[FILL IN: what specifically went wrong when you owned this end-to-end — a scale surprise, a requirements change mid-build, an edge case in the orchestrator — Q8 explicitly asks "what went wrong."]`
+
+### Story D — Angular standards across 6 teams (AIS)
+*Q13, Q15, Q17, Q35 (partial)*
+
+At AIS I established Angular front-end standards that got adopted across 6 project teams — a reusable pattern that outlived any single project, and by construction an influence-without-formal-authority situation, since I didn't manage those 6 teams. `[FILL IN: the resistance you hit getting 6 independent teams to converge on one standard, and specifically how you got buy-in — a pilot team first, a written RFC, a lead-to-lead conversation. This is currently just the outcome; Q15/Q16-style questions want the friction, not just the result.]`
+
+### Story E — JTI-TERA offline-first sync at scale (Wipro)
+*Q18, Q32, Q38*
+
+I architected JTI-TERA, an enterprise mobility platform serving 5,000 field sales users across 20 markets, with an offline-first sync architecture on Azure Service Bus — a bet made with incomplete information by construction, since 20 markets means 20 sets of connectivity, device, and usage conditions you can't fully observe upfront. `[FILL IN: how you actually validated the offline-first design before full rollout — a pilot market, a specific sync-conflict failure mode you designed for, or a systemic reliability issue the sync architecture surfaced once live. Right now this is the architecture description; Q18/Q32/Q38 want the decision process and the evidence, not just the shape of the system.]`
+
+---
+
+### Gaps to close before Wednesday
+
+Nine questions have no real material in this vault yet — they're the ones a Principal-Engineer panel will lean on hardest, because they're about influence and judgment, not architecture:
+
+- **Mentorship** (Q10, Q14) — a specific engineer or team you unblocked or leveled up.
+- **Conflict with a peer/architect** (Q16, Q26, Q40) — a real disagreement, including one where you were the one who was wrong.
+- **Pushing back on leadership** (Q19, Q27) — a time you said no, or slowed something down, to protect platform health.
+- **Trusted advisor moment** (Q20) — leadership brought you a decision, not just a task.
+- **Prioritization under constraint** (Q29, Q31) — two real things competing for the same bandwidth, and what you cut.
+- **Being wrong** (Q23) — a decision you championed that didn't pan out, and how you noticed.
+- **Receiving feedback upward** (Q37) — something a junior engineer told you that changed your approach.
+
+These are worth 20-30 minutes of real recall before the interview, not left to improvisation — they're exactly the ones a fabricated answer falls apart on under a follow-up.
