@@ -35,18 +35,16 @@
 
 ## 2. Non-Functional Requirements
 
-| # | Requirement | Detail |
-|---|---|---|
-| 1 | Availability | 99.99% for the booking/donation path; 99.9% acceptable for the chat/RAG path — an LLM vendor outage shouldn't take down transactions. |
-| 2 | Latency | Chat/RAG p99 ≤ 3s; transactional (booking, donation, event listing) p99 ≤ 300ms. |
-| 3 | Consistency | Strong consistency + locking on slot inventory (no double-booking); at-least-once with an idempotency key on payment (retries must be safe, not blocked); eventual consistency acceptable for chat history and audit logs. |
-| 4 | Concurrency | Optimistic locking (version column, retry-on-conflict) on slot inventory by default; a short-lived distributed lock only if a small number of slots see disproportionate contention. |
-| 5 | Security | Input guardrails (prompt injection/jailbreak detection) before any LLM call; RBAC before tool dispatch; output guardrails + PII-masked audit logging on every response. |
-| 6 | Data isolation | Four separate stores: booking DB, donation/payment DB, chat/context history DB, and the vector DB — no shared schema or instance. |
-| 7 | Idempotency | Every payment request carries a server-issued idempotency key with a TTL, checked before the payment gateway call executes. |
-| 8 | Scalability | Orchestration/API tier is stateless and horizontally scalable; vector DB and payment DB scale independently of chat traffic. |
-| 9 | Cost-effectiveness | LLM and vector DB calls are the dominant marginal cost, not compute — mitigate with caching on repeated queries and a smaller/cheaper model for intent classification vs. a larger model only for generation. |
-| 10 | Observability | Structured, PII-masked audit log per tool invocation; distributed tracing across the orchestration → agent → service hops. |
+1. System should be highly available — targeting 99.99% for the booking/donation path; 99.9% acceptable for the chat/RAG path, since an LLM vendor outage shouldn't take down transactions.
+2. System should have low latency — chat/RAG p99 ≤ 3s; transactional (booking, donation, event listing) p99 ≤ 300ms.
+3. System should have strong consistency on the booking system — locking on slot inventory to prevent double-booking; at-least-once with an idempotency key on payment (retries must be safe, not blocked); eventual consistency acceptable for chat history and audit logs.
+4. System should be able to handle concurrency for the booking system — optimistic locking (version column, retry-on-conflict) on slot inventory by default; a short-lived distributed lock only if a small number of slots see disproportionate contention.
+5. System should be secure enough — input guardrails (prompt injection/jailbreak detection) before any LLM call, RBAC before tool dispatch, and output guardrails + PII-masked audit logging on every response.
+6. Data isolation — four separate stores: booking DB, donation/payment DB, chat/context history DB, and the vector DB. No shared schema or instance.
+7. Payments must handle idempotency — every payment request carries a server-issued idempotency key with a TTL, checked before the payment gateway call executes.
+8. System should be scalable enough — orchestration/API tier is stateless and horizontally scalable; vector DB and payment DB scale independently of chat traffic.
+9. System should be cost-effective — LLM and vector DB calls are the dominant marginal cost, not compute; mitigate with caching on repeated queries and a smaller/cheaper model for intent classification vs. a larger model only for generation.
+10. Observability for every agent and every flow in the system — structured, PII-masked audit log per tool invocation; distributed tracing across the orchestration → agent → service hops.
 
 ---
 
