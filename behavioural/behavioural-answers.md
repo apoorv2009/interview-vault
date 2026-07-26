@@ -267,7 +267,7 @@ So my AI experience is: **deep on systems, wide on tools, honest about boundarie
 
 *Base identity: the EPAM/Architect track above — 16-yr Apoorv Jain, Capital Access. Solera's JD asks for 12+ years and Principal-Engineer/Lead-Architect scope, which matches this track, not the Entity Management System / Senior Full Stack framing.*
 
-*For deep technical fluency on the modernization topics below (Strangler pattern, AngularJS→Angular mechanics, ASP.NET Core migration, Azure service selection, observability, CI/CD, security) beyond what fits in a spoken story, see `enterprise-modernization/reference.md` — generic technical reference and a 75-question deep-dive bank, not tied to a specific claimed incident.*
+*For deep technical fluency on the modernization topics below (Strangler pattern, AngularJS→Angular mechanics, ASP.NET Core migration, Azure service selection, observability, CI/CD, security) beyond what fits in a spoken story, see `enterprise-modernization/enterprise-modernization-guide.md` — generic technical reference and a 75-question deep-dive bank, not tied to a specific claimed incident.*
 
 *A note on how these were written: every answer below is set inside your real projects (Capital Access, JTI-TERA, AIS, Cerebrata, Aagam Mitra) with their real architecture, scale, and tech choices. Where I already had the underlying fact from elsewhere in this vault (the AI-tools numbers, the .NET migration approach, the Service Bus architecture), the answer uses it directly. Where the vault didn't have the specific incident, I've drafted a realistic one consistent with that project's known shape — read each one before Wednesday and adjust any detail that doesn't match what actually happened; don't recite one you haven't mentally verified.*
 
@@ -301,7 +301,7 @@ So my AI experience is: **deep on systems, wide on tools, honest about boundarie
 
 **Q7. Give an example of evolving a monolithic or legacy system toward an API-first or event-driven design. What was hardest about that transition?**
 
-*This is the real Wipro Cloud Migration Programme story, confirmed against my resume (Application Architect, Wipro, Mar 2022–Nov 2024) — full technical mechanics reference in `enterprise-modernization/reference.md` in this vault.*
+*This is the real Wipro Cloud Migration Programme story, confirmed against my resume (Application Architect, Wipro, Mar 2022–Nov 2024) — full technical mechanics reference in `enterprise-modernization/enterprise-modernization-guide.md` in this vault.*
 
 "At Wipro I led the application and data-tier assessment for an enterprise cloud migration programme — a large portfolio, dozens of applications, most built on ASP.NET MVC / Web API on .NET Framework with AngularJS 1.x front ends and on-prem SQL Server, being moved to a target state of ASP.NET Core, Angular 18, and Azure. My role was architecture and planning, not writing every line of migration code myself — I defined the target-state architecture and the governance model a larger delivery team executed against.
 
