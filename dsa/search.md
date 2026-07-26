@@ -89,7 +89,7 @@ Arrays are fixed size in C# — you can't delete. Instead overwrite valid elemen
 
 **LeetCode:** https://leetcode.com/problems/find-numbers-with-even-number-of-digits/
 **Difficulty:** Easy
-**Date:**
+**Date:** 2026-07-26
 
 ### Problem Statement
 
@@ -107,13 +107,29 @@ Output: 1   → 1771 (4 digits)
 ### Solution
 
 ```csharp
-// paste solution here
+public static int LinearSearch(int[] input)
+{
+    int count = 0;
+    for (int i = 0; i < input.Length; i++)
+    {
+        var numberLength = input[i].ToString().Length;
+        if (numberLength % 2 == 0)
+        {
+            count++;
+        }
+    }
+    return count;
+}
 ```
 
 ### Complexity
 
-- **Time:** O(n)
+- **Time:** O(n) — single pass
 - **Space:** O(1)
+
+### Key Takeaway
+
+Convert to string to get digit count in one line. Even digit count = `length % 2 == 0`.
 
 ---
 
