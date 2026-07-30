@@ -22,6 +22,7 @@ SKIP_FILES = {"readme.md", "claude.md", "generate_toc.py"}
 # prefixes match before shorter ones (e.g. "data-structures" before "data").
 PREFIX_TO_TOPIC = [
     ("principal-engineer", "Principal Engineer / Architecture"),
+    ("fundamentals",    "Fundamentals"),
     ("data-structures", "Data Structures"),
     ("microservices",   "Microservices"),
     ("idempotency",     "Concurrency"),

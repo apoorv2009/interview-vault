@@ -19,6 +19,9 @@ Concise, interview-ready deep-dives on system design, distributed systems, and e
 ### Data Structures
 - [How is Gmail username availability check instant?](data-structures-bloom-filter.md)
 
+### Fundamentals
+- [System Design Interview — Handwritten Notes](fundamentals-handwritten-notes.md)
+
 ### Git Workflow
 - [Your branch is 200 commits behind main. What will you do — merge or rebase?](git-merge-vs-rebase.md)
 
@@ -75,6 +78,7 @@ Files follow a `<topic>-<slug>.md` naming convention so a flat directory listing
 | `idempotency` | Concurrency |
 | `drm` | DRM |
 | `data-structures` | Data Structures |
+| `fundamentals` | Fundamentals |
 | `git` | Git Workflow |
 | `incident` | Incident Response |
 | `microservices` | Microservices |
