@@ -1,9 +1,7 @@
 <title>System Design Interview — Handwritten Notes</title>
 <style>
   :root{
-    --paper:#f3efe2;
-    --rule:#b9cbe8;
-    --margin:#c96659;
+    --paper:#f6f3ea;
     --ink:#1e2f4d;
     --ink-soft:#3c5170;
     --hi-yellow:rgba(255,224,102,.55);
@@ -11,14 +9,15 @@
     --hi-purple:rgba(150,120,210,.35);
     --accent:#5b3fa0;
     --accent-2:#2b6cb0;
+    --accent-3:#1f8a5f;
+    --accent-4:#c1484a;
     --tape:#eadfae;
-    --card:#faf7ec;
-    --shadow:rgba(30,20,10,.18);
+    --card:#fffdf6;
+    --shadow:rgba(30,20,10,.16);
+    --ring:#2a2a2a;
   }
   :root[data-theme="dark"]{
     --paper:#1b241d;
-    --rule:rgba(255,255,255,.09);
-    --margin:#e2734f;
     --ink:#eef0e6;
     --ink-soft:#c9d3c3;
     --hi-yellow:rgba(255,224,102,.28);
@@ -26,15 +25,16 @@
     --hi-purple:rgba(178,150,230,.28);
     --accent:#c9b6ff;
     --accent-2:#8fc7ff;
+    --accent-3:#7fd9ab;
+    --accent-4:#ef8b8b;
     --tape:#33402f;
     --card:#212b22;
     --shadow:rgba(0,0,0,.45);
+    --ring:#0e130f;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
       --paper:#1b241d;
-      --rule:rgba(255,255,255,.09);
-      --margin:#e2734f;
       --ink:#eef0e6;
       --ink-soft:#c9d3c3;
       --hi-yellow:rgba(255,224,102,.28);
@@ -42,9 +42,12 @@
       --hi-purple:rgba(178,150,230,.28);
       --accent:#c9b6ff;
       --accent-2:#8fc7ff;
+      --accent-3:#7fd9ab;
+      --accent-4:#ef8b8b;
       --tape:#33402f;
       --card:#212b22;
       --shadow:rgba(0,0,0,.45);
+      --ring:#0e130f;
     }
   }
 
@@ -54,31 +57,26 @@
     font-family:"Segoe Print","Bradley Hand","Segoe Script","Comic Sans MS",cursive;
     color:var(--ink);
     background:var(--paper);
-    background-image:
-      repeating-linear-gradient(var(--paper), var(--paper) 27px, var(--rule) 28px);
     min-height:100%;
-    padding:2.5rem 1.25rem 4rem;
+    padding:2.5rem 1.5rem 3.5rem 4.2rem;
     position:relative;
-    line-height:1.55;
+    line-height:1.5;
   }
-  .book::before{
-    content:"";
+  .spiral{
     position:absolute;
-    top:0; bottom:0; left:48px;
-    width:2px;
-    background:var(--margin);
-    opacity:.55;
-    display:none;
-  }
-  @media(min-width:640px){
-    .book::before{display:block;}
-    .book{padding-left:80px;}
+    left:0; top:0; bottom:0;
+    width:34px;
+    background-image:
+      radial-gradient(circle at 17px center, transparent 6px, var(--ring) 6px, var(--ring) 8px, transparent 8px);
+    background-repeat:repeat-y;
+    background-size:34px 34px;
+    background-position:0 10px;
   }
 
-  .wrap{max-width:760px;margin:0 auto;position:relative;}
+  .wrap{max-width:800px;margin:0 auto;position:relative;}
 
-  header.title{margin-bottom:2rem;}
-  .kicker{
+  .masthead{text-align:center;margin-bottom:1.6rem;}
+  .tag{
     font-family:ui-monospace,"Cascadia Code",Consolas,monospace;
     font-size:.72rem;
     letter-spacing:.14em;
@@ -87,182 +85,113 @@
     display:inline-block;
     background:var(--tape);
     padding:.25rem .6rem;
-    transform:rotate(-1.5deg);
+    transform:rotate(-1.2deg);
     box-shadow:0 2px 4px var(--shadow);
   }
-  h1{
-    font-size:clamp(2rem,5vw,2.9rem);
-    margin:.6rem 0 .2rem;
-    text-wrap:balance;
-    color:var(--ink);
-  }
-  h1 mark{background:none;color:var(--accent);}
-  .sub{color:var(--ink-soft);font-size:1.05rem;margin:0 0 .35rem;}
-  .progress-line{
+  .title-row{display:flex;align-items:center;justify-content:center;gap:.9rem;margin:.7rem 0 .3rem;}
+  .doodle{color:var(--accent-3);font-size:1.6rem;line-height:1;}
+  h1{margin:0;font-size:clamp(1.7rem,4.6vw,2.5rem);line-height:1.15;text-wrap:balance;}
+  h1 .l1{display:block;color:var(--accent-3);}
+  h1 .l2{display:block;color:var(--ink);}
+  .stats{
     font-family:ui-monospace,Consolas,monospace;
     font-size:.78rem;
     color:var(--ink-soft);
-    letter-spacing:.02em;
+    margin-top:.6rem;
   }
-  .progress-line b{color:var(--accent-2);}
+  .stats b{color:var(--accent-2);}
 
-  mark{
-    background:var(--hi-yellow);
-    padding:0 .15em;
-    border-radius:2px;
-    color:inherit;
+  .chapter-pill{
+    display:block;
+    text-align:center;
+    margin:2.2rem auto 1.3rem;
+    max-width:620px;
+    border:2px dashed var(--accent);
+    border-radius:999px;
+    padding:.55rem 1.2rem;
+    font-size:1.02rem;
+    color:var(--ink);
+    background:var(--card);
+    box-shadow:2px 3px 6px var(--shadow);
   }
-  mark.pink{background:var(--hi-pink);}
-  mark.purple{background:var(--hi-purple);}
+  .chapter-pill .range{color:var(--ink-soft);font-size:.85rem;}
 
-  section.chapter{margin:2.6rem 0 1.2rem;}
-  .chapter-tab{
+  .qa{
+    display:grid;
+    grid-template-columns:1.05fr 1fr;
+    gap:1.4rem;
+    align-items:start;
+    padding:1.1rem 0;
+    border-bottom:1px dashed color-mix(in srgb, var(--ink) 22%, transparent);
+  }
+  .qa:last-child{border-bottom:none;}
+  @media(max-width:640px){
+    .qa{grid-template-columns:1fr;}
+  }
+  .qa h3{
+    margin:0 0 .35rem;
+    font-size:1.2rem;
+    color:var(--accent-2);
+    text-wrap:balance;
+  }
+  .qa h3 .num{color:var(--ink-soft);font-family:ui-monospace,Consolas,monospace;font-size:.85rem;margin-right:.3rem;}
+  .ans{margin:0;color:var(--ink);}
+  .ans .lbl{color:var(--accent-3);font-weight:bold;margin-right:.3rem;}
+  .ans ul{margin:.4rem 0 0;padding-left:1.15rem;}
+  .ans li{margin:.2rem 0;color:var(--ink-soft);font-size:.96rem;}
+  .ans mark{background:var(--hi-yellow);padding:0 .15em;border-radius:2px;color:inherit;}
+  .ans mark.pink{background:var(--hi-pink);}
+  .ans mark.purple{background:var(--hi-purple);}
+
+  .box{
+    border:2px dashed var(--accent-2);
+    border-radius:14px;
+    padding:.8rem .9rem;
+    background:var(--card);
+    box-shadow:2px 3px 6px var(--shadow);
+  }
+  .box.c1{border-color:var(--accent-2);}
+  .box.c2{border-color:var(--accent);}
+  .box.c3{border-color:var(--accent-3);}
+  .box.c4{border-color:var(--accent-4);}
+  .box .box-title{
     font-family:ui-monospace,Consolas,monospace;
-    font-size:.85rem;
-    letter-spacing:.08em;
+    font-size:.72rem;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin:0 0 .5rem;
+  }
+  .box svg{width:100%;height:auto;display:block;overflow:visible;}
+  .box .cap{
+    margin:.5rem 0 0;
+    font-size:.74rem;
+    color:var(--ink-soft);
+    font-family:ui-monospace,Consolas,monospace;
+  }
+  .box table{border-collapse:collapse;width:100%;font-size:.86rem;}
+  .box th{
+    font-family:ui-monospace,Consolas,monospace;
+    font-size:.7rem;
+    letter-spacing:.04em;
     text-transform:uppercase;
     color:var(--card);
-    background:var(--accent);
-    display:inline-block;
-    padding:.45rem .9rem;
-    clip-path:polygon(0 0,100% 0,96% 100%,4% 100%);
-    box-shadow:0 3px 6px var(--shadow);
+    background:var(--accent-2);
+    padding:.35rem .5rem;
+    text-align:left;
   }
-  .chapter-note{color:var(--ink-soft);font-size:.92rem;margin:.5rem 0 0;}
+  .box.c2 th{background:var(--accent);}
+  .box.c3 th{background:var(--accent-3);}
+  .box.c4 th{background:var(--accent-4);}
+  .box td{padding:.35rem .5rem;border-bottom:1px dotted color-mix(in srgb, var(--ink) 20%, transparent);color:var(--ink-soft);vertical-align:top;}
+  .box tr:last-child td{border-bottom:none;}
+  .box ol,.box ul{margin:0;padding-left:1.15rem;}
+  .box li{margin:.3rem 0;font-size:.92rem;color:var(--ink-soft);}
+  .box li b{color:var(--ink);}
+  .box .mini-table{width:100%;font-family:ui-monospace,Consolas,monospace;font-size:.76rem;font-variant-numeric:tabular-nums;}
+  .box .mini-table td{padding:.15rem .5rem .15rem 0;}
+  .box .mini-table td:last-child{text-align:right;color:var(--ink);padding-right:0;}
 
-  details.topic{
-    margin:1.1rem 0;
-    border-bottom:1px dashed color-mix(in srgb, var(--ink) 25%, transparent);
-    padding-bottom:.9rem;
-  }
-  details.topic:last-child{border-bottom:none;}
-  summary{
-    cursor:pointer;
-    display:flex;
-    align-items:baseline;
-    gap:.65rem;
-    list-style:none;
-  }
-  summary::-webkit-details-marker{display:none;}
-  summary:focus-visible{outline:2px solid var(--accent-2);outline-offset:4px;border-radius:4px;}
-  .badge{
-    font-family:ui-monospace,Consolas,monospace;
-    font-size:.8rem;
-    min-width:1.9rem;height:1.9rem;
-    border:2px solid var(--accent-2);
-    color:var(--accent-2);
-    border-radius:50%;
-    display:inline-flex;align-items:center;justify-content:center;
-    flex-shrink:0;
-    background:var(--card);
-  }
-  summary .t{
-    font-size:1.35rem;
-    color:var(--ink);
-    text-decoration:underline;
-    text-decoration-style:wavy;
-    text-decoration-color:color-mix(in srgb, var(--accent-2) 55%, transparent);
-    text-underline-offset:5px;
-  }
-  summary .arrow{
-    margin-left:auto;
-    color:var(--ink-soft);
-    font-size:1.1rem;
-    transition:transform .15s ease;
-  }
-  details[open] summary .arrow{transform:rotate(90deg);}
-  @media (prefers-reduced-motion: reduce){
-    details[open] summary .arrow{transition:none;}
-  }
-
-  .notes{
-    margin:.7rem 0 0 2.55rem;
-    padding:0;
-    list-style:none;
-  }
-  .notes > li{
-    position:relative;
-    padding-left:1.05rem;
-    margin:.4rem 0;
-  }
-  .notes > li::before{
-    content:"—";
-    position:absolute;left:0;top:0;
-    color:var(--accent-2);
-  }
-  .notes ul{margin:.3rem 0 .3rem 1rem;padding:0;list-style:none;}
-  .notes ul li{position:relative;padding-left:1rem;margin:.25rem 0;font-size:.97rem;color:var(--ink-soft);}
-  .notes ul li::before{content:"·";position:absolute;left:0;color:var(--ink-soft);}
-
-  .sticky{
-    background:var(--card);
-    border:1px solid color-mix(in srgb, var(--ink) 15%, transparent);
-    box-shadow:2px 3px 8px var(--shadow);
-    padding:.7rem .9rem;
-    margin:.8rem 0 .3rem 2.55rem;
-    max-width:560px;
-    transform:rotate(-.6deg);
-    font-size:.98rem;
-  }
-  .sticky b{color:var(--accent);}
-
-  .tchart{
-    display:grid;
-    grid-template-columns:1fr 1fr;
-    gap:0 1rem;
-    margin:.7rem 0 0 2.55rem;
-    max-width:640px;
-  }
-  .tchart .col{border-top:2px solid var(--accent-2);padding-top:.4rem;}
-  .tchart h4{
-    margin:0 0 .3rem;font-size:1.05rem;color:var(--accent-2);
-    font-family:ui-monospace,Consolas,monospace;letter-spacing:.02em;
-  }
-  .tchart ul{margin:0;padding-left:1.1rem;font-size:.92rem;color:var(--ink-soft);}
-  .tchart li{margin:.2rem 0;}
-  @media(max-width:520px){.tchart{grid-template-columns:1fr;}}
-
-  .latency-table{
-    margin:.7rem 0 0 2.55rem;
-    max-width:600px;
-    overflow-x:auto;
-  }
-  .latency-table table{
-    border-collapse:collapse;
-    width:100%;
-    font-family:ui-monospace,Consolas,monospace;
-    font-size:.82rem;
-    font-variant-numeric:tabular-nums;
-  }
-  .latency-table td{padding:.2rem .6rem .2rem 0;color:var(--ink-soft);border-bottom:1px dotted color-mix(in srgb, var(--ink) 20%, transparent);}
-  .latency-table td:last-child{color:var(--ink);text-align:right;padding-right:0;}
-
-  .algo-list{margin:.7rem 0 0 2.55rem;padding:0;list-style:none;max-width:640px;}
-  .algo-list li{margin:.5rem 0;padding-left:0;}
-  .algo-list .name{color:var(--accent);font-size:1.05rem;}
-  .algo-list .desc{color:var(--ink-soft);font-size:.93rem;display:block;margin-top:.1rem;}
-
-  footer{
-    margin:3rem auto 0;
-    max-width:760px;
-    color:var(--ink-soft);
-    font-size:.8rem;
-    text-align:center;
-    font-family:ui-monospace,Consolas,monospace;
-  }
-
-  figure.diagram{
-    margin:.9rem 0 .9rem 2.55rem;
-    max-width:600px;
-  }
-  figure.diagram svg{width:100%;height:auto;display:block;overflow:visible;}
-  figure.diagram .cap{
-    margin:.4rem 0 0;
-    font-size:.78rem;
-    color:var(--ink-soft);
-    font-family:ui-monospace,Consolas,monospace;
-    font-style:normal;
-  }
   .dg-ink{stroke:var(--ink);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
   .dg-inkfill{fill:var(--ink);}
   .dg-accent{stroke:var(--accent-2);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
@@ -270,7 +199,7 @@
   .dg-accent2{stroke:var(--accent);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
   .dg-accent2fill{fill:var(--accent);}
   .dg-soft{stroke:var(--ink-soft);fill:none;stroke-width:1.6;}
-  .dg-box{fill:var(--card);stroke:var(--ink);stroke-width:2;}
+  .dg-box{fill:var(--paper);stroke:var(--ink);stroke-width:2;}
   .dg-hi{fill:var(--hi-yellow);}
   .dg-hi-pink{fill:var(--hi-pink);}
   .dg-hi-purple{fill:var(--hi-purple);}
@@ -279,646 +208,530 @@
   .dg-text-sm{font-family:inherit;fill:var(--ink-soft);font-size:13px;}
   .dg-mono{font-family:ui-monospace,Consolas,monospace;fill:var(--ink-soft);font-size:10.5px;}
   .dg-mono-accent{font-family:ui-monospace,Consolas,monospace;fill:var(--accent-2);font-size:11px;}
+
+  footer{
+    margin:2.4rem auto 0;
+    max-width:800px;
+    color:var(--ink-soft);
+    font-size:.78rem;
+    text-align:center;
+    font-family:ui-monospace,Consolas,monospace;
+  }
 </style>
 
 <div class="book">
+  <div class="spiral"></div>
   <div class="wrap">
 
-    <header class="title">
-      <span class="kicker">Grokking the System Design Interview</span>
-      <h1>Notes from the <mark>margin</mark>, pen in hand.</h1>
-      <p class="sub">Everything I've actually read so far — condensed, not copied.</p>
-      <p class="progress-line">Course progress at time of writing: <b>24%</b> · through <b>Bloom Filters</b> · 18 lessons covered below</p>
+    <header class="masthead">
+      <span class="tag">Grokking the System Design Interview</span>
+      <div class="title-row">
+        <span class="doodle">≫</span>
+        <h1><span class="l1">SYSTEM DESIGN</span><span class="l2">INTERVIEW NOTES</span></h1>
+        <span class="doodle">≪</span>
+      </div>
+      <div class="stats">Course progress: <b>24%</b> · through <b>Bloom Filters</b> · Q1–Q19 below</div>
     </header>
 
-    <section class="chapter">
-      <span class="chapter-tab">Part 1 — Introduction to System Design Interview</span>
+    <div class="chapter-pill">Part 1 — Introduction to System Design Interview <span class="range">(Q1–Q4)</span></div>
 
-      <details class="topic" open>
-        <summary><span class="badge">1</span><span class="t">What is a System Design Interview?</span><span class="arrow">›</span></summary>
-        <ul class="notes">
-          <li>Assesses ability to design <mark>large-scale software systems</mark> — for SWE, architect, DevOps roles.</li>
-          <li>Open-ended, unlike coding interviews — no single "correct" answer. It's about <mark class="pink">approach + reasoning</mark>, not producing code.</li>
-          <li>What it checks:
-            <ul>
-              <li>Problem-solving on ambiguous, open-ended problems</li>
-              <li>Technical knowledge — DBs, APIs, caching, load balancing, protocols</li>
-              <li>Scalability / reliability thinking</li>
-              <li>Trade-off reasoning — <i>why</i> this choice, not just what</li>
-              <li>Communication — it's a dialogue, whiteboard included</li>
-            </ul>
-          </li>
-          <li>Not about: a "perfect" answer, or memorizing tool trivia.</li>
+    <div class="qa">
+      <div>
+        <h3><span class="num">1.</span>What is a System Design Interview?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Assesses your ability to design <mark>large-scale software systems</mark> — open-ended, no single "correct" answer. It's about <mark class="pink">approach and reasoning</mark>, not producing code, and not memorizing tool trivia.</p>
+      </div>
+      <div class="box c1">
+        <p class="box-title">What it checks</p>
+        <ul>
+          <li>Problem-solving on ambiguous problems</li>
+          <li>Technical knowledge — DBs, APIs, caching, LB, protocols</li>
+          <li>Scalability / reliability thinking</li>
+          <li>Trade-off reasoning — <i>why</i>, not just what</li>
+          <li>Communication — it's a dialogue</li>
         </ul>
-        <div class="sticky"><b>Remember:</b> they're grading how you think, not what you land on.</div>
-      </details>
+      </div>
+    </div>
 
-      <details class="topic" open>
-        <summary><span class="badge">2</span><span class="t">Functional vs. Non-functional Requirements</span><span class="arrow">›</span></summary>
-        <div class="tchart">
-          <div class="col">
-            <h4>Functional — WHAT</h4>
-            <ul>
-              <li>Actions the system must perform</li>
-              <li>Auth validates credentials & access</li>
-              <li>Browse → cart → checkout</li>
-              <li>Forms the backbone of the design</li>
-            </ul>
-          </div>
-          <div class="col">
-            <h4>Non-functional — HOW</h4>
-            <ul>
-              <li><mark>Scalability</mark>, <mark>performance</mark>, <mark>availability</mark>, <mark>security</mark></li>
-              <li>Quality attributes, not features</li>
-              <li>Shows depth / robustness</li>
-            </ul>
-          </div>
-        </div>
-        <ul class="notes" style="margin-top:.8rem;">
-          <li>Interview approach: <b>clarify</b> → <b>prioritize</b> → discuss <b>trade-offs</b> (e.g. read-optimized often ⇒ slower writes) → use real examples → keep it <b>balanced</b>.</li>
-          <li>Interviewers often leave requirements vague on purpose — asking clarifying Qs is part of the test.</li>
+    <div class="qa">
+      <div>
+        <h3><span class="num">2.</span>Functional vs. Non-functional Requirements?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Functional = <b>what</b> the system does (auth, browse → cart → checkout). Non-functional = <b>how</b> it performs — <mark>scalability</mark>, <mark>performance</mark>, <mark>availability</mark>, <mark>security</mark>. Clarify both, prioritize, then discuss trade-offs (e.g. read-optimized often ⇒ slower writes).</p>
+      </div>
+      <div class="box c2">
+        <table>
+          <tr><th>Aspect</th><th>Functional</th><th>Non-functional</th></tr>
+          <tr><td>Defines</td><td>Actions performed</td><td>Quality of performance</td></tr>
+          <tr><td>Examples</td><td>Auth, checkout</td><td>Scale, uptime, security</td></tr>
+          <tr><td>Role</td><td>Backbone of design</td><td>Shows depth &amp; robustness</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">3.</span>What are Back-of-the-Envelope Estimations?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Quick napkin math to sanity-check feasibility, load, and bottlenecks — not precision. Techniques: <mark>rule of thumb</mark>, <mark>approximation</mark> (round numbers), <mark>breakdown &amp; aggregate</mark>, <mark>sanity check</mark> vs known systems.</p>
+        <ul>
+          <li>Load: 100M DAU × 10 posts = 1B/day → ≈ <b>11,574 req/s</b></li>
+          <li>Resource: 10,000 req/s × 10ms = <b>100 cores</b> needed</li>
         </ul>
-      </details>
+      </div>
+      <div class="box c3">
+        <p class="box-title">Latency numbers worth knowing</p>
+        <table class="mini-table">
+          <tr><td>L1 cache ref</td><td>0.5 ns</td></tr>
+          <tr><td>Main memory ref</td><td>100 ns</td></tr>
+          <tr><td>Round trip, same DC</td><td>500 μs</td></tr>
+          <tr><td>Disk seek</td><td>10 ms</td></tr>
+          <tr><td>Read 1MB from disk</td><td>30 ms</td></tr>
+          <tr><td>CA → Netherlands → CA</td><td>150 ms</td></tr>
+        </table>
+      </div>
+    </div>
 
-      <details class="topic" open>
-        <summary><span class="badge">3</span><span class="t">Back-of-the-Envelope Estimations</span><span class="arrow">›</span></summary>
-        <ul class="notes">
-          <li>Quick napkin math to sanity-check feasibility, load, bottlenecks — not precision.</li>
-          <li>Techniques: <mark>rule of thumb</mark>, <mark>approximation</mark> (round numbers), <mark>breakdown & aggregate</mark> (split into parts, sum up), <mark>sanity check</mark> vs known systems.</li>
-          <li>Types: load, storage, bandwidth, latency, resource (servers/CPU) estimation.</li>
-          <li>Worked examples:
-            <ul>
-              <li>Load: 100M DAU × 10 posts = 1B/day → ÷86,400s ≈ <b>11,574 req/s</b></li>
-              <li>Storage: 500M users × 2 photos × 2MB = <b>2B MB/day</b></li>
-              <li>Bandwidth: 10M users × 4 Mbps = <b>40M Mbps</b></li>
-              <li>Latency (sequential) = sum of hops; (parallel) = max of hops</li>
-              <li>Resource: 10,000 req/s × 10ms = 100,000 ms/s → ÷1,000ms/core = <b>100 cores</b></li>
-            </ul>
-          </li>
+    <div class="qa">
+      <div>
+        <h3><span class="num">4.</span>What Should You Avoid in the Interview?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Don't skip clarifying requirements, don't dive into low-level details too soon, don't get married to your first idea, and don't skip <mark>trade-off</mark> discussion. It's a dialogue — under-communicating or faking confidence both read badly.</p>
+      </div>
+      <div class="box c4">
+        <p class="box-title">7 things to avoid</p>
+        <ul>
+          <li>Skipping clarification</li>
+          <li>Details before the big picture</li>
+          <li>Rigid on your first idea</li>
+          <li>Ignoring trade-offs</li>
+          <li>Ignoring non-functional reqs</li>
+          <li>Under-communicating</li>
+          <li>Overconfidence</li>
         </ul>
-        <div class="latency-table">
-          <table>
-            <tr><td>L1 cache ref</td><td>0.5 ns</td></tr>
-            <tr><td>Branch mispredict</td><td>5 ns</td></tr>
-            <tr><td>L2 cache ref</td><td>7 ns</td></tr>
-            <tr><td>Mutex lock/unlock</td><td>100 ns</td></tr>
-            <tr><td>Main memory ref</td><td>100 ns</td></tr>
-            <tr><td>Compress 1K (Zippy)</td><td>10 μs</td></tr>
-            <tr><td>Send 2K over 1Gbps net</td><td>20 μs</td></tr>
-            <tr><td>Read 1MB from memory</td><td>250 μs</td></tr>
-            <tr><td>Round trip, same datacenter</td><td>500 μs</td></tr>
-            <tr><td>Disk seek</td><td>10 ms</td></tr>
-            <tr><td>Read 1MB over network</td><td>10 ms</td></tr>
-            <tr><td>Read 1MB from disk</td><td>30 ms</td></tr>
-            <tr><td>CA → Netherlands → CA</td><td>150 ms</td></tr>
-          </table>
-        </div>
-        <div class="sticky"><b>Habit:</b> state assumptions out loud, then be ready to revise them when challenged.</div>
-      </details>
+      </div>
+    </div>
 
-      <details class="topic" open>
-        <summary><span class="badge">4</span><span class="t">Things to Avoid During the Interview</span><span class="arrow">›</span></summary>
-        <ul class="notes">
-          <li>Don't skip clarifying requirements or oversimplify the problem.</li>
-          <li>Don't dive into low-level details before the high-level shape exists.</li>
-          <li>Don't get married to your first idea — stay flexible, use interviewer hints.</li>
-          <li>Don't skip <mark>trade-off</mark> discussion — every decision has one, justify it.</li>
-          <li>Don't ignore non-functional requirements or real constraints (cost, time, existing stack).</li>
-          <li>Don't under-communicate — it's a dialogue, not a monologue.</li>
-          <li>Don't fake confidence — saying "I don't know, but here's how I'd find out" beats guessing wrong.</li>
-        </ul>
-      </details>
-    </section>
+    <div class="chapter-pill">Part 2 — Glossary of System Design Basics <span class="range">(Q5–Q19)</span></div>
 
-    <section class="chapter">
-      <span class="chapter-tab">Part 2 — Glossary of System Design Basics</span>
-      <p class="chapter-note">Core building blocks: distributed systems traits → load balancing → caching → partitioning → indexes → proxies → replication → SQL/NoSQL → CAP/PACELC → consistent hashing → realtime protocols → Bloom filters.</p>
+    <div class="qa">
+      <div>
+        <h3><span class="num">5.</span>What's the Basic Approach to System Design?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> For any large system, ask: what architectural pieces exist, how do they interact, and what are the right <mark>trade-offs</mark>? Scaling before it's needed is usually bad business — but a little forethought saves pain later.</p>
+      </div>
+      <div class="box c1">
+        <p class="box-title">3 questions to ask</p>
+        <ol>
+          <li>What pieces can be used?</li>
+          <li>How do they work together?</li>
+          <li>What's the right trade-off?</li>
+        </ol>
+      </div>
+    </div>
 
-      <details class="topic" open>
-        <summary><span class="badge">5</span><span class="t">System Design Basics</span><span class="arrow">›</span></summary>
-        <ul class="notes">
-          <li>Three questions for any large system: what pieces exist? how do they interact? what are the right <mark>trade-offs</mark>?</li>
-          <li>Scaling before it's needed is usually bad business — but a little forethought saves pain later.</li>
-        </ul>
-      </details>
+    <div class="qa">
+      <div>
+        <h3><span class="num">6.</span>Key Characteristics of Distributed Systems?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> <mark>Scalability</mark> (horizontal vs vertical), <mark>reliability</mark> (keeps working through failures, via redundancy), <mark>availability</mark> (% uptime — reliable ⇒ available, not the reverse), <mark>efficiency</mark> (latency + throughput), and <mark>manageability</mark> (how easily it's diagnosed and fixed).</p>
+      </div>
+      <div class="box c2">
+        <svg viewBox="0 0 560 175" role="img" aria-label="Vertical scaling makes one server bigger; horizontal scaling adds more servers">
+          <defs>
+            <marker id="ah-scale-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-accent2fill"/></marker>
+            <marker id="ah-scale-b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-accentfill"/></marker>
+          </defs>
+          <text x="20" y="22" class="dg-mono">VERTICAL — scale up</text>
+          <rect x="20" y="105" width="55" height="45" rx="6" class="dg-box"/>
+          <text x="47" y="132" text-anchor="middle" class="dg-text-sm">Server</text>
+          <rect x="120" y="45" width="115" height="105" rx="10" class="dg-box"/>
+          <text x="177" y="95" text-anchor="middle" class="dg-text">Server</text>
+          <text x="177" y="115" text-anchor="middle" class="dg-text-sm">+CPU +RAM</text>
+          <path d="M77,118 Q100,90 118,88" class="dg-accent2" marker-end="url(#ah-scale-a)"/>
+          <text x="330" y="22" class="dg-mono">HORIZONTAL — scale out</text>
+          <rect x="300" y="105" width="55" height="45" rx="6" class="dg-box"/>
+          <text x="327" y="132" text-anchor="middle" class="dg-text-sm">Server</text>
+          <rect x="375" y="105" width="55" height="45" rx="6" class="dg-box"/>
+          <text x="402" y="132" text-anchor="middle" class="dg-text-sm">Server</text>
+          <rect x="450" y="105" width="55" height="45" rx="6" class="dg-box dg-dash"/>
+          <text x="477" y="132" text-anchor="middle" class="dg-text-sm">+ new</text>
+          <path d="M358,88 Q400,65 448,88" class="dg-accent" marker-end="url(#ah-scale-b)"/>
+        </svg>
+        <div class="cap">Cassandra/MongoDB → horizontal · MySQL (classic) → vertical</div>
+      </div>
+    </div>
 
-      <details class="topic" open>
-        <summary><span class="badge">6</span><span class="t">Key Characteristics of Distributed Systems</span><span class="arrow">›</span></summary>
-        <ul class="notes">
-          <li><mark>Scalability</mark> — grow without losing performance.
-            <ul>
-              <li><b>Horizontal</b> (add more machines — Cassandra, MongoDB) vs <b>Vertical</b> (bigger machine — MySQL, usually = downtime + a ceiling)</li>
-            </ul>
-          </li>
-          <li><mark>Reliability</mark> — keeps working correctly through failures, via redundancy of software + data.
-            <ul>
-              <li>Fault tolerance ≠ reliability: FT = system-centric ("does it keep running when a part breaks"); Reliability = user-centric, measured via uptime / MTBF over time.</li>
-            </ul>
-          </li>
-          <li><mark>Availability</mark> — % of time it's operational. Reliable ⇒ available, but available ≠ reliable (can look fine for years, then fail hard — e.g. a system with no security testing that later suffers a breach).</li>
-          <li><mark>Efficiency</mark> — measured by latency (time to first result) + throughput (results per second).</li>
-          <li><mark>Manageability</mark> — how easily it's diagnosed, updated, operated; early fault detection cuts downtime.</li>
-        </ul>
-        <figure class="diagram">
-          <svg viewBox="0 0 560 175" role="img" aria-label="Vertical scaling makes one server bigger; horizontal scaling adds more servers">
-            <defs>
-              <marker id="ah-scale-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-accent2fill"/></marker>
-              <marker id="ah-scale-b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-accentfill"/></marker>
-            </defs>
-            <text x="20" y="22" class="dg-mono">VERTICAL — scale up</text>
-            <rect x="20" y="105" width="55" height="45" rx="6" class="dg-box"/>
-            <text x="47" y="132" text-anchor="middle" class="dg-text-sm">Server</text>
-            <rect x="120" y="45" width="115" height="105" rx="10" class="dg-box"/>
-            <text x="177" y="95" text-anchor="middle" class="dg-text">Server</text>
-            <text x="177" y="115" text-anchor="middle" class="dg-text-sm">+CPU +RAM</text>
-            <path d="M77,118 Q100,90 118,88" class="dg-accent2" marker-end="url(#ah-scale-a)"/>
+    <div class="qa">
+      <div>
+        <h3><span class="num">7.</span>What is Load Balancing?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Sits between client and servers, spreading traffic and skipping unhealthy/slow servers. Can live at 3 layers: user↔web, web↔app/cache, app↔database. The LB itself is a SPOF, so pair two — each monitoring the other's health.</p>
+      </div>
+      <div class="box c3">
+        <svg viewBox="0 0 460 330" role="img" aria-label="A load balancer can sit between the user and web tier, between web and app tier, and between app and database tier">
+          <line x1="90" y1="20" x2="90" y2="310" class="dg-soft dg-dash"/>
+          <circle cx="90" cy="20" r="6" class="dg-inkfill"/>
+          <text x="112" y="25" class="dg-text-sm">Client</text>
+          <circle cx="90" cy="70" r="7" class="dg-accentfill"/>
+          <text x="112" y="75" class="dg-text">Load Balancer ①</text>
+          <circle cx="90" cy="120" r="6" class="dg-inkfill"/>
+          <text x="112" y="125" class="dg-text-sm">Web servers</text>
+          <circle cx="90" cy="170" r="7" class="dg-accentfill"/>
+          <text x="112" y="175" class="dg-text">Load Balancer ②</text>
+          <circle cx="90" cy="220" r="6" class="dg-inkfill"/>
+          <text x="112" y="225" class="dg-text-sm">App / cache servers</text>
+          <circle cx="90" cy="270" r="7" class="dg-accentfill"/>
+          <text x="112" y="275" class="dg-text">Load Balancer ③</text>
+          <circle cx="90" cy="310" r="6" class="dg-inkfill"/>
+          <text x="112" y="315" class="dg-text-sm">Database</text>
+        </svg>
+        <div class="cap">Three places to slot in a load balancer</div>
+      </div>
+    </div>
 
-            <text x="330" y="22" class="dg-mono">HORIZONTAL — scale out</text>
-            <rect x="300" y="105" width="55" height="45" rx="6" class="dg-box"/>
-            <text x="327" y="132" text-anchor="middle" class="dg-text-sm">Server</text>
-            <rect x="375" y="105" width="55" height="45" rx="6" class="dg-box"/>
-            <text x="402" y="132" text-anchor="middle" class="dg-text-sm">Server</text>
-            <rect x="450" y="105" width="55" height="45" rx="6" class="dg-box dg-dash"/>
-            <text x="477" y="132" text-anchor="middle" class="dg-text-sm">+ new</text>
-            <path d="M358,88 Q400,65 448,88" class="dg-accent" marker-end="url(#ah-scale-b)"/>
-          </svg>
-          <div class="cap">Cassandra / MongoDB → horizontal · MySQL (classic) → vertical, usually with downtime</div>
-        </figure>
-      </details>
+    <div class="qa">
+      <div>
+        <h3><span class="num">8.</span>What are the Load Balancing Algorithms?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Round Robin and Random are the simplest (no load-awareness). Least Connections / Weighted variants react to real load. IP Hash gives session stickiness. Least Response Time and Least Bandwidth react to live performance. Custom Load lets you define your own metrics.</p>
+      </div>
+      <div class="box c4">
+        <table>
+          <tr><th>Algorithm</th><th>Best for</th></tr>
+          <tr><td>Round Robin</td><td>Homogeneous, stateless</td></tr>
+          <tr><td>Least Connections</td><td>Variable traffic</td></tr>
+          <tr><td>Weighted Round Robin</td><td>Mixed-capacity pools</td></tr>
+          <tr><td>Weighted Least Conn.</td><td>Most balanced, complex</td></tr>
+          <tr><td>IP Hash</td><td>Session stickiness</td></tr>
+          <tr><td>Least Response Time</td><td>Real-time, low latency</td></tr>
+          <tr><td>Random</td><td>Simple deployments</td></tr>
+          <tr><td>Least Bandwidth</td><td>Video / CDN traffic</td></tr>
+          <tr><td>Custom Load</td><td>Complex, dynamic needs</td></tr>
+        </table>
+      </div>
+    </div>
 
-      <details class="topic" open>
-        <summary><span class="badge">7</span><span class="t">Load Balancing</span><span class="arrow">›</span></summary>
-        <ul class="notes">
-          <li>Sits between client and servers, spreads traffic, stops routing to unhealthy/slow servers.</li>
-          <li>Can live at 3 layers: user↔web, web↔app/cache, app↔database.</li>
-          <li>Benefits: faster/uninterrupted service, less downtime, easier ops, predictive bottleneck insight.</li>
-          <li>The LB itself is a SPOF → pair two LBs, each monitoring the other's health (active takes over on failure).</li>
-        </ul>
-        <figure class="diagram">
-          <svg viewBox="0 0 460 330" role="img" aria-label="A load balancer can sit between the user and web tier, between web and app tier, and between app and database tier">
-            <line x1="90" y1="20" x2="90" y2="310" class="dg-soft dg-dash"/>
-            <circle cx="90" cy="20" r="6" class="dg-inkfill"/>
-            <text x="112" y="25" class="dg-text-sm">Client</text>
-            <circle cx="90" cy="70" r="7" class="dg-accentfill"/>
-            <text x="112" y="75" class="dg-text">Load Balancer ①</text>
-            <circle cx="90" cy="120" r="6" class="dg-inkfill"/>
-            <text x="112" y="125" class="dg-text-sm">Web servers</text>
-            <circle cx="90" cy="170" r="7" class="dg-accentfill"/>
-            <text x="112" y="175" class="dg-text">Load Balancer ②</text>
-            <circle cx="90" cy="220" r="6" class="dg-inkfill"/>
-            <text x="112" y="225" class="dg-text-sm">App / cache servers</text>
-            <circle cx="90" cy="270" r="7" class="dg-accentfill"/>
-            <text x="112" y="275" class="dg-text">Load Balancer ③</text>
-            <circle cx="90" cy="310" r="6" class="dg-inkfill"/>
-            <text x="112" y="315" class="dg-text-sm">Database</text>
-          </svg>
-          <div class="cap">Three places to slot in a load balancer along the request path</div>
-        </figure>
-      </details>
+    <div class="qa">
+      <div>
+        <h3><span class="num">9.</span>What is Caching, and How Do You Invalidate It?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> A fast storage layer between app and source, exploiting <mark>locality of reference</mark>. Write-through/around/back trade consistency for write speed. Invalidate via purge, TTL expiry, or <mark class="purple">stale-while-revalidate</mark>. Evict via <mark>LRU</mark>, LFU, FIFO, or random.</p>
+      </div>
+      <div class="box c1">
+        <svg viewBox="0 0 520 150" role="img" aria-label="Client asks the cache first; on a miss the data comes from the source and is stored back in the cache">
+          <defs>
+            <marker id="ah-cache" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-inkfill"/></marker>
+          </defs>
+          <rect x="20" y="60" width="80" height="40" rx="8" class="dg-box"/>
+          <text x="60" y="85" text-anchor="middle" class="dg-text-sm">Client</text>
+          <rect x="200" y="60" width="90" height="40" rx="8" class="dg-box"/>
+          <text x="245" y="85" text-anchor="middle" class="dg-text-sm">Cache</text>
+          <rect x="400" y="60" width="100" height="40" rx="8" class="dg-box"/>
+          <text x="450" y="85" text-anchor="middle" class="dg-text-sm">DB / source</text>
+          <path d="M100,72 L198,72" class="dg-ink" marker-end="url(#ah-cache)"/>
+          <text x="105" y="65" class="dg-mono">1. request</text>
+          <path d="M290,72 L398,72" class="dg-accent dg-dash" marker-end="url(#ah-cache)"/>
+          <text x="300" y="65" class="dg-mono-accent">2. miss</text>
+          <path d="M398,95 Q345,118 292,95" class="dg-accent2 dg-dash" marker-end="url(#ah-cache)"/>
+          <text x="315" y="128" class="dg-mono">3. store</text>
+          <path d="M198,45 Q150,25 102,45" class="dg-ink" marker-end="url(#ah-cache)"/>
+          <text x="115" y="22" class="dg-mono">4. return (hit or after miss)</text>
+        </svg>
+        <div class="cap">Cache-aside: hit → return · miss → fetch, store, return</div>
+      </div>
+    </div>
 
-      <details class="topic" open>
-        <summary><span class="badge">8</span><span class="t">Load Balancing Algorithms</span><span class="arrow">›</span></summary>
-        <ul class="algo-list">
-          <li><span class="name">Round Robin</span><span class="desc">Cycles servers in fixed order. Simple, no load-awareness. Good: homogeneous, stateless.</span></li>
-          <li><span class="name">Least Connections</span><span class="desc">Sends to server with fewest active connections. Dynamic, load-aware. Good: heterogeneous / variable traffic.</span></li>
-          <li><span class="name">Weighted Round Robin</span><span class="desc">Round Robin + capacity weights. Good: mixed-capacity server pools.</span></li>
-          <li><span class="name">Weighted Least Connections</span><span class="desc">Least Connections + weights — most balanced, most complex.</span></li>
-          <li><span class="name">IP Hash</span><span class="desc">Hash client IP → same server every time. Gives session stickiness; uneven if IPs cluster.</span></li>
-          <li><span class="name">Least Response Time</span><span class="desc">Sends to the currently-fastest-responding server. Good: real-time, low-latency apps.</span></li>
-          <li><span class="name">Random</span><span class="desc">Picks any server at random. Trivial, evens out over time, no session affinity.</span></li>
-          <li><span class="name">Least Bandwidth</span><span class="desc">Routes to server using least bandwidth right now. Good: video/CDN-heavy traffic.</span></li>
-          <li><span class="name">Custom Load</span><span class="desc">Your own metrics (CPU, memory, I/O) drive the decision. Max flexibility, max complexity.</span></li>
-        </ul>
-      </details>
+    <div class="qa">
+      <div>
+        <h3><span class="num">10.</span>What is Data Partitioning?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Splitting a big DB into shards, each on its own node. <b>Horizontal</b> = by rows (risk: uneven shards). <b>Vertical</b> = by columns. Cross-shard joins and rebalancing are the pain points — hash-based partitioning fixes the server count unless you use <mark>consistent hashing</mark>.</p>
+      </div>
+      <div class="box c2">
+        <svg viewBox="0 0 520 210" role="img" aria-label="Horizontal partitioning splits a table by rows into shards; vertical partitioning splits it by columns">
+          <text x="40" y="20" class="dg-mono">HORIZONTAL — by rows</text>
+          <rect x="40" y="30" width="140" height="60" class="dg-hi"/>
+          <rect x="40" y="90" width="140" height="70" class="dg-hi-pink"/>
+          <g class="dg-soft">
+            <line x1="40" y1="60" x2="180" y2="60"/>
+            <line x1="40" y1="90" x2="180" y2="90"/>
+            <line x1="40" y1="125" x2="180" y2="125"/>
+            <line x1="86" y1="30" x2="86" y2="160"/>
+            <line x1="133" y1="30" x2="133" y2="160"/>
+            <rect x="40" y="30" width="140" height="130" fill="none" class="dg-soft"/>
+          </g>
+          <text x="45" y="180" class="dg-mono">Shard A (rows 1–2)</text>
+          <text x="45" y="195" class="dg-mono">Shard B (rows 3–4)</text>
+          <text x="330" y="20" class="dg-mono">VERTICAL — by columns</text>
+          <rect x="330" y="30" width="93" height="130" class="dg-hi"/>
+          <rect x="423" y="30" width="47" height="130" class="dg-hi-pink"/>
+          <g class="dg-soft">
+            <line x1="330" y1="60" x2="470" y2="60"/>
+            <line x1="330" y1="90" x2="470" y2="90"/>
+            <line x1="330" y1="125" x2="470" y2="125"/>
+            <line x1="376" y1="30" x2="376" y2="160"/>
+            <line x1="423" y1="30" x2="423" y2="160"/>
+            <rect x="330" y="30" width="140" height="130" fill="none" class="dg-soft"/>
+          </g>
+          <text x="335" y="180" class="dg-mono">Shard A (profile cols)</text>
+          <text x="335" y="195" class="dg-mono">Shard B (orders col)</text>
+        </svg>
+        <div class="cap">Same table, two ways to cut it</div>
+      </div>
+    </div>
 
-      <details class="topic" open>
-        <summary><span class="badge">9</span><span class="t">Caching</span><span class="arrow">›</span></summary>
-        <ul class="notes">
-          <li>Fast storage layer between app and the real data source — exploits <mark>locality of reference</mark> (recently used data gets reused).</li>
-          <li>Types: in-memory (Redis/Memcached), disk, database, client-side, server-side, CDN, DNS.</li>
-          <li><b>Write strategies:</b>
-            <ul>
-              <li>Write-through — write cache + DB together → consistent, safe, but slower writes</li>
-              <li>Write-around — write DB only, skip cache → fresh writes cause a cache miss on read</li>
-              <li>Write-back — write cache only, flush to DB later → fast, but risk of loss on crash</li>
-            </ul>
-          </li>
-          <li><b>Invalidation methods:</b> purge, refresh, ban (pattern-based), <mark>TTL expiry</mark>, <mark class="purple">stale-while-revalidate</mark> (serve stale instantly, refresh in background).</li>
-          <li><b>Read strategies:</b> read-through (cache manages the fetch-on-miss itself) vs cache-aside/lazy-loading (app manages it — safer if cache dies, app can fall back to DB).</li>
-          <li><b>Eviction policies:</b> FIFO, LIFO, <mark>LRU</mark>, MRU, LFU, Random.</li>
-        </ul>
-        <figure class="diagram">
-          <svg viewBox="0 0 520 150" role="img" aria-label="Client asks the cache first; on a miss the data comes from the source and is stored back in the cache">
-            <defs>
-              <marker id="ah-cache" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-inkfill"/></marker>
-            </defs>
-            <rect x="20" y="60" width="80" height="40" rx="8" class="dg-box"/>
-            <text x="60" y="85" text-anchor="middle" class="dg-text-sm">Client</text>
-            <rect x="200" y="60" width="90" height="40" rx="8" class="dg-box"/>
-            <text x="245" y="85" text-anchor="middle" class="dg-text-sm">Cache</text>
-            <rect x="400" y="60" width="100" height="40" rx="8" class="dg-box"/>
-            <text x="450" y="85" text-anchor="middle" class="dg-text-sm">DB / source</text>
+    <div class="qa">
+      <div>
+        <h3><span class="num">11.</span>What are Indexes, and Why Do They Slow Writes?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> A data structure — like a book's table of contents — storing a column's values + pointers to full rows, so lookups skip a full scan. <mark>Trade-off:</mark> every write must also update the index. Only index what you actually query on.</p>
+      </div>
+      <div class="box c3">
+        <p class="box-title">The trade-off</p>
+        <table>
+          <tr><th>Operation</th><th>With index</th></tr>
+          <tr><td>Reads</td><td>Much faster ✓</td></tr>
+          <tr><td>Writes</td><td>Slower — index updates too</td></tr>
+        </table>
+      </div>
+    </div>
 
-            <path d="M100,72 L198,72" class="dg-ink" marker-end="url(#ah-cache)"/>
-            <text x="105" y="65" class="dg-mono">1. request</text>
+    <div class="qa">
+      <div>
+        <h3><span class="num">12.</span>Forward Proxy vs Reverse Proxy?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> A <b>forward proxy</b> sits in front of clients and hides the <b>client's</b> identity from the server. A <b>reverse proxy</b> sits in front of servers and hides the <b>server's</b> identity from the client. Rule of thumb: protect clients → forward; protect servers → reverse.</p>
+      </div>
+      <div class="box c4">
+        <svg viewBox="0 0 520 170" role="img" aria-label="A forward proxy hides the client from the server; a reverse proxy hides the server from the client">
+          <defs>
+            <marker id="ah-proxy" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-inkfill"/></marker>
+          </defs>
+          <text x="20" y="20" class="dg-mono">FORWARD PROXY — hides the client</text>
+          <rect x="20" y="35" width="80" height="38" rx="8" class="dg-box"/>
+          <text x="60" y="59" text-anchor="middle" class="dg-text-sm">Client</text>
+          <rect x="200" y="35" width="110" height="38" rx="8" class="dg-box"/>
+          <text x="255" y="59" text-anchor="middle" class="dg-text-sm">Forward proxy</text>
+          <rect x="410" y="35" width="90" height="38" rx="8" class="dg-box"/>
+          <text x="455" y="59" text-anchor="middle" class="dg-text-sm">Server</text>
+          <path d="M100,54 L198,54" class="dg-ink" marker-end="url(#ah-proxy)"/>
+          <path d="M310,54 L408,54" class="dg-ink" marker-end="url(#ah-proxy)"/>
+          <text x="20" y="105" class="dg-mono">REVERSE PROXY — hides the server</text>
+          <rect x="20" y="120" width="80" height="38" rx="8" class="dg-box"/>
+          <text x="60" y="144" text-anchor="middle" class="dg-text-sm">Client</text>
+          <rect x="200" y="120" width="110" height="38" rx="8" class="dg-box"/>
+          <text x="255" y="144" text-anchor="middle" class="dg-text-sm">Reverse proxy</text>
+          <rect x="410" y="120" width="90" height="38" rx="8" class="dg-box"/>
+          <text x="455" y="144" text-anchor="middle" class="dg-text-sm">Server</text>
+          <path d="M100,139 L198,139" class="dg-accent2" marker-end="url(#ah-proxy)"/>
+          <path d="M310,139 L408,139" class="dg-accent2" marker-end="url(#ah-proxy)"/>
+        </svg>
+        <div class="cap">Same shape, opposite job</div>
+      </div>
+    </div>
 
-            <path d="M290,72 L398,72" class="dg-accent dg-dash" marker-end="url(#ah-cache)"/>
-            <text x="300" y="65" class="dg-mono-accent">2. miss</text>
+    <div class="qa">
+      <div>
+        <h3><span class="num">13.</span>Redundancy vs Replication?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> <mark>Redundancy</mark> = duplicate critical parts/data so no single failure takes the system down. Replication is usually primary → replica(s). <b>Synchronous</b> = strong consistency, higher latency. <b>Asynchronous</b> = fast, but a staleness window. <b>Semi-sync</b> is the middle ground.</p>
+      </div>
+      <div class="box c1">
+        <svg viewBox="0 0 520 160" role="img" aria-label="Synchronous replication waits for the replica before acknowledging the write; asynchronous acknowledges immediately and replicates later">
+          <defs>
+            <marker id="ah-rep" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-inkfill"/></marker>
+            <marker id="ah-rep-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-accent2fill"/></marker>
+          </defs>
+          <text x="20" y="18" class="dg-mono">SYNCHRONOUS</text>
+          <text x="20" y="40" class="dg-text-sm">Primary</text>
+          <text x="440" y="40" class="dg-text-sm">Replica</text>
+          <path d="M75,36 L400,36" class="dg-ink" marker-end="url(#ah-rep)"/>
+          <text x="150" y="30" class="dg-mono">1. write</text>
+          <path d="M400,50 L75,50" class="dg-ink dg-dash" marker-end="url(#ah-rep)"/>
+          <text x="150" y="66" class="dg-mono">2. confirm → then ack client</text>
+          <text x="20" y="100" class="dg-mono">ASYNCHRONOUS</text>
+          <text x="20" y="122" class="dg-text-sm">Primary</text>
+          <text x="440" y="122" class="dg-text-sm">Replica</text>
+          <path d="M75,118 L160,118" class="dg-accent2" marker-end="url(#ah-rep-a)"/>
+          <text x="80" y="112" class="dg-mono-accent">ack client immediately</text>
+          <path d="M75,138 L400,138" class="dg-accent2 dg-dash" marker-end="url(#ah-rep-a)"/>
+          <text x="150" y="154" class="dg-mono-accent">replicates a little later</text>
+        </svg>
+        <div class="cap">Sync trades latency for certainty</div>
+      </div>
+    </div>
 
-            <path d="M398,95 Q345,118 292,95" class="dg-accent2 dg-dash" marker-end="url(#ah-cache)"/>
-            <text x="315" y="128" class="dg-mono">3. store</text>
+    <div class="qa">
+      <div>
+        <h3><span class="num">14.</span>SQL vs. NoSQL — How Do You Choose?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> SQL = fixed schema, <mark>ACID</mark>, scales vertically, great for complex queries. NoSQL = flexible schema, usually <mark class="purple">BASE</mark>/eventual consistency, scales horizontally. CAP lens: SQL leans <b>CP</b>, Dynamo-style NoSQL leans <b>AP</b>. Most real systems mix both — <mark>polyglot persistence</mark>.</p>
+      </div>
+      <div class="box c2">
+        <table>
+          <tr><th>Aspect</th><th>SQL</th><th>NoSQL</th></tr>
+          <tr><td>Schema</td><td>Fixed, joins</td><td>Flexible</td></tr>
+          <tr><td>Consistency</td><td>ACID</td><td>Usually BASE</td></tr>
+          <tr><td>Scaling</td><td>Vertical</td><td>Horizontal</td></tr>
+          <tr><td>Best for</td><td>Finance, orders</td><td>Massive scale</td></tr>
+        </table>
+      </div>
+    </div>
 
-            <path d="M198,45 Q150,25 102,45" class="dg-ink" marker-end="url(#ah-cache)"/>
-            <text x="115" y="22" class="dg-mono">4. return (hit or after miss)</text>
-          </svg>
-          <div class="cap">Cache-aside flow: hit → return immediately · miss → fetch, store, then return</div>
-        </figure>
-      </details>
+    <div class="qa">
+      <div>
+        <h3><span class="num">15.</span>What is the CAP Theorem?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> A distributed system can't guarantee <b>Consistency</b>, <b>Availability</b>, and <b>Partition tolerance</b> all at once. Since partitions are inevitable, "CA" isn't really an option — <mark>in a partition, pick C or A.</mark></p>
+      </div>
+      <div class="box c3">
+        <svg viewBox="0 0 340 300" role="img" aria-label="CAP triangle: Consistency, Availability, and Partition tolerance, pick two — the CA edge is unrealistic since partitions happen">
+          <path d="M170,35 L290,255" class="dg-accent2"/>
+          <path d="M50,255 L290,255" class="dg-accent"/>
+          <path d="M170,35 L50,255" class="dg-soft dg-dash"/>
+          <text x="180" y="60" class="dg-mono" text-anchor="middle">✕ not realistic</text>
+          <text x="180" y="74" class="dg-mono" text-anchor="middle">(partitions happen)</text>
+          <circle cx="170" cy="35" r="6" class="dg-inkfill"/>
+          <text x="170" y="20" text-anchor="middle" class="dg-text">Consistency</text>
+          <circle cx="50" cy="255" r="6" class="dg-inkfill"/>
+          <text x="50" y="278" text-anchor="middle" class="dg-text">Availability</text>
+          <circle cx="290" cy="255" r="6" class="dg-inkfill"/>
+          <text x="290" y="278" text-anchor="middle" class="dg-text">Partition</text>
+          <text x="290" y="293" text-anchor="middle" class="dg-text">tolerance</text>
+          <text x="170" y="175" text-anchor="middle" class="dg-mono-accent">pick 2</text>
+        </svg>
+        <div class="cap">CP and AP are the real choices</div>
+      </div>
+    </div>
 
-      <details class="topic" open>
-        <summary><span class="badge">10</span><span class="t">Data Partitioning</span><span class="arrow">›</span></summary>
-        <ul class="notes">
-          <li>Split a big DB into independent shards, each on its own node — better perf + scalability.</li>
-          <li><b>Horizontal</b> (by rows / sharding, e.g. by region) — risk: uneven shards if the key isn't chosen well.</li>
-          <li><b>Vertical</b> (by columns, e.g. profile vs orders) — reduces scanned data per query.</li>
-          <li><b>Hybrid</b> — both combined.</li>
-          <li>Criteria: hash-based (fixes server count — <mark>consistent hashing</mark> fixes that), list-based, round-robin, composite.</li>
-          <li>Pain points: cross-shard joins (⇒ denormalize, accept some inconsistency risk), no cross-server foreign keys (⇒ enforce in app code), rebalancing is hard without downtime.</li>
-        </ul>
-        <figure class="diagram">
-          <svg viewBox="0 0 520 210" role="img" aria-label="Horizontal partitioning splits a table by rows into shards; vertical partitioning splits it by columns">
-            <text x="40" y="20" class="dg-mono">HORIZONTAL — by rows</text>
-            <rect x="40" y="30" width="140" height="60" class="dg-hi"/>
-            <rect x="40" y="90" width="140" height="70" class="dg-hi-pink"/>
-            <g class="dg-soft">
-              <line x1="40" y1="60" x2="180" y2="60"/>
-              <line x1="40" y1="90" x2="180" y2="90"/>
-              <line x1="40" y1="125" x2="180" y2="125"/>
-              <line x1="86" y1="30" x2="86" y2="160"/>
-              <line x1="133" y1="30" x2="133" y2="160"/>
-              <rect x="40" y="30" width="140" height="130" fill="none" class="dg-soft"/>
-            </g>
-            <text x="45" y="180" class="dg-mono">Shard A (rows 1–2)</text>
-            <text x="45" y="195" class="dg-mono">Shard B (rows 3–4)</text>
+    <div class="qa">
+      <div>
+        <h3><span class="num">16.</span>What is the PACELC Theorem?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> CAP is silent on the no-partition case — PACELC fills it in. If <b>P</b>artition → trade <b>A</b>vailability vs <b>C</b>onsistency. <b>Else</b> → trade <b>L</b>atency vs <b>C</b>onsistency. Dynamo/Cassandra = PA/EL · BigTable/HBase = PC/EC · MongoDB default = PA/EC.</p>
+      </div>
+      <div class="box c4">
+        <svg viewBox="0 0 420 190" role="img" aria-label="If a partition is happening, trade availability versus consistency; otherwise trade latency versus consistency">
+          <defs>
+            <marker id="ah-pac" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-inkfill"/></marker>
+          </defs>
+          <rect x="155" y="15" width="110" height="42" rx="21" class="dg-box"/>
+          <text x="210" y="40" text-anchor="middle" class="dg-text-sm">Partition?</text>
+          <path d="M175,57 Q120,80 100,98" class="dg-ink" marker-end="url(#ah-pac)"/>
+          <text x="118" y="80" class="dg-mono">yes (P)</text>
+          <path d="M245,57 Q300,80 320,98" class="dg-ink" marker-end="url(#ah-pac)"/>
+          <text x="290" y="80" class="dg-mono">no (else)</text>
+          <rect x="20" y="100" width="160" height="46" rx="8" class="dg-box"/>
+          <text x="100" y="128" text-anchor="middle" class="dg-text-sm">Availability vs Consistency</text>
+          <rect x="240" y="100" width="160" height="46" rx="8" class="dg-box"/>
+          <text x="320" y="128" text-anchor="middle" class="dg-text-sm">Latency vs Consistency</text>
+          <text x="100" y="168" text-anchor="middle" class="dg-mono-accent">= CAP theorem</text>
+          <text x="320" y="168" text-anchor="middle" class="dg-mono-accent">the "ELC" extension</text>
+        </svg>
+        <div class="cap">PAC = CAP · ELC = the normal-operation case</div>
+      </div>
+    </div>
 
-            <text x="330" y="20" class="dg-mono">VERTICAL — by columns</text>
-            <rect x="330" y="30" width="93" height="130" class="dg-hi"/>
-            <rect x="423" y="30" width="47" height="130" class="dg-hi-pink"/>
-            <g class="dg-soft">
-              <line x1="330" y1="60" x2="470" y2="60"/>
-              <line x1="330" y1="90" x2="470" y2="90"/>
-              <line x1="330" y1="125" x2="470" y2="125"/>
-              <line x1="376" y1="30" x2="376" y2="160"/>
-              <line x1="423" y1="30" x2="423" y2="160"/>
-              <rect x="330" y="30" width="140" height="130" fill="none" class="dg-soft"/>
-            </g>
-            <text x="335" y="180" class="dg-mono">Shard A (profile cols)</text>
-            <text x="335" y="195" class="dg-mono">Shard B (orders col)</text>
-          </svg>
-          <div class="cap">Same table, two ways to cut it — pick based on which access pattern you optimize for</div>
-        </figure>
-      </details>
+    <div class="qa">
+      <div>
+        <h3><span class="num">17.</span>What is Consistent Hashing?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Naive <code>hash % N</code> breaks almost every mapping when N changes. Fix: arrange nodes on a <mark>hash ring</mark> — a key's hash lands on the ring and belongs to the next node clockwise, so adding/removing a node only disturbs its neighbor. <b>Vnodes</b> split each node into many small sub-ranges for even load.</p>
+      </div>
+      <div class="box c1">
+        <svg viewBox="0 0 340 320" role="img" aria-label="Nodes sit on a hash ring; a key's hash lands on the ring and is owned by the next node clockwise">
+          <defs>
+            <marker id="ah-ring" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-accent2fill"/></marker>
+          </defs>
+          <circle cx="170" cy="160" r="120" fill="none" class="dg-soft"/>
+          <circle cx="170" cy="40" r="8" class="dg-accentfill"/>
+          <text x="170" y="24" text-anchor="middle" class="dg-text-sm">N1</text>
+          <circle cx="290" cy="160" r="8" class="dg-accentfill"/>
+          <text x="316" y="165" text-anchor="middle" class="dg-text-sm">N2</text>
+          <circle cx="170" cy="280" r="8" class="dg-accentfill"/>
+          <text x="170" y="300" text-anchor="middle" class="dg-text-sm">N3</text>
+          <circle cx="50" cy="160" r="8" class="dg-accentfill"/>
+          <text x="24" y="165" text-anchor="middle" class="dg-text-sm">N4</text>
+          <circle cx="245" cy="75" r="6" class="dg-accent2fill"/>
+          <text x="255" y="65" class="dg-mono-accent">key hash</text>
+          <path d="M251,80 A120,120 0 0,1 288,150" class="dg-accent2" marker-end="url(#ah-ring)"/>
+          <text x="170" y="160" text-anchor="middle" class="dg-mono">owned by next</text>
+          <text x="170" y="173" text-anchor="middle" class="dg-mono">node clockwise → N2</text>
+        </svg>
+        <div class="cap">Used by Amazon Dynamo, Apache Cassandra</div>
+      </div>
+    </div>
 
-      <details class="topic" open>
-        <summary><span class="badge">11</span><span class="t">Indexes</span><span class="arrow">›</span></summary>
-        <ul class="notes">
-          <li>A data structure — like a book's table of contents — that stores a column's values + pointers to full rows, so lookups skip a full scan.</li>
-          <li>Critical when data is huge but each record is tiny (can't brute-force scan terabytes for a 1KB record).</li>
-          <li><mark>Trade-off:</mark> every insert/update/delete must also update the index → slower writes. Only index what you actually query on; drop unused indexes; skip them entirely if the table is write-heavy and rarely read.</li>
-        </ul>
-      </details>
+    <div class="qa">
+      <div>
+        <h3><span class="num">18.</span>Long-Polling vs WebSockets vs SSE?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> <b>Long-polling</b> holds the request open until data exists, then the client re-polls. <b>WebSockets</b> keep one persistent, <mark>full-duplex</mark> connection — either side can push anytime. <b>SSE</b> is persistent but one-way, server → client only.</p>
+      </div>
+      <div class="box c2">
+        <svg viewBox="0 0 520 190" role="img" aria-label="Comparing long-polling, websockets and server-sent events as timelines between client and server">
+          <text x="10" y="14" class="dg-mono">CLIENT</text>
+          <text x="490" y="14" class="dg-mono" text-anchor="end">SERVER</text>
+          <text x="10" y="38" class="dg-text-sm">Long-Polling</text>
+          <line x1="90" y1="34" x2="480" y2="34" class="dg-soft dg-dash"/>
+          <text x="105" y="30" class="dg-mono-accent">↑ request</text>
+          <text x="230" y="30" class="dg-mono">…waiting…</text>
+          <text x="330" y="30" class="dg-mono-accent">↓ data ready</text>
+          <text x="430" y="30" class="dg-mono-accent">↑ re-poll</text>
+          <text x="10" y="88" class="dg-text-sm">WebSockets</text>
+          <line x1="90" y1="84" x2="480" y2="84" class="dg-ink"/>
+          <text x="100" y="76" class="dg-mono-accent">↕ handshake</text>
+          <text x="220" y="76" class="dg-mono-accent">↓</text>
+          <text x="270" y="76" class="dg-mono-accent">↑</text>
+          <text x="330" y="76" class="dg-mono-accent">↓</text>
+          <text x="390" y="76" class="dg-mono-accent">↓</text>
+          <text x="440" y="76" class="dg-mono-accent">↑</text>
+          <text x="10" y="138" class="dg-text-sm">SSE</text>
+          <line x1="90" y1="134" x2="480" y2="134" class="dg-ink"/>
+          <text x="100" y="126" class="dg-mono-accent">↑ connect</text>
+          <text x="230" y="126" class="dg-mono-accent">↓</text>
+          <text x="300" y="126" class="dg-mono-accent">↓</text>
+          <text x="370" y="126" class="dg-mono-accent">↓</text>
+          <text x="440" y="126" class="dg-mono-accent">↓</text>
+          <text x="90" y="170" class="dg-mono">time →</text>
+          <path d="M90,175 L470,175" class="dg-soft" marker-end="url(#ah-proto)"/>
+          <defs><marker id="ah-proto" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ink-soft)"/></marker></defs>
+        </svg>
+        <div class="cap">↑ client→server · ↓ server→client</div>
+      </div>
+    </div>
 
-      <details class="topic" open>
-        <summary><span class="badge">12</span><span class="t">Proxies</span><span class="arrow">›</span></summary>
-        <div class="tchart">
-          <div class="col">
-            <h4>Forward Proxy</h4>
-            <ul>
-              <li>Sits in front of clients</li>
-              <li>Hides the <b>client's</b> identity from the server</li>
-              <li>Used for caching, filtering, logging, request rewriting</li>
-              <li>Can merge duplicate concurrent requests ("collapsed forwarding")</li>
-            </ul>
-          </div>
-          <div class="col">
-            <h4>Reverse Proxy</h4>
-            <ul>
-              <li>Sits in front of servers</li>
-              <li>Hides the <b>server's</b> identity from the client</li>
-              <li>Used for caching, load balancing, routing</li>
-            </ul>
-          </div>
-        </div>
-        <figure class="diagram">
-          <svg viewBox="0 0 520 170" role="img" aria-label="A forward proxy hides the client from the server; a reverse proxy hides the server from the client">
-            <defs>
-              <marker id="ah-proxy" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-inkfill"/></marker>
-            </defs>
-            <text x="20" y="20" class="dg-mono">FORWARD PROXY — hides the client</text>
-            <rect x="20" y="35" width="80" height="38" rx="8" class="dg-box"/>
-            <text x="60" y="59" text-anchor="middle" class="dg-text-sm">Client</text>
-            <rect x="200" y="35" width="110" height="38" rx="8" class="dg-box"/>
-            <text x="255" y="59" text-anchor="middle" class="dg-text-sm">Forward proxy</text>
-            <rect x="410" y="35" width="90" height="38" rx="8" class="dg-box"/>
-            <text x="455" y="59" text-anchor="middle" class="dg-text-sm">Server</text>
-            <path d="M100,54 L198,54" class="dg-ink" marker-end="url(#ah-proxy)"/>
-            <path d="M310,54 L408,54" class="dg-ink" marker-end="url(#ah-proxy)"/>
-
-            <text x="20" y="105" class="dg-mono">REVERSE PROXY — hides the server</text>
-            <rect x="20" y="120" width="80" height="38" rx="8" class="dg-box"/>
-            <text x="60" y="144" text-anchor="middle" class="dg-text-sm">Client</text>
-            <rect x="200" y="120" width="110" height="38" rx="8" class="dg-box"/>
-            <text x="255" y="144" text-anchor="middle" class="dg-text-sm">Reverse proxy</text>
-            <rect x="410" y="120" width="90" height="38" rx="8" class="dg-box"/>
-            <text x="455" y="144" text-anchor="middle" class="dg-text-sm">Server</text>
-            <path d="M100,139 L198,139" class="dg-accent2" marker-end="url(#ah-proxy)"/>
-            <path d="M310,139 L408,139" class="dg-accent2" marker-end="url(#ah-proxy)"/>
-          </svg>
-          <div class="cap">Same shape, opposite job — which side stays anonymous flips</div>
-        </figure>
-        <div class="sticky" style="margin-top:1.2rem;"><b>Rule of thumb:</b> protect clients → forward proxy. Protect servers → reverse proxy.</div>
-      </details>
-
-      <details class="topic" open>
-        <summary><span class="badge">13</span><span class="t">Redundancy and Replication</span><span class="arrow">›</span></summary>
-        <ul class="notes">
-          <li><mark>Redundancy</mark> = duplicate critical parts/data so no single failure takes the system down.</li>
-          <li>Replication is usually primary → replica(s); primary takes all writes, replicas confirm receipt.</li>
-          <li><b>Synchronous</b> — primary waits for replica confirmation before ack'ing the write. Strong consistency, higher latency.</li>
-          <li><b>Asynchronous</b> — primary acks immediately, replicas catch up later. Fast, but a window of staleness.</li>
-          <li><b>Semi-synchronous</b> — at least one replica must confirm; others lag async. Middle ground.</li>
-        </ul>
-        <figure class="diagram">
-          <svg viewBox="0 0 520 160" role="img" aria-label="Synchronous replication waits for the replica before acknowledging the write; asynchronous acknowledges immediately and replicates later">
-            <defs>
-              <marker id="ah-rep" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-inkfill"/></marker>
-              <marker id="ah-rep-a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-accent2fill"/></marker>
-            </defs>
-            <text x="20" y="18" class="dg-mono">SYNCHRONOUS</text>
-            <text x="20" y="40" class="dg-text-sm">Primary</text>
-            <text x="440" y="40" class="dg-text-sm">Replica</text>
-            <path d="M75,36 L400,36" class="dg-ink" marker-end="url(#ah-rep)"/>
-            <text x="150" y="30" class="dg-mono">1. write</text>
-            <path d="M400,50 L75,50" class="dg-ink dg-dash" marker-end="url(#ah-rep)"/>
-            <text x="150" y="66" class="dg-mono">2. confirm → then ack client</text>
-
-            <text x="20" y="100" class="dg-mono">ASYNCHRONOUS</text>
-            <text x="20" y="122" class="dg-text-sm">Primary</text>
-            <text x="440" y="122" class="dg-text-sm">Replica</text>
-            <path d="M75,118 L160,118" class="dg-accent2" marker-end="url(#ah-rep-a)"/>
-            <text x="80" y="112" class="dg-mono-accent">ack client immediately</text>
-            <path d="M75,138 L400,138" class="dg-accent2 dg-dash" marker-end="url(#ah-rep-a)"/>
-            <text x="150" y="154" class="dg-mono-accent">replicates a little later</text>
-          </svg>
-          <div class="cap">Sync trades latency for certainty · async trades a small staleness window for speed</div>
-        </figure>
-      </details>
-
-      <details class="topic" open>
-        <summary><span class="badge">14</span><span class="t">SQL vs. NoSQL</span><span class="arrow">›</span></summary>
-        <div class="tchart">
-          <div class="col">
-            <h4>SQL</h4>
-            <ul>
-              <li>Fixed schema, tables + joins</li>
-              <li><mark>ACID</mark> transactions — all-or-nothing</li>
-              <li>Great for complex queries / analytics</li>
-              <li>Scales <b>vertically</b> by default</li>
-              <li>Best: finance, orders, anything needing strict consistency</li>
-            </ul>
-          </div>
-          <div class="col">
-            <h4>NoSQL</h4>
-            <ul>
-              <li>Flexible / schema-less records</li>
-              <li>Document, key-value, wide-column, graph</li>
-              <li>Usually <mark class="purple">BASE</mark> / eventual consistency</li>
-              <li>Scales <b>horizontally</b>, built-in sharding</li>
-              <li>Best: massive scale, evolving data, simple fast lookups</li>
-            </ul>
-          </div>
-        </div>
-        <ul class="notes" style="margin-top:.8rem;">
-          <li>CAP lens: SQL usually leans <b>CP</b>; Dynamo-style NoSQL usually leans <b>AP</b>.</li>
-          <li>NewSQL (Spanner, CockroachDB) tries to blend both — SQL semantics, distributed backend.</li>
-          <li>Don't force a single choice — <mark>polyglot persistence</mark> is normal (e.g. SQL for payments, NoSQL/Redis for location pings & caches, graph DB for relationships).</li>
-        </ul>
-      </details>
-
-      <details class="topic" open>
-        <summary><span class="badge">15</span><span class="t">CAP Theorem</span><span class="arrow">›</span></summary>
-        <ul class="notes">
-          <li>A distributed system can't guarantee all three at once:
-            <ul>
-              <li><b>Consistency</b> — every node sees the same data at the same time</li>
-              <li><b>Availability</b> — every request to a healthy node gets a response</li>
-              <li><b>Partition tolerance</b> — keeps working through a network split</li>
-            </ul>
-          </li>
-          <li>Real rule: partitions are inevitable, so "CA" isn't really an option — <mark>in a partition, pick C or A.</mark></li>
-          <li>Why: to stay consistent you'd have to stop serving the out-of-date side of the split — which breaks availability.</li>
-        </ul>
-        <figure class="diagram">
-          <svg viewBox="0 0 340 300" role="img" aria-label="CAP triangle: Consistency, Availability, and Partition tolerance, pick two — the CA edge is unrealistic since partitions happen">
-            <path d="M170,35 L290,255" class="dg-accent2"/>
-            <path d="M50,255 L290,255" class="dg-accent"/>
-            <path d="M170,35 L50,255" class="dg-soft dg-dash"/>
-            <text x="180" y="60" class="dg-mono" text-anchor="middle">✕ not realistic</text>
-            <text x="180" y="74" class="dg-mono" text-anchor="middle">(partitions happen)</text>
-            <circle cx="170" cy="35" r="6" class="dg-inkfill"/>
-            <text x="170" y="20" text-anchor="middle" class="dg-text">Consistency</text>
-            <circle cx="50" cy="255" r="6" class="dg-inkfill"/>
-            <text x="50" y="278" text-anchor="middle" class="dg-text">Availability</text>
-            <circle cx="290" cy="255" r="6" class="dg-inkfill"/>
-            <text x="290" y="278" text-anchor="middle" class="dg-text">Partition</text>
-            <text x="290" y="293" text-anchor="middle" class="dg-text">tolerance</text>
-            <text x="170" y="175" text-anchor="middle" class="dg-mono-accent">pick 2</text>
-          </svg>
-          <div class="cap">CP and AP are the real choices — CA quietly assumes a partition never happens</div>
-        </figure>
-      </details>
-
-      <details class="topic" open>
-        <summary><span class="badge">16</span><span class="t">PACELC Theorem</span><span class="arrow">›</span></summary>
-        <ul class="notes">
-          <li>CAP is silent on the no-partition case — PACELC fills that in.</li>
-          <li>If <b>P</b>artition → trade <b>A</b>vailability vs <b>C</b>onsistency (same as CAP).</li>
-          <li><b>Else</b> (normal operation) → trade <b>L</b>atency vs <b>C</b>onsistency.</li>
-          <li>Examples: Dynamo/Cassandra = <b>PA/EL</b> · BigTable/HBase = <b>PC/EC</b> · MongoDB default = <b>PA/EC</b> (writes to majority flips it to PC/EC).</li>
-        </ul>
-        <figure class="diagram">
-          <svg viewBox="0 0 420 190" role="img" aria-label="If a partition is happening, trade availability versus consistency; otherwise trade latency versus consistency">
-            <defs>
-              <marker id="ah-pac" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-inkfill"/></marker>
-            </defs>
-            <rect x="155" y="15" width="110" height="42" rx="21" class="dg-box"/>
-            <text x="210" y="40" text-anchor="middle" class="dg-text-sm">Partition?</text>
-            <path d="M175,57 Q120,80 100,98" class="dg-ink" marker-end="url(#ah-pac)"/>
-            <text x="118" y="80" class="dg-mono">yes (P)</text>
-            <path d="M245,57 Q300,80 320,98" class="dg-ink" marker-end="url(#ah-pac)"/>
-            <text x="290" y="80" class="dg-mono">no (else)</text>
-            <rect x="20" y="100" width="160" height="46" rx="8" class="dg-box"/>
-            <text x="100" y="128" text-anchor="middle" class="dg-text-sm">Availability vs Consistency</text>
-            <rect x="240" y="100" width="160" height="46" rx="8" class="dg-box"/>
-            <text x="320" y="128" text-anchor="middle" class="dg-text-sm">Latency vs Consistency</text>
-            <text x="100" y="168" text-anchor="middle" class="dg-mono-accent">= CAP theorem</text>
-            <text x="320" y="168" text-anchor="middle" class="dg-mono-accent">the "ELC" extension</text>
-          </svg>
-          <div class="cap">PAC = CAP theorem · ELC = what CAP never answers about normal operation</div>
-        </figure>
-      </details>
-
-      <details class="topic" open>
-        <summary><span class="badge">17</span><span class="t">Consistent Hashing</span><span class="arrow">›</span></summary>
-        <ul class="notes">
-          <li>Problem with naive <code>hash % N</code>: adding/removing a server changes N → almost everything remaps → mass data movement.</li>
-          <li>Fix: arrange nodes on a <mark>hash ring</mark>; each node owns a range. A key's hash falls somewhere on the ring → that's its node. Adding/removing a node only disturbs its neighbor, not the whole cluster.</li>
-          <li><b>Virtual nodes (Vnodes):</b> split the ring into many small sub-ranges per physical node instead of one big range each →
-            <ul>
-              <li>rebalancing spreads across many nodes, not just neighbors</li>
-              <li>easy to give stronger servers more sub-ranges</li>
-              <li>fewer hotspots</li>
-            </ul>
-          </li>
-          <li>Replication: key's coordinator node stores it, then replicates clockwise to N-1 more nodes (N = replication factor), usually async.</li>
-          <li>Used by: Amazon Dynamo, Apache Cassandra.</li>
-        </ul>
-        <figure class="diagram">
-          <svg viewBox="0 0 340 320" role="img" aria-label="Nodes sit on a hash ring; a key's hash lands on the ring and is owned by the next node clockwise">
-            <defs>
-              <marker id="ah-ring" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-accent2fill"/></marker>
-            </defs>
-            <circle cx="170" cy="160" r="120" fill="none" class="dg-soft"/>
-            <circle cx="170" cy="40" r="8" class="dg-accentfill"/>
-            <text x="170" y="24" text-anchor="middle" class="dg-text-sm">N1</text>
-            <circle cx="290" cy="160" r="8" class="dg-accentfill"/>
-            <text x="316" y="165" text-anchor="middle" class="dg-text-sm">N2</text>
-            <circle cx="170" cy="280" r="8" class="dg-accentfill"/>
-            <text x="170" y="300" text-anchor="middle" class="dg-text-sm">N3</text>
-            <circle cx="50" cy="160" r="8" class="dg-accentfill"/>
-            <text x="24" y="165" text-anchor="middle" class="dg-text-sm">N4</text>
-            <circle cx="245" cy="75" r="6" class="dg-accent2fill"/>
-            <text x="255" y="65" class="dg-mono-accent">key hash</text>
-            <path d="M251,80 A120,120 0 0,1 288,150" class="dg-accent2" marker-end="url(#ah-ring)"/>
-            <text x="170" y="160" text-anchor="middle" class="dg-mono">owned by next</text>
-            <text x="170" y="173" text-anchor="middle" class="dg-mono">node clockwise → N2</text>
-          </svg>
-          <div class="cap">Vnodes: in practice each node holds many small sub-ranges like this, not one big arc</div>
-        </figure>
-      </details>
-
-      <details class="topic" open>
-        <summary><span class="badge">18</span><span class="t">Long-Polling vs WebSockets vs SSE</span><span class="arrow">›</span></summary>
-        <ul class="notes">
-          <li><b>Ajax Polling</b> — client asks every N ms, server replies even with nothing new. Simple, wasteful (empty responses).</li>
-          <li><b>Long-Polling</b> ("hanging GET") — server holds the request open until it has data, then replies; client immediately re-polls. Less waste than plain polling, still needs periodic reconnects.</li>
-          <li><b>WebSockets</b> — one persistent, <mark>full-duplex</mark> TCP connection after a handshake; either side can push data anytime. True real-time, two-way.</li>
-          <li><b>Server-Sent Events</b> — one persistent connection, server → client only. Simpler than WebSockets when the client never needs to talk back.</li>
-        </ul>
-        <figure class="diagram">
-          <svg viewBox="0 0 520 230" role="img" aria-label="Comparing polling, long-polling, websockets and server-sent events as timelines between client and server">
-            <text x="10" y="14" class="dg-mono">CLIENT</text>
-            <text x="490" y="14" class="dg-mono" text-anchor="end">SERVER</text>
-
-            <text x="10" y="38" class="dg-text-sm">Polling</text>
-            <line x1="90" y1="34" x2="480" y2="34" class="dg-soft dg-dash"/>
-            <text x="105" y="30" class="dg-mono-accent">↑↓</text>
-            <text x="175" y="30" class="dg-mono-accent">↑↓</text>
-            <text x="245" y="30" class="dg-mono-accent">↑↓</text>
-            <text x="315" y="30" class="dg-mono-accent">↑↓</text>
-            <text x="385" y="30" class="dg-mono-accent">↑↓</text>
-
-            <text x="10" y="76" class="dg-text-sm">Long-Polling</text>
-            <line x1="90" y1="72" x2="480" y2="72" class="dg-soft dg-dash"/>
-            <text x="105" y="68" class="dg-mono-accent">↑ request</text>
-            <text x="230" y="68" class="dg-mono">…waiting…</text>
-            <text x="330" y="68" class="dg-mono-accent">↓ data ready</text>
-            <text x="430" y="68" class="dg-mono-accent">↑ re-poll</text>
-
-            <text x="10" y="122" class="dg-text-sm">WebSockets</text>
-            <line x1="90" y1="118" x2="480" y2="118" class="dg-ink"/>
-            <text x="100" y="110" class="dg-mono-accent">↕ handshake</text>
-            <text x="220" y="110" class="dg-mono-accent">↓</text>
-            <text x="270" y="110" class="dg-mono-accent">↑</text>
-            <text x="330" y="110" class="dg-mono-accent">↓</text>
-            <text x="390" y="110" class="dg-mono-accent">↓</text>
-            <text x="440" y="110" class="dg-mono-accent">↑</text>
-
-            <text x="10" y="168" class="dg-text-sm">SSE</text>
-            <line x1="90" y1="164" x2="480" y2="164" class="dg-ink"/>
-            <text x="100" y="156" class="dg-mono-accent">↑ connect</text>
-            <text x="230" y="156" class="dg-mono-accent">↓</text>
-            <text x="300" y="156" class="dg-mono-accent">↓</text>
-            <text x="370" y="156" class="dg-mono-accent">↓</text>
-            <text x="440" y="156" class="dg-mono-accent">↓</text>
-
-            <text x="90" y="200" class="dg-mono">time →</text>
-            <path d="M90,205 L470,205" class="dg-soft" marker-end="url(#ah-proto)"/>
-            <defs><marker id="ah-proto" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-soft" style="fill:var(--ink-soft)"/></marker></defs>
-          </svg>
-          <div class="cap">↑ = client→server · ↓ = server→client · WebSockets alone is truly two-way at will</div>
-        </figure>
-      </details>
-
-      <details class="topic" open>
-        <summary><span class="badge">19</span><span class="t">Bloom Filters</span><span class="arrow">›</span></summary>
-        <ul class="notes">
-          <li>Answers "have I seen this before?" using a tiny bit array + <mark>k</mark> hash functions — no items are ever actually stored.</li>
-          <li><b>Add:</b> hash the item k times → set those k bit positions to 1.</li>
-          <li><b>Check:</b> hash again → if any bit is 0 → <mark>definitely not present</mark>. If all bits are 1 → <mark class="pink">probably present</mark> (could be a false positive).</li>
-          <li>No false negatives ever (bits only ever flip 0→1, never reset) — false positives are the only error, and only in the "yes" direction.</li>
-          <li>Tuning: bigger bit array (m) ↓ false-positive rate; more items (n) ↑ it; hash count (k) has a sweet spot for a given m, n.</li>
-          <li>Can't delete, can't list contents, can't count — just add + check, both <mark>O(1)</mark> regardless of set size.</li>
-          <li>Used to guard expensive lookups (DBs, caches, browsers, network gear) — skip the real check when the filter says "no."</li>
-        </ul>
-        <figure class="diagram">
-          <svg viewBox="0 0 560 190" role="img" aria-label="A bit array where items A and B set overlapping bits to 1; checking a new item can hit all-1 bits by coincidence (false positive) or hit a 0 bit (definitely absent)">
-            <text x="30" y="18" class="dg-mono">bit index →</text>
-            <!-- 14 cells; set = 2,6,9,11,13 -->
-            <g class="dg-text-sm">
-              <rect x="30" y="35" width="30" height="30" rx="4" class="dg-box"/>
-              <rect x="66" y="35" width="30" height="30" rx="4" class="dg-box"/>
-              <rect x="102" y="35" width="30" height="30" rx="4" class="dg-hi"/>
-              <rect x="138" y="35" width="30" height="30" rx="4" class="dg-box"/>
-              <rect x="174" y="35" width="30" height="30" rx="4" class="dg-box"/>
-              <rect x="210" y="35" width="30" height="30" rx="4" class="dg-box"/>
-              <rect x="246" y="35" width="30" height="30" rx="4" class="dg-hi"/>
-              <rect x="282" y="35" width="30" height="30" rx="4" class="dg-box"/>
-              <rect x="318" y="35" width="30" height="30" rx="4" class="dg-box"/>
-              <rect x="354" y="35" width="30" height="30" rx="4" class="dg-hi-pink"/>
-              <rect x="390" y="35" width="30" height="30" rx="4" class="dg-box"/>
-              <rect x="426" y="35" width="30" height="30" rx="4" class="dg-hi"/>
-              <rect x="462" y="35" width="30" height="30" rx="4" class="dg-box"/>
-              <rect x="498" y="35" width="30" height="30" rx="4" class="dg-hi-pink"/>
-            </g>
-            <g class="dg-mono" text-anchor="middle">
-              <text x="45" y="80">0</text><text x="81" y="80">1</text><text x="117" y="80">2</text><text x="153" y="80">3</text>
-              <text x="189" y="80">4</text><text x="225" y="80">5</text><text x="261" y="80">6</text><text x="297" y="80">7</text>
-              <text x="333" y="80">8</text><text x="369" y="80">9</text><text x="405" y="80">10</text><text x="441" y="80">11</text>
-              <text x="477" y="80">12</text><text x="513" y="80">13</text>
-            </g>
-            <text x="117" y="30" text-anchor="middle" class="dg-mono-accent">A,B</text>
-            <text x="261" y="30" text-anchor="middle" class="dg-mono-accent">A</text>
-            <text x="441" y="30" text-anchor="middle" class="dg-mono-accent">A</text>
-            <text x="369" y="30" text-anchor="middle" class="dg-mono-accent">B</text>
-            <text x="513" y="30" text-anchor="middle" class="dg-mono-accent">B</text>
-
-            <path d="M117,100 L117,113 L369,113 L369,100" fill="none" style="stroke:var(--margin);stroke-width:1.6"/>
-            <text x="243" y="130" text-anchor="middle" class="dg-text-sm">Check X → bits 2, 6, 9 all 1</text>
-            <text x="243" y="146" text-anchor="middle" class="dg-text-sm">"probably present" — false positive!</text>
-
-            <path d="M189,100 L189,113" fill="none" style="stroke:var(--ink-soft);stroke-width:1.6"/>
-            <text x="189" y="162" text-anchor="middle" class="dg-text-sm">Check Y → bit 4 is 0</text>
-            <text x="189" y="178" text-anchor="middle" class="dg-text-sm">definitely absent ✓</text>
-          </svg>
-          <div class="cap">Highlighted cells were set by adding item A and item B — no items are stored, only these bits</div>
-        </figure>
-        <div class="sticky"><b>30-sec interview answer:</b> "Bit array + a few hash functions. Adding sets bits, checking tests them. Missing bit = definitely absent, all bits set = probably present. No false negatives, occasional false positives, constant time, tiny memory — great in front of an expensive lookup."</div>
-      </details>
-    </section>
+    <div class="qa">
+      <div>
+        <h3><span class="num">19.</span>What are Bloom Filters?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Answers "have I seen this?" with a tiny bit array + <mark>k</mark> hash functions — no items are stored. Any 0 bit → <mark>definitely not present</mark>. All bits 1 → <mark class="pink">probably present</mark> (maybe a false positive). No false negatives ever, and both add/check are <mark>O(1)</mark>.</p>
+      </div>
+      <div class="box c3">
+        <svg viewBox="0 0 560 190" role="img" aria-label="A bit array where items A and B set overlapping bits to 1; checking a new item can hit all-1 bits by coincidence (false positive) or hit a 0 bit (definitely absent)">
+          <text x="30" y="18" class="dg-mono">bit index →</text>
+          <g class="dg-text-sm">
+            <rect x="30" y="35" width="30" height="30" rx="4" class="dg-box"/>
+            <rect x="66" y="35" width="30" height="30" rx="4" class="dg-box"/>
+            <rect x="102" y="35" width="30" height="30" rx="4" class="dg-hi"/>
+            <rect x="138" y="35" width="30" height="30" rx="4" class="dg-box"/>
+            <rect x="174" y="35" width="30" height="30" rx="4" class="dg-box"/>
+            <rect x="210" y="35" width="30" height="30" rx="4" class="dg-box"/>
+            <rect x="246" y="35" width="30" height="30" rx="4" class="dg-hi"/>
+            <rect x="282" y="35" width="30" height="30" rx="4" class="dg-box"/>
+            <rect x="318" y="35" width="30" height="30" rx="4" class="dg-box"/>
+            <rect x="354" y="35" width="30" height="30" rx="4" class="dg-hi-pink"/>
+            <rect x="390" y="35" width="30" height="30" rx="4" class="dg-box"/>
+            <rect x="426" y="35" width="30" height="30" rx="4" class="dg-hi"/>
+            <rect x="462" y="35" width="30" height="30" rx="4" class="dg-box"/>
+            <rect x="498" y="35" width="30" height="30" rx="4" class="dg-hi-pink"/>
+          </g>
+          <g class="dg-mono" text-anchor="middle">
+            <text x="45" y="80">0</text><text x="81" y="80">1</text><text x="117" y="80">2</text><text x="153" y="80">3</text>
+            <text x="189" y="80">4</text><text x="225" y="80">5</text><text x="261" y="80">6</text><text x="297" y="80">7</text>
+            <text x="333" y="80">8</text><text x="369" y="80">9</text><text x="405" y="80">10</text><text x="441" y="80">11</text>
+            <text x="477" y="80">12</text><text x="513" y="80">13</text>
+          </g>
+          <text x="117" y="30" text-anchor="middle" class="dg-mono-accent">A,B</text>
+          <text x="261" y="30" text-anchor="middle" class="dg-mono-accent">A</text>
+          <text x="441" y="30" text-anchor="middle" class="dg-mono-accent">A</text>
+          <text x="369" y="30" text-anchor="middle" class="dg-mono-accent">B</text>
+          <text x="513" y="30" text-anchor="middle" class="dg-mono-accent">B</text>
+          <path d="M117,100 L117,113 L369,113 L369,100" fill="none" style="stroke:var(--accent-4);stroke-width:1.6"/>
+          <text x="243" y="130" text-anchor="middle" class="dg-text-sm">Check X → bits 2, 6, 9 all 1</text>
+          <text x="243" y="146" text-anchor="middle" class="dg-text-sm">"probably present" — false positive!</text>
+          <path d="M189,100 L189,113" fill="none" style="stroke:var(--ink-soft);stroke-width:1.6"/>
+          <text x="189" y="162" text-anchor="middle" class="dg-text-sm">Check Y → bit 4 is 0</text>
+          <text x="189" y="178" text-anchor="middle" class="dg-text-sm">definitely absent ✓</text>
+        </svg>
+        <div class="cap">No items stored — only these bits</div>
+      </div>
+    </div>
 
     <footer>
-      compiled by hand · source: Grokking the System Design Interview, DesignGurus.io · topics 1–19 (Introduction + Glossary, through Bloom Filters)
+      compiled by hand · source: Grokking the System Design Interview, DesignGurus.io · Q1–Q19 (Introduction + Glossary, through Bloom Filters)
     </footer>
 
   </div>
