@@ -1,9 +1,5 @@
 # System Design Interview — Handwritten Notes
 
-Condensed, hand-drawn-style notes covering everything read so far in *Grokking the System Design Interview* (through Bloom Filters) — 19 topics across the Introduction and Glossary sections, with diagrams for the concepts that need a picture (scaling, load balancer placement, caching flow, partitioning, proxies, replication, CAP, PACELC, consistent hashing, realtime protocols, Bloom filters).
-
-Not a copy of the course text — condensed and re-written from it, in my own words, for review. Will grow as more of the course gets read.
-
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="handwritten-notes/sysdesign-notes-dark.png">
   <source media="(prefers-color-scheme: light)" srcset="handwritten-notes/sysdesign-notes-light.png">
