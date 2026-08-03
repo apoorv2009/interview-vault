@@ -4,11 +4,13 @@
 
 ---
 
-# Part 1 — Architecture & Migration Strategy
+# Part 1 — The Full Story, In Order
 
-## 1. Legacy architecture — what typically accumulates
+*This part is deliberately structured the way an interview conversation actually flows — what the old system was, what it cost you day to day, how you got the money and the mandate to fix it, the big decisions (cloud, services, server vs. serverless), and only then the plan itself. Parts 2-5 are the depth underneath each of these, for when someone asks "how, exactly."*
 
-A business-critical enterprise platform that's run for 8-15 years on ASP.NET MVC (.NET Framework 4.x) + ASP.NET Web API + AngularJS + SQL Server + IIS typically accumulates the same failure modes regardless of the specific business domain:
+## 1. What the old architecture looked like
+
+A business-critical enterprise platform that's run for 8-15 years on ASP.NET MVC (.NET Framework 4.x) + ASP.NET Web API + AngularJS + SQL Server + IIS typically looks like this:
 
 - **Monolithic deployable** — one large IIS-hosted application, so a one-line fix requires a full redeploy and full regression risk.
 - **Shared database** — multiple modules (sometimes multiple "logical services") read and write the same tables directly, so schema changes require coordinating every consumer, and there's no real service boundary, just a folder boundary.
@@ -21,22 +23,54 @@ A business-critical enterprise platform that's run for 8-15 years on ASP.NET MVC
 - **Minimal automated testing** — coverage concentrated (if anywhere) on utility code, not on the business logic that actually changes often.
 - **Limited monitoring** — IIS logs and maybe a text log file per server; diagnosing a cross-cutting production issue means manually correlating timestamps across machines.
 
-## 2. Why incremental modernization, not a rewrite
+## 2. The problems this actually caused, day to day
 
-The standard trade-off, and the one worth being explicit about in an interview:
+The architecture facts above aren't abstract — each one shows up as a specific, recurring operational pain, and this is the framing an interviewer wants to hear (symptoms and business impact, not just a list of legacy tech):
 
-| | Big-bang rewrite | Incremental (Strangler Fig) modernization |
-|---|---|---|
-| Business continuity | High risk — nothing ships until the rewrite is "done" | Low risk — legacy keeps serving traffic throughout |
-| Feature delivery during migration | Effectively frozen | Continues in parallel |
-| Risk exposure | Concentrated at a single cutover | Spread across many small, reversible cutovers |
-| Regression risk | High — reimplementing years of undocumented business rules from scratch | Lower — legacy behavior stays the reference implementation until each piece is proven |
-| Time to first value | Long — nothing is better until the whole thing ships | Short — each migrated module is immediately better |
-| Failure mode | Catastrophic — a failed rewrite can mean throwing away 12-18 months of work | Contained — a failed wave is one module, not the whole programme |
+- **Every release was high-risk and slow.** Because the app is one monolithic deployable, even a one-line fix needs a full build, full regression pass, and a manual deployment window — so releases cluster into infrequent, large, high-blast-radius events instead of small, frequent, low-risk ones.
+- **A schema change was a cross-team negotiation, every time.** The shared database meant no module could change its data shape without checking every other module that touches the same tables — slowing down even simple feature work.
+- **Background job failures were invisible until someone complained.** Windows Services polling file shares had no centralized monitoring — the first sign of a failed nightly batch was often a business user asking why yesterday's data wasn't there.
+- **Diagnosing a production issue took hours, not minutes.** With per-server text logs and no correlation IDs, root-causing anything that crossed more than one part of the system meant manually matching timestamps across machines — a slow, error-prone process during exactly the moments speed mattered most.
+- **The team was afraid to touch large parts of the codebase.** Tight coupling (`HttpContext.Current` reached from business logic, no real DI) and minimal test coverage meant changes to core logic carried real regression risk, which made the team conservative — features that should've been quick took longer because nobody wanted to be the one who broke something load-bearing.
+- **Scaling meant buying hardware, not clicking a button.** On-prem infrastructure sized for peak load sat mostly idle the rest of the time, and a genuine traffic spike (a seasonal peak, a marketing push) meant either over-provisioning permanently or risking a capacity crunch.
+- **The talent cost was real too.** Engineers — especially newer hires — don't want to spend years maintaining AngularJS and .NET Framework; retention and hiring both get harder the longer a platform stays visibly behind current practice.
 
-**The argument for incremental, stated plainly:** a big-bang rewrite bets the entire modernization on getting a full reimplementation right on the first try, with no production feedback until the end. An incremental approach trades a longer overall timeline for continuous validation — every wave either proves the target architecture works under real traffic or fails small and cheap. For a business-critical platform with thousands of users, the cost of being wrong at big-bang scale is almost always higher than the cost of a slower, staged migration — which is why Strangler Fig is the default recommendation for legacy modernization of live, revenue-critical systems, reserving full rewrites for genuinely small or already-decommissioned-in-spirit systems.
+## 3. Building the business case — justifying the cost to senior management
 
-## 3. The Strangler Fig pattern, applied end to end
+Modernization competes for budget against visible feature work, so the pitch has to be a business case, not a technology upgrade request:
+
+- **Frame it as total cost of ownership, not a one-time spend.** The real comparison isn't "$0 (do nothing)" vs. "$X (migrate)" — it's the *ongoing* cost of the status quo (rising infra/licensing spend on aging on-prem hardware, the incident/downtime cost from limited observability, the opportunity cost of slower feature delivery hurting competitive position) versus the migration's cost (cloud spend + engineering effort). Framed this way, "do nothing" has a cost too, it's just less visible because it's spread across many small line items instead of one big ask.
+- **Anchor the "why now" to something already forcing a decision.** The strongest business cases don't ask for a discretionary modernization budget in isolation — they attach to a cost or a deadline that's already on the CFO's radar: an approaching hardware refresh cycle, an OS/SQL Server version reaching end of extended support (forcing a decision anyway), or a compliance requirement the legacy stack can't meet. That reframes the ask from "spend more to modernize" to "we have to spend money here regardless — this option spends it better."
+- **Make the ask incremental, not a single large approval.** Tie the investment to the Strangler Fig plan itself (section 9) — ask for budget for the first wave, show the measured result (a concrete before/after: faster deploys, fewer incidents, a real infra cost delta), and use that evidence to justify the next tranche. This is a genuinely stronger pitch than a large upfront ask, because it gives leadership a cheap off-ramp if the approach isn't working, which paradoxically makes them more comfortable saying yes to the first step.
+- **Quantify what you can, and say plainly what you can't yet.** Concrete, credible numbers land better than a vague "efficiency gains" — infra cost reduction from elastic vs. over-provisioned capacity, reduced hardware capital expense by not doing a like-for-like refresh, reduced incident/MTTR cost from better observability. Where a number isn't knowable yet (developer productivity gains, for instance), say so and describe how you'll measure it post-migration rather than guessing a number to sound complete — a business sponsor trusts an honest "we'll measure this" more than a suspiciously precise made-up figure.
+
+## 4. Choosing the cloud provider
+
+For an estate this deep in the Microsoft stack (.NET Framework, SQL Server, IIS, likely on-prem Active Directory), Azure is usually the pragmatic default over AWS or GCP — for reasons that are about the *existing* estate, not abstract platform quality:
+
+- **Licensing continuity — Azure Hybrid Benefit.** If the organization already owns Windows Server and SQL Server licenses with Software Assurance, Azure Hybrid Benefit lets those licenses offset Azure compute/database costs directly — a real, quantifiable cost reduction that AWS/GCP can't match unless the org is willing to walk away from existing licensing investment entirely.
+- **Identity continuity.** If the legacy app authenticates against on-prem Active Directory, Azure AD/Entra ID with Azure AD Connect gives a hybrid-identity path that's far less disruptive than re-platforming authentication onto a different provider's IAM from a standing start (see the security section in Part 3 for what the target auth model looks like once migrated).
+- **Team skill continuity.** A team of .NET/Windows/SQL Server engineers ramps up on Azure's .NET-native tooling (App Service's first-class .NET support, Azure DevOps integration with Visual Studio) meaningfully faster than retraining onto AWS/GCP-native tooling and conventions — lower risk and higher velocity specifically *during* the migration, when the team is already absorbing a lot of change.
+- **What AWS/GCP would have offered, honestly.** AWS has a broader and more mature container-native/Kubernetes ecosystem; GCP has stronger native data/analytics tooling. Both are legitimate strengths — they're just not the deciding factor for a .NET-heavy estate with an existing Microsoft licensing relationship, where the switching cost (retraining, losing licensing continuity, rebuilding identity integration from scratch) outweighs those benefits. The honest answer to "why not AWS" is economic and organizational fit, not a technical claim that Azure is universally superior.
+
+## 5. Migration strategy — why incremental, not a rewrite, lift-and-shift, or full microservices
+
+Three alternatives are worth explicitly rejecting, not just the rewrite:
+
+| | Big-bang rewrite | Lift-and-shift only | Full microservices from day one | Incremental (Strangler Fig) |
+|---|---|---|---|---|
+| Business continuity | High risk — nothing ships until "done" | Low risk — but changes nothing underneath | Low risk to continuity, high risk to correctness | Low risk — legacy keeps serving traffic throughout |
+| Addresses the technical debt (section 1)? | Eventually, all at once | No — moves hosting only, debt is unchanged | Yes, but before service boundaries are proven | Yes, incrementally, validated wave by wave |
+| Regression risk | High — reimplementing undocumented business rules from scratch | Low — nothing changed | High — distributed-system bugs on unproven boundaries | Lower — legacy stays the reference until each piece is proven |
+| Time to first real value | Long | Immediate, but shallow (hosting only) | Long, and risky | Short — each migrated module is immediately better |
+
+**Why not a big-bang rewrite:** it bets the entire modernization on a full reimplementation being correct with no production feedback until the very end — for a business-critical platform with thousands of users, that's a bigger bet than the business needs to take.
+
+**Why not lift-and-shift as the whole strategy:** it moves hosting risk off aging on-prem hardware, which can be a legitimate *first step* under extreme time pressure (e.g., escaping End-of-Life hardware fast), but it's explicitly a stopgap — every technical-debt item in section 1 remains exactly as it was, just now running on an Azure VM instead of on-prem.
+
+**Why not decompose into full microservices immediately:** drawing fine-grained service boundaries before there's production evidence they're the *right* boundaries adds distributed-system complexity (network calls where there used to be function calls, eventual consistency, cross-service transactions) on top of a system you don't yet understand well enough to decompose correctly. The safer sequence is extracting coarser-grained services via Strangler Fig first, observing real coupling and usage patterns under production load, and only splitting a service further once there's a concrete trigger — a genuine independent-scaling need, an independent deployment-cadence need, or a team-ownership boundary that no longer matches the current service shape.
+
+## 6. The Strangler Fig pattern, applied end to end
 
 The pattern: put a routing seam in front of the legacy system, then incrementally replace pieces behind that seam, so callers never know (or need to know) whether they're hitting old or new.
 
@@ -45,14 +79,7 @@ The pattern: put a routing seam in front of the legacy system, then incrementall
 - **UI layer** — for AngularJS → Angular, the seam is route-level: an outer shell (often kept deliberately thin) decides, per route, whether to load the legacy AngularJS bundle or the new Angular bundle for that page. Both can run side by side in the browser during the transition (see Part 2 for the mechanics).
 - **Data layer** — the hardest seam. Where a new service needs to own data currently in the shared database, the usual sequence is: (1) new service reads from the legacy shared tables directly at first (fastest to ship, keeps a single source of truth), (2) introduce a synchronization mechanism (change data capture, or dual-write with the legacy write path as source of truth) once the new service needs to write, (3) fully cut the legacy write path over once the new service is proven, (4) only then consider physically separating the data store. Skipping straight to "give the new service its own database" before establishing sync is the most common Strangler Fig failure mode — it silently reintroduces the two-databases-drift problem the pattern is supposed to avoid.
 
-**Sequencing waves — the actual planning exercise:**
-1. **Inventory and dependency-map** the whole application/module portfolio — what calls what, what shares a database table, what shares a deployment.
-2. **Classify each piece** by business value and technical complexity (a 2x2: high-value/low-complexity pieces go first — they prove the pattern works and deliver visible wins early; low-value/high-complexity pieces go last or get explicitly descoped).
-3. **Migrate leaf nodes before hubs** — a module with few dependents can move without much coordination; a module everything else depends on needs its consumers ready first, or it becomes the whole programme's bottleneck.
-4. **Define a rollback path per wave before the wave starts** — the routing seam makes this cheap: if the new implementation of a route regresses, flip the gateway rule back to legacy immediately, no redeploy needed.
-5. **Retire legacy code path only after the new path has run under full production load for a defined bake period** (commonly 2-4 weeks) with no rollback — not immediately on cutover.
-
-## 4. Azure adoption strategy — what moves first, and why
+## 7. Choosing which services to adopt, and when
 
 The general sequencing logic, and the justification for each service:
 
@@ -66,18 +93,44 @@ The general sequencing logic, and the justification for each service:
 - **Azure Storage** for file-share replacement (Blob Storage) — a low-risk, high-value move since file shares are usually just unstructured blob storage with extra operational overhead (Windows file server patching, backup, access management).
 
 **Move as the architecture matures: integration and edge**
-- **Azure Service Bus** to replace the Windows Services + file-share polling pattern for background/async work — justified specifically where work needs to survive a process restart, needs guaranteed delivery, or needs to decouple a slow consumer from a fast producer. Not justified as a blanket replacement for every background job — a simple scheduled task that just needs to run reliably is often better served by a Function on a Timer trigger than by introducing a message queue.
-- **Azure Functions** for genuinely event-driven, bursty, or scheduled workloads (a file-uploaded trigger, a nightly batch, a webhook receiver) — the trade-off against App Service–hosted background workers is cold-start latency and execution-time limits versus not having to manage always-on compute for infrequent work. For anything latency-sensitive or continuously busy, a hosted background worker beats a Function.
+- **Azure Service Bus** to replace the Windows Services + file-share polling pattern for background/async work — justified specifically where work needs to survive a process restart, needs guaranteed delivery, or needs to decouple a slow consumer from a fast producer.
+- **Azure Functions** for genuinely event-driven, bursty, or scheduled workloads — see section 8 for the full server-vs-serverless decision framework.
 - **Azure API Management** once there are enough services that consistent versioning, rate limiting, and a single external contract surface matter — introducing APIM on day one for a two-service system is usually premature; it earns its complexity once there are enough consumers and enough services that inconsistent per-service API conventions become the actual pain point.
 - **Azure Front Door** at the edge once there's a real need for global routing, WAF, or multi-region failover — for a single-region enterprise app, this is often deferred until DR planning makes it necessary, not adopted reflexively.
 
 **Alternatives considered and why they're usually rejected at this stage:**
 - **AKS/Kubernetes instead of App Service** — rejected early in a modernization unless the org already runs Kubernetes elsewhere; the operational learning curve competes directly with the modernization's own risk budget.
-- **A full data-store split (separate database per new service) from day one** — rejected in favor of shared-database-with-sync-then-split, per the Strangler data-layer discussion above; splitting too early either duplicates data with no sync (drift risk) or blocks the migration on solving distributed-data problems before there's evidence the service boundary is even right.
+- **A full data-store split (separate database per new service) from day one** — rejected in favor of shared-database-with-sync-then-split, per the Strangler data-layer discussion above.
 - **Rewriting the AngularJS UI entirely in one release** — rejected in favor of route-level Strangler migration (Part 2), for the same continuity reasons as the backend.
-- **"Lift and shift" (rehost on Azure VMs with no architecture change) as the whole strategy** — sometimes the *first* step for a piece under extreme time pressure (get off End-of-Life on-prem hardware fast), but explicitly a stopgap, not the target state — it moves the hosting risk without touching any of the technical debt described in section 1.
 
-## 5. Reference architecture — legacy vs. target
+## 8. Server vs. serverless — the decision framework
+
+This is a decision made per-workload, not once for the whole platform — the question each time is which compute model actually fits that specific piece of work:
+
+**Choose "server" (App Service, always-on compute) when:**
+- Load is reasonably predictable and continuous — a main API surface receiving steady request traffic all day.
+- Latency has to be consistently low — no tolerance for the cold-start delay a serverless function can incur on an infrequently-invoked path.
+- The workload is fundamentally interactive/request-response and user-facing.
+
+**Choose "serverless" (Azure Functions) when:**
+- The workload is event-driven, bursty, or infrequent — a file-uploaded trigger, a webhook receiver, a nightly batch/reconciliation job, a Service-Bus-triggered consumer that doesn't need sub-second response.
+- Paying for idle compute doesn't make sense — something that runs for two minutes a night shouldn't be backed by an always-on instance sitting idle the other 23 hours 58 minutes.
+- Execution time fits within Functions' execution limits, and the occasional cold-start latency is genuinely acceptable for that workload.
+
+**The honest trade-off, stated plainly:** serverless isn't cheaper by default — for a continuously busy workload, an always-on Function plan (or a poorly-utilized dedicated worker) can cost *more* than a right-sized App Service instance running the same logic. The real crossover factor is utilization, not a blanket "serverless = cheap" rule. Concretely, in this migration: the main ASP.NET Core services live on App Service (predictable, latency-sensitive, interactive), while specific bursty/event-driven pieces — a blob-triggered file processor, a Service-Bus-triggered notification consumer, a nightly reconciliation job — move to Functions.
+
+## 9. The migration plan — sequencing the waves
+
+The actual planning exercise, step by step:
+
+1. **Inventory and dependency-map** the whole application/module portfolio — what calls what, what shares a database table, what shares a deployment.
+2. **Classify each piece** by business value and technical complexity (a 2x2: high-value/low-complexity pieces go first — they prove the pattern works and deliver visible wins early; low-value/high-complexity pieces go last or get explicitly descoped).
+3. **Migrate leaf nodes before hubs** — a module with few dependents can move without much coordination; a module everything else depends on needs its consumers ready first, or it becomes the whole programme's bottleneck.
+4. **Define a rollback path per wave before the wave starts** — the routing seam makes this cheap: if the new implementation of a route regresses, flip the gateway rule back to legacy immediately, no redeploy needed.
+5. **Retire legacy code path only after the new path has run under full production load for a defined bake period** (commonly 2-4 weeks) with no rollback — not immediately on cutover.
+6. **Feed measured results from each wave back into the business case** (section 3) — each wave's real numbers are what justify budget for the next tranche.
+
+## 10. Reference architecture — legacy vs. target
 
 ```mermaid
 flowchart TB
@@ -542,7 +595,7 @@ Generic leadership/architecture questions with a framework for answering each �
 *Framework:* avoid framing it as either/or — sequence debt-reduction work to run in parallel with feature work where possible (validate in the background, cut over without a freeze), and where a genuine trade-off exists, quantify the cost of *not* doing the modernization (rising incident rate, infrastructure cost, onboarding friction) so it's compared against feature value in the same terms instead of being an abstract "quality" argument. Real material: the AIS SQL-to-Azure-SQL-Managed-Instance migration run in parallel with feature delivery (Q5, Q30).
 
 **"How do you decide the sequencing of a multi-quarter modernization roadmap?"**
-*Framework:* dependency-map first (what blocks what), then within the resulting order, prioritize by business-value/technical-complexity — high-value, low-complexity pieces first to build momentum and prove the approach, genuinely hard or low-value pieces last or explicitly descoped. See Part 1 section 3 for the full sequencing logic.
+*Framework:* dependency-map first (what blocks what), then within the resulting order, prioritize by business-value/technical-complexity — high-value, low-complexity pieces first to build momentum and prove the approach, genuinely hard or low-value pieces last or explicitly descoped. See Part 1 section 9 for the full sequencing logic.
 
 **"How do you know when a modernization programme is actually done, or when to call it good enough?"**
 *Framework:* tie "done" to measurable exit criteria defined at the start (every module through the routing seam, legacy code path fully retired, or a defined subset explicitly descoped with a documented reason) rather than an open-ended "keep improving" — an unscoped modernization effort never has a moment where stakeholders can confidently say it succeeded.
