@@ -1440,6 +1440,189 @@ await s2.SendAsync("user-1", "Ownership alert"); // ✅ — fully interchangeabl
 
 ---
 
+### **Q6b: LSP in Practice — Handling Business Restrictions (Wipro Case)**
+
+**Real scenario:** "What if we have a business rule that says Wipro can't generate PDF reports? How do we handle that without violating LSP?"
+
+This is a common question because the naive approach violates LSP:
+
+```csharp
+// ❌ WRONG: Hidden restriction in the child violates LSP
+public class PdfReportGenerator : IReportGenerator
+{
+    public async Task<byte[]> GenerateAsync(ReportData data)
+    {
+        if (data.CompanyId == "Wipro")
+            throw new NotSupportedException("Wipro cannot generate PDF reports");
+        return await GeneratePdfAsync(data);
+    }
+}
+// Problem: Caller expected any company to work. Surprise exception = LSP violation.
+```
+
+**The solution: Make the restriction part of the contract, not hidden in the implementation.**
+
+**Option 1: Add a validation method to the interface (honest contract)**
+
+```csharp
+public interface IReportGenerator
+{
+    string Format { get; }
+    
+    // New: declare upfront which companies this supports
+    bool SupportsCompany(string companyId);
+    
+    Task<byte[]> GenerateAsync(ReportData data);
+}
+
+// ✅ LSP-compliant: restriction is transparent
+public class PdfReportGenerator : IReportGenerator
+{
+    public string Format => "pdf";
+    
+    public bool SupportsCompany(string companyId)
+    {
+        // Wipro explicitly not supported (declared in contract)
+        return companyId != "Wipro";
+    }
+    
+    public async Task<byte[]> GenerateAsync(ReportData data)
+    {
+        // Caller already checked SupportsCompany() — safe to proceed
+        // No hidden restrictions ✅
+        return await GeneratePdfAsync(data);
+    }
+}
+
+// Orchestrator respects the contract
+public class ReportOrchestrator
+{
+    public async Task<byte[]> GenerateAsync(ReportData data, string format)
+    {
+        var generator = _generators.FirstOrDefault(g => g.Format == format);
+        
+        // Check BEFORE calling GenerateAsync (not hidden inside it)
+        if (!generator.SupportsCompany(data.CompanyId))
+        {
+            throw new BusinessRuleException(
+                $"Company {data.CompanyId} cannot use {format} reports"
+            );
+        }
+        
+        return await generator.GenerateAsync(data); // ✅ No surprises
+    }
+}
+```
+
+**Option 2: Return result objects (failures are expected, not exceptions)**
+
+```csharp
+public class ReportGenerationResult
+{
+    public bool Success { get; set; }
+    public byte[] Data { get; set; }
+    public string ErrorReason { get; set; }
+    
+    public static ReportGenerationResult Ok(byte[] data) =>
+        new() { Success = true, Data = data };
+    
+    public static ReportGenerationResult Fail(string reason) =>
+        new() { Success = false, ErrorReason = reason };
+}
+
+public interface IReportGenerator
+{
+    string Format { get; }
+    Task<ReportGenerationResult> GenerateAsync(ReportData data);
+}
+
+// ✅ LSP-compliant: failure is expected behavior
+public class PdfReportGenerator : IReportGenerator
+{
+    public async Task<ReportGenerationResult> GenerateAsync(ReportData data)
+    {
+        if (data.CompanyId == "Wipro")
+        {
+            // Failure is part of normal flow, not a surprise exception
+            return ReportGenerationResult.Fail("Wipro is not authorized for PDF reports");
+        }
+        
+        var pdfBytes = await GeneratePdfAsync(data);
+        return ReportGenerationResult.Ok(pdfBytes);
+    }
+}
+
+public class ReportOrchestrator
+{
+    public async Task<ReportGenerationResult> GenerateAsync(ReportData data, string format)
+    {
+        var generator = _generators.FirstOrDefault(g => g.Format == format);
+        return await generator.GenerateAsync(data); // ✅ Contract honored either way
+    }
+}
+```
+
+**Option 3: Business rules in the orchestrator (generators stay pure)**
+
+```csharp
+public class ReportOrchestrator
+{
+    // Business rules centralized — easy to modify
+    private static readonly Dictionary<string, List<string>> CompanyRestrictions = new()
+    {
+        { "Wipro", new() { "pdf" } },        // Wipro can't use PDF
+        { "FinanceClient1", new() { "xlsx" } }, // Finance client restricted
+        { "AAPL", new() }                   // AAPL unrestricted
+    };
+    
+    public async Task<byte[]> GenerateAsync(ReportData data, string format)
+    {
+        // Check business rule BEFORE calling generator
+        if (CompanyRestrictions.TryGetValue(data.CompanyId, out var restricted) &&
+            restricted.Contains(format))
+        {
+            throw new AccessDeniedException(
+                $"Company {data.CompanyId} cannot generate {format} reports"
+            );
+        }
+        
+        // Rule passed — safe to generate
+        var generator = _generators.FirstOrDefault(g => g.Format == format);
+        return await generator.GenerateAsync(data);
+    }
+}
+
+// ✅ Generators are pure — no company restrictions inside them
+public class PdfReportGenerator : IReportGenerator
+{
+    public async Task<byte[]> GenerateAsync(ReportData data)
+    {
+        // Just generate — orchestrator already checked permissions
+        return await GeneratePdfAsync(data);
+    }
+}
+```
+
+**Which approach to use?**
+
+| Approach | Best when | Tradeoff |
+|----------|-----------|----------|
+| **Option 1** (SupportsCompany) | Restriction is fundamental to that generator | Requires interface change, more verbose |
+| **Option 2** (Result objects) | Failures are common/expected in normal flow | Changes return type, all callers must handle result |
+| **Option 3** (Orchestrator rules) | Business rules are centralized and frequently change | Orchestrator gets complex with many rules |
+
+**For Wipro scenario, I'd recommend Option 3:**
+- Wipro restriction is a **business policy**, not a technical limitation of the PDF generator
+- Keep generators focused on one job: generating reports
+- Centralize policy decisions in the orchestrator
+- Easy to add/remove restrictions: just update the dictionary
+- Generators remain simple and testable
+
+**The key LSP insight:**
+Don't hide restrictions in child classes. Make them **explicit in the contract** or handle them at the orchestrator level. That way, callers don't get surprise exceptions, and the substitution principle holds: any generator you give to the orchestrator will behave predictably (or fail predictably, as declared).
+
+---
+
 ### Q7. [Topic: SOLID] Explain the Interface Segregation Principle with a real example.
 
 **Definition**: Don't force a class to implement methods it doesn't need. Split fat interfaces into small, focused ones.
