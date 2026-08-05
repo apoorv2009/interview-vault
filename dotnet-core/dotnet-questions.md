@@ -5255,7 +5255,13 @@ var dtos = await _context.EngagementActivities
 ---
 
 ### Q73. [Topic: ASP.NET Core] What is Clean Architecture and what are its benefits?
-**Definition**: Layered design isolating concerns. **Layers**: (1) **Domain** (business rules, entities, no frameworks); (2) **Application** (use cases, DTOs, validators); (3) **Infrastructure** (EF Core, repositories, external services); (4) **Presentation** (ASP.NET Core controllers, API). **Benefits**: Testability (swap mock repos), maintainability (changes isolated to layers), framework-agnostic (swap EF Core for Dapper). **Capital Access**: Strict layer separation ensures business logic stays testable even if ASP.NET Core version changes.
+**Definition**: A layered design where **dependencies only point inward** — Domain has zero framework dependencies, and outer layers implement interfaces the inner layers define. This dependency rule is the actual differentiator from plain N-Tier/Layered Architecture, which is *also* "layered design isolating concerns" but lets the business layer depend directly on the data-access layer. **Layers**: (1) **Domain** (business rules, entities, no frameworks); (2) **Application** (use cases, DTOs, validators); (3) **Infrastructure** (EF Core, repositories, external services); (4) **Presentation** (ASP.NET Core controllers, API). **Benefits**: Testability (swap mock repos), maintainability (changes isolated to layers), framework-agnostic (swap EF Core for Dapper). **Capital Access**: Strict layer separation ensures business logic stays testable even if ASP.NET Core version changes.
+
+**A nuance worth knowing — where does the repository *interface* live, Domain or Application?** Both conventions exist in real Clean Architecture codebases:
+- **Domain** (used below) — traces back to Eric Evans' original DDD book, which treats a Repository as a domain concept (a collection of Aggregates). Advantage: Infrastructure only ever needs to reference Domain, never Application.
+- **Application** — traces back to Robert C. Martin's original Clean Architecture diagram, where repository interfaces are "output ports" defined at the Use Case boundary, not inside Entities. Advantage: keeps Domain *purely* about business rules and entity behavior, with no data-access-shaped concept leaking in at all.
+
+If asked which is correct: *"Both are seen in practice — what actually matters is that the interface lives inside the boundary and Infrastructure implements it, not which specific inner layer holds it."*
 
 ```
 Domain Layer      → entities, value objects, domain events, repository INTERFACES
