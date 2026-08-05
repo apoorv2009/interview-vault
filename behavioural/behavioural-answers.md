@@ -20,8 +20,66 @@
 4. [Describe a production incident you triaged](#q-describe-a-production-incident-you-triaged-end-to-end)
 5. [Your main experience is .NET. AI is new. How do you justify?](#q-your-main-experience-is-in-net-ai-is-relatively-new-for-you-how-do-you-justify-your-ai-experience)
 
-### **Track 3: Solera — Principal Software Engineer (16 yrs, Architect)**
-*(Section starts at line 266)*
+### **Track 3: Solera — Principal Software Engineer (16 yrs, Architect)** — 43 questions
+
+#### **Section 1: AI & Innovation Leadership (Q1–Q4)**
+1. [Drove adoption of new tools across resistant teams](#q1-tell-me-about-a-time-you-drove-adoption-of-a-new-tool-or-practice-ai-or-otherwise-across-a-team-that-was-initially-resistant)
+2. [Identified opportunity to embed AI/automation](#q2-describe-a-situation-where-you-identified-a-practical-opportunity-to-embed-aiautomation-into-an-existing-workflow-what-was-the-impact)
+3. [Established guardrails for new technology](#q3-have-you-established-guardrails-or-best-practices-for-a-new-technology-before-it-scaled-out-of-control)
+4. [AI-assisted approach with measurable improvement](#q4-tell-me-about-a-time-an-ai-assisted-approach-copilot-llm-rag-measurably-improved-delivery-speed-quality-or-developer-productivity)
+
+#### **Section 2: Architecture & Platform Ownership (Q5–Q7)**
+5. [Balanced short-term delivery vs long-term architecture](#q5-describe-a-time-you-had-to-balance-short-term-delivery-pressure-against-long-term-architectural-health)
+6. [Drove alignment on architectural decision](#q6-tell-me-about-a-major-architectural-decision-you-made-that-other-teams-had-to-align-to)
+7. [Evolved legacy system toward event-driven design](#q7-give-an-example-of-evolving-a-monolithic-or-legacy-system-toward-an-api-first-or-event-driven-design)
+
+#### **Section 3: Feature Delivery & Hands-on Engineering (Q8–Q10)**
+8. [Complex, high-impact feature end-to-end](#q8-tell-me-about-the-most-complex-high-impact-feature-you-owned-end-to-end)
+9. [Debugged critical production issue across services](#q9-describe-a-critical-production-issue-you-personally-debugged-across-servicesapisdata-layers)
+10. [Unblocked another team or engineer](#q10-give-an-example-of-a-time-you-had-to-unblock-another-team-or-engineer-who-was-stuck)
+
+#### **Section 4: Modernization & Engineering Excellence (Q11–Q16)**
+11. [Refactored legacy codebase into modular, testable](#q11-tell-me-about-a-legacy-codebase-or-pattern-you-refactored-into-something-modular-and-testable)
+12. [Improved observability and caught production issues](#q12-describe-a-time-you-improved-observability-logging-monitoring-diagnostics-in-a-system-that-lacked-it)
+13. [Introduced engineering standard adopted beyond team](#q13-tell-me-about-a-time-you-introduced-a-new-engineering-standard-code-review-testing-strategy-performance-practice)
+14. [Reduced team's technical debt systematically](#q14-describe-a-time-you-reduced-a-teams-technical-debt-systematically-and-measurably)
+15. [Diagnosed and fixed hard-to-reproduce issue](#q15-tell-me-about-a-hard-to-reproduce-production-issue-you-diagnosed-and-fixed)
+16. [Made a hard call about quality](#q16-tell-me-about-a-time-you-had-to-make-a-hard-call-about-quality-performance-or-scope)
+
+#### **Section 5: Reliability, Scaling & Complex Systems (Q17–Q24)**
+17. [Incident triggered your thinking about architecture](#q17-describe-an-incident-in-production-that-triggered-your-thinking-about-architecture)
+18. [Moved system from fragile to antifragile](#q18-describe-a-time-you-moved-a-system-from-fragile-to-antifragile)
+19. [Shipped significant feature under time pressure](#q19-tell-me-about-a-time-you-shipped-something-significant-under-extreme-time-pressure)
+20. [Cost optimization that improved reliability](#q20-describe-a-cost-optimization-you-did-that-also-improved-system-reliability-or-performance)
+21. [Collaborated with infrastructure/SRE on deployment](#q21-describe-a-time-you-collaborated-with-an-infrastructure-or-sre-team-on-deployment-safety-or-reliability)
+22. [Diagnosed subtle behavioral bug](#q22-tell-me-about-a-subtle-behavioral-bug-you-diagnosed-where-the-obvious-explanation-was-wrong)
+23. [Evaluated major architectural change](#q23-describe-a-time-you-evaluated-whether-to-do-a-major-architectural-change-vs-incremental-improvement)
+24. [Production outage you were responsible for](#q24-describe-a-production-outage-you-were-responsible-for-what-was-the-root-cause)
+
+#### **Section 6: Decision-Making & Leadership (Q25–Q35)**
+25. [AI/automation didn't deliver expected value](#q25-tell-me-about-a-time-you-introduced-aiautomation-into-a-workflow-and-it-didnt-deliver-the-expected-value)
+26. [Peer architect disagreed with your design](#q26-tell-me-about-a-time-a-peer-architect-or-senior-engineer-strongly-disagreed-with-your-design)
+27. [Leadership wanted to move faster than safe](#q27-describe-a-situation-where-leadership-wanted-to-move-faster-than-you-thought-was-safe)
+28. [Pushed back on AI/Copilot adoption](#q28-tell-me-about-a-time-you-had-to-push-back-on-aicopilot-adoption-for-security-compliance-or-quality-reasons)
+29. [Chose between high-impact initiatives](#q29-tell-me-about-a-time-you-had-to-choose-between-two-high-impact-initiatives-with-limited-engineering-bandwidth)
+30. [Balanced technical debt vs feature velocity](#q30-describe-how-youve-balanced-technical-debt-paydown-against-feature-velocity-on-a-real-project)
+31. [Scoped down feature to hit deadline](#q31-give-an-example-where-you-had-to-scope-down-a-feature-or-architecture-vision-to-hit-a-deadline)
+32. [Diagnosed systemic reliability issue](#q32-tell-me-about-a-time-you-diagnosed-a-systemic-reliability-issue-not-just-a-single-bug)
+33. [Designed/troubleshot webhook/event-driven integration](#q33-describe-your-experience-designing-or-troubleshooting-a-webhookevent-driven-integration)
+34. [Designed background processing system](#q34-tell-me-about-a-background-processing-jobworker-system-you-designed-or-fixed-for-scale-or-reliability)
+35. [Onboarded team on new technology](#q35-describe-a-time-you-onboarded-or-upskilled-a-team-on-a-new-technology-or-pattern)
+
+#### **Section 7: Communication & Feedback (Q36–Q40)**
+36. [Gave difficult feedback to senior engineer](#q36-tell-me-about-giving-difficult-feedback-to-a-senior-engineer-or-peer-how-did-you-approach-it)
+37. [Changed habits based on junior feedback](#q37-have-you-ever-had-to-change-your-own-habits-or-thinking-based-on-feedback-from-someone-more-junior-than-you)
+38. [Defined architecture with minimal direction](#q38-tell-me-about-a-time-you-had-to-define-an-architecture-or-roadmap-with-very-little-direction-from-leadership)
+39. [Explained complex trade-off to non-technical stakeholder](#q39-describe-a-time-you-had-to-explain-a-complex-technical-trade-off-to-a-non-technical-stakeholder-or-executive)
+40. [Your technical recommendation was rejected](#q40-tell-me-about-a-time-your-technical-recommendation-was-rejected-how-did-you-respond)
+
+#### **Section 8: AI Systems & LLM Engineering (Q41–Q43)**
+41. [RAG or LLM-based system you built](#q41-walk-me-through-a-specific-rag-or-llm-based-system-you-built--what-were-the-hardest-engineering-problems)
+42. [Put guardrails around AI feature](#q42-tell-me-about-a-time-you-had-to-put-guardrails-around-an-ai-feature-before-it-could-go-to-production)
+43. [Measure whether AI tool improves productivity](#q43-how-do-you-measure-whether-an-ai-tool-is-actually-improving-developer-productivity)
 
 ---
 
