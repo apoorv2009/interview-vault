@@ -2,6 +2,29 @@
 
 ---
 
+## Table of Contents
+
+### **Track 1: EPAM / Architect (16 yrs, Capital Access)**
+1. [Tell me about yourself / Career journey](#q-tell-me-about-yourself--walk-me-through-your-career-journey)
+2. [Tell me about your previous project](#q-tell-me-about-your-previous-project--roles-and-responsibilities)
+3. [What value does your project bring?](#q-what-value-does-your-project-bring-to-the-client)
+4. [What AI tools have you used?](#q-what-ai-tools-have-you-used-and-what-percentage)
+5. [How to build secure, performant APIs](#q-how-do-you-build-an-api-that-is-secure-and-performance-centric)
+6. [How do you track issues in production?](#q-how-do-you-track-issues-in-production)
+7. [Approach to modernizing .NET Framework 4.7](#q-what-is-your-approach-to-moving-net-framework-47-to-modern-net)
+
+### **Track 2: Other Company Rounds (9 yrs, Entity Management System)**
+1. [Introduce yourself (Virtusa)](#q-introduce-yourself-virtusa)
+2. [Technologies and projects worked on](#q-technologies-and-projects-worked-on--entity-management-system--role-and-description)
+3. [Rate yourself in core stack](#q-rate-yourself-15-in-your-core-stack)
+4. [Describe a production incident you triaged](#q-describe-a-production-incident-you-triaged-end-to-end)
+5. [Your main experience is .NET. AI is new. How do you justify?](#q-your-main-experience-is-in-net-ai-is-relatively-new-for-you-how-do-you-justify-your-ai-experience)
+
+### **Track 3: Solera — Principal Software Engineer (16 yrs, Architect)**
+*(Section starts at line 266)*
+
+---
+
 ## EPAM / Architect Track (16 yrs, Capital Access)
 
 *Framing for the EPAM Application Architect role at S&P Global — 16-year Application Architect narrative, most recent project Capital Access.*
