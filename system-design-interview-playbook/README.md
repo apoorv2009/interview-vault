@@ -26,8 +26,12 @@ Concise, interview-ready deep-dives on system design, distributed systems, and e
 - [Your CTO calls at 3 AM. Your entire S3 bucket just got encrypted. Ransom note in metadata. First 15 minutes?](incident-s3-ransomware-response.md)
 - [SSL cert just expired on Sunday morning. Site is down. What do you do in the next 10 minutes?](incident-ssl-cert-expiry.md)
 
+### E-Commerce
+- [Customers report your e-commerce site shows products as 'In Stock' — but at checkout they're suddenly unavailable. How would you debug and fix this?](ecommerce-inventory-inconsistency.md)
+
 ### Microservices
-- [What Microservice Architecture Do Companies Actually Use in Real Projects?**](microservices-real-world-patterns.md)
+- [What Microservice Architecture Do Companies Actually Use in Real Projects?](microservices-real-world-patterns.md)
+- [A user places an insurance order — can I call multiple downstream services directly now?](microservices-insurance-order-fanout.md)
 
 ### Payments
 - [A passenger swipes their card on a flight with no internet and the bank cannot be contacted. How do you approve the payment without a balance check and prevent fraud in an offline payment system?](payments-offline-approval.md)
@@ -72,6 +76,7 @@ Files follow a `<topic>-<slug>.md` naming convention so a flat directory listing
 |--------|-------|
 | `auth` | Auth |
 | `caching` | Caching |
+| `ecommerce` | E-Commerce |
 | `idempotency` | Concurrency |
 | `drm` | DRM |
 | `data-structures` | Data Structures |
