@@ -68,9 +68,6 @@ Concise, interview-ready deep-dives on system design, distributed systems, and e
 ### Video Streaming
 - [YouTube has the same video in 1080p and 144p. Does the server store separate files for each quality?](video-adaptive-bitrate-storage.md)
 
-### Extended Notes & Reference
-- [System Design — Extended Notes & Reference](system-design-extended-notes.md) — full system-design walkthroughs (Facebook, Twitter, Scripture Sage), a microservices patterns deep-dive, availability fundamentals, and QPS/storage calculation tables. Merged from the `Design-a-system/`, `microservice/`, `systemdesign/`, and `calculations/` subfolders.
-
 ---
 ## Structure
 Files follow a `<topic>-<slug>.md` naming convention so a flat directory listing clusters naturally by topic:

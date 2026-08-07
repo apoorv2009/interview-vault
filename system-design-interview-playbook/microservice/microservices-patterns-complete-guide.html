@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Design & Microservices — Revision Notes</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; font-size: 14px; line-height: 1.7; color: #222; background: #f4f6f9; }
+  .container { max-width: 1000px; margin: 0 auto; padding: 28px 20px; }
+
+  /* Header */
+  .doc-header { background: linear-gradient(135deg, #1a1a2e, #16213e); color: #fff; padding: 28px 32px; border-radius: 10px; margin-bottom: 24px; }
+  .doc-header h1 { font-size: 24px; margin-bottom: 6px; }
+  .doc-header p { color: #aaa; font-size: 13px; }
+
+  /* TOC */
+  .toc { background: #fff; border-radius: 8px; padding: 20px 24px; margin-bottom: 24px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .toc h2 { font-size: 15px; color: #1a1a2e; margin-bottom: 12px; border-bottom: 2px solid #e8ecf0; padding-bottom: 8px; }
+  .toc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; }
+  .toc a { text-decoration: none; color: #2980b9; font-size: 13px; padding: 3px 0; display: block; }
+  .toc a:hover { color: #1a5276; }
+  .toc-num { color: #aaa; font-size: 12px; margin-right: 4px; }
+
+  /* Sections */
+  .section { background: #fff; border-radius: 8px; padding: 24px 28px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  .section-header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; padding-bottom: 12px; border-bottom: 2px solid #e8ecf0; }
+  .section-num { background: #2c3e50; color: #fff; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: bold; flex-shrink: 0; }
+  .section-num.blue   { background: #1a5276; }
+  .section-num.red    { background: #c0392b; }
+  .section-num.green  { background: #1e8449; }
+  .section-num.amber  { background: #d68910; }
+  .section-num.purple { background: #6c3483; }
+  .section-num.teal   { background: #117a65; }
+  .section-num.dark   { background: #2c3e50; }
+  h2.section-title { font-size: 17px; color: #1a1a2e; }
+
+  h3 { font-size: 14px; font-weight: bold; color: #1a1a2e; margin: 16px 0 8px; border-left: 3px solid #2980b9; padding-left: 8px; }
+  h4 { font-size: 13px; font-weight: bold; color: #2c3e50; margin: 12px 0 6px; }
+  p { margin-bottom: 10px; }
+
+  /* Code blocks */
+  .code { background: #1e2a3a; color: #e8f0fe; padding: 14px 16px; border-radius: 6px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.6; margin: 10px 0; white-space: pre; overflow-x: auto; }
+
+  /* Callouts */
+  .callout { padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 10px 0; font-size: 13px; }
+  .callout.blue   { background: #eaf4fb; border-left: 4px solid #2980b9; }
+  .callout.green  { background: #eafaf1; border-left: 4px solid #27ae60; }
+  .callout.amber  { background: #fef9e7; border-left: 4px solid #f39c12; }
+  .callout.red    { background: #fdedec; border-left: 4px solid #e74c3c; }
+  .callout.purple { background: #f5eef8; border-left: 4px solid #8e44ad; }
+  .callout strong { display: block; margin-bottom: 3px; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 13px; }
+  th { background: #2c3e50; color: #fff; padding: 8px 12px; text-align: left; }
+  td { padding: 7px 12px; border-bottom: 1px solid #eee; vertical-align: top; }
+  tr:nth-child(even) td { background: #f9f9f9; }
+
+  /* Tags */
+  .tag { display: inline-block; background: #d5e8f8; color: #1a5276; font-size: 11px; padding: 2px 8px; border-radius: 10px; margin: 2px; }
+  .tag.green  { background: #d5f5e3; color: #1e8449; }
+  .tag.red    { background: #fadbd8; color: #c0392b; }
+  .tag.amber  { background: #fdebd0; color: #d68910; }
+
+  /* Pattern cards */
+  .pattern-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 12px 0; }
+  .pattern-card { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 6px; padding: 12px 14px; }
+  .pattern-card h4 { margin-top: 0; color: #1a5276; border: none; padding: 0; }
+  @media (max-width: 640px) { .pattern-grid { grid-template-columns: 1fr; } .toc-grid { grid-template-columns: 1fr; } }
+
+  /* Flow diagrams */
+  .flow { background: #f0f4f8; border-radius: 6px; padding: 14px 16px; font-family: 'Courier New', monospace; font-size: 12px; line-height: 1.8; margin: 10px 0; white-space: pre; overflow-x: auto; color: #1a1a2e; }
+
+  /* Summary boxes */
+  .summary-box { background: #1a1a2e; color: #e8f0fe; padding: 16px 20px; border-radius: 8px; margin: 16px 0; }
+  .summary-box h4 { color: #7fb3d3; margin-bottom: 10px; border: none; padding: 0; }
+
+  ul, ol { padding-left: 20px; margin: 6px 0 10px; }
+  li { margin-bottom: 4px; }
+
+  .divider { height: 1px; background: #e8ecf0; margin: 16px 0; }
+
+  @media print {
+    body { background: #fff; }
+    .section { box-shadow: none; border: 1px solid #ddd; page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="doc-header">
+    <h1>📚 System Design & Microservices — Revision Notes</h1>
+    <p>Compiled from study sessions &nbsp;|&nbsp; Last updated: June 2026 &nbsp;|&nbsp; Topics grow with every session</p>
+  </div>
+
+  <!-- TOC -->
+  <div class="toc">
+    <h2>📋 Table of Contents</h2>
+    <div class="toc-grid">
+      <a href="#s1"><span class="toc-num">01</span> Microservices — What &amp; Why</a>
+      <a href="#s2"><span class="toc-num">02</span> Service Decomposition Strategies</a>
+      <a href="#s3"><span class="toc-num">03</span> Communication Patterns Overview</a>
+      <a href="#s4"><span class="toc-num">04</span> Synchronous Patterns</a>
+      <a href="#s5"><span class="toc-num">05</span> Asynchronous Patterns</a>
+      <a href="#s6"><span class="toc-num">06</span> Queue vs Pub/Sub — The Key Difference</a>
+      <a href="#s7"><span class="toc-num">07</span> Kafka Deep Dive</a>
+      <a href="#s8"><span class="toc-num">08</span> Kafka vs RabbitMQ vs Queue vs Pub/Sub</a>
+      <a href="#s9"><span class="toc-num">09</span> API Gateway &amp; Security</a>
+      <a href="#s10"><span class="toc-num">10</span> Circuit Breaker Pattern</a>
+      <a href="#s11"><span class="toc-num">11</span> SAGA Pattern</a>
+      <a href="#s12"><span class="toc-num">12</span> Choreography vs Orchestration</a>
+      <a href="#s13"><span class="toc-num">13</span> System Design — Facebook</a>
+      <a href="#s14"><span class="toc-num">14</span> System Design — Twitter</a>
+      <a href="#s15"><span class="toc-num">15</span> Interview Strategy</a>
+    </div>
+  </div>
+
+
+  <!-- ======================== SECTION 1 ======================== -->
+  <div class="section" id="s1">
+    <div class="section-header">
+      <div class="section-num blue">1</div>
+      <h2 class="section-title">Microservices — What &amp; Why</h2>
+    </div>
+
+    <p>Microservices is an architectural style where a large application is broken into small, independent services. Each service owns one thing completely — its data, its logic, its deployment.</p>
+
+    <h3>Monolith vs Microservices</h3>
+    <div class="flow">Monolith:                          Microservices:
+┌─────────────────────┐            ┌──────────┐  ┌──────────┐
+│  Everything in one  │            │  Orders  │  │ Payments │
+│  codebase           │     vs     └──────────┘  └──────────┘
+│  One deploy         │            ┌──────────┐  ┌──────────┐
+│  One database       │            │Inventory │  │  Users   │
+└─────────────────────┘            └──────────┘  └──────────┘</div>
+
+    <h3>Core Principle</h3>
+    <div class="callout blue"><strong>High Cohesion, Low Coupling</strong>A service owns one thing completely. Other services can change independently without affecting yours. If two services always deploy together — they are probably one service.</div>
+
+    <h3>When NOT to use Microservices</h3>
+    <ul>
+      <li>Small team, small project — operational overhead not justified</li>
+      <li>Domain boundaries not yet clear — start with modular monolith first</li>
+      <li>Simple CRUD application — no need for distributed complexity</li>
+    </ul>
+  </div>
+
+
+  <!-- ======================== SECTION 2 ======================== -->
+  <div class="section" id="s2">
+    <div class="section-header">
+      <div class="section-num blue">2</div>
+      <h2 class="section-title">Service Decomposition Strategies</h2>
+    </div>
+
+    <div class="callout amber"><strong>The Hierarchy — Apply in This Order</strong>DDD Bounded Contexts → Business Capability → Data Ownership → Change Rate → Strangler Fig (legacy only) → Core/Supporting/Generic</div>
+
+    <h3>Strategy 1 — DDD Bounded Contexts</h3>
+    <p>Find where the same word means different things — that is your boundary.</p>
+    <div class="flow">Example: "Product" in Flipkart means different things:
+  Catalogue  → name, description, images, SEO tags
+  Inventory  → SKU, stock count, warehouse location
+  Pricing    → price, discounts, promotions
+  Orders     → snapshot of price at time of purchase
+  Reviews    → something customers rate
+  Search     → a document with relevance scores
+
+Each is a separate bounded context → separate service.</div>
+    <div class="callout green"><strong>Use when:</strong> Complex domain with rich business logic. Same word means different things in different parts of the system.</div>
+
+    <h3>Strategy 2 — Business Capability</h3>
+    <p>One service per thing the business does. Most universally applicable — always the starting point.</p>
+    <table>
+      <tr><th>Business Capability</th><th>Service</th></tr>
+      <tr><td>Browse products</td><td>Catalogue Service</td></tr>
+      <tr><td>Know stock levels</td><td>Inventory Service</td></tr>
+      <tr><td>Set prices</td><td>Pricing Service</td></tr>
+      <tr><td>Place orders</td><td>Order Service</td></tr>
+      <tr><td>Process payments</td><td>Payment Service</td></tr>
+      <tr><td>Ship items</td><td>Fulfilment Service</td></tr>
+    </table>
+
+    <h3>Strategy 3 — Data Ownership (Validation Test)</h3>
+    <p>Each service owns its own database. No other service can touch it directly.</p>
+    <div class="callout red"><strong>If two services share a database table — they are not truly separate services.</strong> The boundary is wrong. Go back and redesign.</div>
+
+    <h3>Strategy 4 — Change Rate / Team Ownership</h3>
+    <p>Things that change together for the same reason belong together. Things that change independently belong apart. Design your system to match your team structure (Conway's Law).</p>
+
+    <h3>Strategy 5 — Core / Supporting / Generic</h3>
+    <table>
+      <tr><th>Type</th><th>What it is</th><th>Action</th></tr>
+      <tr><td><strong>Core</strong></td><td>Your competitive advantage</td><td>Build, invest heavily</td></tr>
+      <tr><td><strong>Supporting</strong></td><td>Necessary but not differentiating</td><td>Build simply</td></tr>
+      <tr><td><strong>Generic</strong></td><td>Commodity (auth, email, payments)</td><td>Buy / use third party</td></tr>
+    </table>
+
+    <h3>Strategy 6 — Strangler Fig (Legacy Only)</h3>
+    <p>For decomposing existing monoliths. Put an API Gateway in front. Extract one service at a time. Monolith shrinks gradually. Never rewrite everything at once.</p>
+
+    <h3>The Distributed Monolith Anti-Pattern</h3>
+    <div class="callout red"><strong>Warning signs:</strong> Services share a database · Services always deploy together · One change requires updates in 5 services · Decomposed by technical layer not business domain</div>
+
+    <h3>Boundary Decision — 5 Questions</h3>
+    <ol>
+      <li>Does it have a distinct business capability?</li>
+      <li>Does it have its own data no one else should own?</li>
+      <li>Does it change independently of adjacent services?</li>
+      <li>Can a single team own it end-to-end?</li>
+      <li>Would splitting require constant cross-service coordination? (If yes → wrong boundary)</li>
+    </ol>
+  </div>
+
+
+  <!-- ======================== SECTION 3 ======================== -->
+  <div class="section" id="s3">
+    <div class="section-header">
+      <div class="section-num green">3</div>
+      <h2 class="section-title">Communication Patterns — Overview</h2>
+    </div>
+
+    <h3>The Three-Question Decision Framework</h3>
+    <div class="flow">Question 1: Does the caller need the result to proceed?
+  YES → Synchronous (REST, gRPC, GraphQL)
+  NO  → Asynchronous (Queue, Pub/Sub, Kafka)
+
+Question 2: If async — does one service handle it or many?
+  ONE service   → Message Queue (point-to-point)
+  MANY services → Pub/Sub (topic/event)
+
+Question 3: Is reliability critical — can we afford to lose this message?
+  YES → Use Outbox Pattern on publisher side
+  NO  → Direct publish is fine</div>
+
+    <h3>Full Pattern Map</h3>
+    <div class="flow">SYNCHRONOUS (caller waits)
+├── REST over HTTP
+├── gRPC
+├── GraphQL
+└── API Gateway (sits in front of all)
+
+ASYNCHRONOUS (caller moves on)
+├── Simple Messaging
+│   ├── Message Queue (Point-to-Point)
+│   └── Pub/Sub (Publish-Subscribe)
+├── Advanced Messaging
+│   ├── Event Streaming (Kafka)
+│   └── Request-Reply over Messaging
+└── Reliability Patterns
+    ├── Outbox Pattern
+    ├── Saga Pattern
+    └── Circuit Breaker</div>
+
+    <h3>Master Decision Table</h3>
+    <table>
+      <tr><th>Scenario</th><th>Pattern</th></tr>
+      <tr><td>UI needs data to render</td><td>REST</td></tr>
+      <tr><td>High-frequency internal calls</td><td>gRPC</td></tr>
+      <tr><td>Mobile + web with different data needs</td><td>GraphQL BFF</td></tr>
+      <tr><td>Send email after order</td><td>Message Queue</td></tr>
+      <tr><td>Multiple services react to one event</td><td>Pub/Sub</td></tr>
+      <tr><td>Replay, audit, analytics, high volume</td><td>Kafka</td></tr>
+      <tr><td>All external client traffic</td><td>API Gateway</td></tr>
+      <tr><td>Downstream service is flaky</td><td>Circuit Breaker</td></tr>
+      <tr><td>Operation spans multiple services</td><td>Saga</td></tr>
+      <tr><td>Critical event cannot be lost</td><td>Outbox Pattern</td></tr>
+    </table>
+  </div>
+
+
+  <!-- ======================== SECTION 4 ======================== -->
+  <div class="section" id="s4">
+    <div class="section-header">
+      <div class="section-num green">4</div>
+      <h2 class="section-title">Synchronous Patterns</h2>
+    </div>
+
+    <h3>REST over HTTP</h3>
+    <p>Service A calls Service B's HTTP endpoint and waits for a response. Most common pattern.</p>
+    <table>
+      <tr><th>Verb</th><th>Meaning</th></tr>
+      <tr><td>GET</td><td>Read data, no side effects</td></tr>
+      <tr><td>POST</td><td>Create new resource</td></tr>
+      <tr><td>PUT</td><td>Replace resource entirely</td></tr>
+      <tr><td>PATCH</td><td>Update part of resource</td></tr>
+      <tr><td>DELETE</td><td>Remove resource</td></tr>
+    </table>
+    <div class="callout green"><strong>Use REST when:</strong> UI needs data immediately · Simple reads/queries · External clients · Response needed before proceeding</div>
+    <div class="callout red"><strong>Don't use when:</strong> Chaining 5+ synchronous calls · Caller doesn't need to wait · Downstream is unreliable</div>
+
+    <div class="divider"></div>
+
+    <h3>gRPC</h3>
+    <p>Binary Protocol Buffers over HTTP/2. Strongly typed contracts via .proto files. Much faster than REST. Supports server streaming, client streaming, and bidirectional streaming.</p>
+    <div class="callout green"><strong>Use gRPC when:</strong> High-frequency internal service calls · Performance critical · Streaming needed · Both sides under your control</div>
+    <div class="callout red"><strong>Don't use when:</strong> External/browser clients · Low-frequency calls</div>
+
+    <div class="divider"></div>
+
+    <h3>GraphQL</h3>
+    <p>Client specifies exactly what fields it needs. One endpoint. Three operations: Query (read), Mutation (write), Subscription (real-time).</p>
+    <div class="callout green"><strong>Use GraphQL when:</strong> Multiple clients with different data needs · Mobile bandwidth matters · BFF aggregation layer</div>
+    <div class="callout red"><strong>Don't use when:</strong> Simple stable APIs · Service-to-service calls</div>
+  </div>
+
+
+  <!-- ======================== SECTION 5 ======================== -->
+  <div class="section" id="s5">
+    <div class="section-header">
+      <div class="section-num amber">5</div>
+      <h2 class="section-title">Asynchronous Patterns</h2>
+    </div>
+
+    <h3>Message Queue (Point-to-Point)</h3>
+    <p>Producer drops a message. Exactly ONE consumer picks it up. Producer moves on immediately. Message deleted after consumer acknowledges (ACK).</p>
+    <div class="flow">Order Service ──▶ [Email Queue] ──▶ Notification Service
+Dead Letter Queue (DLQ): message fails N times → moved to DLQ for investigation</div>
+    <div class="callout green"><strong>Use when:</strong> Fire-and-forget jobs · Emails, PDFs, image processing · Exactly ONE service should handle each message</div>
+
+    <div class="divider"></div>
+
+    <h3>Pub/Sub (Publish-Subscribe)</h3>
+    <p>Producer publishes event to a topic. EVERY subscriber gets their own independent copy. Publisher has no knowledge of who's listening.</p>
+    <div class="flow">Order Service ──▶ [OrderPlaced Topic]
+                       ├──▶ Inventory Service  (own copy)
+                       ├──▶ Fulfilment Service (own copy)
+                       └──▶ Notification       (own copy)</div>
+    <div class="callout green"><strong>Use when:</strong> Multiple services react to one event · Domain events · Add subscribers without touching publisher</div>
+
+    <div class="divider"></div>
+
+    <h3>Outbox Pattern</h3>
+    <p>Guarantees DB write and message publish are atomic. Solves dual-write problem.</p>
+    <div class="flow">WITHOUT Outbox:
+  INSERT INTO orders ✅  →  publish to broker ❌ (broker down) → message LOST
+
+WITH Outbox:
+  BEGIN TRANSACTION
+    INSERT INTO orders ...
+    INSERT INTO outbox (event='OrderPlaced', status='PENDING')
+  COMMIT  ← atomic
+
+Relay Process (runs every second):
+  SELECT from outbox WHERE status='PENDING'
+  → publish to broker (retries until success)
+  → UPDATE status='SENT'</div>
+    <div class="callout green"><strong>Always use when:</strong> Publishing critical events (orders, payments) that cannot be lost</div>
+
+    <div class="divider"></div>
+
+    <h3>Request-Reply over Messaging</h3>
+    <p>Async but still returns a response. Caller sends message with replyTo address + correlationId. Consumer processes and replies. Use when you need a response but operation is slow (seconds).</p>
+  </div>
+
+
+  <!-- ======================== SECTION 6 ======================== -->
+  <div class="section" id="s6">
+    <div class="section-header">
+      <div class="section-num amber">6</div>
+      <h2 class="section-title">Queue vs Pub/Sub — The Key Difference</h2>
+    </div>
+
+    <div class="pattern-grid">
+      <div class="pattern-card">
+        <h4>🍽️ Queue = Restaurant Kitchen</h4>
+        <p>Tickets on a rail. One chef picks each ticket. Cooks it. Ticket gone. Other chefs never see it.</p>
+        <p><strong>One message → One worker → Done</strong></p>
+      </div>
+      <div class="pattern-card">
+        <h4>📰 Pub/Sub = Newspaper</h4>
+        <p>One edition printed. All subscribers get their own copy. One slow reader doesn't affect others.</p>
+        <p><strong>One message → Every subscriber → All independent</strong></p>
+      </div>
+    </div>
+
+    <h3>The One Question That Always Gives the Answer</h3>
+    <div class="callout blue"><strong>"Would it be a problem if TWO services both processed this same message?"</strong>
+YES → Queue. Only one worker should handle it.
+NO, you WANT both to process it → Pub/Sub.</div>
+
+    <h3>Why Not Just Use Multiple Queues Instead of Pub/Sub?</h3>
+    <div class="flow">Multiple Queues — grows painful:
+  Order Service ──▶ [Email Queue]   → must modify Order Service for every new service
+  Order Service ──▶ [Invoice Queue] → tight coupling, Order Service knows everyone
+
+Pub/Sub — stays clean forever:
+  Order Service ──▶ [OrderPlaced Topic]
+                        ├──▶ Notification (existing)
+                        └──▶ Fraud        (NEW — zero changes to Order Service)
+
+Key insight:
+  Multiple Queues → PRODUCER is in charge, manages all connections
+  Pub/Sub         → CONSUMERS are in charge, subscribe themselves</div>
+
+    <h3>Comparison</h3>
+    <table>
+      <tr><th></th><th>Queue</th><th>Pub/Sub</th></tr>
+      <tr><td>Message goes to</td><td>Exactly ONE consumer</td><td>ALL subscribers</td></tr>
+      <tr><td>Message after read</td><td>Deleted</td><td>Deleted after all read</td></tr>
+      <tr><td>Competing consumers</td><td>Yes — share the work</td><td>No — each gets own copy</td></tr>
+      <tr><td>Add new consumer</td><td>Must change producer</td><td>Just add subscription</td></tr>
+      <tr><td>Think of it as</td><td>Task / job</td><td>Event / announcement</td></tr>
+    </table>
+
+    <div class="summary-box">
+      <h4>Bottom Line</h4>
+      Queue = work distribution. One job to one worker.<br>
+      Pub/Sub = event broadcasting. Everyone who cares hears it independently.<br><br>
+      <strong>"Send this email"</strong> = task = Queue &nbsp;|&nbsp; <strong>"Order was placed"</strong> = event = Pub/Sub
+    </div>
+  </div>
+
+
+  <!-- ======================== SECTION 7 ======================== -->
+  <div class="section" id="s7">
+    <div class="section-header">
+      <div class="section-num amber">7</div>
+      <h2 class="section-title">Kafka Deep Dive</h2>
+    </div>
+
+    <h3>Why Kafka Exists</h3>
+    <ul>
+      <li>Messages gone after processing — new service has no historical data</li>
+      <li>One slow consumer blocks others in a shared queue</li>
+      <li>Cannot handle millions of events/second with RabbitMQ</li>
+    </ul>
+
+    <h3>The Mental Model — A Library Archive</h3>
+    <div class="flow">Kafka = library that keeps every book ever written, in order, forever.
+
+The Archive (Kafka Topic):
+  Page 1  Page 2  Page 3  ...  Page 50,000
+
+Reader A: bookmark at page 45,000 (slow)
+Reader B: bookmark at page 49,900 (nearly real-time)
+Reader C: bookmark at page 1     (new, reading from beginning)
+
+C starting from page 1 has ZERO impact on A or B.
+Reading does NOT delete the pages.</div>
+
+    <h3>Core Concepts</h3>
+    <table>
+      <tr><th>Concept</th><th>What it is</th></tr>
+      <tr><td><strong>Topic</strong></td><td>Named log. Append-only. Messages never modified, only added.</td></tr>
+      <tr><td><strong>Partition</strong></td><td>Topic split for parallelism. Same key → same partition → ordering guaranteed.</td></tr>
+      <tr><td><strong>Offset</strong></td><td>Consumer's bookmark/position. Can be rewound to replay history.</td></tr>
+      <tr><td><strong>Consumer Group</strong></td><td>Service instances sharing partitions. Different groups = completely independent.</td></tr>
+      <tr><td><strong>Retention</strong></td><td>How long messages are kept. NOT deleted after reading.</td></tr>
+    </table>
+
+    <h3>How "Done" Works — Offset Commit</h3>
+    <div class="flow">Queue/Pub/Sub: Consumer reads → ACK → broker DELETES → gone forever ❌
+
+Kafka: Consumer reads offset 5 → commits offset 5 (moves bookmark)
+       Message at offset 5 STILL THERE ✅ Only bookmark moved.
+
+Crash recovery:
+  Consumer crashes at offset 4 (not committed)
+  Restarts → asks Kafka "where did I leave off?" → offset 3
+  Re-reads from offset 4 → no message lost ✅
+
+Who owns state?
+  Queue/Pub/Sub: BROKER owns state (deletes on ACK)
+  Kafka:         CONSUMER owns state (manages own offset, can replay)</div>
+
+    <div class="callout green"><strong>Use Kafka when:</strong> Need event replay · Extremely high throughput · Audit trail / compliance · Event sourcing · Multiple consumers at different speeds · New services need historical data</div>
+    <div class="callout red"><strong>Don't use when:</strong> Simple pub/sub needs · Low event volume · Team without Kafka ops experience</div>
+  </div>
+
+
+  <!-- ======================== SECTION 8 ======================== -->
+  <div class="section" id="s8">
+    <div class="section-header">
+      <div class="section-num amber">8</div>
+      <h2 class="section-title">Kafka vs RabbitMQ vs Queue vs Pub/Sub</h2>
+    </div>
+
+    <h3>RabbitMQ — The Smart Post Office</h3>
+    <p>A broker supporting multiple patterns via exchanges. Smart routing — reads message label and decides where to send.</p>
+    <table>
+      <tr><th>Exchange Type</th><th>Behaviour</th></tr>
+      <tr><td>Direct</td><td>Route by exact key → queue behaviour</td></tr>
+      <tr><td>Fanout</td><td>Copy to ALL bound queues → pub/sub behaviour</td></tr>
+      <tr><td>Topic</td><td>Route by pattern (e.g. "order.*.uk") → selective pub/sub</td></tr>
+    </table>
+
+    <div class="pattern-grid">
+      <div class="pattern-card">
+        <h4>RabbitMQ — Smart Broker, Dumb Consumer</h4>
+        <ul>
+          <li>Broker does intelligent routing</li>
+          <li>Push-based (broker pushes to consumers)</li>
+          <li>Message deleted after delivery</li>
+          <li>Rich routing rules, DLQ, priority queues built in</li>
+        </ul>
+      </div>
+      <div class="pattern-card">
+        <h4>Kafka — Dumb Broker, Smart Consumer</h4>
+        <ul>
+          <li>Broker just stores messages in order</li>
+          <li>Pull-based (consumers pull at own pace)</li>
+          <li>Message kept after reading</li>
+          <li>Consumer manages its own offset, can replay</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>Full Comparison</h3>
+    <table>
+      <tr><th></th><th>Queue</th><th>Pub/Sub</th><th>RabbitMQ</th><th>Kafka</th></tr>
+      <tr><td>One consumer per message</td><td>✅</td><td>❌</td><td>✅ queue mode</td><td>✅ within group</td></tr>
+      <tr><td>All consumers get copy</td><td>❌</td><td>✅</td><td>✅ fanout</td><td>✅ across groups</td></tr>
+      <tr><td>Message replay</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td></tr>
+      <tr><td>Deleted after read</td><td>✅</td><td>✅</td><td>✅</td><td>❌</td></tr>
+      <tr><td>High throughput</td><td>❌</td><td>Medium</td><td>Medium</td><td>✅</td></tr>
+      <tr><td>Complex routing</td><td>❌</td><td>❌</td><td>✅</td><td>❌</td></tr>
+      <tr><td>Operational complexity</td><td>Low</td><td>Low</td><td>Medium</td><td>High</td></tr>
+    </table>
+
+    <div class="summary-box">
+      <h4>One Line Each</h4>
+      <strong>Queue</strong> — Task board. One person picks each task. Gone when done.<br>
+      <strong>Pub/Sub</strong> — Group announcement. Everyone hears it right now.<br>
+      <strong>RabbitMQ</strong> — Smart post office. Routes messages by rules.<br>
+      <strong>Kafka</strong> — Library archive. Everything stored. Anyone reads anytime. Reading doesn't delete.
+    </div>
+  </div>
+
+
+  <!-- ======================== SECTION 9 ======================== -->
+  <div class="section" id="s9">
+    <div class="section-header">
+      <div class="section-num purple">9</div>
+      <h2 class="section-title">API Gateway &amp; Bypass Security</h2>
+    </div>
+
+    <h3>What API Gateway Does</h3>
+    <ul>
+      <li><strong>Authentication</strong> — validate JWT once, not in every service</li>
+      <li><strong>Routing</strong> — /orders/* → Order Service, /products/* → Catalogue</li>
+      <li><strong>Rate limiting</strong> — 1000 calls/minute per client</li>
+      <li><strong>SSL termination</strong> — HTTPS at edge, plain HTTP internally</li>
+      <li><strong>Load balancing</strong> — distribute across service instances</li>
+    </ul>
+
+    <h3>Preventing Gateway Bypass — Defence in Depth</h3>
+    <table>
+      <tr><th>Layer</th><th>Mechanism</th><th>What it stops</th></tr>
+      <tr><td>1 (most important)</td><td><strong>Network isolation</strong> — private subnet, no public IP</td><td>All external internet bypass</td></tr>
+      <tr><td>2</td><td><strong>mTLS</strong> — both sides present certificates</td><td>Any caller without valid cert</td></tr>
+      <tr><td>3</td><td><strong>Shared secret header</strong> — X-Internal-Secret</td><td>Simple internal bypass</td></tr>
+      <tr><td>4</td><td><strong>JWT validation</strong> at service level</td><td>Unauthenticated requests</td></tr>
+      <tr><td>5</td><td><strong>Service mesh</strong> (Istio) — policy per service</td><td>Policy-based zero trust</td></tr>
+    </table>
+
+    <div class="callout blue"><strong>Defence in Depth:</strong> Layer them all. Network → mTLS → JWT → Authorisation scope. Attacker must breach all layers simultaneously.</div>
+    <div class="callout green"><strong>Interview answer:</strong> "Network isolation first — private subnet, no public IP. mTLS for internal threats. JWT for application-layer enforcement. Service mesh (Istio) codifies all of this as policy automatically."</div>
+  </div>
+
+
+  <!-- ======================== SECTION 10 ======================== -->
+  <div class="section" id="s10">
+    <div class="section-header">
+      <div class="section-num purple">10</div>
+      <h2 class="section-title">Circuit Breaker Pattern</h2>
+    </div>
+
+    <h3>The Problem — Cascading Failure</h3>
+    <p>Review Service goes slow. 1000 users open product page. All 1000 requests stuck waiting 10 seconds. Product Page runs out of threads. Product Page crashes too. One slow service killed the whole website.</p>
+
+    <h3>Analogy — Home Fuse Box</h3>
+    <p>Too many appliances running → fuse trips → cuts electricity → protects the rest of the house. After some time you reset it.</p>
+
+    <h3>Three States</h3>
+    <div class="flow">CLOSED (normal — requests flowing)
+  → Silently counting failures in background
+  → 5 consecutive failures...
+
+OPEN (tripped — blocking all requests)
+  → Instant fallback returned ("Reviews unavailable")
+  → Review Service gets zero traffic — time to recover
+  → Wait 30 seconds...
+
+HALF-OPEN (testing recovery)
+  → One test request sent through
+  → Fails   → back to OPEN (wait again)
+  → Succeeds → back to CLOSED ✅</div>
+
+    <h3>Friend Analogy</h3>
+    <p>Friend not answering. After 5 unanswered calls → stop calling 2 hours (OPEN). After 2 hours → try once (HALF-OPEN). Answers → resume calling (CLOSED).</p>
+
+    <div class="callout green"><strong>Use when:</strong> Any sync call to a non-critical service · Want graceful degradation · Downstream is unreliable</div>
+    <div class="callout blue"><strong>Tools:</strong> Polly (.NET), Hystrix / Resilience4j (Java)</div>
+  </div>
+
+
+  <!-- ======================== SECTION 11 ======================== -->
+  <div class="section" id="s11">
+    <div class="section-header">
+      <div class="section-num purple">11</div>
+      <h2 class="section-title">SAGA Pattern</h2>
+    </div>
+
+    <h3>The Problem</h3>
+    <p>In microservices, each service has its own database. No single transaction spans them all. You cannot ROLLBACK across three separate systems.</p>
+
+    <h3>What Saga Does</h3>
+    <p>Chain of local transactions. Each step publishes an event. If any step fails, compensating transactions undo previous steps in reverse order.</p>
+
+    <h3>Happy Path vs Failure Path</h3>
+    <div class="flow">HAPPY PATH:
+  Step 1: Order Service    → creates order (PENDING) → publishes OrderCreated
+  Step 2: Inventory Service → reserves stock          → publishes StockReserved
+  Step 3: Payment Service  → charges card             → publishes PaymentProcessed
+  Step 4: Order confirmed ✅
+
+FAILURE — Payment fails at Step 3:
+  Payment publishes "PaymentFailed"
+  ├──▶ Inventory Service → RELEASES reserved stock ↩️
+  └──▶ Order Service     → marks order CANCELLED ↩️
+
+COMPENSATION ALWAYS IN REVERSE ORDER:
+  Forward:  Order(1) → Inventory(2) → Payment(3)
+  Backward: Payment(3) → Inventory(2) → Order(1)
+  Always remove from top first — like unstacking plates.</div>
+
+    <h3>Compensating Transaction</h3>
+    <div class="callout blue">NOT a magical undo. A NEW ACTION that reverses the effect of a previous step.
+Original:     Reserve 2 iPhones in stock
+Compensating: Release 2 iPhones back to stock</div>
+
+    <div class="callout green"><strong>Use when:</strong> Business operation spans multiple services · Each service has its own DB · Eventual consistency is acceptable</div>
+  </div>
+
+
+  <!-- ======================== SECTION 12 ======================== -->
+  <div class="section" id="s12">
+    <div class="section-header">
+      <div class="section-num purple">12</div>
+      <h2 class="section-title">Choreography vs Orchestration</h2>
+    </div>
+
+    <div class="callout red"><strong>Neither is automatic or built-in.</strong> Both require explicitly writing every listener, publisher, failure handler, and compensating transaction.</div>
+
+    <div class="pattern-grid">
+      <div class="pattern-card">
+        <h4>🏃 Choreography — Relay Race</h4>
+        <p>No central coordinator. Services react to events. Logic spread across all services.</p>
+        <ul>
+          <li>Cannot see full flow in one place</li>
+          <li>Hard to track "where is this order now?"</li>
+          <li>Adding a step touches multiple services</li>
+          <li>Becomes event spaghetti at scale</li>
+        </ul>
+      </div>
+      <div class="pattern-card">
+        <h4>🎼 Orchestration — Orchestra Conductor</h4>
+        <p>Central Saga Orchestrator directs every step and handles all failures.</p>
+        <ul>
+          <li>Full flow visible in one place</li>
+          <li>Easy to see current step of any order</li>
+          <li>Adding a step = change one file</li>
+          <li>Easier to debug and support</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>When to Use Which</h3>
+    <table>
+      <tr><th>Choreography</th><th>Orchestration</th></tr>
+      <tr><td>Simple flow, 2-3 steps</td><td>Complex flow, 4+ steps</td></tr>
+      <tr><td>Steps rarely change</td><td>Business rules evolve frequently</td></tr>
+      <tr><td>Teams fully independent</td><td>Need visibility across full flow</td></tr>
+      <tr><td>Startup / early stage</td><td>Scale / mature system</td></tr>
+    </table>
+
+    <div class="callout blue"><strong>Real world:</strong> Most teams start with choreography. As system grows they hit event spaghetti and migrate to orchestration. Netflix, Uber, Amazon all use orchestration for core transactional flows.</div>
+  </div>
+
+
+  <!-- ======================== SECTION 13 ======================== -->
+  <div class="section" id="s13">
+    <div class="section-header">
+      <div class="section-num teal">13</div>
+      <h2 class="section-title">System Design — Facebook</h2>
+    </div>
+
+    <h3>Core Features (8 Things)</h3>
+    <p>Profile · Friends (mutual) · Posts/Photos/Videos · News Feed · Likes &amp; Comments · Notifications · Messages · Search</p>
+
+    <h3>The 6 Core Concepts</h3>
+    <table>
+      <tr><th>Concept</th><th>What it does</th><th>Analogy</th></tr>
+      <tr><td><strong>Load Balancer</strong></td><td>Spreads traffic across many servers</td><td>Supermarket directing customers to shortest queue</td></tr>
+      <tr><td><strong>Sharding</strong></td><td>Splits data across multiple databases</td><td>Library rooms A-H, I-P, Q-Z</td></tr>
+      <tr><td><strong>Cache</strong></td><td>Hot data in memory, skip DB</td><td>Brain remembering capital of France</td></tr>
+      <tr><td><strong>CDN</strong></td><td>Files from nearest server worldwide</td><td>Flipkart warehouse in every city</td></tr>
+      <tr><td><strong>Message Queue</strong></td><td>Async background jobs</td><td>Restaurant ticket rail</td></tr>
+      <tr><td><strong>Pre-computation</strong></td><td>Do hard work in advance, serve instantly</td><td>Pre-building your inbox overnight</td></tr>
+    </table>
+
+    <h3>News Feed — The Hardest Problem</h3>
+    <div class="flow">Naive Pull Model (doesn't scale):
+  User opens app → query 500 friends → 500 DB queries → sort → show
+  At 3B users = billions of queries/second → database dies ❌
+
+Facebook's Push Model (Fan-out on Write):
+  Friend posts → immediately pushed to YOUR feed queue in background
+  You open app → read pre-built feed → milliseconds ✅
+
+Celebrity Problem (Cristiano Ronaldo, 500M followers):
+  Cannot push to 500M feeds in real time
+  HYBRID SOLUTION:
+    Normal users (< 10K followers) → Push model
+    Celebrities (millions)          → Pull model (fetch at read time)
+    Your feed = pre-built (normal friends) + pulled celebrity posts</div>
+
+    <h3>Key Solutions Per Problem</h3>
+    <table>
+      <tr><th>Problem</th><th>Solution</th></tr>
+      <tr><td>One server overloaded</td><td>Load Balancer + multiple servers</td></tr>
+      <tr><td>One DB can't handle 3B users</td><td>Sharding + separate DBs per data type</td></tr>
+      <tr><td>Photos/videos too big for DB</td><td>Blob Storage (S3) + CDN</td></tr>
+      <tr><td>Same post read millions of times</td><td>Cache (Redis)</td></tr>
+      <tr><td>Real-time notifications</td><td>WebSockets — persistent two-way connection</td></tr>
+      <tr><td>Search 3B users</td><td>Elasticsearch — pre-built inverted index</td></tr>
+    </table>
+  </div>
+
+
+  <!-- ======================== SECTION 14 ======================== -->
+  <div class="section" id="s14">
+    <div class="section-header">
+      <div class="section-num teal">14</div>
+      <h2 class="section-title">System Design — Twitter</h2>
+    </div>
+
+    <h3>3 Core Differences from Facebook</h3>
+    <table>
+      <tr><th></th><th>Facebook</th><th>Twitter</th></tr>
+      <tr><td>Connection</td><td>Mutual (friend both ways)</td><td>One-way (follow)</td></tr>
+      <tr><td>Feed order</td><td>Algorithm ranked</td><td>Chronological (newest first)</td></tr>
+      <tr><td>Write volume</td><td>Medium</td><td>500M tweets/day — extreme</td></tr>
+      <tr><td>Public by default</td><td>No</td><td>Yes</td></tr>
+      <tr><td>Trending topics</td><td>No</td><td>Core feature</td></tr>
+      <tr><td>Real-time search</td><td>No</td><td>Critical (tweets searchable in seconds)</td></tr>
+    </table>
+
+    <h3>Hybrid Fan-out (Celebrity Problem Even Worse)</h3>
+    <div class="flow">Normal users (< 10K followers) → fan-out on write → push to followers' cache
+Celebrities (millions)         → fan-out on read  → pull when timeline opened
+Your timeline = cache (normal friends) + pulled celebrity tweets (merged chronologically)</div>
+
+    <h3>Trending Topics — Unique to Twitter</h3>
+    <div class="flow">Every tweet arrives → extract hashtags → increment counter in Redis (cache)
+
+Every 30 seconds: sort hashtags by count → top 10 = Trending
+
+Key: Trending = SPIKE detection, not just total count.
+  #Cricket always mentioned → not trending
+  #Cricket spikes 10K/hr → 500K/hr → something big happened → TRENDING
+
+Tools: Kafka + Apache Flink (stream processing)</div>
+
+    <h3>Why Cassandra (Not SQL) for Tweets</h3>
+    <table>
+      <tr><th>SQL Database</th><th>Cassandra (NoSQL)</th></tr>
+      <tr><td>Hard to scale writes horizontally</td><td>Built for massive write throughput</td></tr>
+      <tr><td>Struggles at 6,000 tweets/second</td><td>Handles millions of writes/second</td></tr>
+      <tr><td>ACID transactions</td><td>Eventual consistency</td></tr>
+    </table>
+
+    <h3>What's New vs Facebook</h3>
+    <div class="flow">SAME: Load Balancer, CDN, Cache (Redis), Sharded DBs,
+      Blob Storage, WebSockets, Search Index, Message Queues
+
+NEW/DIFFERENT:
+  Cassandra for tweet storage (write-heavy)
+  Hybrid fan-out service (worse celebrity problem)
+  Timeline cache per user (chronological not ranked)
+  Stream Processing (Kafka + Flink) for trending
+  Real-time search indexing (seconds not hours)
+  Trending Topics Service (spike detection)</div>
+
+    <div class="summary-box">
+      <h4>The One Sentence Difference</h4>
+      <strong>Facebook</strong> = social network. Connections between people. Sharing life moments with friends.<br>
+      <strong>Twitter</strong> = public broadcast platform. Sharing information with the world in real time.<br><br>
+      Same building blocks. Assembled differently because the problems are different.
+    </div>
+  </div>
+
+
+  <!-- ======================== SECTION 15 ======================== -->
+  <div class="section" id="s15">
+    <div class="section-header">
+      <div class="section-num dark">15</div>
+      <h2 class="section-title">Interview Strategy</h2>
+    </div>
+
+    <h3>System Design — The 5 Gears</h3>
+    <table>
+      <tr><th>Gear</th><th>What to do</th><th>Time</th></tr>
+      <tr><td><strong>1 — Clarify</strong></td><td>What features? How many users? Read or write heavy? Speed vs accuracy?</td><td>2-3 min</td></tr>
+      <tr><td><strong>2 — Simple</strong></td><td>Design for one user. One server, one database. Show foundation first.</td><td>3-4 min</td></tr>
+      <tr><td><strong>3 — Identify breaks</strong></td><td>Name what breaks at scale BEFORE jumping to solutions.</td><td>4-5 min</td></tr>
+      <tr><td><strong>4 — Solve</strong></td><td>Problem → Solution → WHY. Always the why.</td><td>10-12 min</td></tr>
+      <tr><td><strong>5 — Deep dive</strong></td><td>Interviewer picks one area. Apply queues, Kafka, circuit breakers etc.</td><td>remaining</td></tr>
+    </table>
+
+    <h3>The Magic Sentence Structure</h3>
+    <div class="callout blue">"The <strong>problem</strong> here is [X].
+This <strong>matters</strong> because [why it breaks at scale].
+So the <strong>solution</strong> is [Y].
+This <strong>works</strong> because [why Y solves X]."</div>
+
+    <h3>What Interviewers Actually Score</h3>
+    <ul>
+      <li>✅ Did you ask clarifying questions?</li>
+      <li>✅ Did you identify the right problems?</li>
+      <li>✅ Did you explain WHY each solution exists?</li>
+      <li>✅ Did you discuss trade-offs?</li>
+      <li>✅ Did you structure your thinking clearly?</li>
+      <li>✅ Did you handle pushback confidently?</li>
+    </ul>
+
+    <h3>Handling Challenges</h3>
+    <div class="callout green"><strong>When interviewer challenges your design:</strong>
+Don't say: "Oh yes, you are right." (and stop)
+Do say: "Good point. There is a trade-off here. We can [A] which gives [benefit] but costs [downside].
+         Alternatively [B]. For this use case I'd choose A because [reason]."
+Interviewers challenge to see if you can defend decisions — not to catch you out.</div>
+
+    <div class="summary-box">
+      <h4>The Golden Rule</h4>
+      The best system design answer is NOT the one with the most components.<br>
+      It is the one where every component exists for a clear reason you can explain in plain English.<br><br>
+      Start from one user. Scale up. Explain the why. Discuss trade-offs. The interviewer wants to see your thinking — not a memorised architecture.
+    </div>
+  </div>
+
+  <div style="text-align:center; color:#888; font-size:12px; padding: 24px 0;">
+    📍 Saved at D:\Learning\Study Material &nbsp;|&nbsp; Updated after every session &nbsp;|&nbsp; New topics added as discussions grow
+  </div>
+
+</div>
+</body>
+</html>
