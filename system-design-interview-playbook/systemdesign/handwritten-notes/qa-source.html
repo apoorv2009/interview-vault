@@ -1,0 +1,717 @@
+<title>System Design Interview — Q&A Handwritten Notes</title>
+<script>
+  // ?theme=dark|light forces the data-theme attribute for screenshot rendering,
+  // overriding prefers-color-scheme (used to generate both PNG variants).
+  (function(){
+    var m = location.search.match(/[?&]theme=(dark|light)/);
+    if (m) document.documentElement.setAttribute('data-theme', m[1]);
+  })();
+</script>
+<style>
+  :root{
+    --paper:#f6f3ea;
+    --ink:#1e2f4d;
+    --ink-soft:#3c5170;
+    --hi-yellow:rgba(255,224,102,.55);
+    --hi-pink:rgba(255,143,171,.45);
+    --hi-purple:rgba(150,120,210,.35);
+    --accent:#5b3fa0;
+    --accent-2:#2b6cb0;
+    --accent-3:#1f8a5f;
+    --accent-4:#c1484a;
+    --tape:#eadfae;
+    --card:#fffdf6;
+    --shadow:rgba(30,20,10,.16);
+    --ring:#2a2a2a;
+  }
+  :root[data-theme="dark"]{
+    --paper:#1b241d;
+    --ink:#eef0e6;
+    --ink-soft:#c9d3c3;
+    --hi-yellow:rgba(255,224,102,.28);
+    --hi-pink:rgba(255,143,171,.28);
+    --hi-purple:rgba(178,150,230,.28);
+    --accent:#c9b6ff;
+    --accent-2:#8fc7ff;
+    --accent-3:#7fd9ab;
+    --accent-4:#ef8b8b;
+    --tape:#33402f;
+    --card:#212b22;
+    --shadow:rgba(0,0,0,.45);
+    --ring:#0e130f;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --paper:#1b241d;
+      --ink:#eef0e6;
+      --ink-soft:#c9d3c3;
+      --hi-yellow:rgba(255,224,102,.28);
+      --hi-pink:rgba(255,143,171,.28);
+      --hi-purple:rgba(178,150,230,.28);
+      --accent:#c9b6ff;
+      --accent-2:#8fc7ff;
+      --accent-3:#7fd9ab;
+      --accent-4:#ef8b8b;
+      --tape:#33402f;
+      --card:#212b22;
+      --shadow:rgba(0,0,0,.45);
+      --ring:#0e130f;
+    }
+  }
+
+  *{box-sizing:border-box;}
+  body{margin:0;}
+  .book{
+    font-family:"Segoe Print","Bradley Hand","Segoe Script","Comic Sans MS",cursive;
+    color:var(--ink);
+    background:var(--paper);
+    min-height:100%;
+    padding:2.5rem 1.5rem 3.5rem 4.2rem;
+    position:relative;
+    line-height:1.5;
+  }
+  .spiral{
+    position:absolute;
+    left:0; top:0; bottom:0;
+    width:34px;
+    background-image:
+      radial-gradient(circle at 17px center, transparent 6px, var(--ring) 6px, var(--ring) 8px, transparent 8px);
+    background-repeat:repeat-y;
+    background-size:34px 34px;
+    background-position:0 10px;
+  }
+
+  .wrap{max-width:800px;margin:0 auto;position:relative;}
+
+  .masthead{text-align:center;margin-bottom:1.6rem;}
+  .tag{
+    font-family:ui-monospace,"Cascadia Code",Consolas,monospace;
+    font-size:.72rem;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--accent-2);
+    display:inline-block;
+    background:var(--tape);
+    padding:.25rem .6rem;
+    transform:rotate(-1.2deg);
+    box-shadow:0 2px 4px var(--shadow);
+  }
+  .title-row{display:flex;align-items:center;justify-content:center;gap:.9rem;margin:.7rem 0 .3rem;}
+  .doodle{color:var(--accent-3);font-size:1.6rem;line-height:1;}
+  h1{margin:0;font-size:clamp(1.7rem,4.6vw,2.5rem);line-height:1.15;text-wrap:balance;}
+  h1 .l1{display:block;color:var(--accent-3);}
+  h1 .l2{display:block;color:var(--ink);}
+  .stats{
+    font-family:ui-monospace,Consolas,monospace;
+    font-size:.78rem;
+    color:var(--ink-soft);
+    margin-top:.6rem;
+  }
+  .stats b{color:var(--accent-2);}
+
+  .chapter-pill{
+    display:block;
+    text-align:center;
+    margin:2.2rem auto 1.3rem;
+    max-width:620px;
+    border:2px dashed var(--accent);
+    border-radius:999px;
+    padding:.55rem 1.2rem;
+    font-size:1.02rem;
+    color:var(--ink);
+    background:var(--card);
+    box-shadow:2px 3px 6px var(--shadow);
+  }
+  .chapter-pill .range{color:var(--ink-soft);font-size:.85rem;}
+
+  .qa{
+    display:grid;
+    grid-template-columns:1.05fr 1fr;
+    gap:1.4rem;
+    align-items:start;
+    padding:1.1rem 0;
+    border-bottom:1px dashed color-mix(in srgb, var(--ink) 22%, transparent);
+  }
+  .qa:last-child{border-bottom:none;}
+  @media(max-width:640px){
+    .qa{grid-template-columns:1fr;}
+  }
+  .qa h3{
+    margin:0 0 .35rem;
+    font-size:1.2rem;
+    color:var(--accent-2);
+    text-wrap:balance;
+  }
+  .qa h3 .num{color:var(--ink-soft);font-family:ui-monospace,Consolas,monospace;font-size:.85rem;margin-right:.3rem;}
+  .ans{margin:0;color:var(--ink);}
+  .ans .lbl{color:var(--accent-3);font-weight:bold;margin-right:.3rem;}
+  .ans ul{margin:.4rem 0 0;padding-left:1.15rem;}
+  .ans li{margin:.2rem 0;color:var(--ink-soft);font-size:.96rem;}
+  .ans mark{background:var(--hi-yellow);padding:0 .15em;border-radius:2px;color:inherit;}
+  .ans mark.pink{background:var(--hi-pink);}
+  .ans mark.purple{background:var(--hi-purple);}
+
+  .box{
+    border:2px dashed var(--accent-2);
+    border-radius:14px;
+    padding:.8rem .9rem;
+    background:var(--card);
+    box-shadow:2px 3px 6px var(--shadow);
+  }
+  .box.c1{border-color:var(--accent-2);}
+  .box.c2{border-color:var(--accent);}
+  .box.c3{border-color:var(--accent-3);}
+  .box.c4{border-color:var(--accent-4);}
+  .box .box-title{
+    font-family:ui-monospace,Consolas,monospace;
+    font-size:.72rem;
+    letter-spacing:.06em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    margin:0 0 .5rem;
+  }
+  .box svg{width:100%;height:auto;display:block;overflow:visible;}
+  .box .cap{
+    margin:.5rem 0 0;
+    font-size:.74rem;
+    color:var(--ink-soft);
+    font-family:ui-monospace,Consolas,monospace;
+  }
+  .box table{border-collapse:collapse;width:100%;font-size:.86rem;}
+  .box th{
+    font-family:ui-monospace,Consolas,monospace;
+    font-size:.7rem;
+    letter-spacing:.04em;
+    text-transform:uppercase;
+    color:var(--card);
+    background:var(--accent-2);
+    padding:.35rem .5rem;
+    text-align:left;
+  }
+  .box.c2 th{background:var(--accent);}
+  .box.c3 th{background:var(--accent-3);}
+  .box.c4 th{background:var(--accent-4);}
+  .box td{padding:.35rem .5rem;border-bottom:1px dotted color-mix(in srgb, var(--ink) 20%, transparent);color:var(--ink-soft);vertical-align:top;}
+  .box tr:last-child td{border-bottom:none;}
+  .box ol,.box ul{margin:0;padding-left:1.15rem;}
+  .box li{margin:.3rem 0;font-size:.92rem;color:var(--ink-soft);}
+  .box li b{color:var(--ink);}
+  .box .mini-table{width:100%;font-family:ui-monospace,Consolas,monospace;font-size:.76rem;font-variant-numeric:tabular-nums;}
+  .box .mini-table td{padding:.15rem .5rem .15rem 0;}
+  .box .mini-table td:last-child{text-align:right;color:var(--ink);padding-right:0;}
+
+  .dg-ink{stroke:var(--ink);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
+  .dg-inkfill{fill:var(--ink);}
+  .dg-accent{stroke:var(--accent-2);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
+  .dg-accentfill{fill:var(--accent-2);}
+  .dg-accent2{stroke:var(--accent);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;}
+  .dg-accent2fill{fill:var(--accent);}
+  .dg-soft{stroke:var(--ink-soft);fill:none;stroke-width:1.6;}
+  .dg-box{fill:var(--paper);stroke:var(--ink);stroke-width:2;}
+  .dg-hi{fill:var(--hi-yellow);}
+  .dg-hi-pink{fill:var(--hi-pink);}
+  .dg-hi-purple{fill:var(--hi-purple);}
+  .dg-dash{stroke-dasharray:5 5;}
+  .dg-text{font-family:inherit;fill:var(--ink);font-size:15px;}
+  .dg-text-sm{font-family:inherit;fill:var(--ink-soft);font-size:13px;}
+  .dg-mono{font-family:ui-monospace,Consolas,monospace;fill:var(--ink-soft);font-size:10.5px;}
+  .dg-mono-accent{font-family:ui-monospace,Consolas,monospace;fill:var(--accent-2);font-size:11px;}
+
+  footer{
+    margin:2.4rem auto 0;
+    max-width:800px;
+    color:var(--ink-soft);
+    font-size:.78rem;
+    text-align:center;
+    font-family:ui-monospace,Consolas,monospace;
+  }
+</style>
+
+<div class="book">
+  <div class="spiral"></div>
+  <div class="wrap">
+
+    <header class="masthead">
+      <span class="tag">Personal Interview Q&amp;A — Condensed</span>
+      <div class="title-row">
+        <span class="doodle">≫</span>
+        <h1><span class="l1">SYSTEM DESIGN</span><span class="l2">INTERVIEW Q&amp;A</span></h1>
+        <span class="doodle">≪</span>
+      </div>
+      <div class="stats">condensed from <b>system-design-interview-answers.md</b> · 26 questions · 10 chapters</div>
+    </header>
+
+    <div class="chapter-pill">Auth &amp; Caching <span class="range">(3 questions)</span></div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">1.</span>JWT exists but API returns 401 — why, and how do you debug it?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> A valid JWT must pass <mark>4 gates in order</mark> — format, signature, time/issuer claims, permissions. Fail <b>any one</b> = 401. Usual suspects: <mark class="pink">expired token</mark>, wrong signing secret, audience mismatch, or clock skew between client and server.</p>
+        <ul>
+          <li>Debug: decode (no verify) → check exp/iss/aud</li>
+          <li>Debug: test with raw curl, skip the app</li>
+          <li>Debug: read the server's exact error string</li>
+        </ul>
+      </div>
+      <div class="box c1">
+        <p class="box-title">The 4 gates — fail any one → 401</p>
+        <svg viewBox="0 0 520 110" role="img" aria-label="Four gates a JWT must pass: format, signature, claims, permissions">
+          <defs>
+            <marker id="ah-jwt" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="dg-inkfill"/></marker>
+          </defs>
+          <rect x="10" y="30" width="105" height="46" rx="8" class="dg-box"/>
+          <text x="62" y="58" text-anchor="middle" class="dg-text-sm">Format</text>
+          <rect x="140" y="30" width="105" height="46" rx="8" class="dg-box"/>
+          <text x="192" y="58" text-anchor="middle" class="dg-text-sm">Signature</text>
+          <rect x="270" y="30" width="105" height="46" rx="8" class="dg-box"/>
+          <text x="322" y="52" text-anchor="middle" class="dg-text-sm">Claims</text>
+          <text x="322" y="66" text-anchor="middle" class="dg-mono">exp / iss / aud</text>
+          <rect x="400" y="30" width="115" height="46" rx="8" class="dg-box"/>
+          <text x="457" y="58" text-anchor="middle" class="dg-text-sm">Permissions</text>
+          <path d="M115,53 L138,53" class="dg-ink" marker-end="url(#ah-jwt)"/>
+          <path d="M245,53 L268,53" class="dg-ink" marker-end="url(#ah-jwt)"/>
+          <path d="M375,53 L398,53" class="dg-ink" marker-end="url(#ah-jwt)"/>
+          <text x="260" y="100" text-anchor="middle" class="dg-mono-accent">any gate fails → 401 Unauthorized</text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">2.</span>An OTP is valid for 30s and never stored server-side — how does the server verify it?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Phone and server both run the <mark>same HMAC algorithm</mark> on the <mark>same shared secret</mark> + the <mark class="purple">current 30-second time step</mark> — independently landing on the same 6-digit code. Nothing is stored or transmitted ahead of time; it's computed fresh, twice, in parallel.</p>
+      </div>
+      <div class="box c2">
+        <svg viewBox="0 0 480 170" role="img" aria-label="Phone and server both hash the shared secret with the current time step to independently arrive at the same code">
+          <text x="20" y="20" class="dg-text-sm">Phone</text>
+          <rect x="20" y="30" width="180" height="40" rx="8" class="dg-box"/>
+          <text x="110" y="55" text-anchor="middle" class="dg-mono">secret + time÷30</text>
+          <text x="280" y="20" class="dg-text-sm">Server</text>
+          <rect x="280" y="30" width="180" height="40" rx="8" class="dg-box"/>
+          <text x="370" y="55" text-anchor="middle" class="dg-mono">secret + time÷30</text>
+          <path d="M110,70 L110,100 Q110,120 200,130" class="dg-accent2"/>
+          <path d="M370,70 L370,100 Q370,120 280,130" class="dg-accent2"/>
+          <rect x="170" y="130" width="140" height="34" rx="17" class="dg-box"/>
+          <text x="240" y="152" text-anchor="middle" class="dg-text-sm">same 6-digit code ✓</text>
+        </svg>
+        <div class="cap">HMAC(secret, time-step) — computed twice, matched once</div>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">3.</span>Design a cache that never slows down no matter how many items you store.</h3>
+        <p class="ans"><span class="lbl">Ans:</span> <mark>HashMap</mark> + <mark>Doubly Linked List</mark>. HashMap gives O(1) lookup; the list's head/tail give O(1) "most-recent" / "least-recent" tracking. The HashMap stores key → <b>pointer to the node</b>, so both structures stay in sync in O(1) — regardless of cache size.</p>
+      </div>
+      <div class="box c3">
+        <p class="box-title">O(1) every step</p>
+        <table class="mini-table">
+          <tr><td>GET(key)</td><td>map lookup + move to head</td></tr>
+          <tr><td>PUT when full</td><td>evict tail + map delete</td></tr>
+          <tr><td>PUT new</td><td>add head + map insert</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="chapter-pill">Concurrency <span class="range">(2 questions)</span></div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">4.</span>Two threads update the same data simultaneously — how do you prevent a race condition?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> The outcome depends on <mark>timing</mark> — both threads read a stale value, both compute from it, whichever writes last silently overwrites the other ("lost update"). Fix: <b>serialize</b> the read-modify-write, one of three ways.</p>
+      </div>
+      <div class="box c1">
+        <p class="box-title">3 ways to serialize</p>
+        <table>
+          <tr><th>Approach</th><th>How</th><th>Best for</th></tr>
+          <tr><td>Pessimistic lock</td><td>Block others until done</td><td>High contention</td></tr>
+          <tr><td>Optimistic</td><td>Version column, retry on conflict</td><td>Low contention</td></tr>
+          <tr><td>Atomic instr.</td><td>Hardware compare-and-swap</td><td>Simple counters</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">5.</span>Two users hit the same API at the same millisecond, both pass validation, both insert — now you have duplicates. Fix?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Validation runs <i>before</i> the insert, so "check, then act" leaves a gap — both requests see "doesn't exist," both proceed. Stop trusting the app-level check; make <mark class="pink">the database itself</mark> reject the second write.</p>
+      </div>
+      <div class="box c2">
+        <p class="box-title">3 ways to close the gap</p>
+        <ul>
+          <li><b>Unique constraint</b> — DB rejects the 2nd insert outright</li>
+          <li><b>Idempotency key</b> — dedupe by request ID</li>
+          <li><b>Distributed lock</b> — serialize the whole window</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="chapter-pill">DRM, Data Structures &amp; TTL <span class="range">(3 questions)</span></div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">6.</span>You try to screen-record Netflix but only get a black screen. Why?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Netflix never even "sees" the recording attempt — the <mark>OS itself</mark> refuses to capture that window, because Netflix flagged its video surface as <mark class="purple">protected content (HDCP)</mark>. The compositor blacks it out before any recording tool gets a frame.</p>
+      </div>
+      <div class="box c3">
+        <p class="box-title">Who blocks what</p>
+        <table>
+          <tr><th>Layer</th><th>Role</th></tr>
+          <tr><td>App (Netflix)</td><td>Marks its surface HDCP-protected</td></tr>
+          <tr><td>OS compositor</td><td>Excludes that surface from the capture buffer</td></tr>
+          <tr><td>Screen recorder</td><td>Gets a black frame — never sees content</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">7.</span>How is Gmail's username-availability check instant?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Gmail uses a <mark>Bloom Filter</mark> — a tiny bit array in RAM answering "taken?" in &lt;1ms with <b>no false negatives</b>, only occasional false positives. No usernames are actually stored in it.</p>
+      </div>
+      <div class="box c4">
+        <svg viewBox="0 0 380 140" role="img" aria-label="A bit array where a checked username hits an all-1 pattern (maybe taken) or a 0 bit (definitely free)">
+          <g class="dg-text-sm">
+            <rect x="20" y="20" width="34" height="34" rx="4" class="dg-hi"/>
+            <rect x="60" y="20" width="34" height="34" rx="4" class="dg-box"/>
+            <rect x="100" y="20" width="34" height="34" rx="4" class="dg-hi-pink"/>
+            <rect x="140" y="20" width="34" height="34" rx="4" class="dg-box"/>
+            <rect x="180" y="20" width="34" height="34" rx="4" class="dg-hi"/>
+            <rect x="220" y="20" width="34" height="34" rx="4" class="dg-box"/>
+            <rect x="260" y="20" width="34" height="34" rx="4" class="dg-hi-pink"/>
+          </g>
+          <text x="37" y="72" text-anchor="middle" class="dg-mono">1</text>
+          <text x="77" y="72" text-anchor="middle" class="dg-mono">0</text>
+          <text x="117" y="72" text-anchor="middle" class="dg-mono">1</text>
+          <text x="157" y="72" text-anchor="middle" class="dg-mono">0</text>
+          <text x="197" y="72" text-anchor="middle" class="dg-mono">1</text>
+          <text x="237" y="72" text-anchor="middle" class="dg-mono">0</text>
+          <text x="277" y="72" text-anchor="middle" class="dg-mono">1</text>
+          <text x="77" y="105" text-anchor="middle" class="dg-text-sm">bit 1 = 0</text>
+          <text x="77" y="122" text-anchor="middle" class="dg-text-sm">→ definitely free ✓</text>
+          <text x="237" y="105" text-anchor="middle" class="dg-mono-accent">bits 0,2,4,6 all 1</text>
+          <text x="237" y="122" text-anchor="middle" class="dg-mono-accent">→ probably taken (check DB)</text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">8.</span>Instagram Stories expire after exactly 24 hours. What mechanism tracks and enforces that?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> No per-story timer runs anywhere. Every story stores an <mark>expires_at</mark> timestamp once, at creation. The server just <mark class="pink">filters it out</mark> of any query once that time has passed.</p>
+      </div>
+      <div class="box c1">
+        <p class="box-title">No timers, just a filter</p>
+        <ul>
+          <li><code>expires_at = created_at + 24h</code> — stored once</li>
+          <li>Every fetch: <code>WHERE expires_at &gt; now()</code></li>
+          <li>Background sweep / TTL index only for storage reclaim, not enforcement</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="chapter-pill">E-Commerce &amp; Git Workflow <span class="range">(2 questions)</span></div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">9.</span>Products show 'In Stock' but are unavailable at checkout. How do you debug and fix this?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> A classic <mark>eventual consistency</mark> bug — the listing page reads stale state (cache/replica/CQRS lag) while checkout enforces real-time truth. Also check for a <mark class="pink">non-atomic read-modify-write</mark> at checkout itself — that alone oversells even with fresh reads.</p>
+      </div>
+      <div class="box c2">
+        <p class="box-title">Root causes, by likelihood</p>
+        <table>
+          <tr><th>Cause</th><th>Likelihood</th></tr>
+          <tr><td>Stale cache / CDN TTL</td><td>High</td></tr>
+          <tr><td>Race at checkout (no lock)</td><td>High</td></tr>
+          <tr><td>Read replica lag</td><td>Medium</td></tr>
+          <tr><td>CQRS read-model delay</td><td>Medium</td></tr>
+          <tr><td>WMS batch-sync delay</td><td>Medium</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">10.</span>Your branch is 200 commits behind main. Merge or rebase?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Depends on <mark>one question</mark> — is the branch shared with others, or yours alone? <b>Never rebase a shared branch.</b></p>
+      </div>
+      <div class="box c3">
+        <table>
+          <tr><th>Branch is...</th><th>Use</th></tr>
+          <tr><td>Yours alone</td><td>Rebase — clean linear history</td></tr>
+          <tr><td>Shared with others</td><td>Merge — never rewrite shared history</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="chapter-pill">Incident Response &amp; Security <span class="range">(3 questions)</span></div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">11.</span>CTO calls at 3 AM — your S3 bucket got encrypted, ransom note in metadata. First 15 minutes?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> <mark class="pink">Do NOT start recovering data yet</mark> — the attacker may still have access, and restoring now just means they re-encrypt it again. First: stop the bleeding, lock them out, preserve evidence. Recovery comes after.</p>
+      </div>
+      <div class="box c4">
+        <p class="box-title">First 15 minutes</p>
+        <ol>
+          <li>Revoke / rotate the compromised credentials</li>
+          <li>Block bucket writes (deny-all policy)</li>
+          <li>Preserve evidence — CloudTrail logs, snapshot</li>
+          <li><b>Then</b>, only then: begin recovery</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">12.</span>SSL cert expired Sunday morning, site is down. Next 10 minutes?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Don't panic — <mark>verify</mark> the problem, tell your team, <b>then</b> fix it. Jumping straight to a fix without understanding the scope can make things worse.</p>
+      </div>
+      <div class="box c1">
+        <p class="box-title">Next 10 minutes</p>
+        <ol>
+          <li>Confirm it's really the cert (not DNS/other)</li>
+          <li>Notify team / status page</li>
+          <li>Reissue + deploy new cert</li>
+          <li>Postmortem: automate renewal (ACME/cert-manager)</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">13.</span>What measures protect APIs from unauthorized access in a microservices architecture?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Don't open with "use OAuth2" — start from a <mark>threat model</mark>. In microservices, <mark class="pink">East-West</mark> traffic (service-to-service) is the blind spot — often implicitly trusted. Defense in depth beats any single control.</p>
+      </div>
+      <div class="box c2">
+        <table>
+          <tr><th>Traffic</th><th>Risk</th><th>Defense</th></tr>
+          <tr><td>North-South</td><td>Classic boundary</td><td>OAuth2/JWT at gateway</td></tr>
+          <tr><td>East-West</td><td>Often trusted by default</td><td>mTLS + per-service JWT</td></tr>
+          <tr><td>Compromised service</td><td>Lateral movement</td><td>Least-privilege scopes</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="chapter-pill">Microservices &amp; Architecture <span class="range">(3 questions)</span></div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">14.</span>A user places an insurance order — can I call multiple downstream services directly now?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> <mark class="pink">No</mark> — not from the originating service. Calling Underwriting, Payment, and Notification synchronously from one request thread creates a <mark>distributed monolith</mark> disguised as microservices.</p>
+      </div>
+      <div class="box c3">
+        <p class="box-title">Why direct fan-out bites</p>
+        <ul>
+          <li><b>Cascading failure</b> — one slow service blocks the whole caller thread pool</li>
+          <li><b>No atomicity</b> — partial failure, no rollback across calls</li>
+          <li><b>Tight coupling</b> — every downstream change forces a redeploy</li>
+        </ul>
+        <p class="cap">Fix: async fan-out via events/saga — not sync calls from the origin</p>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">15.</span>What microservice architecture do companies actually use in real projects?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Textbooks show clean boxes with arrows; production is messier — a <mark>hybrid</mark> of decomposed services, shared libraries, and platform teams. <mark class="purple">gRPC internally, REST only at the boundary.</mark></p>
+      </div>
+      <div class="box c4">
+        <table>
+          <tr><th>Textbook fiction</th><th>Production reality</th></tr>
+          <tr><td>Every service independently deployable</td><td>Shared DB schemas, monorepo coupling</td></tr>
+          <tr><td>Clean REST everywhere</td><td>gRPC internally; REST only at the edge</td></tr>
+          <tr><td>Service mesh from day one</td><td>Rolled out incrementally; many bypass it</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">16.</span>Principal Engineer / Solution Architect — Enterprise Architecture Interview Bank</h3>
+        <p class="ans"><span class="lbl">Note:</span> Not one question — a <mark>consolidated bank</mark> spanning 15 categories, structured as a themed conversation rather than isolated questions (why it's asked, what a great answer covers, common mistakes, follow-ups — per category).</p>
+      </div>
+      <div class="box c1">
+        <p class="box-title">15 categories</p>
+        <ul>
+          <li>Microservices Design · Architecture Decisions</li>
+          <li>Scalability · Reliability · Distributed Systems</li>
+          <li>Messaging · Database Design</li>
+          <li>Cloud Architecture (Azure) · Security</li>
+          <li>Performance · High Availability</li>
+          <li>Monitoring &amp; Observability</li>
+          <li>AI System Design · Migration Scenarios</li>
+          <li>Scenario-Based Leadership Questions</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="chapter-pill">Payments &amp; Pricing <span class="range">(2 questions)</span></div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">17.</span>A passenger swipes a card offline, bank unreachable. Approve without a balance check, and prevent fraud?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> You can't verify the balance, so don't try — approve against a <mark>pre-computed risk budget</mark> stored locally, sign the transaction cryptographically, and <mark class="pink">reconcile</mark> against the real ledger the moment connectivity returns. Same idea as EMV chip offline counters.</p>
+      </div>
+      <div class="box c2">
+        <p class="box-title">Approve → cap risk → reconcile</p>
+        <ul>
+          <li>Terminal enforces an offline floor limit + cumulative exposure cap per card</li>
+          <li>Signed transaction record — non-repudiable proof it happened</li>
+          <li>Real balance/fraud check happens at reconnect — issuer/airline eats loss beyond the floor limit</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">18.</span>A user thinks airline prices rise because they searched again. What actually changed?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> The price didn't change <i>because</i> they searched — that's <mark>correlation mistaken for causation</mark>. Prices are recomputed fresh on every request by a pricing engine reacting to inventory, time, and demand that move independently of any one searcher.</p>
+      </div>
+      <div class="box c3">
+        <p class="box-title">What actually moves the price</p>
+        <ul>
+          <li>Cache TTL expiry — recomputed periodically anyway</li>
+          <li>Seat-class inventory shifts</li>
+          <li>Real competitor / demand-based repricing</li>
+          <li>(Rarely, legitimately) personalization — not "tracking your search"</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="chapter-pill">RAG <span class="range">(3 questions)</span></div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">19.</span>5000 PDFs — text, tables, charts, scanned images. Build a RAG chatbot that answers accurately.</h3>
+        <p class="ans"><span class="lbl">Ans:</span> "Chunk and embed" fails immediately — scanned pages have no text layer, naive splitting destroys tables, charts are invisible to text parsers. You need a pipeline that <mark>routes each content type separately</mark>.</p>
+      </div>
+      <div class="box c4">
+        <ol>
+          <li>Classify: text layer vs scanned page</li>
+          <li>OCR scanned pages (Tesseract / Textract)</li>
+          <li>Extract tables as atomic chunks — never split</li>
+          <li>Describe charts via a vision model</li>
+          <li>Smart / hierarchical chunking by section</li>
+          <li>Embed + store in vector DB</li>
+          <li>Hybrid retrieval: semantic + BM25 keyword</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">20.</span>RAG retrieves top-5, but the answer is in chunk #12. Raising top-K to 20 blows the context window. Fix?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> One-stage retrieval is doing two conflicting jobs — cast a <mark>wide net</mark> to find #12, and be <mark class="pink">precise</mark> enough to rank it top-5. Split into two stages instead.</p>
+      </div>
+      <div class="box c1">
+        <table>
+          <tr><th>Stage</th><th>Job</th><th>Cost</th></tr>
+          <tr><td>Retrieve broad</td><td>top-50/100, wide net</td><td>Low</td></tr>
+          <tr><td>Re-rank</td><td>cross-encoder, narrow to top-5</td><td>Higher, small set</td></tr>
+        </table>
+        <p class="cap">Recall from stage 1, precision from stage 2</p>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">21.</span>Your RAG data changes every hour. How do you version it without breaking the system?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Treat RAG like static data and you're one update from an outage. <mark>Three</mark> separate things need versioning, each with its own rule.</p>
+      </div>
+      <div class="box c2">
+        <table>
+          <tr><th>Layer</th><th>Rule</th></tr>
+          <tr><td>Documents</td><td>Versioned source of truth per doc</td></tr>
+          <tr><td>Embeddings</td><td>Re-embed on model change</td></tr>
+          <tr><td>Index</td><td>Atomic swap — never mutate in place</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="chapter-pill">Reliability &amp; Scaling <span class="range">(2 questions)</span></div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">22.</span>Your API is fine at 1,000 users but crashes at 100,000. What do you check first?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> "Crashes at scale" is a symptom, not a diagnosis — eliminate layers systematically, starting with whatever <mark>doesn't scale linearly</mark> with users.</p>
+      </div>
+      <div class="box c3">
+        <p class="box-title">Check first, in order</p>
+        <ol>
+          <li>DB connection pool exhaustion — most common</li>
+          <li>N+1 queries, invisible at low volume</li>
+          <li>Single-threaded bottleneck</li>
+          <li>Memory leak under sustained load</li>
+        </ol>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">23.</span>How do 3 billion Instagram users keep scrolling forever without melting the servers?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Instagram never fetches "the feed" — it fetches a small page at a time via a <mark>cursor</mark> that remembers exactly where you left off, paired with a ranking service that decides <mark class="pink">what's next</mark>, not just pagination that decides position.</p>
+      </div>
+      <div class="box c4">
+        <ul>
+          <li>Fetch 10–20 posts at a time, not 1,000</li>
+          <li>Cursor encodes exact position — offset breaks under concurrent inserts</li>
+          <li>Ranking service pre-computes (or computes just-in-time) ordering</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="chapter-pill">Streaming, Vector DB &amp; Video <span class="range">(3 questions)</span></div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">24.</span>How does Netflix switch subtitles instantly mid-movie without reloading?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Subtitles are <mark>not part of the video</mark> — they're tiny separate text files fetched independently. Switching language just swaps which file is being read; the video stream never stops.</p>
+      </div>
+      <div class="box c1">
+        <svg viewBox="0 0 480 110" role="img" aria-label="Video stream keeps playing while the subtitle file being read is swapped independently">
+          <rect x="20" y="15" width="440" height="34" rx="8" class="dg-box"/>
+          <text x="240" y="37" text-anchor="middle" class="dg-text-sm">Video stream — never stops</text>
+          <rect x="20" y="65" width="200" height="34" rx="8" class="dg-hi"/>
+          <text x="120" y="87" text-anchor="middle" class="dg-text-sm">subtitle file: English</text>
+          <text x="240" y="87" text-anchor="middle" class="dg-mono-accent">↔ swap</text>
+          <rect x="260" y="65" width="200" height="34" rx="8" class="dg-hi-pink"/>
+          <text x="360" y="87" text-anchor="middle" class="dg-text-sm">subtitle file: Hindi</text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">25.</span>Our vector database costs are increasing rapidly. How do you optimize and reduce them?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> Vector DB cost is overwhelmingly a <mark>memory</mark> cost, not storage — indexes want to sit fully in RAM for low-latency search, and teams keep every vector "hot" at full float32 precision. Layered fix.</p>
+      </div>
+      <div class="box c2">
+        <ul>
+          <li><b>Quantize</b> — shrink each vector (float32 → int8/binary)</li>
+          <li><b>Tier</b> — move cold vectors to disk / object storage</li>
+          <li><b>Dedup</b> — delete stale vectors, reduce dimensions</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="qa">
+      <div>
+        <h3><span class="num">26.</span>YouTube has the same video in 1080p and 144p. Does the server store separate files for each quality?</h3>
+        <p class="ans"><span class="lbl">Ans:</span> <mark>Yes</mark> — separate encoded versions per quality, pre-transcoded at upload time. But not as whole files: each quality is split into small ~2-second chunks (adaptive bitrate), and audio is stored <mark class="pink">once</mark>, shared across every video quality.</p>
+      </div>
+      <div class="box c3">
+        <ul>
+          <li>Every quality pre-transcoded once at upload, not on demand</li>
+          <li>Split into ~2s chunks — client switches quality between chunks</li>
+          <li>Audio stored once per language, shared across all video qualities</li>
+        </ul>
+      </div>
+    </div>
+
+    <footer>
+      compiled by hand · condensed from system-design-interview-answers.md · 26 questions, 10 chapters
+    </footer>
+
+  </div>
+</div>
