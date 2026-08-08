@@ -3706,43 +3706,42 @@ Start with #1 (pre-trained LLMs), move to #2 (RAG) if needed. Don't jump to #3 o
 
 ## Updated Table of Contents
 
-```
-1. Context window (Q1)
-2. LLM selection (Q2)
-3. Prompting techniques (Q3)
-4. AI agents (Q4)
-5. RAG (Q5-Q6)
-6. SQL validation (Q7)
-7. Infinite loops (Q8)
-8. ChromaDB choice (Q9)
-9. Tracing (Q10)
-10. Frameworks (Q11-Q12)
-11. Multi-agent coordination (Q13)
-12. Agent operations (Q14)
-13. AI system exposure (Q15)
-14. Memory types (Q16)
-15. Chunk strategy (Q17)
-16. Agent accuracy measurement (Q18)
-17. Route agents (Q19)
-18. Temperature parameter (Q20)
-19. LLM fundamentals (Q21) — NEW
-20. Function calling (Q22) — NEW
-21. Embeddings (Q23) — NEW
-22. Reducing hallucinations (Q24) — NEW
-23. Semantic search (Q25) — NEW
-24. AutoGPT (Q26) — NEW
-25. Enterprise integration (Q27) — NEW
-26. AI orchestration (Q28) — NEW
-27. Responsible AI (Q29) — NEW
-28. AI governance (Q30) — NEW
-29. Model evaluation (Q31) — NEW
-30. AI security (Q32) — NEW
-31. Monitoring AI (Q33) — NEW
-32. AI deployment (Q34) — NEW
-33. Performance optimization (Q35) — NEW
-34. Production incidents (Q36) — NEW
-35. Workflow automation (Q37) — NEW
-36. Implementation challenges (Q38) — NEW
-```
+1. [Context window](#q1-what-is-a-context-window-in-an-llm-and-what-happens-when-you-exhaust-it) (Q1)
+2. [LLM selection](#q2-how-do-you-choose-which-llm-to-use-for-a-given-task) (Q2)
+3. [Prompting techniques](#q3-what-prompting-techniques-do-you-use-to-write-efficient-prompts) (Q3)
+4. [AI agents](#q4-what-is-an-ai-agent-what-is-agentic-mode) (Q4)
+5. RAG ([Q5](#q5-what-is-rag-retrieval-augmented-generation-how-does-it-work)–[Q6](#q6-how-do-you-make-rag-context-aware-across-conversation-turns))
+6. [SQL validation](#q7-how-do-you-validate-whether-the-generated-sql-query-is-correct) (Q7)
+7. [Infinite loops](#q8-how-do-you-handle-infinite-loops-in-an-ai-agent) (Q8)
+8. [ChromaDB choice](#q9-why-did-you-choose-chromadb-instead-of-postgresql-or-mongodb) (Q9)
+9. [Tracing](#q10-how-do-you-implement-tracing-in-your-ai-application) (Q10)
+10. Frameworks ([Q11](#q11-have-you-used-opentelemetry-langsmith-langchain-or-langgraph)–[Q12](#q12-what-frameworks-are-available-today-to-build-agentic-ai-applications))
+11. [Multi-agent coordination](#q13-how-do-multiple-ai-agents-coordinate-with-each-other) (Q13)
+12. [Agent operations](#q14-what-are-the-operations-of-an-ai-agent) (Q14)
+13. [AI system exposure](#q15-how-would-you-expose-your-ai-system-to-another-ai-agent) (Q15)
+14. [Memory types](#q16-what-type-of-memory-did-your-ai-agent-use-and-disadvantages-of-storing-context-in-memory) (Q16)
+15. [Chunk strategy](#q17-what-chunk-strategy-do-you-use-for-rag) (Q17)
+16. [Agent accuracy measurement](#q18-how-do-you-measure-agent-accuracy-results) (Q18)
+17. [Route agents](#q19-what-is-a-route-agent-pattern) (Q19)
+18. [Temperature parameter](#q20-what-is-temperature-in-llm-and-how-does-it-affect-output) (Q20)
+19. [LLM fundamentals](#q21-explain-large-language-models-llms-fundamentals--how-do-they-work) (Q21) — NEW
+20. [Function calling](#q22-what-is-function-calling-why-is-it-critical-for-ai-agents) (Q22) — NEW
+21. [Embeddings](#q23-explain-embeddings-why-do-they-matter-for-rag) (Q23) — NEW
+22. [Reducing hallucinations](#q24-how-do-you-reduce-hallucinations-in-llms-whats-the-difference-between-hallucination-and-error) (Q24) — NEW
+23. [Semantic search](#q25-what-is-semantic-search-how-does-it-differ-from-keyword-search) (Q25) — NEW
+24. [AutoGPT](#q26-explain-autogpt-what-problem-does-it-solve) (Q26) — NEW
+25. [Enterprise integration](#q27-how-do-you-integrate-ai-with-enterprise-applications-real-considerations) (Q27) — NEW
+26. [AI orchestration](#q28-explain-ai-orchestration-how-do-you-coordinate-multiple-systems) (Q28) — NEW
+27. [Responsible AI](#q29-what-is-responsible-ai-how-do-you-implement-it) (Q29) — NEW
+28. [AI governance](#q30-explain-ai-governance-what-policies-do-you-implement) (Q30) — NEW
+29. [Model evaluation](#q31-what-is-model-evaluation-how-do-you-measure-if-an-ai-model-is-good) (Q31) — NEW
+30. [AI security](#q32-explain-ai-security-what-are-the-risks) (Q32) — NEW
+31. [Monitoring AI](#q33-how-do-you-monitor-ai-applications-what-metrics-matter) (Q33) — NEW
+32. [AI deployment](#q34-explain-ai-deployment-how-do-you-take-a-model-to-production) (Q34) — NEW
+33. [Performance optimization](#q35-how-do-you-optimize-ai-performance-speed-and-cost) (Q35) — NEW
+34. [Production incidents](#q36-how-do-you-handle-production-issues-in-ai-systems-real-incident-response) (Q36) — NEW
+35. [Workflow automation](#q37-explain-workflow-automation-how-do-you-automate-repetitive-tasks-with-ai) (Q37) — NEW
+36. [Implementation challenges](#q38-what-are-common-ai-implementation-challenges-how-do-you-solve-them) (Q38) — NEW
+
 ---
 
