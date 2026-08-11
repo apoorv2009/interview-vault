@@ -8,6 +8,7 @@ A condensed, cross-referenced study guide covering all 8 domains of the Claude /
 
 ## Table of contents
 
+0. [⚠️ Personal weak-spot review](#️-personal-weak-spot-review)
 1. [Agents & Workflows](#1-agents--workflows)
 2. [Applications & Integration](#2-applications--integration)
 3. [Claude Code](#3-claude-code)
@@ -17,6 +18,66 @@ A condensed, cross-referenced study guide covering all 8 domains of the Claude /
 7. [Security & Safety](#7-security--safety)
 8. [Tools & MCP](#8-tools--mcp)
 9. [How the eight domains connect](#how-the-eight-domains-connect)
+
+---
+
+## ⚠️ Personal weak-spot review
+
+From a hard-difficulty practice attempt: **42/53 (79%)** overall, but concentrated misses in **D3 (50%)**, **D5 (67%)**, and **D8 (67%)** — all below the 75% target. D6 and D7 were clean (100%). The 11 points below are the exact traps hit; review these until they're automatic.
+
+| Domain | Score |
+|---|---|
+| D6 · Prompt & Context Engineering | 6/6 · 100% |
+| D7 · Security & Safety | 4/4 · 100% |
+| D2 · Applications & Integration | 14/17 · 82% |
+| D1 · Agents & Workflows | 7/9 · 78% |
+| D5 · Model Selection & Optimization | 6/9 · 67% |
+| D8 · Tools & MCP | 4/6 · 67% |
+| D3 · Claude Code | 1/2 · 50% |
+
+#### 1. Thinking-mode configuration is model-specific (D5)
+- Opus 4.8 and Sonnet 5 support **only `thinking.type: "adaptive"`**, with no `budget_tokens` field — the model sizes its own reasoning per request.
+- Sending `thinking.type: "enabled"` with `budget_tokens` on these models returns a **400 error**.
+- The legacy `budget_tokens` pattern still applies to **older models** (Sonnet 4.5, Opus 4.5) — one config does not work across the whole model line.
+- 🎯 **Exam trap:** this exact scenario (migrating legacy `budget_tokens` code to a newer model) showed up twice in one practice set — treat it as a near-certain exam topic.
+
+#### 2. `effort` is a nested field, not a top-level one (D2 / D5)
+- Reasoning effort is configured at **`output_config.effort`**, not the request root.
+- Valid values: `max`, `xhigh`, `high`, `medium`, `low` — default is **`high`**.
+- A top-level `effort` field is silently ignored, not an error — easy to miss in review.
+
+#### 3. Bedrock integration specifics (D2 / D5)
+- **Current recommended path:** the `bedrock-mantle` endpoint, reached via the `AnthropicBedrockMantle` client, using **bare `anthropic.`-prefixed model IDs** — this mirrors the first-party API's request/response shape.
+- **Legacy path** (still functional, but not the answer for a *new* build): `InvokeModel` with **region-scoped inference-profile IDs** (`us.anthropic....`).
+- **Vision on Bedrock/Vertex:** URL-based image input and the Files API are **not supported** on either — images must be sent **inline as base64**. A design that assumes URLs work everywhere breaks the moment it targets Bedrock or Vertex.
+
+#### 4. MCP stdio transport is literally stdin/stdout (D8)
+- When an MCP client spawns a server locally, the two processes exchange protocol messages over the **child process's standard input and standard output streams** — not a TCP socket, not a shared file, not an authenticated HTTPS channel.
+- A locally-run server over stdio is a **complete, valid deployment** for single-machine/single-developer use — it does not need a hosted public endpoint to "count" as done.
+
+#### 5. Reach for the built-in before building custom (D8)
+- Anthropic ships built-in server tools (e.g. web retrieval) that cost nothing to wire up — no schema to write, no server to host, no Skill to author.
+- When a built-in already covers the need, building a custom tool, a Skill, or standing up an MCP server for the same capability is **pure duplicated effort**. Check the built-in list first.
+
+#### 6. Hooks live in settings.json, not CLAUDE.md (D2)
+- **CLAUDE.md** = behavioral instructions (advisory, what Claude should *know*).
+- **settings.json** = hooks and permissions (enforced, what Claude *can do*).
+- A `PreToolUse` hook meant to run for the whole team belongs in the **project-root `settings.json`**, committed to version control — putting it in CLAUDE.md means it never actually fires as a hook.
+
+#### 7. Commands vs. Skills — different trigger mechanics (D3)
+- A **custom slash command** is a plain Markdown file; its **filename alone** becomes the keyword. No frontmatter is required for it to work.
+- A **Skill** requires **valid YAML frontmatter** (with a `description` Claude matches against) to trigger — that requirement belongs to Skills, not commands.
+- Mixing these up leads to over-engineering a command with frontmatter it doesn't need, or under-specifying a Skill that then never fires.
+
+#### 8. Subagents: the point is context isolation, not parallelism (D1)
+- The headline benefit of delegating to a subagent is **keeping a subtask's intermediate tokens out of the parent's context window** — its reasoning, tool calls, and raw output stay in its own disposable window; only the final summary returns.
+- Parallel speed is a nice side effect (and something Claude decides, not something you schedule) — it is **not** the primary architectural reason to use subagents.
+- Subagents do **not** share memory with the parent implicitly, and they don't inherently reduce cost or guarantee determinism.
+
+#### 9. Self-hosted ≠ "the whole loop runs on our servers" (D1)
+- In a **self-hosted managed deployment**, the **agent loop and orchestration stay on Anthropic** — only **tool execution** moves to the customer's infrastructure.
+- This is the shape for "keep sensitive tool calls in our network, but don't make us build and run our own harness."
+- Contrast: **Anthropic-hosted** = everything (loop + tools) runs in an Anthropic-managed sandbox, zero customer infrastructure. A **custom harness** = the team runs and maintains the whole loop themselves — reach for this only when Anthropic's managed options genuinely don't fit.
 
 ---
 
