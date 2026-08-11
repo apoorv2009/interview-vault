@@ -1,0 +1,525 @@
+# Claude Certification — Exam Study Guide
+
+A condensed, cross-referenced study guide covering all 8 domains of the Claude / Anthropic certification (Associate, Developer, Architect tracks share the same blueprint). Compiled from the official course decks; every place the source material explicitly flagged something as an exam signal is called out inline as **🎯 Exam rule**.
+
+**Exam format:** 60 scenario-based multiple-choice questions (practice sets typically ship ~53 proportionally weighted), 120 minutes, ~135 minutes total seat time with check-in and survey, passing score 720/1000 (~75%).
+
+---
+
+## Table of contents
+
+1. [Agents & Workflows](#1-agents--workflows)
+2. [Applications & Integration](#2-applications--integration)
+3. [Claude Code](#3-claude-code)
+4. [Eval, Testing & Debugging](#4-eval-testing--debugging)
+5. [Model Selection & Optimization](#5-model-selection--optimization)
+6. [Prompt & Context Engineering](#6-prompt--context-engineering)
+7. [Security & Safety](#7-security--safety)
+8. [Tools & MCP](#8-tools--mcp)
+9. [How the eight domains connect](#how-the-eight-domains-connect)
+
+---
+
+## 1. Agents & Workflows
+
+The foundational domain — its vocabulary (loop, context, subagent, hook) is reused by every other domain.
+
+### Workflow or Agent?
+
+**Workflow** — you write the steps, Claude fills in the language inside them.
+**Agent** — you give the goal and tools; Claude decides the next step at runtime.
+
+> **🎯 Exam rule:** The only distinguishing question is **who decides the next step** — not "which is smarter," not "which uses tools" (both can). If you can draw the flowchart in advance, it's a workflow.
+
+Four workflow patterns:
+- **Chaining** — output of one step feeds the next.
+- **Routing** — classify first, then send to the right handler.
+- **Parallel** — run independent steps at once, then combine.
+- **Orchestrator** — one step plans the work and gathers results from workers.
+
+| | Workflow | Agent |
+|---|---|---|
+| Steps decided by | You, upfront | Claude, at runtime |
+| Predictable | Yes | No |
+| Cost | Known | Varies |
+| Debugging | Easy | Harder |
+| Best for | Repeated, known tasks | Open-ended tasks |
+
+> **🎯 Exam rule:** When both approaches could work, **choose the workflow**.
+
+### Inside the Agent Loop
+
+The loop, every cycle:
+1. **Claude thinks** — goal + tools + history, reasoning about the immediate next action only.
+2. **Calls a tool** — Claude requests, your code decides whether to run it and executes it. Claude never runs anything itself.
+3. **Result returns** — appended to history.
+4. **Loop repeats** with more context than before.
+
+> **⚠️ Watch for:** The gap between "Claude calls a tool" and "your code executes it" is exactly where approvals, permissions, and hooks live (see Domain 7).
+
+**The stopping problem** — a loop needs an exit: goal met, iteration limit hit, or unrecoverable error. A loop with no exit runs forever and bills forever.
+
+> **🎯 Exam rule:** Production agents **always** set an iteration limit — this is the line between a demo and a real system.
+
+**Three loop shapes:**
+- Single call — no loop, one tool one answer.
+- Tool-use loop — repeats until done, steps unknown upfront.
+- Subagent dispatch — loop spawns loops, for separable subtasks.
+
+### Context & Memory
+
+The context window is a fixed-size whiteboard shared by the system prompt, conversation history, and tool outputs. Once full, quality drops *silently*, before anything visibly breaks.
+
+| | Bloat | Drift |
+|---|---|---|
+| Problem | Too much volume. Junk tool output crowds out what matters. | A problem of attention. The original goal gets buried under turns. |
+| Fix | **Prune tool output** before it lands — filter to only the fields Claude needs. | **Re-anchor the goal.** |
+
+> **⚠️ Caution:** Bloat and drift are different problems with different fixes — don't treat them as one.
+
+**Compaction** summarizes old turns and keeps recent ones intact — trades detail for room; it is lossy and can lose something that mattered.
+
+| | Context window | Memory |
+|---|---|---|
+| Lifespan | Wiped at session end | Survives after session ends |
+| Cost | Every single call | Only on retrieval |
+| Holds | What Claude has right now | What Claude can go fetch |
+
+Memory lives **outside** the model, in a file or database. Two actions only: **write** what's worth keeping on the way out, **read** back only the relevant notes on the way in — reading everything back just rebuilds bloat.
+
+### Manager, Workers, Subagents
+
+One manager agent owns the plan; subagents own execution. Each subagent starts with a **fresh, empty** whiteboard and one narrow job — it runs its own full loop and returns only its answer.
+
+- **Isolation** — a 200-page doc gets read inside the subagent; only one paragraph comes back.
+- **Containment** — a failure stays inside one subagent instead of poisoning the whole run.
+- **Speed** — independent subagents can run in parallel (Claude decides when, you don't script it).
+
+> **⚠️ Caution:** Subagents aren't free — you pay the manager's tokens **plus** every subagent's. Split only when subtasks are genuinely independent, context is overflowing, or parallel speed truly matters. Don't add a manager for a three-step task.
+
+### Building Agents with Claude
+
+| | Agent SDK | Custom harness | Managed Agents |
+|---|---|---|---|
+| Who writes the loop | Anthropic | You | Anthropic |
+| Runs in | Your process | Your process | Anthropic's cloud |
+| Best for | Common patterns | Unusual requirements | Long-running, async, production |
+
+> **🎯 Exam rule:** The Agent SDK is **not** a generic agent framework — it's Claude Code itself, packaged as a library, with built-in tools (Read/Write/Edit/Bash/Glob/Grep/WebSearch/WebFetch). Move to a custom harness only when you can **name** the specific thing the SDK won't let you do.
+
+> **⚠️ Nuance:** Self-hosted infrastructure is a choice *inside* Managed Agents, not its opposite. Managed Agents is in beta and, because sessions are stateful, is **not currently eligible for Zero Data Retention or HIPAA**.
+
+**Hooks are deterministic** — code that always runs, no model judgement involved. Named events: `PreToolUse`, `PostToolUse`, `Stop`, `SessionStart`, `SessionEnd`, `UserPromptSubmit`.
+
+> **🎯 Exam rule:** Prompting *asks* Claude nicely; a hook *enforces*. "Deterministic" is the exam signal word.
+
+### Agentic Frameworks
+
+All three speak MCP (Domain 8) and build both workflows and agents.
+
+| Framework | Model | Optimized for |
+|---|---|---|
+| **Strands** | Model-driven — give tools + a goal, get out of the way | AWS Bedrock |
+| **LangGraph** | Graph-driven — agent is a state machine with LLM steps | Branching paths, pause/resume, checkpoints, human approval |
+| **PydanticAI** | Type-driven — typed outputs + dependency injection | Strict validation, less code |
+
+> **🔗 Connects to:** Frameworks trade control for speed; the spectrum runs Framework → Agent SDK → Custom harness for code-you-write, with Managed Agents as the only one that moves the loop off your own infrastructure.
+
+### Quick recall — Domain 1
+- Who decides the next step = the only workflow-vs-agent test.
+- Loop = think → call tool → result returns → repeat. Claude requests, your code executes.
+- Always set an iteration limit in production.
+- Bloat (volume) ≠ Drift (attention) — different fixes.
+- Memory: write on the way out, read on the way in — outside the model.
+- Subagents: fresh context, isolation + containment + parallel speed — but never free.
+- Agent SDK = Claude Code as a library, not a generic framework.
+- Hooks are deterministic enforcement; prompts are advisory.
+
+---
+
+## 2. Applications & Integration
+
+Translating a business wish into a build spec, the API mechanics underneath every call, and the lifecycle that keeps it working.
+
+### Business Needs → Build Requirements
+
+- **Functional** — what the system must *do*. Test: can you phrase it as "the system shall…"? e.g. look up an order, answer FAQs, escalate to a human.
+- **Infrastructure** — what it must *run on*: scale, latency, cost, security, data location. Decides model choice, batch vs realtime, self-hosting.
+
+> **🎯 Exam rule:** Beginners remember functional and forget infrastructure — miss it and the app works in a demo but falls over in production. Exam scenarios give a business need and ask which requirement is missing.
+
+### REST, JSON, Async
+
+An API is the waiter between your code and Claude. The Claude API is REST: a request to a URL, a predictable JSON response every time.
+
+**Synchronous** — your code waits at the counter until Claude replies. **Asynchronous** — fire the request, keep working, pick up the answer later (the idea behind the Batch API).
+
+### API Mechanics I — Messages, Tools, Streaming
+
+Every call is a list of messages with three roles: `system` (standing rules), `user` (the ask), `assistant` (Claude's reply). The whole history is resent every call — Claude has no memory between calls.
+
+**Tools**: Claude requests an action, your code runs it, the result returns — the request-execute gap from Domain 1, now at the API level.
+
+> **🎯 Exam rule:** Streaming is a UX choice, not a correctness one — **stream for a human watching**, skip it for another program consuming the whole answer at once or a batch job.
+
+### API Mechanics II — Vision, Caching, Vendors, Batch
+
+- **Vision** — images as input. **Extended thinking** — reason longer before answering, better on hard tasks, costs more tokens/time.
+- **Prompt caching** — cache reads cost roughly a **tenth** of normal input. One of the biggest cost levers.
+- **Where Claude runs** — Anthropic API, Amazon Bedrock, Google Vertex: same model, different front door. "Our whole stack is on AWS" → Bedrock.
+- **Batch API** — bulk, non-urgent, overnight, ~50% cheaper.
+
+> **🎯 Exam rule:** "Non-urgent, cost is the priority, results by morning" → the answer is always **Batch**. Three access patterns: realtime (sync), streaming (pieces as they arrive), batch (async bulk).
+
+### The Life of a Claude System (SDLC)
+
+Five stages, looping, not linear: **Plan → Build → Test → Deploy → Operate**. Waterfall runs them once in order; Agile repeats them in short cycles.
+
+> **🎯 Exam rule:** Unlike ordinary software, a Claude app's behavior can shift when **the model updates**, even with your code untouched — this is why version pinning is part of the lifecycle, not an optional extra.
+
+Building takes weeks; **operating takes years** — monitoring quality, handling errors, updating prompts, controlling cost is where most real work lives. A problem spotted while operating feeds back into the next planning round.
+
+### Version Control, Code Review, Refactoring
+
+Git = unlimited, shared undo. **Prompts and CLAUDE.md are code too** — version them so a prompt change that hurts quality can be diffed and rolled back.
+
+Code review = a second pair of eyes before shipping. Refactoring: small (rename, split a function — low risk) vs large (restructure many files — needs more testing and review).
+
+### Interfaces & Boundaries
+
+API/SDK, Claude Code, Desktop, claude.ai — same model, different doors, and **each treats your instructions differently**. A system prompt in the API is fixed and applies to every call; the same words typed in claude.ai sit in a different setup entirely.
+
+> **🎯 Exam rule:** **Content boundary** = trusted instructions vs untrusted content. A document Claude is asked to summarize is data to work *on*, never orders to follow — even if it contains text like "ignore your instructions." This is the same idea Domain 7 calls prompt-injection defense.
+
+Match interface to job: building a product → API/SDK · modernizing a codebase → Claude Code · everyday personal use → Desktop/claude.ai.
+
+### Schemas, Sessions, Plugins
+
+**Schema** = a fixed, agreed shape for Claude's output — clear names, only the fields you'll use, a stable shape.
+
+**Session hygiene** — one job per conversation; start fresh when the topic shifts, or stale info from a finished task pollutes new answers (the drift problem from Domain 1, now a design rule).
+
+**Plugins** are dependencies — track which ones and which versions, same as any other dependency.
+
+### Configuration Management
+
+| | CLAUDE.md | settings.json |
+|---|---|---|
+| What it is | Written rules — what Claude should *know* | Machine control panel — what Claude *can do* |
+| Enforcement | Guides only — does not enforce | Enforces (tool permissions) |
+
+> **🎯 Exam rule:** **Pin the model version** (not `"latest"`) so behavior doesn't shift silently. Version prompts and plugins too, so a bad change can be rolled back — this is the whole point of the version control lecture, applied.
+
+### Quick recall — Domain 2
+- Functional = what it does; Infrastructure = what it runs on — the exam tests both.
+- Stream for humans, not machine consumers or batch jobs.
+- Cache reads ≈ 1/10th cost; Batch ≈ 50% off, overnight.
+- SDLC is a loop: Plan→Build→Test→Deploy→Operate; model updates can shift behavior.
+- Content boundary: trusted instructions vs untrusted data — never let content give orders.
+- CLAUDE.md guides (advisory); settings.json enforces (machine control panel).
+- Pin the model version; version prompts and plugins.
+
+---
+
+## 3. Claude Code
+
+A smaller domain — know the configurable pieces and the two ways to run it.
+
+### The Building Blocks
+
+| Piece | What it is | Loads / triggers |
+|---|---|---|
+| **Rules** | Focused instruction files in `.claude/rules/` | Only when matching files are touched |
+| **Skills** | A `SKILL.md` folder — reusable know-how for one task class | Typed `/command` or Claude spots a matching task |
+| **Commands** | Slash shortcuts — built-in (`/init`, `/clear`, `/compact`) or a custom file | Typed explicitly |
+| **Agents** | Subagents with their own clean context — review, test-writing, refactor | Dispatched for a sub-task |
+| **Agent Memory** | CLAUDE.md (you write it) + Auto Memory (Claude learns patterns) | Explicit vs learned |
+
+> **🔗 Connects to:** Rules keep context clean the same way Domain 1's pruning does — targeted guidance instead of one giant always-loaded file.
+
+### Running It
+
+`/init` scans the repo and writes a starting CLAUDE.md — the first command in a fresh repository, then you edit it by hand.
+
+**CLAUDE.md hierarchy** — read up the directory tree: Home folder (broad) → Project (shared with the team) → Sub-folder (specific area, added on top). `settings.json` merges user settings, then project settings — later ones override earlier.
+
+| Session tool | Does |
+|---|---|
+| **Resume** | Pick up where you left off |
+| **Branch** | Split off a new direction |
+| **Checkpoint** | Return to an earlier point |
+| `/clear` | Reset a cluttered session |
+
+> **⚠️ Exam caution:** Checkpoints are **not Git** — they cannot undo real-world side effects like a sent API call.
+
+**Interactive** (`claude`) — a person types, watches, responds. **Headless** (`claude -p "…"`) — pass the whole task, no UI, prints the result; puts Claude Code into CI/CD pipelines.
+
+> **🎯 Exam rule:** Two independent axes, don't conflate them — **streaming mode** controls how OUTPUT flows (live event feed); **auto-mode** controls how APPROVALS are handled (a second model reviews routine tool calls instead of asking you).
+
+### Quick recall — Domain 3
+- Rules load when relevant; Skills load when triggered; Commands are typed explicitly.
+- CLAUDE.md hierarchy: Home → Project → Sub-folder, broad to specific.
+- Checkpoints ≠ Git — can't undo side effects.
+- Streaming mode = output flow; auto-mode = approval handling — different axes.
+
+---
+
+## 4. Eval, Testing & Debugging
+
+The provided material for this domain covers the debugging workflow: classify before you fix.
+
+### When Things Go Wrong
+
+Professional instinct: slow down and classify before touching anything. Four steps — **Type → Origin → Trace → Recover.**
+
+| Code | Meaning | Whose fault |
+|---|---|---|
+| `429` | Rate limit | Your account sent too many requests |
+| `529` | Overloaded | The service is busy — nothing to do with you |
+| `400` | Bad request | Your request itself was malformed |
+
+**Origin** — is the problem the **integration layer** (your code, the network, a bad API call) or **model output** (what Claude actually produced, e.g. JSON with a missing field)?
+
+> **🎯 Exam rule:** Always ask: is this my plumbing, or is this the answer? Fixing the wrong layer wastes hours.
+
+**Trace** the record — Request → Tool call → Tool result → Response — to find the exact step where it broke. That step is the **failure mode**: naming it points at the fix.
+
+| Recovery | When |
+|---|---|
+| **Retry** | `529` → exponential backoff (temporary, not your fault). `429` → wait exactly the retry-after time. |
+| **Fix the request** | `400` or a bad schema — retrying won't help. You fix the request itself. |
+
+### Quick recall — Domain 4
+- Classify first: Type → Origin → Trace → Recover — never guess-and-change.
+- Integration layer (your code) vs Model output (Claude's answer) — isolate which.
+- Match the recovery to the diagnosis: retry temporary faults, fix malformed requests.
+
+---
+
+## 5. Model Selection & Optimization
+
+How LLMs actually generate text, the thinking-mode dial, picking a tier, and controlling the bill.
+
+### How LLMs Actually Work
+
+- **Tokens** are chunks, not words (~1 token ≈ 4 characters of English) — you pay and measure in tokens.
+- **Context window** = everything the model can see in one request — fixed and finite, the "desk."
+- **Next-token generation** — predicts one token at a time, feeding each choice back in; there's no plan written in advance.
+- **Sampling / temperature** — picks from a ranked list of candidates. Low temperature → almost always the top candidate (predictable); high → more variety (creative).
+
+> **🎯 Exam rule:** Non-determinism is **normal, not a bug** — the same prompt can give slightly different answers each time because of sampling. This is why testing a Claude app differs from testing ordinary code.
+
+### Thinking Modes & Prompting Basics
+
+| Mode | What happens | Use when |
+|---|---|---|
+| **Fast mode** | No extra reasoning, respond straight through | Default — most everyday tasks |
+| **Extended thinking** | Reasons in a scratchpad before answering | Tricky maths, multi-step logic, planning |
+| **Adaptive thinking** | Model decides depth itself; you steer with an **effort level** (low → medium → high → xhigh → max) | Replaced the older manual thinking-token budget |
+
+> **🎯 Exam rule:** The exam names **both** the old manual thinking-budget and the newer effort-level system — know that one replaced the other.
+
+**Zero-shot** (no examples — try first) → **Single-shot** (one example) → **Multi-shot** (several — more consistent, more tokens). Use the fewest examples that get the job done.
+
+### The Engineering Underneath
+
+An SDK wraps the REST API — one clean function call instead of raw HTTP — and handles auth, retries with backoff, error parsing, and streaming for you. It's still REST underneath; if the SDK can't do something, drop to raw REST.
+
+> **🎯 Exam rule:** REST = letters (ask, get a reply, connection closes) fits **almost everything**. Reach for a **websocket** (a continuous open line, like a phone call) only for genuinely real-time, two-way work.
+
+### Choosing Your Model — Opus, Sonnet, Haiku
+
+| Tier | Profile | Deep thinking? |
+|---|---|---|
+| **Haiku** | Fastest & cheapest — high volume, tagging, routing, classification | No |
+| **Sonnet** | Balanced default — strong at most tasks, moderate price | Yes |
+| **Opus** | Most capable — genuinely hard problems, slower, pricier | Yes |
+
+> **🎯 Exam rule:** This is a **capability** difference, not just price — if a task needs careful multi-step reasoning, Haiku isn't the pick no matter how cheap. Default rule: **start with Sonnet**, drop to Haiku only for high-volume simple work, escalate to Opus only when Sonnet genuinely struggles.
+
+Trade-off triangle: quality, latency, cost — no "best" model, only best fit. When a new model ships, **re-evaluate** — a task that needed Opus may now run on Sonnet, and tokenizing itself can change. This is exactly why you pin your model version (Domain 2).
+
+### Managing Tokens and Cost
+
+You pay per token, input **and** output — output usually costs more per token. Every response reports `input_tokens` / `output_tokens` usage — track it, don't guess. Model your cost before you scale: `tokens/request × requests/day × price = monthly cost`.
+
+Cost-optimization order:
+1. **Cache** — reuse repeated context, biggest single lever.
+2. **Batch** — group non-urgent work, ~50% off.
+3. **Shorten prompts** — trim what you send.
+4. **Downgrade model** — only as a last resort.
+
+> **🎯 Exam rule:** The cost-optimization order is a named sequence on the exam — cut waste before you cut intelligence. Downgrading the model comes **last**, not first. `Cache checkpointing` marks points in a growing prompt so earlier stable parts stay cached as the conversation extends.
+
+### Quick recall — Domain 5
+- 1 token ≈ 4 characters; non-determinism is expected behavior, not a bug.
+- Fast (default) → Extended thinking (hard tasks) → Adaptive thinking (effort low→max, replaced manual budget).
+- SDK wraps REST; use websockets only for genuine real-time two-way work.
+- Haiku (no deep thinking) / Sonnet (default) / Opus (hardest) — capability gap, not just price.
+- Re-test and re-pin on every new model release.
+- Cost order: Cache → Batch → Shorten prompts → Downgrade model (last resort).
+
+---
+
+## 6. Prompt & Context Engineering
+
+From wording one instruction well, to curating everything the model sees, to making the output something your code can trust.
+
+### Writing a Good Prompt
+
+Parts of a prompt: **instruction** (what you want done), **context** (background needed), **examples** (the pattern), **format** (how to shape the answer) — not every prompt needs all four, but knowing the pieces helps you spot what's missing.
+
+Be specific: task + length + audience + tone beats a vague ask. Give the model a **role** via the system prompt — standing behavior across the whole conversation, separate from each question. Ask explicitly for the output shape you want.
+
+### Examples, Templates, Refinement
+
+Examples teach the pattern faster than description — use the fewest that work. A **prompt template** is written once with blanks filled per request: consistency, and one place to improve everything at once (and the thing you version — Domain 2).
+
+**Iterative refinement**: write → run → check output → adjust → repeat. Treat prompting like tuning, not a one-shot guess.
+
+### Context Engineering — Feeding the Model Right
+
+> **🎯 Exam rule:** Prompt engineering is about a **sentence**. Context engineering is about the **whole pipeline** — deciding everything the model sees on a call: system prompt, retrieved documents, conversation history, tool definitions, stored memory. As apps grow into agents, this becomes the more important skill.
+
+**Context rot** — counter-intuitively, as tokens grow, recall of any single fact goes **down**, and it starts degrading *before* the size limit. Stuffing everything in makes answers worse, not better.
+
+The **attention budget** is a finite resource every token spends a little of — the goal is the smallest set of high-value tokens, not the biggest pile. Put key instructions up front; label documents clearly.
+
+- **RAG** — Retrieval-Augmented Generation: search first, pull only the relevant chunks into the prompt — the direct answer to context rot.
+- **Just-in-time context** — keep lightweight references (file paths, stored queries, links); load actual content only at the moment it's used. Claude Code works this way — Anthropic's recommendation for long-running agents.
+
+### Making Output Reliable
+
+**Structured outputs** (JSON) give your code a predictable shape to parse — vs. free text your code has to guess at. Always **validate** the response (right fields, right types, all present) before acting — the model is non-deterministic, so you validate rather than assume.
+
+Plan for both a **refusal** ("I can't help with that") and an **error** (429/529) — catch it, show a helpful message, retry if it makes sense, or fall back to a safe default.
+
+> **🎯 Exam rule:** Consistency techniques — none makes output perfectly identical, but together they push toward reliable: lower temperature, strict schema, add examples, one clear format.
+
+### Quick recall — Domain 6
+- Prompt engineering = one sentence; Context engineering = the whole pipeline.
+- Context rot starts before the hard limit — smallest high-value set beats the biggest pile.
+- RAG fetches only relevant chunks; just-in-time context loads late and keeps references light.
+- Always validate structured output before acting; plan for refusals and errors separately.
+- Consistency levers: lower temperature, strict schema, examples, clear format.
+
+---
+
+## 7. Security & Safety
+
+Two different problems that get conflated on the exam: attackers coming in (security) vs Claude's own behavior going out (safety).
+
+### Securing Your Claude App
+
+An AI app can read files, run commands, and call tools — those powers make it useful, and a target.
+
+> **🎯 Exam rule:** **Prompt injection is the #1 AI security threat** — hidden instructions buried in content Claude reads, no code exploit, just malicious text Claude may follow as if legitimate.
+
+| | Direct (jailbreak) | Indirect |
+|---|---|---|
+| Adversary | The user themself | The fetched content (web page, email, tool result) |
+| Trust | User untrusted | User trusted — content is the danger |
+
+> **⚠️ Caution:** Indirect is sneakier — the danger arrives inside content you trusted enough to fetch in the first place.
+
+Main defense: the **trust boundary** — your system prompt and rules are trusted; uploads, web pages, and tool results are untrusted data to work *on*, never orders to follow. Label untrusted content clearly.
+
+**PII protection**: **minimize** (send only what the task needs), **mask** (redact sensitive fields), **control access** (limit who/what can reach it). A leaked API key or `.env` file is a top real-world risk.
+
+### Keeping Claude Safe
+
+> **🎯 Exam rule:** **Security** defends against bad actors coming in. **Safety** keeps Claude's own behavior appropriate going out — and matters even with no attacker present. Claude is safety-trained by default; guardrails add on top.
+
+**Guardrails**: an input screen (a cheap model like Haiku pre-checks risky input) and output filtering/moderation (checks the response before it's shown).
+
+**Defense in depth** — no single layer is perfect, so stack them, from advisory to hard enforcement:
+1. **CLAUDE.md** — guides behavior, advisory, no enforcement.
+2. **Permissions** — blocks tool patterns (bash can still slip past).
+3. **Hooks** — inspect and hard-block an action.
+4. **Sandbox** — the OS-level boundary that contains what runs.
+
+> **⚠️ Exam caution:** **Human-in-the-loop** — for high-risk actions, a person approves before it runs (the permission prompt). `--dangerously-skip-permissions` removes that safety net entirely.
+
+### Quick recall — Domain 7
+- Prompt injection = #1 threat; direct = user is the adversary, indirect = trusted content is.
+- Trust boundary: instructions trusted, outside content never trusted with orders.
+- PII: minimize, mask, control access.
+- Security (attackers in) ≠ Safety (Claude's behavior out) — separate concepts.
+- Defense in depth, soft to hard: CLAUDE.md → Permissions → Hooks → Sandbox; human approves the riskiest actions.
+
+---
+
+## 8. Tools & MCP
+
+Formalizing the request-execute gap from Domain 1, then the shared protocol that makes tool connections reusable.
+
+### How Tool Use Works
+
+A tool lets Claude request an action instead of just producing text. A **tool definition** has three parts: `name`, `description` (tells Claude *when* to use it — and when not to), `input_schema` (JSON schema of required parameters).
+
+Loop: Claude requests → your code runs it → result returns → Claude answers. Claude never runs the tool itself.
+
+> **🎯 Exam rule:** **Parallel tool use** fires when calls are independent (none needs another's result) — results return together, faster than one at a time. If tool B needs tool A's result, they run in sequence instead.
+
+**Built-in tools** (web search, code execution) ship ready to switch on; **custom tools** are functions you define — same loop either way.
+
+### MCP — One Way to Connect Everything
+
+> **🎯 Exam rule:** Before MCP: **M apps × N tools = M×N** custom integrations, each with its own auth and data handling. MCP is an open standard (Anthropic, late 2024) — "USB-C for AI tools" — build a connector once, any MCP-compatible app can use it: **M×N becomes M+N.**
+
+| Role | What it is |
+|---|---|
+| **Host** | The user-facing AI app — Claude Desktop, Claude Code, Cursor |
+| **Client** | Lives inside the host, one client per server — the wire |
+| **Server** | Independent program exposing tools & data to the host — the capability |
+
+A connection: client connects to server → server declares what it offers (**capability discovery**) → host can now use those capabilities. Any host understands any server automatically.
+
+> **🔗 Connects to:** MCP doesn't replace the Domain 1/Lecture 1 tool-use loop — it standardizes how connections happen, adding **discovery**, **transport**, and **session** layers on top of the same request → run → return mechanics.
+
+### Building and Using MCP Servers
+
+| You need to… | Use a… | Example |
+|---|---|---|
+| Read data | **Resource** | Read a file, fetch a record |
+| Do something | **Tool** | Run a query, send an email |
+| Reuse a workflow | **Prompt** | A pre-built task template |
+
+> **🎯 Exam rule:** Rule of thumb: **resources query, tools act, prompts standardize.**
+
+**Transports**: `stdio` — local, same machine, the default for Claude Desktop & Code. **Streamable HTTP** — remote, over HTTPS, for shared hosted connectors. Same message format underneath either way.
+
+> **⚠️ Caution:** A tool description is text Claude reads — only connect MCP servers you trust (ties directly back to Domain 7's trust boundary).
+
+### Quick recall — Domain 8
+- Tool definition = name + description (when) + input_schema (what).
+- Parallel tool calls only when independent; dependent calls run in sequence.
+- MCP turns M×N integrations into M+N via one shared standard.
+- Host (app) → Client (wire, in host) → Server (capability) — connect, discover, use.
+- Resources query, Tools act, Prompts standardize.
+- stdio = local/default; Streamable HTTP = remote/hosted.
+- Only connect MCP servers you trust — a tool description is untrusted text otherwise.
+
+---
+
+## How the eight domains connect
+
+The decks cross-reference constantly. These are the load-bearing links worth holding in mind walking into the exam.
+
+| Link | What connects |
+|---|---|
+| 1 → 5 | The context window "whiteboard" (D1) is the same fixed-size, token-measured context window explained mechanically in D5. |
+| 1 → 8 | The agent loop's "request-execute gap" (D1) is formalized as the tool-use loop (D8, Lecture 1) and then standardized for reuse by MCP (D8, Lecture 2). |
+| 1 → 7 | Hooks as deterministic enforcement (D1) reappear as the hard-block layer in the D7 defense-in-depth ladder, above advisory CLAUDE.md and permeable permissions. |
+| 2 → 7 | The content boundary (D2, trusted vs untrusted) IS the anti-prompt-injection defense (D7) — same concept, security framing. |
+| 2 → 3 | CLAUDE.md and settings.json are introduced conceptually in D2's Configuration Management, then operated hands-on in D3. |
+| 2 → 5 | Prompt caching is introduced in D2's API mechanics and becomes the #1 cost-optimization lever in D5. |
+| 4 → 5 | The 429/529 error codes debugged in D4 are exactly what an SDK's built-in retry-with-backoff (D5) exists to absorb automatically. |
+| 5 → 6 | Zero/single/multi-shot prompting (D5) is the theory; D6's "Examples Teach the Pattern" is the applied version. |
+| 6 → 1 | Context rot and the attention budget (D6) are the mechanism behind D1's bloat/drift problem — same failure, explained at two levels. |
+| 6 → 2 | Structured outputs (D6) are schemas (D2) applied — the shape your code parses, not just the shape a human reads. |
+| 7 → 2/3 | "CLAUDE.md guides, doesn't enforce" is stated in D2, operated in D3, and cashed in as a security fact in D7's enforcement ladder. |
+
+---
+
+*Study guide compiled from: Domain 1 (Agents & Workflows), Domain 2 (Applications & Integration), Domain 3 (Claude Code), Domain 4 (Eval, Testing & Debugging), Domain 5 (Model Selection & Optimization), Domain 6 (Prompt & Context Engineering), Domain 7 (Security & Safety), Domain 8 (Tools & MCP). All content sourced from the provided course decks.*
