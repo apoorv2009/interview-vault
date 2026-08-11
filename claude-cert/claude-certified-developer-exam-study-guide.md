@@ -8,7 +8,7 @@ A condensed, cross-referenced study guide covering all 8 domains of the Claude /
 
 ## Table of contents
 
-0. [⚠️ Personal weak-spot review](#️-personal-weak-spot-review)
+0. [⚠️ Personal weak-spot review](#personal-weak-spot-review)
 1. [Agents & Workflows](#1-agents--workflows)
 2. [Applications & Integration](#2-applications--integration)
 3. [Claude Code](#3-claude-code)
@@ -21,7 +21,7 @@ A condensed, cross-referenced study guide covering all 8 domains of the Claude /
 
 ---
 
-## ⚠️ Personal weak-spot review
+## Personal weak-spot review ⚠️
 
 From a hard-difficulty practice attempt: **42/53 (79%)** overall, but concentrated misses in **D3 (50%)**, **D5 (67%)**, and **D8 (67%)** — all below the 75% target. D6 and D7 were clean (100%). The 11 points below are the exact traps hit; review these until they're automatic.
 
