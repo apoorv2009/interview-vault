@@ -6,91 +6,34 @@ All system-design interview Q&A in one file, grouped by topic. Previously one fi
 
 ## Table of Contents
 
-### Auth
-
-- [JWT token exists but API still returns 401 Unauthorized. Why, and how do you debug it?](#jwt-token-exists-but-api-still-returns-401-unauthorized-why-and-how-do-you-debug-it)
-- [An OTP is valid for only 30 seconds and is not stored on the server. How can the server still verify it?](#an-otp-is-valid-for-only-30-seconds-and-is-not-stored-on-the-server-how-can-the-server-still-verify-it)
-
-### Caching
-
-- [Design a cache that never slows down no matter how many items you store. What data structure?](#design-a-cache-that-never-slows-down-no-matter-how-many-items-you-store-what-data-structure)
-
-### Concurrency
-
-- [Two threads update the same data simultaneously. How do you prevent a race condition?](#two-threads-update-the-same-data-simultaneously-how-do-you-prevent-a-race-condition)
-- [Two users hit the same API at the exact same millisecond, both pass validation, and both try to insert the same record. Now you have duplicate data in production. What's your fix?](#two-users-hit-the-same-api-at-the-exact-same-millisecond-both-pass-validation-and-both-try-to-insert-the-same-record-now-you-have-duplicate-data-in-production-whats-your-fix)
-
-### DRM
-
-- [You try to screen record Netflix but only get a black screen. Why?](#you-try-to-screen-record-netflix-but-only-get-a-black-screen-why)
-
-### Data Structures
-
-- [How is Gmail username availability check instant?](#how-is-gmail-username-availability-check-instant)
-
-### E-Commerce
-
-- [Customers Report Your E-Commerce Site Shows Products as 'In Stock' — But at Checkout They're Suddenly Unavailable. How Would You Debug and Fix This?](#customers-report-your-e-commerce-site-shows-products-as-in-stock--but-at-checkout-theyre-suddenly-unavailable-how-would-you-debug-and-fix-this)
-
-### Git Workflow
-
-- [Your branch is 200 commits behind main. What will you do — merge or rebase?](#your-branch-is-200-commits-behind-main-what-will-you-do--merge-or-rebase)
-
-### Incident Response
-
-- [Your CTO calls at 3 AM. Your entire S3 bucket just got encrypted. Ransom note in metadata. First 15 minutes?](#your-cto-calls-at-3-am-your-entire-s3-bucket-just-got-encrypted-ransom-note-in-metadata-first-15-minutes)
-- [SSL cert just expired on Sunday morning. Site is down. What do you do in the next 10 minutes?](#ssl-cert-just-expired-on-sunday-morning-site-is-down-what-do-you-do-in-the-next-10-minutes)
-
-### Microservices
-
-- [A User Places an Insurance Order — Can I Call Multiple Downstream Services Directly Now?](#a-user-places-an-insurance-order--can-i-call-multiple-downstream-services-directly-now)
-- [What Microservice Architecture Do Companies Actually Use in Real Projects?](#what-microservice-architecture-do-companies-actually-use-in-real-projects)
-
-### Payments
-
-- [A passenger swipes their card on a flight with no internet and the bank cannot be contacted. How do you approve the payment without a balance check and prevent fraud in an offline payment system?](#a-passenger-swipes-their-card-on-a-flight-with-no-internet-and-the-bank-cannot-be-contacted-how-do-you-approve-the-payment-without-a-balance-check-and-prevent-fraud-in-an-offline-payment-system)
-
-### Pricing
-
-- [A user thinks airlines hike prices because they searched again. As a software engineer, explain why the price actually changed.](#a-user-thinks-airlines-hike-prices-because-they-searched-again-as-a-software-engineer-explain-why-the-price-actually-changed)
-
-### Principal Engineer / Architecture
-
-- [Principal Engineer / Solution Architect — Enterprise Architecture Interview Bank (JPMC-style)](#principal-engineer--solution-architect--enterprise-architecture-interview-bank-jpmc-style)
-
-### RAG
-
-- [Your client gives you 5000 PDFs with text, tables, charts and scanned images. Build a RAG chatbot that answers accurately.](#your-client-gives-you-5000-pdfs-with-text-tables-charts-and-scanned-images-build-a-rag-chatbot-that-answers-accurately)
-- [Your RAG retrieves top-5 chunks, but the correct answer lives in chunk #12. Increasing top-K to 20 blows the context window. How do you fix it?](#your-rag-retrieves-top-5-chunks-but-the-correct-answer-lives-in-chunk-12-increasing-top-k-to-20-blows-the-context-window-how-do-you-fix-it)
-- [Your RAG data changes every hour. How do you manage versioning without breaking the system?](#your-rag-data-changes-every-hour-how-do-you-manage-versioning-without-breaking-the-system)
-
-### Reliability
-
-- [Your API works fine for 1,000 users but crashes at 100,000 users. What will you check first?](#your-api-works-fine-for-1000-users-but-crashes-at-100000-users-what-will-you-check-first)
-
-### Scaling
-
-- [How can 3 billion Instagram users keep scrolling forever? If every user fetched 1,000 posts at once, the servers would melt down — so how does Instagram know exactly which posts to send next?](#how-can-3-billion-instagram-users-keep-scrolling-forever-if-every-user-fetched-1000-posts-at-once-the-servers-would-melt-down--so-how-does-instagram-know-exactly-which-posts-to-send-next)
-
-### Security
-
-- [What Measures Would You Take to Protect APIs from Unauthorized Access in a Microservices Architecture?](#what-measures-would-you-take-to-protect-apis-from-unauthorized-access-in-a-microservices-architecture)
-
-### Streaming
-
-- [How does Netflix switch subtitles instantly mid-movie without reloading?](#how-does-netflix-switch-subtitles-instantly-mid-movie-without-reloading)
-
-### TTL & Expiry
-
-- [Instagram Stories expire after exactly 24 hours. What mechanism tracks and enforces that?](#instagram-stories-expire-after-exactly-24-hours-what-mechanism-tracks-and-enforces-that)
-
-### Vector DB
-
-- [Our vector database costs are increasing rapidly. How would you optimize and reduce them?](#our-vector-database-costs-are-increasing-rapidly-how-would-you-optimize-and-reduce-them)
-
-### Video Streaming
-
-- [YouTube has the same video in 1080p and 144p. Does the server store separate files for each quality?](#youtube-has-the-same-video-in-1080p-and-144p-does-the-server-store-separate-files-for-each-quality)
+| # | Topic | Question |
+| --- | --- | --- |
+| 1 | Auth | [JWT token exists but API still returns 401 Unauthorized. Why, and how do you debug it?](#jwt-token-exists-but-api-still-returns-401-unauthorized-why-and-how-do-you-debug-it) |
+| 2 | Auth | [An OTP is valid for only 30 seconds and is not stored on the server. How can the server still verify it?](#an-otp-is-valid-for-only-30-seconds-and-is-not-stored-on-the-server-how-can-the-server-still-verify-it) |
+| 3 | Caching | [Design a cache that never slows down no matter how many items you store. What data structure?](#design-a-cache-that-never-slows-down-no-matter-how-many-items-you-store-what-data-structure) |
+| 4 | Concurrency | [Two threads update the same data simultaneously. How do you prevent a race condition?](#two-threads-update-the-same-data-simultaneously-how-do-you-prevent-a-race-condition) |
+| 5 | Concurrency | [Two users hit the same API at the exact same millisecond, both pass validation, and both try to insert the same record. Now you have duplicate data in production. What's your fix?](#two-users-hit-the-same-api-at-the-exact-same-millisecond-both-pass-validation-and-both-try-to-insert-the-same-record-now-you-have-duplicate-data-in-production-whats-your-fix) |
+| 6 | DRM | [You try to screen record Netflix but only get a black screen. Why?](#you-try-to-screen-record-netflix-but-only-get-a-black-screen-why) |
+| 7 | Data Structures | [How is Gmail username availability check instant?](#how-is-gmail-username-availability-check-instant) |
+| 8 | E-Commerce | [Customers Report Your E-Commerce Site Shows Products as 'In Stock' — But at Checkout They're Suddenly Unavailable. How Would You Debug and Fix This?](#customers-report-your-e-commerce-site-shows-products-as-in-stock--but-at-checkout-theyre-suddenly-unavailable-how-would-you-debug-and-fix-this) |
+| 9 | Git Workflow | [Your branch is 200 commits behind main. What will you do — merge or rebase?](#your-branch-is-200-commits-behind-main-what-will-you-do--merge-or-rebase) |
+| 10 | Incident Response | [Your CTO calls at 3 AM. Your entire S3 bucket just got encrypted. Ransom note in metadata. First 15 minutes?](#your-cto-calls-at-3-am-your-entire-s3-bucket-just-got-encrypted-ransom-note-in-metadata-first-15-minutes) |
+| 11 | Incident Response | [SSL cert just expired on Sunday morning. Site is down. What do you do in the next 10 minutes?](#ssl-cert-just-expired-on-sunday-morning-site-is-down-what-do-you-do-in-the-next-10-minutes) |
+| 12 | Microservices | [A User Places an Insurance Order — Can I Call Multiple Downstream Services Directly Now?](#a-user-places-an-insurance-order--can-i-call-multiple-downstream-services-directly-now) |
+| 13 | Microservices | [What Microservice Architecture Do Companies Actually Use in Real Projects?](#what-microservice-architecture-do-companies-actually-use-in-real-projects) |
+| 14 | Payments | [A passenger swipes their card on a flight with no internet and the bank cannot be contacted. How do you approve the payment without a balance check and prevent fraud in an offline payment system?](#a-passenger-swipes-their-card-on-a-flight-with-no-internet-and-the-bank-cannot-be-contacted-how-do-you-approve-the-payment-without-a-balance-check-and-prevent-fraud-in-an-offline-payment-system) |
+| 15 | Pricing | [A user thinks airlines hike prices because they searched again. As a software engineer, explain why the price actually changed.](#a-user-thinks-airlines-hike-prices-because-they-searched-again-as-a-software-engineer-explain-why-the-price-actually-changed) |
+| 16 | Principal Engineer / Architecture | [Principal Engineer / Solution Architect — Enterprise Architecture Interview Bank (JPMC-style)](#principal-engineer--solution-architect--enterprise-architecture-interview-bank-jpmc-style) |
+| 17 | RAG | [Your client gives you 5000 PDFs with text, tables, charts and scanned images. Build a RAG chatbot that answers accurately.](#your-client-gives-you-5000-pdfs-with-text-tables-charts-and-scanned-images-build-a-rag-chatbot-that-answers-accurately) |
+| 18 | RAG | [Your RAG retrieves top-5 chunks, but the correct answer lives in chunk #12. Increasing top-K to 20 blows the context window. How do you fix it?](#your-rag-retrieves-top-5-chunks-but-the-correct-answer-lives-in-chunk-12-increasing-top-k-to-20-blows-the-context-window-how-do-you-fix-it) |
+| 19 | RAG | [Your RAG data changes every hour. How do you manage versioning without breaking the system?](#your-rag-data-changes-every-hour-how-do-you-manage-versioning-without-breaking-the-system) |
+| 20 | Reliability | [Your API works fine for 1,000 users but crashes at 100,000 users. What will you check first?](#your-api-works-fine-for-1000-users-but-crashes-at-100000-users-what-will-you-check-first) |
+| 21 | Scaling | [How can 3 billion Instagram users keep scrolling forever? If every user fetched 1,000 posts at once, the servers would melt down — so how does Instagram know exactly which posts to send next?](#how-can-3-billion-instagram-users-keep-scrolling-forever-if-every-user-fetched-1000-posts-at-once-the-servers-would-melt-down--so-how-does-instagram-know-exactly-which-posts-to-send-next) |
+| 22 | Security | [What Measures Would You Take to Protect APIs from Unauthorized Access in a Microservices Architecture?](#what-measures-would-you-take-to-protect-apis-from-unauthorized-access-in-a-microservices-architecture) |
+| 23 | Streaming | [How does Netflix switch subtitles instantly mid-movie without reloading?](#how-does-netflix-switch-subtitles-instantly-mid-movie-without-reloading) |
+| 24 | TTL & Expiry | [Instagram Stories expire after exactly 24 hours. What mechanism tracks and enforces that?](#instagram-stories-expire-after-exactly-24-hours-what-mechanism-tracks-and-enforces-that) |
+| 25 | Vector DB | [Our vector database costs are increasing rapidly. How would you optimize and reduce them?](#our-vector-database-costs-are-increasing-rapidly-how-would-you-optimize-and-reduce-them) |
+| 26 | Video Streaming | [YouTube has the same video in 1080p and 144p. Does the server store separate files for each quality?](#youtube-has-the-same-video-in-1080p-and-144p-does-the-server-store-separate-files-for-each-quality) |
 
 ---
 
