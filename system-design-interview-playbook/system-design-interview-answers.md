@@ -13,27 +13,34 @@ All system-design interview Q&A in one file, grouped by topic. Previously one fi
 | 3 | Caching | [Design a cache that never slows down no matter how many items you store. What data structure?](#design-a-cache-that-never-slows-down-no-matter-how-many-items-you-store-what-data-structure) |
 | 4 | Concurrency | [Two threads update the same data simultaneously. How do you prevent a race condition?](#two-threads-update-the-same-data-simultaneously-how-do-you-prevent-a-race-condition) |
 | 5 | Concurrency | [Two users hit the same API at the exact same millisecond, both pass validation, and both try to insert the same record. Now you have duplicate data in production. What's your fix?](#two-users-hit-the-same-api-at-the-exact-same-millisecond-both-pass-validation-and-both-try-to-insert-the-same-record-now-you-have-duplicate-data-in-production-whats-your-fix) |
-| 6 | DRM | [You try to screen record Netflix but only get a black screen. Why?](#you-try-to-screen-record-netflix-but-only-get-a-black-screen-why) |
-| 7 | Data Structures | [How is Gmail username availability check instant?](#how-is-gmail-username-availability-check-instant) |
-| 8 | E-Commerce | [Customers Report Your E-Commerce Site Shows Products as 'In Stock' — But at Checkout They're Suddenly Unavailable. How Would You Debug and Fix This?](#customers-report-your-e-commerce-site-shows-products-as-in-stock--but-at-checkout-theyre-suddenly-unavailable-how-would-you-debug-and-fix-this) |
-| 9 | Git Workflow | [Your branch is 200 commits behind main. What will you do — merge or rebase?](#your-branch-is-200-commits-behind-main-what-will-you-do--merge-or-rebase) |
-| 10 | Incident Response | [Your CTO calls at 3 AM. Your entire S3 bucket just got encrypted. Ransom note in metadata. First 15 minutes?](#your-cto-calls-at-3-am-your-entire-s3-bucket-just-got-encrypted-ransom-note-in-metadata-first-15-minutes) |
-| 11 | Incident Response | [SSL cert just expired on Sunday morning. Site is down. What do you do in the next 10 minutes?](#ssl-cert-just-expired-on-sunday-morning-site-is-down-what-do-you-do-in-the-next-10-minutes) |
-| 12 | Microservices | [A User Places an Insurance Order — Can I Call Multiple Downstream Services Directly Now?](#a-user-places-an-insurance-order--can-i-call-multiple-downstream-services-directly-now) |
-| 13 | Microservices | [What Microservice Architecture Do Companies Actually Use in Real Projects?](#what-microservice-architecture-do-companies-actually-use-in-real-projects) |
-| 14 | Payments | [A passenger swipes their card on a flight with no internet and the bank cannot be contacted. How do you approve the payment without a balance check and prevent fraud in an offline payment system?](#a-passenger-swipes-their-card-on-a-flight-with-no-internet-and-the-bank-cannot-be-contacted-how-do-you-approve-the-payment-without-a-balance-check-and-prevent-fraud-in-an-offline-payment-system) |
-| 15 | Pricing | [A user thinks airlines hike prices because they searched again. As a software engineer, explain why the price actually changed.](#a-user-thinks-airlines-hike-prices-because-they-searched-again-as-a-software-engineer-explain-why-the-price-actually-changed) |
-| 16 | Principal Engineer / Architecture | [Principal Engineer / Solution Architect — Enterprise Architecture Interview Bank (JPMC-style)](#principal-engineer--solution-architect--enterprise-architecture-interview-bank-jpmc-style) |
-| 17 | RAG | [Your client gives you 5000 PDFs with text, tables, charts and scanned images. Build a RAG chatbot that answers accurately.](#your-client-gives-you-5000-pdfs-with-text-tables-charts-and-scanned-images-build-a-rag-chatbot-that-answers-accurately) |
-| 18 | RAG | [Your RAG retrieves top-5 chunks, but the correct answer lives in chunk #12. Increasing top-K to 20 blows the context window. How do you fix it?](#your-rag-retrieves-top-5-chunks-but-the-correct-answer-lives-in-chunk-12-increasing-top-k-to-20-blows-the-context-window-how-do-you-fix-it) |
-| 19 | RAG | [Your RAG data changes every hour. How do you manage versioning without breaking the system?](#your-rag-data-changes-every-hour-how-do-you-manage-versioning-without-breaking-the-system) |
-| 20 | Reliability | [Your API works fine for 1,000 users but crashes at 100,000 users. What will you check first?](#your-api-works-fine-for-1000-users-but-crashes-at-100000-users-what-will-you-check-first) |
-| 21 | Scaling | [How can 3 billion Instagram users keep scrolling forever? If every user fetched 1,000 posts at once, the servers would melt down — so how does Instagram know exactly which posts to send next?](#how-can-3-billion-instagram-users-keep-scrolling-forever-if-every-user-fetched-1000-posts-at-once-the-servers-would-melt-down--so-how-does-instagram-know-exactly-which-posts-to-send-next) |
-| 22 | Security | [What Measures Would You Take to Protect APIs from Unauthorized Access in a Microservices Architecture?](#what-measures-would-you-take-to-protect-apis-from-unauthorized-access-in-a-microservices-architecture) |
-| 23 | Streaming | [How does Netflix switch subtitles instantly mid-movie without reloading?](#how-does-netflix-switch-subtitles-instantly-mid-movie-without-reloading) |
-| 24 | TTL & Expiry | [Instagram Stories expire after exactly 24 hours. What mechanism tracks and enforces that?](#instagram-stories-expire-after-exactly-24-hours-what-mechanism-tracks-and-enforces-that) |
-| 25 | Vector DB | [Our vector database costs are increasing rapidly. How would you optimize and reduce them?](#our-vector-database-costs-are-increasing-rapidly-how-would-you-optimize-and-reduce-them) |
-| 26 | Video Streaming | [YouTube has the same video in 1080p and 144p. Does the server store separate files for each quality?](#youtube-has-the-same-video-in-1080p-and-144p-does-the-server-store-separate-files-for-each-quality) |
+| 6 | Concurrency | [You have 3 servers, each running the same midnight cron job. Now every email is sent 3 times. Fix it.](#you-have-3-servers-each-running-the-same-midnight-cron-job-now-every-email-is-sent-3-times-fix-it) |
+| 7 | DRM | [You try to screen record Netflix but only get a black screen. Why?](#you-try-to-screen-record-netflix-but-only-get-a-black-screen-why) |
+| 8 | Data Structures | [How is Gmail username availability check instant?](#how-is-gmail-username-availability-check-instant) |
+| 9 | Database | [Your database has grown from 10 million to 1 billion records. Queries that took 50ms now take 10 seconds. How do you fix it without replacing the database?](#your-database-has-grown-from-10-million-to-1-billion-records-queries-that-took-50ms-now-take-10-seconds-how-do-you-fix-it-without-replacing-the-database) |
+| 10 | Database | [You DELETE a million rows, but the database size doesn't shrink. Where did the space go?](#you-delete-a-million-rows-but-the-database-size-doesnt-shrink-where-did-the-space-go) |
+| 11 | Database | [Both UUID and auto-increment give unique IDs. Why can UUIDs make your database slower?](#both-uuid-and-auto-increment-give-unique-ids-why-can-uuids-make-your-database-slower) |
+| 12 | DevOps | [What are the different deployment strategies and when to use them?](#what-are-the-different-deployment-strategies-and-when-to-use-them) |
+| 13 | E-Commerce | [Customers Report Your E-Commerce Site Shows Products as 'In Stock' — But at Checkout They're Suddenly Unavailable. How Would You Debug and Fix This?](#customers-report-your-e-commerce-site-shows-products-as-in-stock--but-at-checkout-theyre-suddenly-unavailable-how-would-you-debug-and-fix-this) |
+| 14 | Git Workflow | [Your branch is 200 commits behind main. What will you do — merge or rebase?](#your-branch-is-200-commits-behind-main-what-will-you-do--merge-or-rebase) |
+| 15 | Incident Response | [Your CTO calls at 3 AM. Your entire S3 bucket just got encrypted. Ransom note in metadata. First 15 minutes?](#your-cto-calls-at-3-am-your-entire-s3-bucket-just-got-encrypted-ransom-note-in-metadata-first-15-minutes) |
+| 16 | Incident Response | [SSL cert just expired on Sunday morning. Site is down. What do you do in the next 10 minutes?](#ssl-cert-just-expired-on-sunday-morning-site-is-down-what-do-you-do-in-the-next-10-minutes) |
+| 17 | Microservices | [A User Places an Insurance Order — Can I Call Multiple Downstream Services Directly Now?](#a-user-places-an-insurance-order--can-i-call-multiple-downstream-services-directly-now) |
+| 18 | Microservices | [What Microservice Architecture Do Companies Actually Use in Real Projects?](#what-microservice-architecture-do-companies-actually-use-in-real-projects) |
+| 19 | Microservices | [A microservice is very slow because of external API calls. How do you optimize it?](#a-microservice-is-very-slow-because-of-external-api-calls-how-do-you-optimize-it) |
+| 20 | Payments | [A passenger swipes their card on a flight with no internet and the bank cannot be contacted. How do you approve the payment without a balance check and prevent fraud in an offline payment system?](#a-passenger-swipes-their-card-on-a-flight-with-no-internet-and-the-bank-cannot-be-contacted-how-do-you-approve-the-payment-without-a-balance-check-and-prevent-fraud-in-an-offline-payment-system) |
+| 21 | Pricing | [A user thinks airlines hike prices because they searched again. As a software engineer, explain why the price actually changed.](#a-user-thinks-airlines-hike-prices-because-they-searched-again-as-a-software-engineer-explain-why-the-price-actually-changed) |
+| 22 | Principal Engineer / Architecture | [Principal Engineer / Solution Architect — Enterprise Architecture Interview Bank (JPMC-style)](#principal-engineer--solution-architect--enterprise-architecture-interview-bank-jpmc-style) |
+| 23 | RAG | [Your client gives you 5000 PDFs with text, tables, charts and scanned images. Build a RAG chatbot that answers accurately.](#your-client-gives-you-5000-pdfs-with-text-tables-charts-and-scanned-images-build-a-rag-chatbot-that-answers-accurately) |
+| 24 | RAG | [Your RAG retrieves top-5 chunks, but the correct answer lives in chunk #12. Increasing top-K to 20 blows the context window. How do you fix it?](#your-rag-retrieves-top-5-chunks-but-the-correct-answer-lives-in-chunk-12-increasing-top-k-to-20-blows-the-context-window-how-do-you-fix-it) |
+| 25 | RAG | [Your RAG data changes every hour. How do you manage versioning without breaking the system?](#your-rag-data-changes-every-hour-how-do-you-manage-versioning-without-breaking-the-system) |
+| 26 | RAG | [Users ask in casual Hindi-English like 'kitna refund milega for cancelled order', but your docs are in formal English. How do you handle code-mixed queries in retrieval?](#users-ask-in-casual-hindi-english-like-kitna-refund-milega-for-cancelled-order-but-your-docs-are-in-formal-english-how-do-you-handle-code-mixed-queries-in-retrieval) |
+| 27 | Reliability | [Your API works fine for 1,000 users but crashes at 100,000 users. What will you check first?](#your-api-works-fine-for-1000-users-but-crashes-at-100000-users-what-will-you-check-first) |
+| 28 | Scaling | [How can 3 billion Instagram users keep scrolling forever? If every user fetched 1,000 posts at once, the servers would melt down — so how does Instagram know exactly which posts to send next?](#how-can-3-billion-instagram-users-keep-scrolling-forever-if-every-user-fetched-1000-posts-at-once-the-servers-would-melt-down--so-how-does-instagram-know-exactly-which-posts-to-send-next) |
+| 29 | Security | [What Measures Would You Take to Protect APIs from Unauthorized Access in a Microservices Architecture?](#what-measures-would-you-take-to-protect-apis-from-unauthorized-access-in-a-microservices-architecture) |
+| 30 | Streaming | [How does Netflix switch subtitles instantly mid-movie without reloading?](#how-does-netflix-switch-subtitles-instantly-mid-movie-without-reloading) |
+| 31 | TTL & Expiry | [Instagram Stories expire after exactly 24 hours. What mechanism tracks and enforces that?](#instagram-stories-expire-after-exactly-24-hours-what-mechanism-tracks-and-enforces-that) |
+| 32 | Vector DB | [Our vector database costs are increasing rapidly. How would you optimize and reduce them?](#our-vector-database-costs-are-increasing-rapidly-how-would-you-optimize-and-reduce-them) |
+| 33 | Video Streaming | [YouTube has the same video in 1080p and 144p. Does the server store separate files for each quality?](#youtube-has-the-same-video-in-1080p-and-144p-does-the-server-store-separate-files-for-each-quality) |
 
 ---
 
@@ -410,6 +417,64 @@ Fix: tagged pointers / version stamps alongside the value, or hazard pointers in
 
 ---
 
+## You have 3 servers, each running the same midnight cron job. Now every email is sent 3 times. Fix it.
+
+**SIMPLE EXPLANATION — Read This First**
+
+Short Answer: `cron` is a per-machine primitive with no concept of your other servers. When you scale a service horizontally from 1 instance to 3, you silently went from "1 scheduler" to "3 independent schedulers" that all fire at the same wall-clock time. The fix is to make exactly one instance win the right to run the job (a distributed lock or a leader election), and — as a second line of defense — make the job's side effect (sending the email) idempotent so a duplicate execution is a safe no-op instead of a duplicate send.
+
+- The bug, precisely: nothing in `crontab -e` on Server A knows that Server B and Server C exist. Each server's OS-level cron daemon reads its own crontab and fires independently. This isn't a race condition in the concurrency-control sense (no shared state is being corrupted) — it's an *uncoordinated duplication* problem: 3 correct, independent executions of correct code.
+- Fix 1 (do this): Distributed lock before running — each instance tries `SET job:send-digest:2026-08-12 NX EX 300` in Redis (or `INSERT ... ON CONFLICT DO NOTHING` / `SELECT ... FOR UPDATE SKIP LOCKED` in Postgres) right before executing. Only the instance whose `SET NX` succeeds runs the job; the other two see the key already exists and skip.
+- Fix 2 (better at scale): Leader election — designate one server the leader (via Redis/etcd/ZooKeeper lease, or a Kubernetes `Lease` object) and only the leader's scheduler fires *any* cron job. Cheaper than a per-job lock when you have many recurring jobs, and the leader automatically fails over if it dies.
+- Fix 3 (best architecturally): Don't run cron on app servers at all. Move scheduling to something that natively guarantees single-execution — a Kubernetes `CronJob` with `concurrencyPolicy: Forbid`, a managed scheduler (AWS EventBridge Scheduler → single Lambda/SQS), or a dedicated scheduler service separate from the horizontally-scaled app fleet.
+- Defense in depth (do this too, always): Make the email send itself idempotent — before sending, check/set a `(job_name, run_date, recipient)` row with a unique constraint. Even if two instances somehow both win the lock (clock skew, lock expiring mid-run), the second one's insert fails the unique constraint and it skips the actual send. This is the same "unique constraint as the final backstop" pattern as the duplicate-insert race above — locks reduce the *probability* of a double-run, only a uniqueness guarantee at the point of the side effect *eliminates* it.
+
+**DEEP DIVE — Technical Architecture Below**
+
+#### From 3 Independent Crons to 1 Coordinated Job
+
+```
+  Before (the bug)                         After (the fix)
+  ─────────────────                        ────────────────
+  00:00 Server A: cron fires → send email   00:00 Server A: cron fires
+  00:00 Server B: cron fires → send email       → SET NX job-lock:2026-08-12 (wins)
+  00:00 Server C: cron fires → send email       → runs job → sends email
+                                             00:00 Server B: cron fires
+  Result: email sent 3x per user                → SET NX job-lock:2026-08-12 (fails, key exists)
+                                                 → skips
+                                             00:00 Server C: cron fires
+                                                 → SET NX job-lock:2026-08-12 (fails)
+                                                 → skips
+
+                                             Result: email sent 1x per user
+                                             Backstop: send_log unique(job, date, recipient)
+                                             catches it even if the lock layer ever double-fires
+```
+
+#### Why a Naive Fix Doesn't Work
+
+| Naive "fix" | Why it fails |
+| --- | --- |
+| Only deploy the cron job to 1 of the 3 servers | Works until that server is redeployed/rescheduled by the orchestrator and the crontab isn't re-applied, or someone adds a 4th server and forgets — silent regression with no alarm |
+| Have each server check "did *I* already run this today" | Doesn't help — the bug isn't one server re-running, it's 3 *different* servers each running once; local state can't see across the fleet |
+| Random jitter / stagger start times | Reduces collision odds, doesn't eliminate them — still fundamentally 3 uncoordinated schedulers, and jitter adds latency for no real guarantee |
+
+#### Lock Design Details
+
+- TTL on the lock key must be longer than the job's worst-case runtime — if the job can take 4 minutes, use an 8–10 minute TTL, not 60 seconds, or the lock can expire mid-run and let a second instance start the same job.
+- Key must be scoped per logical run, not just per job name — `job:send-digest:{date}` (or `{date}:{hour}` for hourly jobs), so tomorrow's run isn't blocked by a stale key from a crashed run today.
+- Prefer `SET NX EX` (atomic set-if-not-exists-with-expiry) over separate `EXISTS` + `SET` calls — the separate version reintroduces the exact same check-then-act race this section is about.
+
+#### Theoretical Framework — Interview Talking Points
+
+- **CAP Theorem**: A distributed lock for "run exactly once" is a CP choice — under a network partition between the lock service and a worker, the safe behavior is to refuse to run (unavailable) rather than risk two workers both believing they hold the lock (inconsistent, duplicate sends). Choosing "fail to send this one cycle" over "maybe send it twice" is the right trade for anything user-visible.
+- **PACELC**: Under normal operation (no partition), acquiring the lock costs one extra round-trip (E-L: latency for consistency) before the job even starts — negligible for a job that runs once a day, but would matter for a job scheduled every few seconds.
+- **Write Amplification**: The idempotency backstop (unique constraint on `job_name + run_date + recipient`) adds one row and one index write per send — trivial compared to the cost of a duplicate email eroding user trust or triggering support tickets.
+- **Read/Write Trade-off**: The lock check is a read-before-write gate: every instance pays a small read (lock lookup) so that only one pays the write (the actual job execution) — the same shape as the idempotency-key pattern used for duplicate-insert prevention.
+- **Execution Trade-offs**: Leader election (fix 2) front-loads the coordination cost once, at leadership acquisition, rather than per-job (fix 1's per-job lock). Pick per-job locking for a handful of jobs where simplicity wins; pick leader election once you have dozens of scheduled jobs and don't want N lock round-trips per cycle.
+
+---
+
 ## Two users hit the same API at the exact same millisecond, both pass validation, and both try to insert the same record. Now you have duplicate data in production. What's your fix?
 
 **SIMPLE EXPLANATION — Read This First**
@@ -646,6 +711,214 @@ Short Answer: Gmail uses a Bloom Filter — a tiny data structure that sits enti
 - Read/Write Trade-off: The Bloom filter is an extreme read optimization. At the cost of 2.5 GB RAM and async update writes, 99% of DB reads are eliminated. Username availability is checked billions of times per day, written orders of magnitude less. Classic read-heavy optimization.
 - CAP Theorem: The check is AP: briefly says "available" for a username registered milliseconds ago (eventual consistency). The final registration DB write is CP: unique constraint enforces true consistency. Correct layering — use AP for responsive UX, CP for data integrity.
 
+
+---
+
+<!-- Topic: Database -->
+
+## Your database has grown from 10 million to 1 billion records. Queries that took 50ms now take 10 seconds. How do you fix it without replacing the database?
+
+**SIMPLE EXPLANATION — Read This First**
+
+Short Answer: At 10M rows your indexes and working set fit comfortably in RAM, so every lookup is a cheap in-memory operation. At 1B rows they no longer fit — the B-tree index has grown extra levels and most of it lives on disk, so each lookup now costs random I/O instead of a memory read. You don't need a new database engine; you need to work through a standard diagnostic ladder: fix missing/wrong indexes first, then table bloat, then query patterns, then partitioning, then offload reads — in that order, because each later step is more expensive and riskier than the one before it.
+
+- Step 1 — Profile before touching anything: Run `EXPLAIN ANALYZE` on the slow query. If you see a `Seq Scan` on a 1B-row table where you expected an `Index Scan`, that's most of your answer right there — a missing or unused index.
+- Step 2 — Missing/wrong index: Add a composite index matching the query's actual `WHERE`/`JOIN`/`ORDER BY` columns, in the right order (most selective / equality columns first, range columns last). A single wrong index can make the planner ignore it entirely and fall back to a full scan.
+- Step 3 — Index doesn't fit in memory anymore: At 1B rows, even the *correct* index may be too large for the buffer cache, so each lookup pages in from disk. Partitioning the table (by date range, tenant ID, etc.) shrinks each partition's index enough to stay hot in memory, and lets old/cold partitions live on cheaper, slower storage.
+- Step 4 — Table bloat: If this table has heavy UPDATE/DELETE traffic, dead tuples accumulate between vacuum cycles (Postgres) or fragmentation builds up (MySQL/InnoDB), forcing the engine to scan more physical pages than there are live rows. Tune `autovacuum` aggressiveness or schedule `OPTIMIZE TABLE`.
+- Step 5 — Bad query pattern at scale: `OFFSET`-based pagination (`LIMIT 20 OFFSET 500000`) forces the database to scan and discard 500,000 rows before returning 20 — cheap at 10M rows, ruinous at 1B. Switch to keyset/cursor pagination (`WHERE id > last_seen_id ORDER BY id LIMIT 20`).
+- Step 6 — Offload, don't replace: Add read replicas for read-heavy load, and cache hot/rarely-changing lookups in Redis so most reads never hit the primary at all. None of this requires swapping the database engine — it requires using the one you have correctly at this scale.
+
+**DEEP DIVE — Technical Architecture Below**
+
+#### Diagnostic Ladder
+
+```
+  Query is slow (50ms → 10s)
+      │
+      ▼
+  EXPLAIN ANALYZE the query
+      │
+      ├─ Seq Scan on huge table? ──────► Add/fix index on filter+sort columns
+      │                                   (re-measure)
+      ├─ Index Scan but still slow? ───► Index too big for RAM
+      │                                   → Partition table, keep hot partitions cached
+      ├─ High "Heap Fetches" / bloat? ─► VACUUM / OPTIMIZE TABLE, tune autovacuum
+      ├─ OFFSET pagination? ───────────► Switch to keyset pagination
+      └─ Still slow, read-bound? ──────► Read replicas + cache hot keys in Redis
+      │
+      ▼
+  Only after all of the above: consider sharding or a different engine
+```
+
+#### Root Cause vs Fix
+
+| Symptom in `EXPLAIN` | Root Cause | Fix | Risk if Skipped |
+| --- | --- | --- | --- |
+| `Seq Scan` on filter column | No index, or planner ignoring an existing one due to low selectivity/stale stats | `CREATE INDEX`, then `ANALYZE` to refresh planner statistics | Full table scans stay O(n) forever as the table grows |
+| `Index Scan` but high buffer reads | Index bigger than available cache — cold, disk-bound lookups | Range/hash partition; keep recent/hot partitions in a fast tier | Every query pays random-I/O latency regardless of indexing |
+| Growing `n_dead_tup` | Heavy churn without enough vacuum throughput | Tune `autovacuum_vacuum_scale_factor`, or manual `VACUUM (ANALYZE)` off-peak | Bloat compounds — table physically grows even as logical row count is stable |
+| Latency scales with `OFFSET` value | Pagination anti-pattern | Keyset pagination (`WHERE id > ?`) | Deep-page requests get linearly worse forever |
+| CPU/connections maxed on primary, index/query already optimal | Single primary can't serve the read volume | Read replicas, read-through cache | Any further data growth re-triggers the same incident |
+
+#### Theoretical Framework — Interview Talking Points
+
+- **CAP Theorem**: Adding read replicas trades strict consistency for availability and read throughput — replicas serve slightly stale data (AP-leaning) so the primary isn't overwhelmed. Fine for a product catalog page; wrong for a balance check right before approving a payment.
+- **PACELC**: Even with no partition, you're choosing latency over consistency the moment you read from a replica — accept a small replication lag (E-L) in exchange for not adding load to the primary.
+- **Write Amplification**: Every new secondary index you add to fix a slow query also makes every future `INSERT`/`UPDATE` slightly slower, because the engine must maintain that index too. Add indexes deliberately, based on real query patterns — not defensively.
+- **Read/Write Trade-off**: This entire diagnostic ladder is a read-optimization exercise; if the table is write-heavy instead, the fix path differs (batch writes, reduce index count, partition for write locality rather than read locality).
+- **Execution Trade-offs**: Partitioning and read replicas are operationally reversible and low-risk; swapping the database engine is a multi-month, high-risk migration. Exhaust the cheap, reversible fixes before ever considering the expensive, irreversible one — which is precisely why the question specifies "without replacing the database."
+
+---
+
+## You DELETE a million rows, but the database size doesn't shrink. Where did the space go?
+
+**SIMPLE EXPLANATION — Read This First**
+
+Short Answer: `DELETE` doesn't erase bytes from disk — it marks those rows as dead/invisible so the storage engine can reuse the space *internally*, but it doesn't hand the space back to the operating system. The file on disk stays the same size (or even grows temporarily) until you explicitly run a compaction operation that physically rewrites the table.
+
+- Why the row isn't actually gone: Most production databases (Postgres, MySQL/InnoDB) use MVCC — multiple versions of a row can exist so that a transaction which started before your `DELETE` still sees the old version. `DELETE` marks the row's tuple as dead for future transactions, it doesn't synchronously rewrite the file.
+- Where the space "went": Dead tuples sit in the same table/index pages as live rows. The space becomes free-list space the engine can reuse for *future inserts into that same table* — but the file itself doesn't shrink, because shrinking a file means moving all the still-live data to the front and truncating the end, which is a much more expensive operation.
+- Routine `VACUUM` (Postgres) / normal operation reclaims dead space for reuse but does **not** shrink the file on disk.
+- `VACUUM FULL` (Postgres) / `OPTIMIZE TABLE` (MySQL) does a full table rewrite into a new, compact file and then swaps it in — this *does* shrink the file and return space to the OS, but takes an exclusive lock (blocking) on that table for the duration, so it's disruptive on a large table unless you use an online variant (`pg_repack`, `gh-ost`, `pt-online-schema-change`) that rewrites in the background with minimal locking.
+- Indexes bloat the same way and need a `REINDEX` alongside the table compaction, or the old bloated index sticks around even after the table itself is compacted.
+- Better than deleting a million rows at once: if this was a planned bulk delete (e.g., "purge data older than 2 years"), partition the table by date and `DROP` the whole old partition instead — that's an instant metadata operation with zero bloat, versus a slow row-by-row `DELETE` that bloats both the table and its indexes.
+
+**DEEP DIVE — Technical Architecture Below**
+
+#### Tuple Lifecycle Under MVCC
+
+```
+  Row inserted           Row deleted              Routine VACUUM         VACUUM FULL / pg_repack
+  ───────────           ────────────              ───────────────        ───────────────────────
+  Live tuple      →     Marked dead,        →      Dead tuple slot   →    Table physically
+  visible to all         invisible to new           added to the          rewritten into a new,
+  new transactions       transactions, but           free space map —     compact file; old file
+                         still visible to any         reusable by          dropped. File size on
+                         transaction that              FUTURE inserts      disk actually shrinks;
+                         started earlier               into THIS table.    space returned to OS.
+                         (MVCC snapshot)               File size on disk
+                                                        UNCHANGED.
+```
+
+#### What Reclaims What
+
+| Operation | Reclaims space for reuse within the table | Shrinks the file on disk | Locking |
+| --- | --- | --- | --- |
+| `DELETE` | No (creates dead tuples) | No | Row-level, brief |
+| `VACUUM` (Postgres, routine/auto) | Yes | No | None (runs concurrently) |
+| `VACUUM FULL` (Postgres) | Yes | Yes | Exclusive table lock |
+| `pg_repack` / `gh-ost` / `pt-online-schema-change` | Yes | Yes | Brief lock only at swap step |
+| `OPTIMIZE TABLE` (MySQL/InnoDB) | Yes | Yes | Table lock (varies by engine) |
+| `DROP PARTITION` (planned bulk delete) | N/A — whole file segment removed | Yes, instantly | Minimal (metadata-only) |
+
+#### Theoretical Framework — Interview Talking Points
+
+- **CAP Theorem**: MVCC's "keep the old version around" behavior is what lets long-running read transactions stay consistent (their own snapshot) without blocking concurrent deletes — a consistency mechanism that happens to have a storage-space cost as its side effect.
+- **PACELC**: Routine `VACUUM` runs concurrently with normal traffic (low latency impact, eventual space reclaim) — the E-L choice here favors availability/latency over immediate space reclamation. `VACUUM FULL` inverts that: you accept blocked latency now in exchange for reclaiming space immediately.
+- **Write Amplification**: A bulk `DELETE` of a million rows is itself a large write (every row's tuple header gets rewritten as dead), and the subsequent `VACUUM`/compaction is a second wave of writes over the same data — this is why `DROP PARTITION` is so much cheaper: it avoids both waves entirely.
+- **Read/Write Trade-off**: Leaving dead tuples in place (skipping `VACUUM FULL`) keeps writes fast (no blocking) at the cost of reads scanning through more physical pages than there are logical rows — a classic space/latency trade-off you can tune via `autovacuum` aggressiveness.
+- **Execution Trade-offs**: For planned, predictable bulk deletes, design the schema (partitioning) so the "delete" becomes a metadata-only `DROP PARTITION` up front, rather than reaching for `VACUUM FULL` as an after-the-fact cleanup — the same principle as "prevent the race" beating "clean up after the race" elsewhere in this document.
+
+---
+
+## Both UUID and auto-increment give unique IDs. Why can UUIDs make your database slower?
+
+**SIMPLE EXPLANATION — Read This First**
+
+Short Answer: Both guarantee uniqueness, but they behave completely differently as index keys. Auto-increment IDs are sequential, so every new row is appended at the right-hand edge of the primary key's B-tree — cheap, cache-friendly, no fragmentation. Random UUIDs (v4) land at a random position in that same B-tree on every insert, causing page splits, poor cache locality, and a larger index footprint — and it gets worse as the table grows, exactly like the query in the question above.
+
+- B-tree insert pattern: With an auto-increment key, inserts always go to the last leaf page — that page stays "hot" in memory, and once it's full a new page is allocated cleanly at the end. With a random UUID, each insert can land on any leaf page, forcing pages that were already full to split, which fragments the index and defeats the storage engine's read-ahead/caching assumptions.
+- Size overhead: A UUID is 16 bytes vs. 4 bytes (INT) or 8 bytes (BIGINT) for an auto-increment ID. That's not just the primary key column — every secondary index and every foreign key referencing this table now carries that larger key too, inflating total index size and pushing more of it out of RAM.
+- Cache locality: Databases assume recently-inserted rows are often accessed together (e.g., "today's orders"). Sequential IDs preserve that physical locality; random UUIDs scatter logically-related rows across the whole table, so a range scan over "recent rows" touches far more disk pages.
+- You don't have to give up UUIDs entirely: Use a *time-ordered* UUID (UUIDv7) or a similar scheme (ULID, Twitter Snowflake, KSUID) — these keep the "globally unique, generatable client-side, no central counter" benefits of UUIDs while preserving mostly-sequential insert order, so you keep the B-tree locality of auto-increment. Alternatively, keep a sequential `BIGINT` as the physical/clustered primary key and expose the UUID as a separate unique, indexed public identifier.
+
+**DEEP DIVE — Technical Architecture Below**
+
+#### Insert Pattern: Sequential vs Random Keys
+
+```
+  Auto-increment inserts (1, 2, 3, 4, 5...)     Random UUID v4 inserts
+  ──────────────────────────────────────        ───────────────────────
+  [1][2][3][4]  [5][ ][ ][ ]  ← new page          [a3f..][ ][ ][ ]
+   full page     appending      allocated          [ ][7b2..][ ][ ]     ← scattered
+                 here (hot)      cleanly            [ ][ ][ ][e91..]        across many
+                                                     [c04..][ ][ ][ ]       pages, causing
+  → sequential writes, no fragmentation             page splits as       splits/fragmentation
+                                                     new random keys
+                                                     land mid-page
+```
+
+#### Comparing ID Strategies
+
+| Strategy | Size | Insert locality | Globally unique (multi-server safe) | Predictable / enumerable | Best for |
+| --- | --- | --- | --- | --- | --- |
+| Auto-increment (`BIGINT`) | 8 bytes | Sequential (fast, cache-friendly) | No — needs central counter, breaks in multi-primary setups | Yes (can leak row counts/IDs) | Single-writer systems, internal keys |
+| UUID v4 (random) | 16 bytes | Random (page splits, fragmentation) | Yes | No | Distributed ID generation without coordination, at the cost of index locality |
+| UUIDv7 / ULID (time-ordered) | 16 bytes | Mostly sequential (time-prefixed) | Yes | Partially (timestamp visible) | Distributed systems that still want B-tree-friendly inserts |
+| Snowflake ID | 8 bytes | Mostly sequential (timestamp + machine ID bits) | Yes (with coordinated machine IDs) | Partially | High-throughput distributed systems (Twitter, Discord) |
+
+#### Theoretical Framework — Interview Talking Points
+
+- **CAP Theorem**: Auto-increment IDs require a single source of truth for "the next number" — a CP dependency that becomes a bottleneck or single point of failure in a multi-region write setup. UUIDs remove that dependency entirely (any node can generate a globally unique ID with zero coordination), trading index locality for availability of ID generation itself.
+- **PACELC**: Choosing UUIDs is implicitly choosing to pay a latency/throughput cost on every write (page splits, larger indexes) at all times — not just during partitions — in exchange for not needing a coordinated ID-generation service. UUIDv7 is the PACELC-aware middle ground: still coordination-free, but without paying the full locality tax.
+- **Write Amplification**: Page splits from random UUID inserts are a direct write-amplification cost — one logical insert can trigger a page split, which means rewriting an entire index page rather than just appending a few bytes.
+- **Read/Write Trade-off**: The insert-time cost of UUIDs (fragmentation) also becomes a read-time cost later — range scans and cache hit rates both degrade as the index gets less physically ordered, so this isn't a one-time write penalty, it compounds on every subsequent read too.
+- **Execution Trade-offs**: If you already have a UUID-keyed table suffering this problem, the fix isn't necessarily "migrate everything to BIGINT" (high-risk, breaking change for any external API exposing the UUID) — often the pragmatic fix is adding a sequential `BIGINT` clustered/physical key internally while keeping the UUID as the public-facing unique identifier, giving you both properties without an API-breaking migration.
+
+---
+
+<!-- Topic: DevOps -->
+
+## What are the different deployment strategies and when to use them?
+
+**SIMPLE EXPLANATION — Read This First**
+
+Short Answer: The four core strategies — Recreate, Rolling, Blue-Green, and Canary — trade off downtime, rollback speed, and infrastructure cost against each other. There's no single "best" one; you pick based on how much downtime you can tolerate, how fast you need to roll back if something's wrong, and how much you're willing to pay for running duplicate infrastructure during the switch. Feature flags are a complementary tool that decouples "deploying code" from "releasing a feature," and work alongside any of the four.
+
+- Recreate: Stop all old instances, then start all new ones. Simple, but causes downtime. Fine for internal tools, batch jobs, or dev/staging — never for a user-facing production service.
+- Rolling update: Replace instances a few at a time, keeping the service available throughout (this is Kubernetes' default `Deployment` strategy). No downtime, low extra cost (never running much more than N+1 instances), but rollback means rolling the same way in reverse — not instant.
+- Blue-Green: Run two complete, identical environments ("blue" = current, "green" = new). Deploy fully to green, test it, then flip the load balancer/DNS to send all traffic to green instantly. Rollback is just flipping back — as fast as the switch itself. Costs roughly 2x infrastructure during the cutover window.
+- Canary: Route a small percentage of real production traffic (e.g., 5%) to the new version, watch error rates/latency, then gradually increase (5% → 25% → 50% → 100%) — or automatically roll back if metrics degrade. Smallest blast radius if something's wrong, because only a fraction of users ever saw the bad version, but requires good monitoring/automation to be safe.
+- The one thing all three no-downtime strategies (rolling, blue-green, canary) require: your database schema and API must be backward *and* forward compatible for the whole rollout window, because old and new code run simultaneously against the same data store. This is the "expand-contract" pattern — add new columns/fields as optional first, deploy code that can read both old and new shapes, then remove the old shape only in a later release.
+
+**DEEP DIVE — Technical Architecture Below**
+
+#### Strategy Comparison
+
+| Strategy | Downtime | Rollback speed | Extra infra cost | Blast radius if broken | Best for |
+| --- | --- | --- | --- | --- | --- |
+| Recreate | Yes | Slow (full redeploy) | None (1x) | 100% of users | Non-critical/internal apps, dev/staging |
+| Rolling | None (if min-available kept) | Moderate (roll back gradually) | Low (~N+1 instances) | Partial, grows during rollout | Default for most stateless services |
+| Blue-Green | None | Instant (flip back) | High (2x during cutover) | 100% once flipped — but detected fast | Changes needing an instant, clean rollback; DB-migration-safe releases |
+| Canary | None | Fast (small % affected) | Medium (extra capacity for canary slice) | Small (only canary %) | High-risk changes; need real production signal before full rollout |
+
+#### Canary Progression With Automated Rollback
+
+```
+  5% traffic → new version
+      │
+      ▼
+  Monitor error rate / p99 latency vs. baseline (e.g. 2-5 min window)
+      │
+      ├─ Metrics healthy ──► increase to 25% ──► monitor ──► 50% ──► 100%
+      │
+      └─ Error rate > threshold ──► automatic rollback to 0%
+                                      (old version keeps 100% of traffic)
+```
+
+#### Complementary Tool: Feature Flags
+
+- Decouples *deploying* code (getting it running in production) from *releasing* a feature (turning it on for users) — the new code can ship dark behind a flag, get toggled on for internal users first, then a % of real users, independent of the deployment strategy used to get it there.
+- Lets you separate "is this code safe to run" (deployment concern) from "is this feature ready for users" (product concern) — a rolling deploy can finish in minutes while a feature stays behind a flag for weeks of gradual rollout.
+
+#### Theoretical Framework — Interview Talking Points
+
+- **CAP Theorem**: Blue-green and canary both rely on running two versions against the *same* data store simultaneously — which is really a consistency problem in disguise: both versions must agree on how to read/write the shared schema, or you get subtly corrupted data rather than a clean partition-style failure.
+- **PACELC**: Canary is explicitly a latency-for-safety trade even with no partition — you deliberately slow down your rollout (take longer to reach 100%) in exchange for a tighter feedback loop on production signal before committing everyone to the new version.
+- **Write Amplification**: Blue-green's 2x infrastructure during cutover is the deployment-strategy equivalent of write amplification — you're paying double the resource cost for the safety property of an instant, clean rollback.
+- **Read/Write Trade-off**: Expand-contract schema changes bias toward extra read complexity (application code must handle both old and new shapes during the transition) in exchange for zero-downtime writes — you never block writes to add the safety window.
+- **Execution Trade-offs**: Rolling deploys are the pragmatic default because they need no extra infrastructure and no extra tooling; reach for blue-green or canary specifically when the risk of the *specific* change (schema migration, payment logic, a rewrite) justifies the added operational complexity — using canary for every trivial config change is over-engineering the same way using a distributed lock for a single-threaded script would be.
 
 ---
 
@@ -1399,6 +1672,63 @@ Synchronous orchestration is simpler to reason about but creates latency chains 
 
 End of Document — System Design Interview Repository
 
+---
+
+## A microservice is very slow because of external API calls. How do you optimize it?
+
+**SIMPLE EXPLANATION — Read This First**
+
+Short Answer: First figure out *why* it's slow — are you calling multiple external APIs one after another (serialized latency), calling them synchronously when you don't need the result immediately, or getting stuck behind a degraded upstream with no timeout? Then apply the fix that matches: parallelize independent calls, cache what doesn't need to be real-time, add timeouts + circuit breakers so a slow dependency can't stall your whole service, and move anything non-critical off the synchronous request path entirely.
+
+- Diagnose first: Trace the request. If total latency ≈ sum of each external call's latency, they're running sequentially and parallelization is your biggest win. If latency ≈ the slowest call but still too slow, the problem is that one dependency, not your orchestration.
+- Fix 1 — Parallelize independent calls: If you're calling 3 unrelated external APIs with `await`/blocking calls back-to-back, run them concurrently (`Promise.all`, `asyncio.gather`, parallel threads) instead — your latency becomes `max(calls)` instead of `sum(calls)`.
+- Fix 2 — Cache what you can: For external data that doesn't need to be real-time on every request (exchange rates, geocoding, product catalog lookups), cache responses in Redis with a sensible TTL. This is usually the single highest-leverage fix, because it removes the external call from the hot path entirely for most requests.
+- Fix 3 — Timeouts + circuit breaker: Set an aggressive timeout on every external call (don't rely on the library's default, which is often far too long or infinite). Wrap the call in a circuit breaker so that once the external API is clearly degraded, you fail fast instead of piling up slow requests and exhausting your own thread/connection pool — the classic cascading-failure pattern.
+- Fix 4 — Move it off the request path: If the external call's result isn't needed for the response you're about to send (e.g., "notify a partner system," "log to analytics"), don't call it synchronously at all — publish an event / enqueue a background job, respond to your own caller immediately, and let a worker handle the external call asynchronously.
+- Fix 5 — Bulkhead isolation: Give each external dependency its own connection pool / thread pool, so a slow or hanging API can't starve calls to a different, healthy API sharing the same pool.
+- Fix 6 — Batch where the API supports it: If you're calling the same external API N times in a loop, check whether it offers a batch endpoint — one round-trip for N items beats N round-trips.
+
+**DEEP DIVE — Technical Architecture Below**
+
+#### Before vs After
+
+```
+  Before: sequential, unbounded, no isolation
+  ─────────────────────────────────────────────
+  Request → call API-A (200ms) → call API-B (300ms) → call API-C (150ms) → respond
+  Total latency ≈ 650ms, and if API-B hangs, this request (and every thread
+  waiting behind it) hangs too — no timeout, no circuit breaker.
+
+  After: parallel + cached + protected
+  ─────────────────────────────────────────────
+  Request → [call API-A, call API-B, call API-C] in parallel, each with:
+              - a tight timeout (e.g. 300ms)
+              - its own connection pool (bulkhead)
+              - a circuit breaker (skip the call if API is already tripped)
+              - a cache check first (skip the call entirely on a hit)
+            → respond once all three resolve or time out
+  Total latency ≈ max(calls that actually ran) ≈ 300ms, and a broken API-B
+  can't take down calls to A or C, nor exhaust the whole service's capacity.
+```
+
+#### Technique Selection
+
+| Technique | Fixes | When to use | Risk if misapplied |
+| --- | --- | --- | --- |
+| Parallelize independent calls | Serialized latency (sum → max) | Multiple unrelated external calls per request | None real — almost always safe if calls are truly independent |
+| Cache with TTL | Repeated calls for the same/similar data | Data that tolerates some staleness | Serving stale data for something that needed to be real-time (e.g., live inventory) |
+| Timeout + circuit breaker | Cascading failure from a hanging dependency | Any synchronous external call, always | Timeout set too aggressively causes false trips on a merely-slow-but-healthy API |
+| Async / event-driven offload | External call isn't needed for the response | Non-critical side effects (notifications, analytics, webhooks) | Using it for calls the *caller* actually needs the result of — now you've just added complexity without removing latency from the path that matters |
+| Bulkhead (separate pools) | One dependency starving others | Multiple external dependencies with very different reliability/latency profiles | Over-partitioning pools for a service with only one dependency — unnecessary complexity |
+| Batch requests | N sequential calls to the same API | API supports a batch/bulk endpoint | Batching so large a single failure invalidates a big batch — bound batch size |
+
+#### Theoretical Framework — Interview Talking Points
+
+- **CAP Theorem**: A circuit breaker is an availability-preserving choice — when the external dependency is unreachable/degraded, you deliberately serve a fallback or fail fast (staying available for the rest of your service) rather than blocking indefinitely waiting for a consistent answer from a partitioned dependency.
+- **PACELC**: Caching external API responses is a textbook PACELC trade even absent any partition — you accept slightly stale data (sacrificing consistency) in exchange for latency, because a live call to a third party is always slower than a local cache hit.
+- **Write Amplification**: Doesn't directly apply to read-heavy external calls, but the analogous cost is *retry amplification* — retrying a failing external call without backoff multiplies load on an already-struggling dependency, worsening the outage you're trying to route around.
+- **Read/Write Trade-off**: Most external-API slowness problems are read-latency problems, which is exactly why caching is so effective here — you're trading a small amount of staleness for a large latency win, the same trade-off pattern as read replicas.
+- **Execution Trade-offs**: Moving a call off the synchronous path (fix 4) trades immediate consistency (the caller doesn't know the side effect finished yet) for responsiveness and resilience — appropriate only when the caller genuinely doesn't need to wait for that result, which is a product decision as much as an engineering one.
 
 ---
 
@@ -2549,6 +2879,68 @@ vector_db.query(q_vec, filter={"valid_from": {"$lte": "2024-01-10"}})
 - Write Amplification: A full re-index triggers write amplification across: text re-extraction, re-embedding (API cost), vector DB upserts, BM25 rebuild. Incremental hash-based updates reduce this from O(N) to O(changed_docs) — typically O(100) vs O(5000) for hourly changes. 50x cost reduction.
 - Execution Trade-offs: Index updates must be fully async relative to query serving. Synchronous updates (blocking queries during mutation) cause 503s every hour. Asynchronous blue/green deployment decouples update cadence from query availability. The alias swap is O(1) atomic regardless of index size — this is the clean solution to the sync/async trade-off.
 
+
+---
+
+## Users ask in casual Hindi-English like 'kitna refund milega for cancelled order', but your docs are in formal English. How do you handle code-mixed queries in retrieval?
+
+**SIMPLE EXPLANATION — Read This First**
+
+Short Answer: Your embedding model was almost certainly trained mostly on monolingual, formal text — a code-mixed, colloquial query like "kitna refund milega for cancelled order" lands in a very different part of vector space than "refund policy for cancelled orders" in your formal English docs, so cosine similarity between them is weak and retrieval quality drops, even though a human reads both as the same question. The fix works at three layers: normalize the query before embedding, use (or fine-tune) an embedding model that actually understands code-mixed text, and back dense retrieval up with sparse/keyword matching so you're not relying on semantic similarity alone.
+
+- Root cause, precisely: this is a train/query distribution mismatch, not a bug — the retriever is doing exactly what it was trained to do, on a query distribution it was never trained on. "Formal English docs, formal English eval queries" during development hides this regression until real (code-mixed) user traffic hits production.
+- Fix 1 — Query normalization/rewriting: Before embedding, run the raw query through a lightweight LLM or rule-based transliteration/translation step that converts "kitna refund milega" → "how much refund will I get" (or a normalized Hinglish-to-English gloss). This is the highest-leverage, fastest-to-ship fix because it doesn't require retraining anything — you're fixing the input, not the model.
+- Fix 2 — Multilingual/code-mix-aware embeddings: Swap the embedding model for one trained on multilingual or code-mixed corpora (e.g., multilingual-E5, LaBSE, or a provider's multilingual embedding endpoint) instead of an English-only model — these place semantically equivalent text from different languages/scripts closer together in vector space even without an explicit translation step.
+- Fix 3 — Hybrid retrieval as a safety net: Combine dense (embedding) search with sparse/keyword search (BM25) plus a small synonym/transliteration dictionary for common domain terms (paisa/refund, cancel karna/cancel, order/mangwaya) — when the embedding similarity is weak, keyword overlap on the transliterated/translated terms can still surface the right chunk.
+- Fix 4 — Close the loop with real data: Mine actual code-mixed queries and the documents users ultimately found useful (via clicks/feedback) and use those pairs to fine-tune the retriever or the reranker — generic multilingual embeddings get you most of the way, but domain-specific code-mixed pairs (your actual Hinglish support vocabulary) close the rest of the gap.
+- Critical: your eval set must include code-mixed queries. An English-only eval suite will show green metrics while production quality silently degrades for exactly the users this question is about.
+
+**DEEP DIVE — Technical Architecture Below**
+
+#### Code-Mixed Retrieval Pipeline
+
+```
+  Raw query: "kitna refund milega for cancelled order"
+      │
+      ▼
+  Language ID / script detection
+   (romanized Hindi + English tokens mixed)
+      │
+      ▼
+  Query normalization (LLM-based rewrite or transliteration)
+   → "how much refund will I get for a cancelled order"
+      │
+      ▼
+  ┌─────────────────────────┐    ┌─────────────────────────┐
+  │ Dense retrieval          │    │ Sparse/keyword retrieval │
+  │ (multilingual embedding) │    │ (BM25 + synonym dict)    │
+  └─────────────┬─────────────┘    └─────────────┬─────────────┘
+                │                                 │
+                └───────────────┬─────────────────┘
+                                 ▼
+                     Merge + rerank (cross-encoder,
+                     ideally trained on code-mixed pairs)
+                                 │
+                                 ▼
+                     Top-k chunks → generation
+```
+
+#### Why Each Layer Matters
+
+| Layer | What it fixes | What it misses alone |
+| --- | --- | --- |
+| Query normalization only | Cheap, fast, no retraining | Brittle for queries the rewrite model mistranslates or doesn't recognize as code-mixed |
+| Multilingual embeddings only | Handles code-mix without an extra rewrite step, more robust generally | Still weaker than English-only embeddings on pure-English queries if not carefully chosen/tuned |
+| Hybrid (dense + sparse) only | Catches cases where semantic similarity fails but keyword overlap exists | Doesn't fix the root semantic gap — a pure paraphrase with zero shared keywords still fails |
+| All three + domain fine-tuning | Closes the gap comprehensively | Requires labeled code-mixed query-document pairs, which take effort to collect |
+
+#### Theoretical Framework — Interview Talking Points
+
+- **CAP Theorem**: Not directly applicable to embedding quality, but the eval-pipeline analogue is real: an English-only eval set gives you a falsely "consistent" (green) signal while the actual production query distribution silently diverges — the RAG equivalent of a monitoring blind spot masking a partition.
+- **PACELC**: Query rewriting (fix 1) adds one extra LLM call before retrieval — a latency cost paid on every query in exchange for correctness on the code-mixed subset. If p50 latency is critical, run the rewrite step only when language ID detects code-mixing, not on every query.
+- **Write Amplification**: Not a write-path problem, but the training-data analogue is real: every new code-mixed query pattern you want the retriever to handle well ideally needs representation in the fine-tuning set — under-representing code-mix in training data is the root cause you're patching around at inference time with fixes 1 and 3.
+- **Read/Write Trade-off**: Hybrid retrieval (dense + sparse) roughly doubles retrieval-time compute (two search paths merged) in exchange for materially better recall on exactly the queries a single retrieval method would miss — worth it for a support/refund use case where a wrong or missing answer has real cost.
+- **Execution Trade-offs**: Ship fix 1 (query normalization) first — it's reversible, requires no retraining, and is testable within a day. Treat fixes 2 and 4 (better embeddings, fine-tuning) as the durable follow-up once you have production evidence (from fix 1's rollout) of exactly which code-mixed patterns still fail.
 
 ---
 
