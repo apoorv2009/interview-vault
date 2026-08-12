@@ -106,6 +106,7 @@ Cumulative across practice attempts — each new attempt's misses get appended h
 - `permissionDecision` accepts **`allow`, `deny`, `ask`, and `defer`** — not just allow/deny/ask.
 - `ask` routes the call to a human for an explicit yes/no. `defer` hands the decision to the normal permission configuration instead of the hook deciding outright.
 - A three-value framing (allow/deny/ask) that drops `defer` is a distractor to watch for.
+- 🎯 **Missed twice now** — once on the full 53-question mock, again on a mock built specifically to drill it. The note alone isn't sticking; use the mnemonic **A·D·A·D — Allow, Deny, Ask, Defer** (say it in that order, it's alphabetical-ish and rhymes) until picking `ask` and `defer` out of a 5-option list is automatic.
 
 #### 12. Cache-prefix structure: stable content in system, variable content in user turn (D2)
 - Persistent rules/instructions belong in the **system prompt** — they apply every turn and form a reusable cached prefix.
