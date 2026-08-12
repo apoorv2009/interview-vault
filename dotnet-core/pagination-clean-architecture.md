@@ -29,6 +29,7 @@ rather than actually creating folders.
 | 13 | [Unit of Work](#13-unit-of-work--infrastructurepersistenceunitofworkcs) | `Infrastructure/Persistence/UnitOfWork.cs` |
 | 14 | [Controller](#14-controller--apicontrollersproductscontrollercs) | `API/Controllers/ProductsController.cs` |
 | 15 | [DI wiring](#15-di-wiring--apiprogramcs) | `API/Program.cs` |
+| 16 | [Angular UI consumption](#16-angular-ui-consumption--how-the-frontend-calls-this-api) | `src/app/...` |
 | — | [SOLID — one line each](#solid--one-line-each-memorize-these) | — |
 | — | [Offset vs Cursor — which do you use?](#offset-vs-cursor--one-line-answer-if-asked-which-do-you-use) | — |
 | — | [What to actually write in 60 minutes](#what-to-actually-write-in-60-minutes-no-ide) | — |
@@ -544,6 +545,275 @@ app.UseAuthorization();
 app.MapControllers();
 app.Run();
 ```
+
+---
+
+## 16. Consuming the API from the UI — (React example, either style works with any frontend)
+
+**Offset pagination — classic page-numbered table**
+
+```jsx
+function ProductTable() {
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(20);
+  const [data, setData] = useState({ items: [], totalPages: 1 });
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    fetch(`/api/products?page=${page}&pageSize=${pageSize}`)
+      .then(res => res.json())
+      .then(setData)
+      .finally(() => setLoading(false));
+  }, [page]);
+
+  return (
+    <>
+      <table>{data.items.map(p => <ProductRow key={p.id} product={p} />)}</table>
+
+      <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</button>
+      <span>Page {page} of {data.totalPages}</span>
+      <button disabled={page >= data.totalPages} onClick={() => setPage(p => p + 1)}>Next</button>
+    </>
+  );
+}
+```
+
+**Cursor pagination — infinite scroll feed**
+
+```jsx
+function ProductFeed() {
+  const [items, setItems] = useState([]);
+  const [cursor, setCursor] = useState(null);
+  const [hasMore, setHasMore] = useState(true);
+  const sentinelRef = useRef(null);
+
+  const loadMore = useCallback(async () => {
+    if (!hasMore) return;
+    const url = cursor
+      ? `/api/products/cursor?cursor=${encodeURIComponent(cursor)}&limit=20`
+      : `/api/products/cursor?limit=20`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    setItems(prev => [...prev, ...data.items]);
+    setCursor(data.nextCursor);
+    setHasMore(data.hasMore);
+  }, [cursor, hasMore]);
+
+  // Fire loadMore() once on mount, then again whenever the sentinel div
+  // scrolls into view (IntersectionObserver) — no page numbers needed.
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) loadMore();
+    });
+    if (sentinelRef.current) observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [loadMore]);
+
+  return (
+    <>
+      {items.map(p => <ProductCard key={p.id} product={p} />)}
+      <div ref={sentinelRef} />{/* triggers next fetch when scrolled into view */}
+    </>
+  );
+}
+```
+
+**Talking points if asked "how does the UI call this?"**
+
+- Offset: UI owns `page` state, requests a specific page, shows Prev/Next or numbered
+  buttons — needs `totalPages`/`totalCount` from the response to render page numbers.
+- Cursor: UI never asks for a page number — it just resends the **opaque `nextCursor`**
+  it got back last time. This maps naturally onto infinite scroll / "Load more" UX,
+  since there's no concept of "page 5" to jump to.
+- Either way, the frontend treats the cursor as an opaque string — it must **not**
+  decode or construct it manually, since that's the server's contract to change.
+- Debounce/guard against duplicate requests (e.g. `hasMore` check, disable the
+  button while `loading`) so a fast double-scroll or double-click doesn't fire the
+  same request twice.
+
+---
+
+## 16. Angular UI consumption — how the frontend calls this API
+
+```
+src/app/
+  models/product.models.ts        → TS mirrors of the DTOs/result shapes
+  services/product.service.ts     → HttpClient calls, mapped to typed Observables
+  components/product-list/        → offset pagination (page numbers)
+  components/product-infinite/    → cursor pagination (infinite scroll / "load more")
+  environments/environment.ts     → apiBaseUrl
+```
+
+### 16.1 Models — (`src/app/models/product.models.ts`)
+
+```typescript
+export interface ProductDto {
+  id: number;
+  name: string;
+  category: string;
+  price: number;
+}
+
+export interface PagedResult<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+  totalPages: number;
+  hasPrevious: boolean;
+  hasNext: boolean;
+}
+
+export interface CursorPagedResult<T> {
+  items: T[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+```
+
+### 16.2 Service — (`src/app/services/product.service.ts`)
+
+```typescript
+import { Injectable, inject } from '@angular/core';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { environment } from '../../environments/environment';
+import { PagedResult, CursorPagedResult, ProductDto } from '../models/product.models';
+
+@Injectable({ providedIn: 'root' })
+export class ProductService {
+  private http = inject(HttpClient);
+  private baseUrl = `${environment.apiBaseUrl}/api/products`;
+
+  // Offset-based — GET api/products?page=1&pageSize=20&category=Electronics
+  getOffsetPaged(page: number, pageSize: number, category?: string): Observable<PagedResult<ProductDto>> {
+    let params = new HttpParams().set('page', page).set('pageSize', pageSize);
+    if (category) params = params.set('category', category);
+
+    return this.http.get<PagedResult<ProductDto>>(this.baseUrl, { params });
+  }
+
+  // Cursor-based — GET api/products/cursor?cursor=xyz&limit=20&category=Electronics
+  getCursorPaged(cursor: string | null, limit: number, category?: string): Observable<CursorPagedResult<ProductDto>> {
+    let params = new HttpParams().set('limit', limit);
+    if (cursor) params = params.set('cursor', cursor);
+    if (category) params = params.set('category', category);
+
+    return this.http.get<CursorPagedResult<ProductDto>>(`${this.baseUrl}/cursor`, { params });
+  }
+}
+```
+
+### 16.3 Offset pagination component (page numbers) — (`src/app/components/product-list/product-list.component.ts`)
+
+```typescript
+import { Component, OnInit, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ProductService } from '../../services/product.service';
+import { ProductDto } from '../../models/product.models';
+
+@Component({
+  selector: 'app-product-list',
+  standalone: true,
+  imports: [CommonModule],
+  template: `
+    <table>
+      <tr *ngFor="let p of items">
+        <td>{{ p.name }}</td>
+        <td>{{ p.category }}</td>
+        <td>{{ p.price | currency }}</td>
+      </tr>
+    </table>
+
+    <button [disabled]="!hasPrevious" (click)="goTo(page - 1)">Previous</button>
+    <span>Page {{ page }} of {{ totalPages }}</span>
+    <button [disabled]="!hasNext" (click)="goTo(page + 1)">Next</button>
+  `
+})
+export class ProductListComponent implements OnInit {
+  private productService = inject(ProductService);
+
+  items: ProductDto[] = [];
+  page = 1;
+  pageSize = 20;
+  totalPages = 0;
+  hasPrevious = false;
+  hasNext = false;
+
+  ngOnInit(): void {
+    this.load();
+  }
+
+  goTo(page: number): void {
+    this.page = page;
+    this.load();
+  }
+
+  private load(): void {
+    this.productService.getOffsetPaged(this.page, this.pageSize).subscribe(result => {
+      this.items = result.items;
+      this.totalPages = result.totalPages;
+      this.hasPrevious = result.hasPrevious;
+      this.hasNext = result.hasNext;
+    });
+  }
+}
+```
+
+### 16.4 Cursor pagination component (infinite scroll / "load more") — (`src/app/components/product-infinite/product-infinite.component.ts`)
+
+```typescript
+import { Component, OnInit, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { ProductService } from '../../services/product.service';
+import { ProductDto } from '../../models/product.models';
+
+@Component({
+  selector: 'app-product-infinite',
+  standalone: true,
+  imports: [CommonModule],
+  template: `
+    <div *ngFor="let p of items">{{ p.name }} — {{ p.price | currency }}</div>
+    <button [disabled]="!hasMore || loading" (click)="loadMore()">
+      {{ loading ? 'Loading…' : 'Load more' }}
+    </button>
+  `
+})
+export class ProductInfiniteComponent implements OnInit {
+  private productService = inject(ProductService);
+
+  items: ProductDto[] = [];
+  cursor: string | null = null;
+  hasMore = true;
+  loading = false;
+
+  ngOnInit(): void {
+    this.loadMore();
+  }
+
+  loadMore(): void {
+    if (this.loading || !this.hasMore) return;
+    this.loading = true;
+
+    this.productService.getCursorPaged(this.cursor, 20).subscribe(result => {
+      this.items = [...this.items, ...result.items];
+      this.cursor = result.nextCursor;
+      this.hasMore = result.hasMore;
+      this.loading = false;
+    });
+  }
+}
+```
+
+### 16.5 Wiring notes (say these out loud if asked)
+
+- **HttpClient provider**: `provideHttpClient()` in `app.config.ts` (standalone bootstrap) — no `HttpClientModule` needed in modern Angular.
+- **Base URL**: kept in `environment.ts` / `environment.prod.ts` so dev vs. prod API hosts don't leak into component code.
+- **CORS**: the API must allow the Angular dev origin (`app.UseCors(...)` in `Program.cs`, before `UseAuthorization()`), otherwise the browser blocks the response even though Postman/curl would work fine.
+- **Which one to bind to the UI**: page-numbered offset pagination for admin/report grids (this maps to Block 3's `product-list` component); cursor pagination for infinite-scroll feeds (`product-infinite`) — same reasoning as the backend section below, just surfaced in the UI pattern.
+- **Error handling**: in a real app wrap `.subscribe()` with an `error` callback (or a `catchError` in the service) to surface failed requests instead of leaving the UI stuck on the previous page — omitted above to keep the snippets interview-length.
 
 ---
 
