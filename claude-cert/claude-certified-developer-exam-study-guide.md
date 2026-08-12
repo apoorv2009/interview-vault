@@ -23,7 +23,11 @@ A condensed, cross-referenced study guide covering all 8 domains of the Claude /
 
 ## Personal weak-spot review ⚠️
 
-From a hard-difficulty practice attempt: **42/53 (79%)** overall, but concentrated misses in **D3 (50%)**, **D5 (67%)**, and **D8 (67%)** — all below the 75% target. D6 and D7 were clean (100%). The 11 points below are the exact traps hit; review these until they're automatic.
+Cumulative across practice attempts — each new attempt's misses get appended here rather than replacing the old ones, so this compounds over time. Points are numbered continuously across attempts.
+
+### Attempt 1 — Hard Difficulty
+
+**42/53 (79%)** overall, concentrated misses in **D3 (50%)**, **D5 (67%)**, and **D8 (67%)** — all below the 75% target. D6 and D7 were clean (100%).
 
 | Domain | Score |
 |---|---|
@@ -78,6 +82,61 @@ From a hard-difficulty practice attempt: **42/53 (79%)** overall, but concentrat
 - In a **self-hosted managed deployment**, the **agent loop and orchestration stay on Anthropic** — only **tool execution** moves to the customer's infrastructure.
 - This is the shape for "keep sensitive tool calls in our network, but don't make us build and run our own harness."
 - Contrast: **Anthropic-hosted** = everything (loop + tools) runs in an Anthropic-managed sandbox, zero customer infrastructure. A **custom harness** = the team runs and maintains the whole loop themselves — reach for this only when Anthropic's managed options genuinely don't fit.
+
+### Attempt 2 — Hard Difficulty
+
+**43/53 (81%)** overall — up from attempt 1, but **D7 dropped to the weakest domain (50%)** this time, and D2 stayed borderline. D3, D5, D6 all improved to comfortably clean.
+
+| Domain | Score |
+|---|---|
+| D3 · Claude Code | 2/2 · 100% |
+| D5 · Model Selection & Optimization | 8/9 · 89% |
+| D6 · Prompt & Context Engineering | 6/7 · 86% |
+| D8 · Tools & MCP | 5/6 · 83% |
+| D1 · Agents & Workflows | 7/8 · 88% |
+| D2 · Applications & Integration | 13/17 · 76% |
+| D7 · Security & Safety | 2/4 · 50% |
+
+#### 10. Least-privilege identity, scoped per agent *and* per tool (D7)
+- IAM best practice: **every tool gets its own narrowly-scoped identity/credential**, not one shared identity across all tools "for convenience." A compromised tool should inherit only *its* role, not everything.
+- Fixes that **don't** address the actual problem: verbose logging on the shared identity, rotating the shared credential more often, or storing the shared broad-scope key in a secret store. All of these keep the blast radius wide — logging/rotation/secure-storage are orthogonal to *scope*.
+- 🎯 **Exam trap:** this exact lesson appeared twice in one attempt (once as "one shared service identity," once as "one shared API key") — high-yield, near-certain repeat.
+
+#### 11. `PreToolUse` hook decisions: four values, not three (D1)
+- `permissionDecision` accepts **`allow`, `deny`, `ask`, and `defer`** — not just allow/deny/ask.
+- `ask` routes the call to a human for an explicit yes/no. `defer` hands the decision to the normal permission configuration instead of the hook deciding outright.
+- A three-value framing (allow/deny/ask) that drops `defer` is a distractor to watch for.
+
+#### 12. Cache-prefix structure: stable content in system, variable content in user turn (D2)
+- Persistent rules/instructions belong in the **system prompt** — they apply every turn and form a reusable cached prefix.
+- Per-request variable data (a document, a user question) belongs in the **user turn**, after the cache breakpoint, where it's expected to change.
+- Mixing them — e.g. putting the rules in the user turn or the variable document in the system prompt — breaks caching and blurs the stable/variable boundary.
+
+#### 13. Right-size the model tier *before* reaching for caching (D2 / D5)
+- If a **simple, well-scoped, high-volume task** is running expensive and slow on Opus, the fix is **moving to a lighter tier (Haiku/Sonnet)** that still meets the quality bar — not adding prompt caching to make the over-provisioned Opus cheaper.
+- Caching optimizes cost on a *correctly chosen* tier; it doesn't correct a wrong tier choice. Reducing reasoning effort or batching have the same blind spot — they keep paying for capability the task doesn't need.
+
+#### 14. Cache economics: the first call on a new prefix pays the write premium (D5)
+- On the **first call** against a stable prefix — before any cache entry exists — the request pays the **cache-write multiplier** (a premium over the base rate), because that call is what creates the cache entry.
+- Only **subsequent calls** that hit the existing entry get the discounted read rate. There's no "reduced charge for reserving a slot" and the base rate is not simply skipped.
+- Savings only accrue once a prefix is reused enough times to amortize that initial write premium.
+
+#### 15. Security-review triage: a hardcoded credential outranks other findings (D2)
+- In a code review surfacing multiple issues (free-text parsing, broad tool access, a hardcoded API key, trusting confident-sounding output), the **hardcoded key in source control is the most severe** — it's an exposed secret reachable via the repo, logs, or context, and must move to an environment variable or secret store.
+- Don't let a less severe but more "interesting" finding (like output-parsing style) top the priority list ahead of an actual leaked credential.
+
+#### 16. Don't force every extension through MCP — demote single-app capabilities to custom tools (D8)
+- MCP earns its overhead (a server to build, host, and secure) **only when a capability is genuinely shared across multiple clients or apps**.
+- A narrow action used by exactly one product, with no reuse in sight, should be a **custom tool** wired directly to the backend — not an MCP server. Exposing every single-app action as its own MCP server just adds operational overhead, attack surface, and misrouting between overlapping servers.
+- This is the mirror image of weak spot #5 (reach for the built-in before building custom): the same "match the mechanism to actual reuse" principle, applied one level up.
+
+#### 17. Batch/bulk processing needs *per-record* defensive parsing, not one big try/except (D6)
+- When processing many model responses in a loop (e.g. an overnight batch job), wrapping the **entire job** in one try/except that stops at the first error still aborts the whole run on a single malformed response.
+- The fix is parsing **each record defensively**, so one bad generation is contained and handled locally — the run continues past it instead of dying on it.
+
+#### 18. Tool schema design: only require fields with no safe default; use enums for fixed sets (D2)
+- Marking **every** field required causes the model to stall mid-call asking for values it can't infer. Require only fields that have **no safe default**.
+- For any field with a fixed set of valid values (e.g. a status field), use an **enum**, not a free-form string with a longer description — free-form strings for fixed sets is exactly the pattern that lets the model send inconsistent values (`economy`, `Economy`, `coach`) that break the backend.
 
 ---
 
