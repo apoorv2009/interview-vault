@@ -9,6 +9,32 @@ rather than actually creating folders.
 
 ---
 
+## Table of Contents
+
+| # | Section | File / Location |
+|---|---------|------------------|
+| — | [Conceptual folder structure](#conceptual-folder-structure-say-this-out-loud-dont-create-it) | — |
+| 1 | [Entity](#1-entity--domainentitiesproductcs) | `Domain/Entities/Product.cs` |
+| 2 | [Pagination request/response models](#2-pagination-requestresponse-models--domaincommonpaginationmodelscs) | `Domain/Common/PaginationModels.cs` |
+| 3 | [Repository interfaces](#3-repository-interfaces--domaininterfaces) | `Domain/Interfaces/` |
+| 4 | [DTOs](#4-dtos--applicationdtosproductdtoscs) | `Application/DTOs/ProductDtos.cs` |
+| 5 | [Service interface](#5-service-interface--applicationinterfacesiproductservicecs) | `Application/Interfaces/IProductService.cs` |
+| 6 | [Cursor encode/decode helper](#6-cursor-encodedecode-helper--applicationservicescursorcodeccs) | `Application/Services/CursorCodec.cs` |
+| 7 | [Service implementation](#7-service-implementation--applicationservicesproductservicecs) | `Application/Services/ProductService.cs` |
+| 8 | [Specification pattern (bonus)](#8-specification-pattern-bonus-mention-if-time-allows--applicationspecifications) | `Application/Specifications/` |
+| 9 | [EF Core DbContext](#9-ef-core-dbcontext--infrastructurepersistenceappdbcontextcs) | `Infrastructure/Persistence/AppDbContext.cs` |
+| 10 | [EF Fluent API config](#10-ef-fluent-api-config--infrastructurepersistenceconfigurationsproductconfigurationcs) | `Infrastructure/Persistence/Configurations/ProductConfiguration.cs` |
+| 11 | [Generic repository implementation](#11-generic-repository-implementation--infrastructurepersistencerepositoriesgenericrepositorycs) | `Infrastructure/Persistence/Repositories/GenericRepository.cs` |
+| 12 | [Product repository — both pagination strategies](#12-product-repository--both-pagination-strategies--infrastructurepersistencerepositoriesproductrepositorycs) | `Infrastructure/Persistence/Repositories/ProductRepository.cs` |
+| 13 | [Unit of Work](#13-unit-of-work--infrastructurepersistenceunitofworkcs) | `Infrastructure/Persistence/UnitOfWork.cs` |
+| 14 | [Controller](#14-controller--apicontrollersproductscontrollercs) | `API/Controllers/ProductsController.cs` |
+| 15 | [DI wiring](#15-di-wiring--apiprogramcs) | `API/Program.cs` |
+| — | [SOLID — one line each](#solid--one-line-each-memorize-these) | — |
+| — | [Offset vs Cursor — which do you use?](#offset-vs-cursor--one-line-answer-if-asked-which-do-you-use) | — |
+| — | [What to actually write in 60 minutes](#what-to-actually-write-in-60-minutes-no-ide) | — |
+
+---
+
 ## Conceptual folder structure (say this out loud, don't create it)
 
 ```
