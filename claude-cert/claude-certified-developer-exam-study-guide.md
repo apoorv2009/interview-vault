@@ -138,6 +138,47 @@ Cumulative across practice attempts — each new attempt's misses get appended h
 - Marking **every** field required causes the model to stall mid-call asking for values it can't infer. Require only fields that have **no safe default**.
 - For any field with a fixed set of valid values (e.g. a status field), use an **enum**, not a free-form string with a longer description — free-form strings for fixed sets is exactly the pattern that lets the model send inconsistent values (`economy`, `Economy`, `coach`) that break the backend.
 
+### Attempt 3 — Challenging Difficulty
+
+**46/53 (87%)** overall — best score yet, on the hardest tier. D5, D6, D7 all hit 100%. **D2 is the recurring soft spot across all three attempts** (82% → 76% → 76%) and D3 dipped to 67% on a small 3-question sample.
+
+| Domain | Score |
+|---|---|
+| D5 · Model Selection & Optimization | 10/10 · 100% |
+| D6 · Prompt & Context Engineering | 6/6 · 100% |
+| D7 · Security & Safety | 4/4 · 100% |
+| D1 · Agents & Workflows | 6/7 · 86% |
+| D8 · Tools & MCP | 5/6 · 83% |
+| D2 · Applications & Integration | 13/17 · 76% |
+| D3 · Claude Code | 2/3 · 67% |
+
+#### 19. Tool-use token overhead applies whenever tools are *present* — `tool_choice` doesn't change that (D2 / D8)
+- Sending tool definitions on a request adds a **base tool-use system-prompt cost** (roughly 290 tokens on Opus 4.8) regardless of `tool_choice`.
+- Setting `tool_choice: "none"` or `"auto"` does **not** remove this overhead — it only changes whether the model is allowed/forced to call a tool, not whether the tool schemas are billed.
+- The only way to reach genuinely zero tool-use overhead on a request that won't need one: **omit the tool definitions from that request entirely.**
+- 🎯 This exact trap appeared twice in one attempt (once as `tool_choice: "none"`, once as `"auto"`) — high-yield repeat.
+
+#### 20. Agent SDK "streaming input" ≠ API `stream: true` (D2)
+- **Streaming input** is the Agent SDK's mode for how prompts/messages are *fed into* the running agent loop — it's an input mechanism, and the SDK's recommended default.
+- **`stream: true`** at the API level controls how *output tokens* are delivered back (as server-sent events) — it's an output mechanism.
+- These are two unrelated settings that happen to share the word "stream" — don't assume configuring one affects the other, and don't assume they're the same feature under two names.
+
+#### 21. Team-reproducibility file mapping: one correct home per concern (D2 / D3)
+- **Shared behavioral rules** (coding conventions, standards) → committed **`CLAUDE.md`**.
+- **Deterministic guardrails** (e.g. a `PreToolUse` hook blocking a destructive command) → committed **`settings.json`**.
+- **Personal, per-developer overrides** that must never be shared or committed → **`.claude/settings.local.json`**, which is git-ignored.
+- No single file can hold all three — a design that crams guardrails or personal overrides into `CLAUDE.md` (prose can't enforce a hook) or commits `settings.local.json` (defeats the point of "personal") breaks reproducibility, enforcement, or privacy respectively.
+
+#### 22. A refusal is intended behavior, not a bug — classify before you "fix" it (D2)
+- When Claude declines a request on safety/policy grounds, that's a **refusal**: the model working as intended, not a defect.
+- Filing a refusal as a system bug (or as a "transient error to retry," or "a tool integration error") misclassifies it — the correct response is to adjust the **prompt or guardrail configuration**, not to debug application code.
+- Distinguishing refusal from bug matters because it determines *which* part of the system you go fix.
+
+#### 23. The memory tool is client-side — Claude requests it, your code executes it (D1)
+- The file-backed **memory tool** is an Anthropic-schema **client-side tool**, in the same family as `bash` and `text_editor` — Claude emits the call, but the developer's own code performs the actual read/write against storage.
+- It does **not** run on Anthropic infrastructure automatically, and it is **not** the same thing as CLAUDE.md (which loads once, automatically, at session start, and is static).
+- Because it writes outside the context window, memory-tool state **survives compaction and session boundaries** — unlike in-context conversation state, which is lost the moment the window truncates or the session ends.
+
 ---
 
 ## 1. Agents & Workflows
