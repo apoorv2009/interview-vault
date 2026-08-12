@@ -267,7 +267,7 @@ public class UnitOfWork : IUnitOfWork
 ## 8. Controller & service skeletons
 
 ```csharp
-// IProductService.cs (skeleton — each approach below adds one method)
+// Application/Interfaces/IProductService.cs (skeleton — each approach below adds one method)
 public interface IProductService
 {
     Task<ProductDto> CreateAsync(CreateProductDto dto);
