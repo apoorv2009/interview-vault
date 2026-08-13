@@ -74,6 +74,15 @@ folders.
 | — | [SOLID — one line each](#solid--one-line-each-memorize-these) | — |
 | — | [Approach comparison table](#pagination-approach-comparison--offset-vs-cursor-vs-time-based-vs-client-side) | — |
 | — | [What to actually write in 60 minutes](#what-to-actually-write-in-60-minutes-no-ide) | — |
+| — | [Anticipated Follow-Up Questions (with Answers)](#anticipated-follow-up-questions-with-answers) | — |
+| — | ↳ [Architecture & design patterns](#architecture--design-patterns) | — |
+| — | ↳ [Pagination trade-offs](#pagination-trade-offs) | — |
+| — | ↳ [EF Core / data layer](#ef-core--data-layer) | — |
+| — | ↳ [API / REST design](#api--rest-design) | — |
+| — | ↳ [Security](#security) | — |
+| — | ↳ [Performance & scalability](#performance--scalability) | — |
+| — | ↳ [Angular / frontend](#angular--frontend) | — |
+| — | ↳ [Testing](#testing) | — |
 
 ---
 
@@ -1301,3 +1310,342 @@ public async Task<ActionResult<PagedResult<ProductDto>>> Get(int page = 1, int p
    asked to implement one.
 
 Good luck tomorrow.
+
+---
+
+# Anticipated Follow-Up Questions (with Answers)
+
+Once you've walked through the code, expect the interviewer to probe *why*
+you made each choice, not just whether it works. These are grouped by which
+part of the submission would trigger them.
+
+### Architecture & design patterns
+
+**Q: Why Clean Architecture / layered design at all — why not one controller with EF calls inline?**
+A: It separates *what the business does* (Domain/Application) from *how it's
+persisted/exposed* (Infrastructure/API). That lets you swap EF Core for
+Dapper, or REST for gRPC, without touching business logic. For a demo-sized
+app it's genuinely more ceremony than the problem needs in isolation — the
+payoff is long-term change safety and testability as the app grows, not
+speed of writing this exact feature.
+
+**Q: Why Repository pattern on top of EF Core, when `DbContext` is already an abstraction?**
+A: `DbContext` abstracts ADO.NET; the Repository abstracts persistence for
+*my application*. It hides EF Core specifics (`IQueryable`, change tracking,
+LINQ provider quirks) behind a domain-shaped interface, so `ProductService`
+only knows "get me a page of products," not "how EF Core executes that." It
+also makes services unit-testable without a real database.
+
+**Q: Why Unit of Work when `DbContext` already tracks changes and commits atomically?**
+A: It decouples the service layer from EF Core (Dependency Inversion — the
+service depends on `IUnitOfWork`, not `AppDbContext`) and gives one place to
+coordinate a save across multiple repositories if the app grows beyond a
+single entity. Honest caveat: on a pure EF Core stack it's somewhat
+redundant, since `DbContext` already *is* a unit of work — it earns its
+keep mainly through testability and insulating the app from an ORM swap.
+
+**Q: Generic `IGenericRepository<T>` plus a specific `IProductRepository` — isn't that an ISP violation?**
+A: No — Interface Segregation is about not forcing *unrelated* consumers to
+depend on methods they don't use. `IProductRepository` extending the
+generic interface is just composition: its consumers get both the generic
+CRUD and the product-specific pagination methods, and nothing forces an
+unrelated repository's consumers to see Product-specific methods.
+
+**Q: Why DTOs instead of returning entities directly from the API?**
+A: Decouples the wire contract from the persistence model — the DTO can
+omit internal fields (`IsActive`) and evolve independently of schema
+changes. It also avoids accidentally serializing EF navigation
+properties/lazy-loading proxies into the response.
+
+**Q: Why the Specification pattern instead of just adding filter parameters?**
+A: Open/Closed — new filters become new `Specification` classes without
+touching the repository's method signature every time. At this scale (one
+`category` filter) it's arguably overkill; it pays off once you have many
+optional, combinable filters.
+
+**Q: Walk me through each SOLID letter with a concrete example from your code.**
+A: Use the doc's SOLID section verbatim as your answer skeleton — Controller
+vs Service vs Repository vs Codec (**S**), Specification pattern (**O**),
+`ProductRepository` substitutable for `IGenericRepository<Product>` (**L**),
+`IProductRepository`'s lean surface (**I**), `ProductService` depending on
+`IUnitOfWork` not `AppDbContext` (**D**).
+
+### Pagination trade-offs
+
+**Q: Why implement 4 approaches instead of picking one?**
+A: Different UIs and access patterns need different guarantees:
+page-numbered grids need offset (total count, jump-to-page); infinite
+scroll needs cursor (no drift, fast at any depth); feeds need time-based
+cursor ("what's new since X"); small static lists don't need server-side
+paging at all. Showing all four demonstrates picking the tool for the
+access pattern instead of defaulting to one everywhere.
+
+**Q: Explain offset vs cursor precisely — mechanism, not just "one is faster."**
+A: Offset counts and discards N rows positionally (`Skip`/`Take` →
+`OFFSET`/`FETCH`); cursor seeks directly to a row's identity
+(`WHERE Id > lastId`) using the index, never touching the skipped rows at
+all. That's why cursor's cost stays flat at any depth and offset's grows
+with page number.
+
+**Q: What is "page drift," and how does cursor pagination avoid it?**
+A: If rows are inserted or deleted between two offset requests, the
+positional ranking shifts — a row can be skipped entirely or shown twice,
+because `Skip(N)` is a *position*, not a fixed identity. Cursor pagination
+anchors to an actual row's `Id` (`WHERE Id > 143`), which stays correct
+regardless of what changed elsewhere in the table.
+
+**Q: Why must the cursor's sort column be unique and indexed?**
+A: Ties on the sort key make seeking ambiguous — two rows with the same
+value could be split inconsistently across pages, causing skipped or
+duplicated rows. Uniqueness guarantees a stable, unambiguous order; the
+index is what keeps the seek fast instead of degrading into a scan.
+
+**Q: Why base64-encode the cursor instead of sending the raw `Id`? Is that actually secure?**
+A: It obscures, it doesn't cryptographically protect — a motivated client
+can trivially decode it. The real value is decoupling the API contract (an
+opaque token) from the implementation (currently an `Id`) so the
+implementation can change later without breaking existing clients. For
+genuine tamper-resistance I'd HMAC-sign or encrypt the cursor instead of
+just base64-encoding it.
+
+**Q: What happens if a client sends a tampered or garbage cursor?**
+A: `CursorCodec.Decode` wraps the base64 decode in a `try/catch` — invalid
+input returns `null`, which the repository treats as "no cursor" and
+starts from the beginning. It fails safe, not with a crash or a 500.
+
+**Q: Time-based cursor — what if two rows share the exact same `CreatedAt`?**
+A: The tie-breaker `Id` in the composite `(CreatedAt, Id)` ordering and
+cursor keeps the ordering total and unambiguous even when timestamps
+collide — same reasoning as why the offset/cursor sort column must be
+unique.
+
+**Q: What about clock skew, or a transaction committing "late" with an earlier timestamp than rows already served?**
+A: That row can genuinely be missed — the client's cursor has already moved
+past that timestamp window by the time the late write lands. Mitigation:
+use a monotonic, strictly-increasing sequence (like an identity `Id`)
+instead of wall-clock time when write-ordering correctness matters, or
+accept a small deliberate "grace window" and re-query slightly behind the
+current time.
+
+**Q: Client-side pagination caps at 500 — how would you actually decide that number for a real dataset?**
+A: Based on measured payload size against a reasonable HTTP response budget
+(low hundreds of KB to a few MB), how static/small the dataset genuinely
+is, and worst-case render cost on lower-powered client devices — profiled,
+not guessed.
+
+**Q: Dataset grows from 10K to 50M rows overnight — which approach breaks first?**
+A: Client-side breaks immediately (already returning "everything" in one
+capped response, now truncating far more of the data). Offset degrades next
+as pages get deep — `OFFSET` cost grows with page depth. Cursor keeps
+working essentially unchanged, since it's always an index seek regardless
+of table size.
+
+**Q: Could you combine approaches — offset for shallow pages, cursor once deep?**
+A: Possible, but it adds real complexity: the client needs to know when to
+switch, and "page number" UX doesn't translate cleanly into cursor
+semantics. Usually not worth it in practice — better to just pick cursor
+up front for anything that could scale.
+
+**Q: Cursor pagination has no `TotalCount` — is that a real problem for infinite scroll?**
+A: Not really — infinite scroll UX needs "keep loading until `hasMore` is
+false," not "37 of 4,200 items." `TotalCount` matters for offset's
+page-number UI; it's not a natural fit for a continuously-scrolling feed
+anyway.
+
+**Q: How does this relate to GraphQL's Relay cursor spec or cloud provider continuation tokens (DynamoDB, Cosmos)?**
+A: Same concept, different vendor name — Relay's `cursor`/`after`,
+DynamoDB's `LastEvaluatedKey`, Cosmos's `ContinuationToken`, S3's
+`ContinuationToken` are all opaque tokens the client stores and replays
+verbatim to resume a seek-based scan. This doc's `cursor` is a simplified,
+self-contained version of the same pattern.
+
+### EF Core / data layer
+
+**Q: Why `AsNoTracking()` on every read query — what does it actually save, and when would you skip it?**
+A: It skips the change tracker's overhead (snapshotting, dirty-checking) for
+queries that only read — meaningful on larger result sets. Skip it when you
+intend to modify and `SaveChanges()` the same entities you just queried
+(a get-then-update flow), since that requires tracking.
+
+**Q: Does `Skip`/`Take` translate the same way on every database provider?**
+A: The LINQ is identical; the generated SQL isn't — SQL Server gets
+`OFFSET`/`FETCH NEXT`, MySQL/SQLite get `LIMIT`/`OFFSET` syntax. That's the
+point of the abstraction: same C#, provider-appropriate SQL.
+
+**Q: Why index `Category` and put a unique index on `Id`?**
+A: Without them, filtering by category or sorting/seeking by `Id` forces a
+full table scan. The `Category` index supports the `WHERE p.Category ==
+category` filter; the unique `Id` index (really the PK) supports the
+`ORDER BY`/seek every pagination approach relies on.
+
+**Q: Why a composite index on `(CreatedAt, Id)` for time-based pagination instead of two separate indexes?**
+A: A composite index lets the seek `WHERE CreatedAt > x OR (CreatedAt = x
+AND Id > y) ORDER BY CreatedAt, Id` execute as a single ordered index seek.
+Two separate single-column indexes can't be combined that efficiently for
+this compound sort-and-seek pattern.
+
+**Q: Why `decimal(18,2)` for `Price` instead of `float`/`double`?**
+A: `decimal` is exact base-10 arithmetic — required for money, since
+`float`/`double` are approximate binary floating point and can produce
+rounding errors (`0.1 + 0.2 != 0.3` in binary) that are unacceptable for
+financial values.
+
+**Q: Why `Take(limit + 1)` instead of a separate existence check?**
+A: It's a single query (`SELECT TOP 21 ...`) instead of two round-trips.
+Fetching one extra row and trimming it client-side is cheaper than a
+follow-up `AnyAsync()` call.
+
+**Q: Soft delete (`IsActive`) vs hard delete — does it matter for cursor stability?**
+A: Soft delete leaves the `Id` sequence and row intact, so a cursor
+pointing past that `Id` stays valid — the row is just filtered out by the
+`IsActive` check. Hard delete leaves a gap in `Id`s, which is also harmless
+for cursor pagination (`Id > lastId` still works fine); the real danger
+would be *reusing* `Id`s, which identity columns never do by design.
+
+### API / REST design
+
+**Q: Why query params for `page`/`pageSize` instead of a request body?**
+A: GET requests conventionally carry no body (and many caches/proxies strip
+it). Query params keep the request cacheable, bookmarkable, and RESTful — a
+GET should be fully described by its URL.
+
+**Q: Why `/cursor` and `/since` as separate routes instead of one endpoint with a `?strategy=` flag?**
+A: Each style returns a different response shape (`PagedResult` vs
+`CursorPagedResult` vs `TimeCursorPagedResult`) and takes different query
+params. Modeling them as distinct routes keeps each endpoint's contract
+explicit and self-documenting in Swagger, rather than one endpoint whose
+shape depends on a hidden flag.
+
+**Q: Would you version this API?**
+A: Yes, if the pagination contract changed in a breaking way (e.g. renaming
+`NextCursor`) — via URL versioning (`/api/v2/products`) or a header. For
+additive changes (a new optional field) I wouldn't version, just extend.
+
+**Q: Should the response include HATEOAS-style `self`/`next`/`prev` links?**
+A: Could, for a more RESTful (Richardson Maturity Model level 3) API — but
+for an API consumed by a single SPA that already knows how to build the
+next request from `NextCursor`, it's often unnecessary ceremony. Worth
+adding if the API were meant for third-party/public consumption.
+
+**Q: Why is `Category` a free-text filter instead of a foreign key to a `Categories` table?**
+A: Free text is simpler and fine for a small, stable category set with low
+miskey risk. A FK normalizes it, prevents typos/inconsistent casing, and
+supports richer category metadata — worth doing once categories need their
+own attributes or change often.
+
+**Q: `PageSize` is clamped in its setter — is that the right layer? What about `page=0` or negative?**
+A: Clamping in the setter is defensive but silent — a client sending
+`pageSize=500` gets quietly capped to 100 with no feedback. I'd pair it
+with model validation (`[Range]` + an explicit 400 response) for clearer
+client-facing errors, and add the same clamp/validation to `Page` — it's
+currently unguarded, so `Skip((page - 1) * pageSize)` throws on `page=0` or
+a negative value. (This is a real bug spotted earlier in this exact doc —
+know the fix cold.)
+
+### Security
+
+**Q: Can a client forge a page number to see data beyond intended limits?**
+A: Not in this app, since pagination isn't layered onto any per-user
+scoping — but in general, if pagination sat on top of a permission-scoped
+list (e.g. "my orders"), the authorization filter (`UserId ==
+currentUser`) must always be applied alongside the pagination filter, never
+relied on to keep users in a lane by itself.
+
+**Q: SQL injection risk via the `category` filter?**
+A: Not exploitable — `.Where(p => p.Category == category)` is translated by
+EF Core into a parameterized SQL query, the same protection ADO.NET's
+`SqlParameter` gives you. The string is never concatenated into raw SQL
+text.
+
+**Q: Should these endpoints require authentication?**
+A: Depends on data sensitivity — this demo doesn't show auth, but any
+real endpoint returning non-public data should have `[Authorize]`, and if
+categories are user/tenant-scoped, the server should filter by the
+authenticated user's tenant regardless of what the client requests.
+
+**Q: Could cursor pagination make it easy to scrape the entire dataset?**
+A: Yes — looping cursor requests is a cheap, complete crawl of the table.
+I'd add rate limiting (e.g. ASP.NET Core's built-in `RateLimiter`
+middleware) per client/IP/API key on these endpoints in production.
+
+### Performance & scalability
+
+**Q: How does statelessness help horizontal scaling, and what would break it?**
+A: Every request carries everything needed to resume (a page number or
+cursor), so any server instance behind a load balancer can serve any
+request — no sticky sessions required. It would break if the cursor or
+"current page" were cached server-side keyed by session instead of being
+round-tripped to the client on every request.
+
+**Q: Would you cache the `CountAsync()` call for offset pagination?**
+A: Yes — it reruns on every single page request even though the total
+rarely changes mid-session. A short-TTL cache per category filter trades a
+little staleness for a large reduction in `COUNT(*)` query volume.
+
+**Q: At what offset does deep paging become a real problem?**
+A: Rough ballpark: noticeable degradation starts somewhere in the
+tens-of-thousands to low hundreds-of-thousands of skipped rows, depending
+on indexing and hardware. The exact number needs profiling on real data —
+the important thing to know is the trend (cost grows with page depth), not
+a memorized figure.
+
+**Q: What about concurrent writes during a long offset-paging session?**
+A: Same page-drift issue, framed as a testable scenario — write an
+integration test that inserts a row mid-pagination and asserts on whether
+the resulting pages skip or duplicate rows.
+
+### Angular / frontend
+
+**Q: Why standalone components instead of NgModules?**
+A: It's the modern Angular default — no NgModule boilerplate, components
+declare their own imports directly, better tree-shaking, and it's the
+direction Angular is heading; NgModules are increasingly legacy.
+
+**Q: Why polling instead of SignalR/WebSockets for the live-feed component?**
+A: Polling is simpler and stateless — no persistent connection, no
+server-push infrastructure, works through any proxy/firewall a normal HTTP
+GET does. The trade-off is latency (bounded by the poll interval) and
+wasted requests when nothing's new. I'd switch to SignalR/WebSockets if
+true real-time delivery mattered, or if polling volume itself became a load
+problem.
+
+**Q: Why is error handling omitted in the `.subscribe()` calls?**
+A: Kept out only to keep the reference snippets interview-length. In
+production I'd add an error callback (or `catchError` in the service) so a
+failed request surfaces to the user instead of leaving the UI silently
+stuck on stale data.
+
+**Q: Why keep `apiBaseUrl` in `environment.ts`?**
+A: Keeps environment-specific config (dev/staging/prod API host) out of
+component code, swappable at build time via Angular's file-replacement
+mechanism without touching any TypeScript logic.
+
+**Q: The offset component replaces `items`, the cursor component appends to it — could that get flipped by accident?**
+A: Easily, if copy-pasted between the two without noticing — it's a
+one-line, one-character difference (`this.items = result.items` vs
+`this.items = [...this.items, ...result.items]`) that encodes the entire
+UX difference between "paged grid" and "infinite scroll." Worth flagging
+specifically in code review since the bug is easy to introduce and easy to
+miss.
+
+### Testing
+
+**Q: How would you unit test `ProductService.GetOffsetPagedAsync` without a real database?**
+A: Mock `IUnitOfWork` (with its `Products` property returning a mocked
+`IProductRepository`) using Moq/NSubstitute, stub
+`GetOffsetPagedAsync` to return a known `(items, totalCount)` tuple, then
+assert the service maps and computes `PagedResult` correctly. This is
+exactly why the service depends on the interface, not `AppDbContext`
+directly.
+
+**Q: How would you test `CursorCodec.Decode` against tampered input?**
+A: Feed it non-base64 strings, base64 of non-numeric content, and
+empty/null input — assert it returns `null` in every case instead of
+throwing, since the repository relies on that "fails safe" contract.
+
+**Q: In-memory EF Core provider or a real test database for integration tests?**
+A: In-memory is fast but doesn't enforce real SQL Server behavior (it won't
+catch a missing index or validate that `Skip`/`OrderBy` actually translate
+correctly). For pagination specifically I'd lean toward a real, containerized
+database (e.g. Testcontainers) for repository-level tests, and reserve
+in-memory for pure service-layer logic tests.
