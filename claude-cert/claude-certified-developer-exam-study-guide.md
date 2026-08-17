@@ -281,6 +281,49 @@ Cumulative across practice attempts — each new attempt's misses get appended h
 - Roots are the **client-granted list of paths** a server may reach; a server has **no implicit filesystem access** beyond what's declared there. Registering every individual file as its own tool does not scope anything — it just multiplies tools without adding a boundary.
 - This exact concept (roots as the least-privilege filesystem mechanism) was answered correctly in an earlier mock and missed here under different wording — a sign the underlying fact needs one more deliberate pass rather than being marked "known."
 
+### Attempt 6 — Warm-Up difficulty
+
+**47/53 (89%)** — strongest raw score yet. Six misses, and two of them (#40's pair) test the identical concept back-to-back in the same attempt — a stronger signal than a single miss.
+
+| Domain | Score |
+|---|---|
+| D3 · Claude Code | 2/2 · 100% |
+| D4 · Eval, Testing & Debugging | 1/1 · 100% |
+| D2 · Applications & Integration | 17/18 · 94% |
+| D5 · Model Selection & Optimization | 8/9 · 89% |
+| D1 · Agents & Workflows | 7/8 · 88% |
+| D6 · Prompt & Context Engineering | 6/7 · 86% |
+| D8 · Tools & MCPs | 4/5 · 80% |
+| D7 · Security & Safety | 2/3 · 67% |
+
+#### 39. Exceeding the context window is an error, not a silent fix (D5)
+- If a request goes over the context window, the API **returns an error** — it does not silently drop the oldest tokens, auto-summarize, or auto-expand the window to fit.
+- Staying inside the limit is an **active engineering responsibility**: pruning stale tool output, compacting history, or windowing content, not something the API manages for you.
+- The distractors to rule out on sight: "silently drops the oldest tokens and continues" and "the window automatically expands" are both fabricated behaviors — the real answer is always the error, with management as the developer's job.
+
+#### 40. "More context is always better" is false — missed twice in one attempt, worded two different ways (D1 / D6)
+- 🎯 Tested as both "stuffing every document the model might conceivably need" and "keeping every raw tool response for completeness" — same underlying concept, both missed. Treat this as high-yield.
+- Filler and low-signal content **wastes budget, raises cost and latency, and can actively degrade focus and accuracy** — it does not sit there harmlessly, and the model does not "ignore" it for free.
+- Selective, high-signal context beats cramming everything in. This is the same mechanism as context rot / the attention budget from the main Domain 6 material, now confirmed as a real, recurring miss rather than just a concept to recognize.
+- Distractors to rule out: "a larger context tends to improve quality," "filler tokens are ignored and carry no cost," "bloat raises latency but leaves accuracy unchanged" — all three deny that bloat has a real, negative effect on the answer itself.
+
+#### 41. PII protection acts on the way IN, not just the way out (D7)
+- Sensitive data (SSNs, full records) must be **minimized and redacted before it ever enters the prompt or gets logged** — not sent in full and cleaned up by filtering the response afterward.
+- Filtering only the outbound response leaves the inbound exposure completely unaddressed — the data already reached the model, and very likely a log, before any output-side filter ever runs.
+- Distractors to rule out: encrypting the response (protects it in transit/storage, does nothing about the model or logs having already seen raw PII), and timing sends for off-peak hours (irrelevant to exposure — has nothing to do with *who* or *what* can see the data).
+
+#### 42. MCP's three primitives have distinct **control owners** — not just distinct jobs (D8)
+- **Tools** are **model-controlled** — the model decides when to invoke one.
+- **Resources** are **application-controlled** — the host application decides what to include.
+- **Prompts** are **user-controlled** — a person explicitly selects/invokes them.
+- This is a sharper framing than "resources query, tools act, prompts standardize" (still true, but this question is testing *who decides*, not just *what each does*). A distractor naming a different trio ("functions, files, templates") or claiming the model controls all three misstates the protocol.
+
+#### 43. The SDK never unlocks capabilities the underlying REST surface doesn't support — reinforced with a new combination (D2)
+- The SDK is a thin convenience wrapper (auth, retries, typed errors, streaming parsing) over the **same REST endpoints** — it cannot expose a capability the REST surface lacks.
+- Concretely: if server-side tools are unsupported on a platform like Bedrock, migrating from raw REST to the SDK does **not** unlock them — they stay unsupported either way.
+- The SDK also does **not** make output deterministic — non-determinism is a property of generation itself, unrelated to which client sent the request.
+- This combines two already-known facts (SDK-wraps-REST, and non-determinism-is-expected) into one question — the miss suggests reaching for "the SDK is more powerful/reliable" as an assumption rather than recalling it's a pure convenience layer.
+
 ## Final cram — Tier 1 & Tier 2
 
 Prioritized from the pattern across all five attempts. If exam day is close, read this section last, in this order.
