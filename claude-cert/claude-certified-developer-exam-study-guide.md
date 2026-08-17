@@ -180,6 +180,60 @@ Cumulative across practice attempts — each new attempt's misses get appended h
 - It does **not** run on Anthropic infrastructure automatically, and it is **not** the same thing as CLAUDE.md (which loads once, automatically, at session start, and is static).
 - Because it writes outside the context window, memory-tool state **survives compaction and session boundaries** — unlike in-context conversation state, which is lost the moment the window truncates or the session ends.
 
+### Attempt 4 — CCDV-F Form 1 (different source: AI Certificates)
+
+**42/53 (79%)** — first attempt from a different question bank, useful precisely because it phrases familiar concepts differently. Confirms D2 as a genuine, now four-attempt-consistent pattern (82% → 76% → 76% → 76%), and surfaces a clear new gap: **Skill vs. every other extension mechanism**, missed twice in this one attempt.
+
+| Domain | Score |
+|---|---|
+| D7 · Security & Safety | 4/4 · 100% |
+| D4 · Eval & Debugging | 1/1 · 100% |
+| D5 · Model Selection & Optimization | 8/9 · 89% |
+| D1 · Agents & Workflows | 7/8 · 88% |
+| D6 · Prompt & Context Engineering | 5/6 · 83% |
+| D2 · Applications & Integration | 13/17 · 76% |
+| D8 · Tools & MCPs | 3/6 · 50% |
+| D3 · Claude Code | 1/2 · 50% |
+
+#### 24. Client-side `tool_use` still means *your code* runs it and returns a `tool_result` (D1 / D8)
+- When a response ends with `stop_reason: "tool_use"` for a **custom (client-side) tool**, the API has paused and is waiting on the application — it does not execute the tool for you. The app must run the call itself, then return a `tool_result` block tied to that `tool_use` id before the model can continue.
+- Only Anthropic's **server-side** tools (web search, web fetch, code execution, tool search) run on Anthropic's infrastructure and can return directly without this round trip.
+- 🎯 Worth extra drilling: this exact mechanic showed up twice in one attempt, worded differently — missed once, answered correctly once. If the underlying fact isn't rock-solid, different phrasing will catch it inconsistently.
+
+#### 25. Deriving the *right* infrastructure requirement from a deadline — don't grab the nearest plausible-sounding one (D2)
+- Given a business constraint like "40,000 reports must be summarized and visible by 6 a.m., nobody watches it run," the infrastructure requirement that actually follows is **throughput sufficient to finish the volume by the deadline** — not low-latency streaming (nobody's watching), not autoscaling for morning dashboard readers (that's read traffic *after* the results exist), not a realtime priority queue (nothing needs per-item immediacy).
+- The trap: several distractors describe real infrastructure concerns that just don't apply to *this* constraint. Anchor on what the business requirement is actually binding on before picking an answer.
+
+#### 26. A prompt tuned in claude.ai will not behave the same sent verbatim through the API (D2)
+- Consumer surfaces like claude.ai inject their **own system prompt, tools, and product-level framing** around whatever you type. The raw Messages API starts from a blank slate — none of that scaffolding exists unless you build it yourself.
+- The fix when porting behavior from claude.ai to the API isn't debugging the model — it's **explicitly reconstructing** the framing (system prompt, tone rules, tool access) that the web interface was quietly providing.
+
+#### 27. Large diffs degrade code review effectiveness — no amount of process fixes that (D2)
+- A 2,000-line pull request gets reviewed fast and defects still slip through, not because reviewers are careless but because **diff size and mixed purpose make genuine scrutiny infeasible**, regardless of checklists, a second approver, or a live walkthrough (which just transfers the author's framing rather than checking it).
+- The actual fix is **splitting work into small, single-purpose changes** reviewed separately — this is the intervention that makes careful review possible at all, not an add-on to a large-diff process.
+
+#### 28. When something is a Skill — vs. CLAUDE.md, a slash command, an MCP server, or a custom tool (D3 / D8)
+- **Missed twice in one attempt** — this is the clearest new gap from this pass. The discriminating questions to ask about a piece of team know-how:
+  - Does it need to be **always loaded**, every session, no matter the task? → **CLAUDE.md**.
+  - Does someone need to **explicitly invoke** it when they remember to? → a **slash command**.
+  - Should it **load automatically, only when the task matches**, without permanently costing context? → a **Skill**.
+  - Does it need to **call a live external system** (a database, a shared service) rather than just supply instructions and reference files? → an **MCP server** (if shared across clients) or a **custom tool** (if used by only one app).
+- A documented multi-step procedure with formatting rules and helper scripts, with *no external system involved*, that should surface only when relevant — that shape is a Skill's exact use case, not an MCP server (nothing external to connect to), not a custom tool (it's not one callable function), and not CLAUDE.md (would tax every session's context for something only occasionally relevant).
+
+#### 29. Adaptive thinking is the answer for *mixed-difficulty* traffic on one endpoint (D5)
+- When one endpoint serves a mix of simple lookups and occasional multi-step reasoning, **always-on extended thinking** taxes every simple request with unneeded thinking tokens, while **manually routing by keyword** to two separate deployments is brittle and adds an extra system to maintain.
+- **Adaptive thinking** lets the model itself decide, per request, whether the query warrants deeper reasoning — solving exactly this mixed-workload shape without a routing layer or a blanket policy in either direction.
+
+#### 30. Some fixes are genuinely two-part — don't stop after finding one correct lever (D6 / D8)
+- **Output-format instability** (bullets one run, a table the next, prose after that) is fixed by **two complementary levers together**: explicitly spelling out the required structure *and* showing worked examples of it. Either alone is weaker than both — instructions alone leave room for interpretation, examples alone don't state the rule they're illustrating.
+- **Tool-selection errors** (the model picking the wrong one of several similar tools) are fixed by **two complementary levers together**: rewriting each tool's description to state precisely when it applies and how it differs from its near-neighbor, *and* consolidating genuinely overlapping tools into a smaller, non-competing set. Sharper descriptions alone don't remove real overlap; consolidation alone doesn't help if what's left is still vaguely described.
+- On multi-select questions, a partially-right pair (one correct lever + one plausible-but-wrong one) is a common trap — check whether the two "obviously good" options are actually addressing the same root cause from different angles, which is usually the signal both are meant to be picked.
+
+#### 31. Tool failures should reach the model as a structured error, not crash the run (D8)
+- When a tool call fails (e.g. a transient `503` from a backend API), the harness should return the failure as an **error-flagged `tool_result`** — what failed, and why — so the model can reason about it: retry, back off, or try a different approach.
+- What *not* to do: let the exception kill the whole run (discarding all prior progress), retry silently with no visibility (the model never learns retries are failing and can't adapt), or try to validate every possible failure away beforehand (a transient server-side fault happens to perfectly valid requests — validation can't prevent it).
+- This is the same "your code executes, the model reasons over the result" principle as #24, applied to the failure path specifically.
+
 ---
 
 ## 1. Agents & Workflows
