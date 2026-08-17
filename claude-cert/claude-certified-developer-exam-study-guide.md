@@ -234,6 +234,53 @@ Cumulative across practice attempts — each new attempt's misses get appended h
 - What *not* to do: let the exception kill the whole run (discarding all prior progress), retry silently with no visibility (the model never learns retries are failing and can't adapt), or try to validate every possible failure away beforehand (a transient server-side fault happens to perfectly valid requests — validation can't prevent it).
 - This is the same "your code executes, the model reasons over the result" principle as #24, applied to the failure path specifically.
 
+### Attempt 5 — Form 2 (self-authored original mock)
+
+**45/53 (85%)** — best percentage yet, on an original 53-question full-length form (D3 and D8 misses are on small samples, 2 and 6 questions respectively, so weigh those less heavily than D1's 6/8).
+
+| Domain | Score |
+|---|---|
+| D4 · Eval, Testing & Debugging | 1/1 · 100% |
+| D7 · Security & Safety | 4/4 · 100% |
+| D2 · Applications & Integration | 16/17 · 94% |
+| D6 · Prompt & Context Engineering | 5/6 · 83% |
+| D8 · Tools & MCPs | 5/6 · 83% |
+| D5 · Model Selection & Optimization | 7/9 · 78% |
+| D1 · Agents & Workflows | 6/8 · 75% |
+| D3 · Claude Code | 1/2 · 50% |
+
+#### 32. Subagents have TWO distinct benefits — isolation *and* containment — don't collapse them into one (D1)
+- **Isolation**: a subtask's intermediate tokens (a long document read, a big exploration) stay in the subagent's own window, so only the distilled result reaches the parent.
+- **Containment**: a *failure* inside the subagent — a bad read, an error, a wrong turn — stays local and can't corrupt or poison the manager's own state/run.
+- These are separate claims. A multi-select question can correctly flag isolation while the second correct answer is containment, not something adjacent-sounding like "guaranteed determinism" or "automatically cheaper" — subagents provide neither of those.
+
+#### 33. Bloat/drift distractors also come as a *swapped* fix, not just a merged one (D1)
+- The known trap is treating bloat and drift as one problem with one fix. There's a second, subtler trap: a distractor that keeps them separate but **swaps which fix goes with which problem** — e.g. "the crowding is fixed by re-anchoring; drift resolves once tool output shrinks" (backwards).
+- The correct pairing is always: **drift → re-anchor the instruction**, **bloat/crowding → prune or compact tool output**. When a multi-part answer keeps the two problems distinct, still check the fix is matched to the *right* one before picking it.
+
+#### 34. A business objective is a third category — not automatically a non-functional requirement (D2)
+- "Reduce processing cost by 25% this year" or "improve customer satisfaction scores" are **business objectives** — the outcomes requirements exist to serve — not themselves functional or non-functional requirements on the system.
+- On a multi-select "which are non-functional requirements" question, a business-goal-shaped statement is a common wrong pick precisely because it *sounds* like a constraint. The real non-functional requirements are the measurable quality attributes (latency, isolation, throughput) — not the business reason those attributes matter.
+
+#### 35. Plan Mode is not headless mode — don't reach for it for unattended automation (D3)
+- **Plan Mode** proposes a set of actions and pauses for a human to approve them — useful for supervised work, wrong for anything unattended.
+- **Headless mode** (`-p` / `--print`) runs a fixed prompt to completion with no UI and no pause, then exits — this is what CI pipelines and cron jobs need.
+- A CI/cron scenario ("no person present to respond to anything") is designed to make Plan Mode look plausible because it's still an "automation" feature — it is not the automation feature that fits *unattended* runs.
+
+#### 36. Fast mode vs. extended thinking — the most consistently missed distinction across every attempt so far (D5)
+- 🎯 **This has now been missed multiple times across different question banks — treat it as close to guaranteed to appear on the real exam.**
+- **Fast mode**: the *same* model, generating output tokens faster, at a premium per-token price. It's a **latency** lever. Reasoning quality is unchanged because the model itself hasn't changed.
+- **Extended thinking**: the model reasons in a scratchpad *before* answering — this **increases** time-to-first-token, the opposite of what a latency complaint needs.
+- The reliable tell: any scenario that says *"latency is the complaint, quality must be preserved, cost is secondary"* → the answer is fast mode, never extended thinking, never a smaller tier, never Batches.
+
+#### 37. Long documents: content first, question after — a concrete positional rule, not just advice (D6)
+- When a request pairs a long document with a specific question about it, the accuracy fix is **structural**: put the full document **before** the question and instructions, so the model reads the query with the content already in view.
+- Wrong-but-tempting alternatives: splitting the document into many small per-page requests (destroys cross-page context the answer may depend on), or dropping the document and answering from general knowledge (answers about the topic in general, not about *this* document).
+
+#### 38. MCP roots — flagged again after an earlier correct answer on the same concept (D8)
+- Roots are the **client-granted list of paths** a server may reach; a server has **no implicit filesystem access** beyond what's declared there. Registering every individual file as its own tool does not scope anything — it just multiplies tools without adding a boundary.
+- This exact concept (roots as the least-privilege filesystem mechanism) was answered correctly in an earlier mock and missed here under different wording — a sign the underlying fact needs one more deliberate pass rather than being marked "known."
+
 ---
 
 ## 1. Agents & Workflows
