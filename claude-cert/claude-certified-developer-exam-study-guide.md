@@ -281,6 +281,107 @@ Cumulative across practice attempts — each new attempt's misses get appended h
 - Roots are the **client-granted list of paths** a server may reach; a server has **no implicit filesystem access** beyond what's declared there. Registering every individual file as its own tool does not scope anything — it just multiplies tools without adding a boundary.
 - This exact concept (roots as the least-privilege filesystem mechanism) was answered correctly in an earlier mock and missed here under different wording — a sign the underlying fact needs one more deliberate pass rather than being marked "known."
 
+## Final cram — Tier 1 & Tier 2
+
+Prioritized from the pattern across all five attempts. If exam day is close, read this section last, in this order.
+
+### 🎯 Tier 1 — near-certain to appear, missed repeatedly
+
+#### 1. Fast mode vs. Extended thinking
+
+| | Fast mode | Extended thinking |
+|---|---|---|
+| What changes | Same model, faster **output token generation** | Model reasons in a scratchpad **before** answering |
+| Effect on latency | **Reduces** time-to-answer | **Increases** time-to-first-token |
+| Effect on reasoning quality | Unchanged — it's still the same model | Improves quality on hard, multi-step problems |
+| Cost | Premium per-token rate | More tokens spent (the thinking tokens) |
+| Availability | Not available with the Batches API | Available on models that support adaptive thinking |
+
+**How the exam disguises this:** every version of this question sets up the same shape — an interactive, latency-sensitive workload (live chat, a debugging copilot, an agent mid-call) where reasoning quality must be **preserved**, and cost is explicitly stated as **secondary**. The distractor that keeps winning is **extended thinking**, because "reasoning more carefully" *sounds* like the safe, quality-preserving choice. It's the opposite — it adds a reasoning phase before the answer even starts, making the latency complaint worse, not better.
+
+**The other distractors, and why they're wrong:**
+- **Downgrade to a smaller tier** — sacrifices exactly the reasoning quality the scenario says to protect.
+- **Move to the Batches API** — trades *cost* for a multi-hour delay window; the opposite of an interactive workload's needs, and fast mode isn't even available there.
+
+> **Exam-day rule:** the moment a question says *latency complaint + preserve quality + cost is secondary*, the answer is fast mode. That combination has only one correct mechanism among the options you'll be shown.
+
+#### 2. `PreToolUse` hook `permissionDecision` — four values
+
+- **`allow`** — the tool call proceeds.
+- **`deny`** — the tool call is hard-blocked before it runs.
+- **`ask`** — the call pauses and routes to a **human** for an explicit yes/no.
+- **`defer`** — the hook declines to decide, and the call falls back to the normal permission configuration instead.
+
+**How the exam disguises this:** the trap is a distractor option listing only three values — typically `allow`, `deny`, `ask` — omitting `defer`. It reads as complete and plausible, especially if you're recalling "a hook can allow, deny, or ask a human," which is *almost* right and exactly wrong.
+
+**Where this shows up:** any question about routing a risky-but-not-always-wrong tool call to a human (a file deletion, a destructive command, a payment) for confirmation rather than outright blocking it — `ask` is usually the single right answer there. On a multi-select "which two decisions exist for this" version, the pairing to recognize is **`ask` and `defer`** as the two non-terminal decisions, versus `allow`/`deny` as the two terminal ones. Fabricated-sounding options like `permit`, `escalate`, or `block` are never real values.
+
+> **Exam-day rule:** if the answer choices include a three-value list for this, that's the tell it's wrong — the real set always has four: allow, deny, ask, defer. Mnemonic: **A-D-A-D**.
+
+#### 3. Skill vs. CLAUDE.md vs. slash command vs. MCP server vs. custom tool
+
+The decision tree, in the order the exam actually asks it:
+
+1. **Does it need to call a live external system** (a database, a shared internal service, an API)?
+   - Yes, and **multiple clients/apps** need it → **MCP server**.
+   - Yes, but only **one app** needs it → **custom tool**.
+   - No external system at all → go to step 2.
+2. **Is it pure knowledge/procedure** (instructions, templates, formatting rules, a checklist) with no external system to call?
+   - Needs to be **always loaded**, every session, regardless of task → **CLAUDE.md**.
+   - Someone must **explicitly invoke it** when they remember to → **slash command**.
+   - Should **load automatically, only when the task matches**, without taxing every session's context → **Skill**.
+
+**The specific scenario shape that keeps catching this:** "a documented multi-step procedure with formatting rules and helper scripts, used across many projects, that should surface only when a matching task arises — no new system call involved." This is the canonical Skill description. The wrong answers that keep winning:
+- **MCP server** — sounds "shareable across projects," but MCP's value is a *live connection to an external system*, and there's nothing external here.
+- **Custom tool** — sounds like it "packages the scripts," but a custom tool is one callable function; a judgment-heavy, multi-step procedure isn't a single function call.
+
+**A related trap in the same family:** a **custom slash command** is just a Markdown file — its **filename alone** is the trigger, no frontmatter required. A **Skill** *requires* valid YAML frontmatter with a `description` Claude matches against to know when to load it. Assuming a command needs frontmatter, or that a Skill will trigger without it, is a distinct but related mistake.
+
+> **Exam-day rule:** first ask "is there a live external system to call?" — that single question splits MCP/custom-tool from CLAUDE.md/command/Skill immediately. Only then decide between always-loaded, user-invoked, or auto-loaded-on-demand.
+
+### ⚠️ Tier 2 — inconsistent, worth a solid re-read
+
+#### 4. MCP roots — the filesystem least-privilege mechanism
+
+**The mechanism, precisely:** when an MCP server needs filesystem access, the **client** declares which specific paths ("roots") the server is allowed to reach. The server has **no implicit access beyond what's declared** — a default-closed, least-privilege boundary set from the client side, not something the server grants itself or something enforced reactively after the fact.
+
+**The scenario shape:** "an MCP server needs to read files, but must be limited to two specific project folders and nothing else on disk" — seen almost identically twice, right once, wrong once, meaning the fact hasn't fully hardened yet.
+
+**The distractors, and exactly why each is wrong:**
+- **"The server inherits the host process's full filesystem access by default"** — false, and the *opposite* of a least-privilege boundary. Instant no.
+- **"Register every individual file as its own separate tool"** — the one that actually catches you. Sounds granular/scoped, but adds no boundary enforcement at all — it just multiplies tools while access stays exactly as open.
+- **A `PostToolUse` hook that reacts to out-of-scope reads** — reacts *after* the read already happened. Wrong layer; the boundary must prevent the read, not clean up afterward.
+
+> **Exam-day rule:** whenever a question scopes *what a server can read on disk*, the answer is roots. Per-file tools, a reactive hook, or "default full access" are all wrong regardless of how the scenario is dressed up.
+
+#### 5. Subagents: isolation *and* containment are two separate claims
+
+- **Isolation** — a subtask's intermediate tokens (a long document read, a big exploration, verbose tool output) stay inside the subagent's own context window; only the final, distilled result returns to the parent. About **volume/token growth**.
+- **Containment** — if something goes wrong *inside* the subagent, that failure stays local and can't corrupt or poison the manager's own state. About **failure blast radius** — a completely different axis from isolation.
+
+**How the exam disguises this:** single-choice subagent questions usually only need isolation, which is solid. The trap is on **multi-select "choose two benefits"** questions — isolation gets picked correctly, then the second pick reaches for something that sounds adjacent but is fabricated:
+- **"Guaranteed byte-identical output"** — wrong; generation stays non-deterministic regardless of where it runs.
+- **"Automatically runs on a cheaper model tier"** — wrong; delegation doesn't change model tier, that's a separate explicit choice.
+- **"Removes the need to design a synthesis step"** — wrong; someone still has to combine the subagent's report into the overall answer.
+
+> **Exam-day rule:** on any multi-select subagent question, the two real answers are isolation and containment. Treat them as a fixed pair to recall together, not something to re-derive each time.
+
+#### 6. Domain 2 generally — the recurring sub-themes
+
+D2 is 33% of the real exam by weight. Even though the most recent attempt jumped to 94%, these narrow, easy-to-mix-up facts recurred across three flatter attempts (~76% each) and are worth a final pass:
+
+- **`effort` lives under `output_config.effort`**, not the request root. A top-level `effort` field is silently ignored, not an error.
+- **Current Bedrock path** is the `bedrock-mantle` endpoint via `AnthropicBedrockMantle`, with bare `anthropic.`-prefixed IDs — legacy `InvokeModel` + region-scoped profile IDs still works but isn't the answer for a *new* build.
+- **Hooks live in `settings.json`, not CLAUDE.md** — CLAUDE.md is advisory; a `PreToolUse` hook for the whole team must be in the committed project `settings.json`.
+- **Cache prefix structure**: stable content (system prompt, tools) first with the breakpoint after it; variable per-request content (a timestamp, a trace ID, a user's question) always *after* that breakpoint, never before it.
+- **Right-size the model tier before reaching for caching** — a simple, high-volume task running expensive on Opus needs a lighter tier, not caching an over-provisioned model.
+- **In a security-review triage question, a hardcoded credential always outranks every other finding** — broad tool access, free-text parsing, confidence-based trust issues are real but lower severity.
+- **claude.ai injects its own system prompt and tools that the raw API starts without** — behavior tuned in claude.ai must be explicitly rebuilt when moved to the API; not a quality or randomness difference.
+- **A business objective ("reduce cost by 25%") is a third category**, separate from both functional and non-functional requirements — don't pick it on a "which are non-functional" multi-select just because it sounds like a constraint.
+- **Session hygiene**: independent tasks get independent sessions — "ignore everything above" instructions don't reliably work because the material is still physically in context.
+
+> **Exam-day rule for D2:** if a question tests a small, specific API/config detail rather than a broad concept, it's likely drawing from this list — these are the "gotcha" facts, not the conceptual ones.
+
 ---
 
 ## 1. Agents & Workflows
