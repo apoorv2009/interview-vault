@@ -2,7 +2,7 @@
 
 A condensed, cross-referenced study guide covering all 8 domains of the Claude / Anthropic certification (Associate, Developer, Architect tracks share the same blueprint). Compiled from the official course decks; every place the source material explicitly flagged something as an exam signal is called out inline as **🎯 Exam rule**.
 
-**Exam format:** 60 scenario-based multiple-choice questions (practice sets typically ship ~53 proportionally weighted), 120 minutes, ~135 minutes total seat time with check-in and survey, passing score 720/1000 (72%).
+**Exam format:** 53 scenario-based multiple-choice questions, 120 minutes, ~135 minutes total seat time with check-in and survey, passing score 720/1000 (72%).
 
 ---
 
