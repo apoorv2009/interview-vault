@@ -324,6 +324,43 @@ Cumulative across practice attempts — each new attempt's misses get appended h
 - The SDK also does **not** make output deterministic — non-determinism is a property of generation itself, unrelated to which client sent the request.
 - This combines two already-known facts (SDK-wraps-REST, and non-determinism-is-expected) into one question — the miss suggests reaching for "the SDK is more powerful/reliable" as an assumption rather than recalling it's a pure convenience layer.
 
+### Attempt 7 — Easy Difficulty
+
+**48/53 (91%)** — strongest percentage yet. Five misses, mostly retreads from earlier attempts rather than new ground.
+
+| Domain | Score |
+|---|---|
+| D1 · Agents & Workflows | 8/8 · 100% |
+| D3 · Claude Code | 2/2 · 100% |
+| D4 · Eval, Testing & Debugging | 1/1 · 100% |
+| D6 · Prompt & Context Engineering | 7/7 · 100% |
+| D7 · Security & Safety | 3/3 · 100% |
+| D2 · Applications & Integration | 16/18 · 89% |
+| D5 · Model Selection & Optimization | 8/9 · 89% |
+| D8 · Tools & MCPs | 3/5 · 60% |
+
+#### 44. Prompt caching has a hard limit: four breakpoints max (D5)
+- 🎯 This has now appeared twice (Attempt 6 miss + Attempt 7 miss) — a sign the limit is a specific fact worth memorizing rather than deriving.
+- A single request can have **up to four `cache_control` breakpoints**, no more.
+- Distractors to avoid: "up to eight" (too high), "up to five" (too high), "one breakpoint anywhere caches the whole request" (false — it caches up to and including that breakpoint).
+- The cached prefix runs tools, then system, then messages, up to and including the marked block. A breakpoint on the last system block caches tools and system together.
+
+#### 45. Temperature and other legacy sampling params return a 400 on current models (D5)
+- 🎯 Missed in both Attempt 6 and now Attempt 7 — the consistent pattern suggests this is a critical, easy-to-miss fact.
+- On **Opus 4.8, Opus 4.7, and Sonnet 5**, passing a non-default `temperature`, `top_p`, or `top_k` returns a **400 error**. These legacy sampling controls are rejected outright.
+- The distractor that keeps winning: "the response becomes more random while staying valid and accepted" — sounds plausible, but it's wrong. The request fails, not succeeds.
+- **Variety must be steered through prompting and the `effort` parameter, not through temperature tuning.**
+
+#### 46. Workload-to-API matching: async real-time vs. Batches (D2)
+- **Interactive user chats** (sub-second latency needed, high concurrency): **async real-time concurrency** (many parallel live calls).
+- **Nightly bulk jobs** (cost-dominated, latency-irrelevant): **Message Batches API** (50% price, up to 24-hour window).
+- The trap: assuming one pattern (usually Batches) can serve both. It can't — they're fundamentally different workload shapes with different tools.
+
+#### 47. Tool set design: prune overlapping tools, don't just describe them better (D8)
+- When an agent has several tools with overlapping purposes and misroutes frequently, the direct fix is **pruning to a minimal, non-overlapping set**.
+- The distractor that keeps winning: "add richer descriptions to the overlapping tools" — this sounds helpful but doesn't address the root cause (real overlap).
+- Overlap is fixed by consolidation, not by description edits. A smaller, well-scoped toolset outperforms a larger, even well-described one.
+
 ## Final cram — Tier 1 & Tier 2
 
 Prioritized from the pattern across all five attempts. If exam day is close, read this section last, in this order.
