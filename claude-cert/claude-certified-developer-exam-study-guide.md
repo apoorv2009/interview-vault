@@ -361,6 +361,43 @@ Cumulative across practice attempts — each new attempt's misses get appended h
 - The distractor that keeps winning: "add richer descriptions to the overlapping tools" — this sounds helpful but doesn't address the root cause (real overlap).
 - Overlap is fixed by consolidation, not by description edits. A smaller, well-scoped toolset outperforms a larger, even well-described one.
 
+### Attempt 9 — Hard Difficulty
+
+**49/53 (92.5%)** — strongest non-perfect score. Four misses are all specific technical details, not conceptual gaps.
+
+| Domain | Score |
+|---|---|
+| D1 · Agents & Workflows | 8/8 · 100% |
+| D2 · Applications & Integration | 17/18 · 94% |
+| D3 · Claude Code | 2/2 · 100% |
+| D4 · Eval, Testing & Debugging | 1/1 · 100% |
+| D5 · Model Selection & Optimization | 8/9 · 89% |
+| D6 · Prompt & Context Engineering | 7/7 · 100% |
+| D7 · Security & Safety | 3/3 · 100% |
+| D8 · Tools & MCPs | 3/5 · 60% |
+
+#### 48. Tool call input arguments stream as incremental JSON deltas, not all at once (D5)
+- 🎯 This is a specific streaming-protocol detail: tool call block arguments arrive as **input JSON delta events** carrying partial JSON strings, which the client **accumulates and parses only at `content_block_stop`**.
+- NOT delivered whole in the `content_block_start` event (the original wrong pick).
+- This is the distinction between text deltas (streamed incrementally for text content) and tool-argument deltas (streamed incrementally as JSON fragments, then assembled at block end).
+
+#### 49. MCP stdio transport uses stdin/stdout, not HTTPS or sockets (D8)
+- With stdio, the client spawns the server as a **child process** and they exchange protocol messages over **standard input and standard output** streams.
+- NOT an HTTPS channel, NOT a TCP socket, NOT a shared temporary file.
+- Stdio is the lowest-overhead, local-only transport — no network at all, just parent-child process pipes.
+
+#### 50. Hook lifecycle event for notifications: Notification, not PreToolUse (D1)
+- The **Notification event** fires when the harness surfaces a message to the user (e.g., a permission prompt, an approval gate).
+- This is the right anchor for a desktop alert during a long run.
+- **PreToolUse** fires before each tool call, which is the wrong granularity for attention alerts.
+- Hook lifecycle events matter: different events fire at different points in the loop, so matching the event to the intent is critical.
+
+#### 51. PreToolUse permissionDecision for gated actions: ask, not deny (D7)
+- When an action is **legitimate in some cases but risky in others** (like a refund over a threshold), return **`ask`** to pause for human confirmation.
+- **`deny`** blocks outright (for irreversible, forbidden actions).
+- **`ask`** adds a gate without blocking the workflow, fitting actions that need oversight but not outright blocking.
+- The four values are: `allow`, `deny`, `ask`, `defer`. Confusing which situation calls for which is a sharp trap.
+
 ## Final cram — Tier 1 & Tier 2
 
 Prioritized from the pattern across all five attempts. If exam day is close, read this section last, in this order.
