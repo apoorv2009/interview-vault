@@ -4686,4 +4686,594 @@ Short Answer: Distributed systems can't guarantee perfect consistency all the ti
 - **Critical operations** (money, auth): Strong consistency
 - **Non-critical** (views, likes, metrics): Eventual consistency
 
+---
+
+## You deployed a new version, but some users still see the old one. As a developer, how would you troubleshoot this?
+
+**SIMPLE EXPLANATION — Read This First**
+
+Short Answer: This is a **cache invalidation problem** at multiple layers. Users are seeing stale content because caches aren't being cleared when you deploy. Troubleshoot by checking: **(1) browser cache** (Ctrl+F5 hard refresh), **(2) CDN cache** (might be serving old assets), **(3) service worker cache** (PWAs cache aggressively), **(4) database query cache** (Redis/Memcached returning stale data), **(5) DNS TTL** (old IPs still being served).
+
+**Common scenarios:**
+- Browser cached old HTML/CSS/JS
+- CDN still serving old version (purge cache not triggered)
+- Service worker cached old version (no versioning strategy)
+- API returns cached data from Redis but didn't invalidate
+- Client app shipped with old endpoint URL
+
+**Multi-layer Cache Invalidation Strategy:**
+
+```
+Browser Layer:
+  - Add version hash to static assets: app.v1a2b3c4.js
+  - Set HTTP cache headers: max-age=0 for HTML, long TTL for versioned assets
+  - HTML itself: Cache-Control: no-cache, must-revalidate
+
+CDN Layer:
+  - On deploy, purge cache or add version prefix
+  - Example: cdn.com/assets/v1.5.2/app.js instead of cdn.com/assets/app.js
+
+Service Worker Layer:
+  - Use versioned cache names: cache_v1.5.2
+  - On new deploy, update service worker to new version
+  - Old worker cleaned up after new one activates
+
+Database Query Cache (Redis/Memcached):
+  - Publish cache invalidation event on deploy
+  - Clear specific keys or use TTL
+  - Example: publish InvalidateUserCache event → Redis DEL user:*
+
+API Response Cache:
+  - Add versioning to response headers: X-API-Version: 2.1.0
+  - Client checks version and revalidates if different
+```
+
+---
+
+## If Stored Procedures can be faster, why do teams still prefer app-side queries?
+
+**SIMPLE EXPLANATION — Read This First**
+
+Short Answer: Stored procedures are **faster at runtime** but **slower to develop, deploy, and maintain**. Teams prefer app-side queries because: **(1) easier version control** (code lives in git, not in database), **(2) easier to test** (unit tests + integration tests), **(3) easier to deploy** (update app code, not database schema), **(4) language flexibility** (write in Python/Go/Java, not SQL/PL/pgSQL), **(5) easier debugging** (logs, stack traces in application code).
+
+**Trade-offs:**
+
+| Aspect | Stored Procedures | App-Side Queries |
+| --- | --- | --- |
+| **Speed** | Faster (compiled, no network serialization) | Slightly slower (app parses SQL, sends over network) |
+| **Development** | Slow (SQL/PL-pgSQL debugging is painful) | Fast (use your favorite language) |
+| **Testing** | Hard (need test database, manual mocking) | Easy (ORM makes mocking natural) |
+| **Deployment** | Risky (database schema changes separately) | Safe (app code + migrations together) |
+| **Debugging** | Very hard (limited logging, hard to trace) | Easy (full stack traces, debugger) |
+| **Portability** | Database-specific (can't switch databases) | Portable (ORM abstracts database) |
+| **Team skills** | Requires SQL/PL-SQL experts | Most engineers know Python/Go/Java |
+
+**When to use Stored Procedures:**
+- Extremely hot paths (trading, fraud detection, 1000s of calls/sec)
+- Financial calculations (complex business logic best kept atomic in DB)
+- Regulatory requirements (immutable audit trail in stored procs)
+
+**When to use App-Side Queries:**
+- 99% of cases (Web apps, APIs, microservices)
+- Prioritizing developer velocity over microsecond optimizations
+
+---
+
+## Your API Gateway is running, all microservices pass health checks, yet every client request returns HTTP 503 Service Unavailable. What could be causing this, and how would you troubleshoot it?
+
+**SIMPLE EXPLANATION — Read This First**
+
+Short Answer: Health checks only verify **the service is running**, not that it can **handle requests**. Causes: **(1) all instances are at max connection limit**, **(2) database connection pool exhausted** (services can't query DB), **(3) circuit breaker tripped** (too many upstream errors), **(4) rate limiter misconfigured** (all traffic rejected), **(5) service mesh sidecar misconfigured** (Envoy/Istio blocking traffic).
+
+**Troubleshooting checklist:**
+
+```
+1. Check connection pool:
+   $ curl http://api-gateway:8080/metrics | grep connection
+   Result: All connections exhausted? Increase pool size or find connection leak.
+
+2. Check circuit breaker:
+   $ curl http://api-gateway:8080/metrics | grep circuit_breaker_state
+   Result: Open? Restart the service or wait for half-open recovery.
+
+3. Check rate limiting:
+   $ curl -H "X-Debug: true" http://api-gateway:8080/health/detailed
+   Result: Rate limit exceeded? Check if DDoS protection misconfigured.
+
+4. Check database connectivity:
+   $ curl http://service-1:8081/health/db
+   Result: Database unreachable? Connection pool all used up by background jobs.
+
+5. Check service mesh:
+   $ kubectl logs -l app=api-gateway | grep "refuse\|closed"
+   Result: Sidecar proxy closed all connections? Check Envoy config.
+
+6. Check resource limits (Kubernetes):
+   $ kubectl top pod api-gateway-xyz
+   Result: OOMKilled? Increase memory limit.
+```
+
+**Real-world scenario:**
+```
+Timeline:
+  11:00 - Deploy update (increase worker threads)
+  11:05 - Metrics show all DB connections in use
+  11:10 - New requests timeout waiting for DB connection
+  11:15 - Timeout → upstream error → circuit breaker opens
+  11:20 - All traffic returns 503 even though services are "healthy"
+  
+Root cause: Migration ran in background, holding all DB connections
+Solution: Kill background job, connection pool freed, circuit breaker resets
+```
+
+---
+
+## Your API Gateway runs on multiple instances. How do you implement distributed rate limiting so a user can't bypass limits by hitting different instances?
+
+**SIMPLE EXPLANATION — Read This First**
+
+Short Answer: **Centralized state store** (Redis/Memcached). Instead of each instance tracking limits locally, all instances check and update a **single Redis counter**. When user hits instance A (5 requests) then instance B (5 requests), Redis sees 10 total and enforces the limit globally.
+
+**Local rate limiting (WRONG):**
+```
+Instance A: Rate limit 10 req/s per IP
+Instance B: Rate limit 10 req/s per IP
+
+User hits Instance A with 10 req/s → allowed
+User hits Instance B with 10 req/s → allowed
+→ Total 20 req/s → BYPASS!
+```
+
+**Distributed rate limiting (RIGHT):**
+```
+Redis: Rate limit 10 req/s per IP (shared state)
+
+User hits Instance A: Check Redis counter for IP
+  Redis says: 3 requests so far this second
+  Allow request, increment to 4 in Redis
+
+User hits Instance B: Check Redis counter for IP
+  Redis says: 4 requests so far this second
+  Allow request, increment to 5 in Redis
+
+Total: 5 requests tracked globally
+Next Instance C will see 5 and enforce limit correctly
+```
+
+**Implementation (token bucket with Redis):**
+
+```python
+import redis
+
+redis_client = redis.Redis(host='redis', port=6379)
+
+def is_rate_limited(user_ip, limit=100, window=60):
+    key = f"rate_limit:{user_ip}"
+    current = redis_client.incr(key)
+    
+    if current == 1:
+        # First request in window, set expiration
+        redis_client.expire(key, window)
+    
+    if current > limit:
+        return True  # Rate limited
+    
+    return False  # Request allowed
+
+# Usage on any instance
+@app.route('/api/request')
+def handle_request():
+    if is_rate_limited(request.remote_addr, limit=100, window=60):
+        return {'error': 'Rate limit exceeded'}, 429
+    
+    return process_request()
+```
+
+**Architecture:**
+```
+        User Requests
+            │
+    ┌───────┼───────┐
+    ▼       ▼       ▼
+Instance A  Instance B  Instance C
+    │       │       │
+    └───────┼───────┘
+            ▼
+        Redis (single source of truth)
+        Key: rate_limit:192.168.1.100
+        Value: 45 (requests in current window)
+```
+
+**Critical points:**
+- **Single point of failure**: If Redis goes down, fallback to local limiting (loose but working)
+- **Consistency**: All instances must use same Redis instance (not cluster with sharding by IP)
+- **Race condition**: Redis `INCR` is atomic, so no double-counting even with parallel requests
+
+---
+
+## How do you calculate mid in Binary Search without causing integer overflow?
+
+**SIMPLE EXPLANATION — Read This First**
+
+Short Answer: Classic mistake: `mid = (left + right) / 2` overflows when left and right are large. **Correct formula**: `mid = left + (right - left) / 2`.
+
+**The overflow bug:**
+
+```python
+❌ WRONG:
+left = 1_000_000_000
+right = 2_000_000_000
+mid = (left + right) // 2  # 1.5 billion
+# OverflowError: integer too large (in languages with fixed int size)
+
+✅ CORRECT:
+mid = left + (right - left) // 2  # 1.5 billion, calculated safely
+# Equivalent to (left + right) / 2 but avoids overflow
+```
+
+**Why it matters:**
+- In Java, C++, C#: `int` is 32-bit, max ~2.1 billion
+- Adding two numbers close to max can exceed the limit
+- Languages like Python auto-expand integers (no overflow)
+- But good practice anyway for portability
+
+**The fix:**
+```python
+# Binary search template (safe for all languages)
+def binary_search(arr, target):
+    left, right = 0, len(arr) - 1
+    
+    while left <= right:
+        mid = left + (right - left) // 2  # ✅ Safe formula
+        
+        if arr[mid] == target:
+            return mid
+        elif arr[mid] < target:
+            left = mid + 1
+        else:
+            right = mid - 1
+    
+    return -1  # Not found
+```
+
+---
+
+## Your AI-generated code passes every test, but could it still fail in production? As an engineer, what would you check before deploying it?
+
+**SIMPLE EXPLANATION — Read This First**
+
+Short Answer: Tests validate **happy paths**, not **edge cases and real-world conditions**. Before deploying AI-generated code, check: **(1) error handling** (what happens on null input, timeout, exception?), **(2) performance** (does it scale to production data volume?), **(3) security** (SQL injection, XSS, auth bypass?), **(4) concurrency** (thread-safe? race conditions?), **(5) resource limits** (memory leaks, unbounded loops?), **(6) dependencies** (are versions pinned? outdated packages?).
+
+**Checklist before deploying AI code:**
+
+```
+1. Error Handling:
+   - Try with null/empty input
+   - Try with invalid types
+   - Try with network timeout
+   - Try with database connection failure
+   Result: Does code crash or handle gracefully?
+
+2. Performance:
+   - Run with production data volume (10M rows, not 1000)
+   - Measure latency and memory usage
+   - Check for O(n²) loops or N+1 queries
+   Result: Does it complete in reasonable time?
+
+3. Security:
+   - Are inputs sanitized? (SQL injection, XSS)
+   - Are secrets hardcoded? (API keys, passwords)
+   - Are permissions checked? (User can't access other users' data)
+   - Are rate limits enforced?
+   Result: Can an attacker break this?
+
+4. Concurrency:
+   - Run with 10 concurrent requests
+   - Check for race conditions (shared state modified)
+   - Check for deadlocks
+   Result: Does code work under parallel load?
+
+5. Resource Limits:
+   - Memory: Does it grow unbounded? (memory leak)
+   - CPU: Any infinite loops or very expensive operations?
+   - File handles: Are files/connections properly closed?
+   Result: Can this crash the server?
+
+6. Dependencies:
+   - Are package versions pinned?
+   - Are there known vulnerabilities in dependencies?
+   - Can you build/deploy without internet?
+   Result: Is this reproducible and secure?
+
+7. Code Review (Human):
+   - Read the code like you wrote it (not blindly)
+   - Look for suspicious patterns
+   - Verify business logic correctness
+   - Check for dead code or unclear variable names
+   Result: Does this actually do what we want?
+```
+
+**Real-world example:**
+```
+AI-generated SQL:
+  SELECT * FROM users WHERE id = input
+
+Tests pass: ✓ Returns correct user
+
+Production failure:
+  Input: "1 OR 1=1" (SQL injection)
+  Returns: All users (security breach)
+  
+Why test didn't catch it: Test used safe integer, not string injection
+
+Fix: Use parameterized queries
+  cursor.execute("SELECT * FROM users WHERE id = ?", [input])
+```
+
+---
+
+## Black Friday starts in 2 days. Your site handles 100K users – 10 million are expected. How do you prepare without rewriting the architecture?
+
+**SIMPLE EXPLANATION — Read This First**
+
+Short Answer: You can't scale 100x without rewriting. But you can **cap load** and **prioritize traffic**. Strategy: **(1) add read replicas** (scale reads), **(2) enable caching** (reduce DB hits), **(3) implement rate limiting** (reject excess traffic politely), **(4) add load balancers** (distribute traffic), **(5) pre-warm caches** (popular items ready), **(6) reduce features** (disable non-critical APIs), **(7) auto-scale** (spin up more instances as load increases).
+
+**48-hour action plan:**
+
+```
+Day 1 (Friday before):
+  ✓ Add database read replicas (x3)
+    - Reads go to replicas, writes to primary
+    - Reduces primary load by 3x
+  
+  ✓ Enable caching layer (Redis)
+    - Cache product listings (1 hour TTL)
+    - Cache user profiles (30 min TTL)
+    - Reduces DB queries by 50-80%
+  
+  ✓ Set up rate limiting
+    - 100 req/min per IP for catalog
+    - 10 req/min per user for checkout
+    - Politely rejects excess traffic with 429 status
+  
+  ✓ Pre-warm caches
+    - Load top 100 products into Redis
+    - Load popular categories
+    - Reduces cold cache misses on day 1
+
+Day 2 (Black Friday morning):
+  ✓ Monitor metrics every 5 minutes
+    - CPU, memory, database connections
+    - Latency, error rate, queue depth
+  
+  ✓ Auto-scale rules ready
+    - If CPU > 70% → spin up 2 more instances (takes 2-3 min)
+    - If queue depth > 100 → spin up 1 more
+    - Max 5 extra instances (cost control)
+  
+  ✓ Circuit breaker ready
+    - If checkout service fails, return "sold out" gracefully
+    - If inventory service fails, show cached inventory
+    - Don't cascade failures
+
+  ✓ Graceful degradation
+    - Disable product recommendations (save 20% DB queries)
+    - Disable customer reviews (save 10% DB queries)
+    - Disable personalization
+    - Show static homepage instead of dynamic
+```
+
+**Reality check:**
+```
+Can't be done in 48 hours:
+  ❌ Rewrite for microservices
+  ❌ Move to Kubernetes
+  ❌ Change database from MySQL to Cassandra
+  
+Can be done in 48 hours:
+  ✅ Add read replicas
+  ✅ Enable caching
+  ✅ Rate limiting
+  ✅ Circuit breakers
+  ✅ Feature flags to disable non-critical APIs
+  ✅ Auto-scaling rules
+  ✅ Database query optimization
+  
+Expected outcome: Handle 500K-1M concurrent users, not 10M
+Reject overflow traffic gracefully with 429 status
+```
+
+---
+
+## What will happen if two people push code to the same branch at the same time, one modified a file the other deleted the same file?
+
+**SIMPLE EXPLANATION — Read This First**
+
+Short Answer: **Git conflict** (if the file was modified then deleted on the same branch) or **merge conflict** (if on different branches being merged). The person who pulls second will see a **conflict** in their working directory, and Git will mark the file as "deleted by them, modified by us" or vice versa. They must manually **resolve** by deciding: keep modified version or accept deletion?
+
+**Scenario 1: Same branch, Person A then Person B**
+
+```
+Initial state: file.txt exists with content
+
+Person A: Deletes file.txt
+  $ rm file.txt
+  $ git add .
+  $ git commit -m "Remove file.txt"
+  $ git push origin main ✓ Success
+
+Person B: Modifies file.txt (doesn't know A deleted it)
+  $ echo "new content" >> file.txt
+  $ git add .
+  $ git commit -m "Update file.txt"
+  $ git push origin main ✗ REJECTED (B is behind A)
+
+Person B tries to pull:
+  $ git pull origin main
+  CONFLICT: file.txt deleted by them, modified by us
+  
+B must resolve:
+  $ git rm file.txt  (accept deletion)
+  OR
+  $ git add file.txt  (keep modified version)
+  
+  $ git commit -m "Merge conflict resolved"
+  $ git push origin main ✓ Now works
+```
+
+**Scenario 2: Different branches, merged together**
+
+```
+main branch: file.txt exists
+
+Feature branch A: Delete file.txt
+Feature branch B: Modify file.txt
+
+Merge A into main:
+  $ git merge feature-a
+  ✓ Deleted file.txt
+
+Merge B into main:
+  $ git merge feature-b
+  CONFLICT: Deleted by feature-a, modified by feature-b
+  
+Person must decide: Should file.txt exist or not?
+  If both features are critical: keep modified version
+  If file is truly obsolete: accept deletion
+```
+
+**How to resolve:**
+
+```bash
+# See what's in conflict
+$ git status
+> both added, both deleted, or both modified
+
+# Check the full conflict
+$ git diff --name-only --diff-filter=U
+
+# Option 1: Accept their deletion
+$ git rm file.txt
+$ git add .
+
+# Option 2: Keep your modifications
+$ git checkout --ours file.txt
+$ git add file.txt
+
+# Option 3: Manual merge (edit the file, keep parts from both)
+$ git add file.txt
+
+# Complete the merge
+$ git commit -m "Resolve merge conflict: keep file.txt"
+```
+
+**Prevention:**
+- Use short-lived branches (delete files on feature branch, not main)
+- Communicate before major deletions
+- Code review before pushing to shared branches
+- Use branch protection rules (require PR approval before merge)
+
+---
+
+## How will you return 100,000 (1 lakh) users to the client efficiently?
+
+**SIMPLE EXPLANATION — Read This First**
+
+Short Answer: **Never return all 100,000 users at once.** Use **pagination with cursor-based offsets**: return 20 users per page, use an opaque cursor token (base64-encoded ID + timestamp) to fetch the next page without scanning all previous rows. Client can fetch page 1, 100, or 5000 with same latency (O(1) instead of O(n)).
+
+**Three approaches:**
+
+| Approach | Query | Speed | Problem |
+| --- | --- | --- | --- |
+| **Return all (naive)** | `SELECT * FROM users` | 10 sec, 50 MB response | Client crashes, network timeout |
+| **OFFSET pagination** | `SELECT * FROM users LIMIT 20 OFFSET 0,1000000` | Page 1: fast, Page 50K: slow (must scan 1M rows) | Deep pagination is O(n) |
+| **Cursor pagination** | `SELECT * FROM users WHERE id > ? LIMIT 20` | Page 1, 50K, 1M all equal speed | Requires index on ID |
+
+**Cursor-based pagination (best):**
+
+```python
+# API response for page 1
+GET /api/users?limit=20
+
+Response:
+{
+  "users": [
+    {"id": 1, "name": "Alice"},
+    {"id": 2, "name": "Bob"},
+    ... 20 users total ...
+  ],
+  "cursor": "eyJpZCI6IDIwLCAidGltZXN0YW1wIjogMTYyNDAwMDAwMH0="  # base64({id: 20})
+}
+
+# Client stores cursor and requests next page
+GET /api/users?limit=20&cursor=eyJpZCI6IDIwLCAidGltZXN0YW1wIjogMTYyNDAwMDAwMH0=
+
+Backend:
+  cursor_data = decode_base64(cursor)  # {id: 20}
+  query = "SELECT * FROM users WHERE id > :after_id LIMIT 20"
+  execute(query, after_id=cursor_data['id'])
+  
+Response:
+{
+  "users": [ users 21-40 ],
+  "cursor": "eyJpZCI6IDQwLCAidGltZXN0YW1wIjogMTYyNDAwMDAwMH0="
+}
+```
+
+**Implementation in Python:**
+
+```python
+from flask import request, jsonify
+import base64
+import json
+
+@app.route('/api/users')
+def get_users():
+    limit = int(request.args.get('limit', 20))
+    cursor = request.args.get('cursor', None)
+    
+    # Decode cursor
+    after_id = 0
+    if cursor:
+        try:
+            cursor_data = json.loads(base64.b64decode(cursor))
+            after_id = cursor_data['id']
+        except:
+            return {'error': 'Invalid cursor'}, 400
+    
+    # Query (uses index on id, O(1) seek time)
+    users = db.query(
+        "SELECT id, name, email FROM users WHERE id > :id LIMIT :limit",
+        id=after_id,
+        limit=limit + 1  # Fetch one extra to know if there's more
+    )
+    
+    has_more = len(users) > limit
+    users = users[:limit]
+    
+    # Generate next cursor
+    next_cursor = None
+    if has_more and users:
+        next_cursor = base64.b64encode(
+            json.dumps({'id': users[-1]['id']}).encode()
+        ).decode()
+    
+    return jsonify({
+        'users': users,
+        'cursor': next_cursor,
+        'has_more': has_more
+    })
+```
+
+**Performance:**
+- **Fetching 100K users one by one**: 100,000 requests = hours
+- **Fetching all at once**: 1 request, 50 MB response = crashes
+- **Cursor pagination**: ~5,000 requests (at 20 per page), each ~10ms = ~50 seconds total, user never sees >20 items
+
+**Why Instagram uses this:**
+- Users scroll forever (infinite scroll)
+- Instagram shows 10-20 posts per page
+- Cursor encodes last post ID seen
+- Backend doesn't care if you're on page 1 or page 5000, query speed is identical
+
 
