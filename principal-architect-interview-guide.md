@@ -702,9 +702,13 @@ A: Delivery result plus defect/reliability/security/debt metrics.
 
 I start with tenant model and NFRs, then use a layered Azure design: Front Door/WAF, APIM, Entra, domain-aligned .NET services, Service Bus, fit-for-purpose data stores, Key Vault/Managed Identity and end-to-end observability. Tenant isolation is enforced at every layer.
 
-**Full Answer, Architecture Diagram, Trade-Offs, Follow-Ups:**
+**2-4 Minute Architect Answer**
 
-[See detailed content in extracted document. Full expanded answer here with whiteboard diagram.]
+First classify tenant tiers, compliance/data residency, noisy-neighbor tolerance, restore needs, traffic skew, availability and RTO/RPO. Model bounded contexts such as Tenant Management, Identity, Workflow, Documents, Notifications, Integration and Audit. At the edge use Front Door/WAF where global edge/WAF requirements exist, then APIM for governed API exposure. Entra ID handles identity; APIs enforce tenant/resource authorization.
+
+Run stateless .NET services on the least-complex compute that meets requirements: AKS where orchestration/platform needs justify it, App Service for simpler APIs, Functions for event/bursty workloads. Use Service Bus for asynchronous workflows. Choose Azure SQL for relational transactional domains and Cosmos for access patterns that benefit from its distribution/scale; Redis is an optimization, not system of record. Use Storage for documents, Key Vault plus Managed Identity, OpenTelemetry/App Insights, IaC and CI/CD.
+
+For tenancy, standard tenants may share compute/data with strict logical isolation, while regulated/high-volume tenants can receive dedicated database or deployment. Add per-tenant quotas, cost attribution, SLOs, backup/restore and offboarding. The architecture is a product platform with guardrails, not a collection of Azure services.
 
 **Whiteboard**
 
@@ -758,17 +762,306 @@ A: Isolation model must support tenant-level backup/export/recovery or dedicated
 
 ### 17. Tenant Isolation
 
+**COMPANY TAG:** Coforge
+
 **30-Second Answer**
 
 I treat isolation as a spectrum and choose by compliance, blast radius, restore, scale and economics. Enterprise SaaS often needs a hybrid: pooled standard tenants and stronger dedicated isolation for regulated or very large tenants.
 
-**[Continue with full answer, decisions, follow-ups as per document pattern.]**
+**2-4 Minute Architect Answer**
+
+Shared database/shared schema maximizes density and simplifies fleet management, but every query/cache/message must be tenant-safe and selective restore is harder. Schema-per-tenant gives more logical separation but creates migration/schema-management overhead. Database-per-tenant improves isolation, restore and per-tenant tuning but increases cost and fleet operations. Dedicated deployment provides the strongest compute/network isolation at the highest cost.
+
+Whichever model is chosen, tenant identity comes from a trusted authenticated entitlement, not a client-supplied field. I propagate tenant context into authorization, query filters, partition keys, cache keys, message headers, blob paths, search filters and telemetry. I add automated cross-tenant security tests. Tenant provisioning and offboarding include keys, data retention/export, backup/restore and deletion evidence.
+
+**Whiteboard — Isolation Spectrum**
+
+```
+Pooled (shared DB/schema)  →  Schema-per-tenant  →  DB-per-tenant  →  Dedicated deployment
+     cheapest, densest          more logical            stronger           strongest isolation,
+     hardest to restore         separation              isolation,         highest cost
+     one tenant                                         easier restore
+                          Standard tier  ←———————→  Regulated / large tenant tier
+```
+
+**Decisions & Trade-Offs to Defend**
+
+- Isolation is more than database layout — it spans identity, cache, messages, storage, search, telemetry
+- Commercial tier can map to technical isolation (e.g., "Enterprise" plan = dedicated DB)
+- Automated cross-tenant tests are essential, not optional QA
+- Noisy-neighbor controls belong at API/compute/data layers, not just the database
+
+**Likely Follow-Ups**
+
+**Q: TenantId as Cosmos partition key?**
+A: Often useful for tenant-scoped access, but one very large tenant can create hot/skewed partitions; validate access/load distribution and consider hierarchical partition keys or a dedicated container for outlier tenants.
+
+**Q: Cache leak between tenants?**
+A: Tenant-aware cache keys (never a global key for tenant-scoped data) plus authorization re-checked before returning any cached data — cache is not a trust boundary.
+
+**Q: How do you prove isolation to an auditor?**
+A: Automated cross-tenant access tests in CI, documented data-flow diagrams showing tenant context propagation at every layer, and penetration-test evidence.
+
+**What NOT to Say**
+
+- Trusting TenantId from the request body or URL without validating it against the authenticated principal's entitlement
+- "Shared schema is always fine because we filter by TenantId in the WHERE clause" (one missed filter = data breach — needs defense in depth: query filters + row-level security + tests)
+- Treating isolation as purely a database concern
 
 ---
 
-### 18-24. [Additional Coforge Questions]
+### 18. AKS Architecture
 
-[Detailed content for AKS, APIM, Cosmos, Platform Engineering, FinOps, RAG, Agentic AI]
+**COMPANY TAG:** Coforge
+
+**30-Second Answer**
+
+I use AKS when Kubernetes capabilities create clear value. I make workloads stateless, define requests/limits and probes, autoscale pods and nodes from meaningful signals, design zone/disruption resilience, and protect downstream dependencies from uncontrolled scaling.
+
+**2-4 Minute Architect Answer**
+
+For each workload I set resource requests/limits from measurements, readiness/liveness/startup probes, Pod Disruption Budgets and topology/zone considerations. HPA scales pods from CPU/memory or custom signals; message consumers may scale better on queue depth/oldest-message age. Cluster autoscaler adds/removes nodes when pod scheduling requires capacity. Separate node pools can isolate system, compute-heavy or specialized workloads.
+
+I use progressive deployment, ACR, Managed Identity/workload identity patterns, secrets from Key Vault, network policies/private connectivity where required and centralized observability. I also plan upgrades, image vulnerability management and capacity. AKS is not automatically the default: for a small set of standard web APIs, App Service may achieve the NFRs with lower operational overhead.
+
+**Decisions & Trade-Offs to Defend**
+
+- HPA and cluster autoscaler solve different layers (pod scheduling vs node capacity)
+- Readiness controls traffic; liveness restarts unhealthy process — conflating them causes restart storms
+- Autoscale signal should reflect workload (queue depth for consumers, not just CPU)
+- Downstream DB/message limits cap useful scaling — scaling pods beyond what the DB can serve makes things worse
+
+**Likely Follow-Ups**
+
+**Q: Node dies?**
+A: Scheduler replaces pods on healthy capacity; ensure replicas, PDB/topology spread and sufficient spare/autoscale capacity so this doesn't cause an availability dip.
+
+**Q: HPA makes DB worse?**
+A: Yes — more callers can amplify saturation; combine admission control (rate limiting) and dependency capacity planning so autoscaling doesn't turn a slow dependency into an outage.
+
+**Q: Why not App Service for everything?**
+A: App Service is simpler operationally for standard stateless APIs; AKS earns its complexity when you need fine-grained scheduling, sidecars/service mesh, multi-workload bin-packing, or platform-level consistency across many services.
+
+**What NOT to Say**
+
+- Using liveness probes to check a downstream dependency's health — a failing dependency then causes cascading pod restarts (restart storms) instead of a controlled degradation
+- "AKS scales automatically so we don't need capacity planning"
+
+---
+
+### 19. APIM Governance
+
+**COMPANY TAG:** Coforge
+
+**30-Second Answer**
+
+APIM is the governed API boundary for authentication policies, throttling, routing, version/lifecycle controls, analytics and developer consumption. Business rules remain in domain services.
+
+**2-4 Minute Architect Answer**
+
+I define an API product model: ownership, OpenAPI contract, naming/resource conventions, error format, pagination, idempotency, version/deprecation policy and SLO. APIM can validate/mediate tokens, enforce quotas/rate limits, route versions/backends and expose analytics. It should not become a giant transformation/business-logic engine because that logic becomes hard to test and own.
+
+For internal service-to-service calls I may use direct service networking or an internal gateway depending on security/operational needs. APIM can coexist with YARP/BFF: APIM provides enterprise API management while a BFF shapes data for a particular UI. Contract checks and policy validation belong in CI/CD.
+
+**Decisions & Trade-Offs to Defend**
+
+- API lifecycle includes deprecation, not just launch
+- Rate limits protect downstream capacity, not just the caller experience
+- Gateway and BFF have different responsibilities — don't collapse them
+- Avoid domain logic in policies (XML/inline transforms become unmaintainable and untestable)
+
+**Likely Follow-Ups**
+
+**Q: Versioning approach?**
+A: Prefer backward-compatible evolution; when a breaking change is necessary, run versions in parallel with explicit deprecation/migration windows communicated to consumers.
+
+**Q: APIM itself becomes unavailable?**
+A: Design tier/region availability to the required SLO (Premium tier supports multi-region deployment) and avoid unnecessary gateway hops for internal service-to-service traffic that doesn't need governance.
+
+**What NOT to Say**
+
+- Using APIM as an ESB/business-workflow engine with complex orchestration logic in policies
+- "APIM handles authorization so services don't need to check anything" — downstream services must still authorize; APIM validates tokens, but resource/tenant-level authorization belongs in the domain service
+
+---
+
+### 20. Cosmos DB Partitioning
+
+**COMPANY TAG:** Coforge
+
+**30-Second Answer**
+
+Partition-key selection determines Cosmos distribution, transaction scope and query cost. I choose it from access patterns and tenant/load distribution. I use SQL for relational transactional domains and Cosmos when its globally distributed high-scale document/key access patterns justify the complexity/cost.
+
+**2-4 Minute Architect Answer**
+
+For Cosmos I list the dominant reads/writes and identify a high-cardinality key that distributes load while keeping common queries targeted. TenantId can be attractive in SaaS, but one very large tenant may create skew/hot partitions; hierarchical partitioning/dedicated treatment may be needed depending on the design. I consider RU consumption, item size, indexing, consistency and cross-partition queries, then test with realistic skew.
+
+Azure SQL is preferable where relational integrity, joins, transactions and reporting dominate. Cosmos is preferable where document/key access, elastic scale and geographic distribution dominate. Polyglot persistence is acceptable across bounded contexts, but I avoid giving every service a different database merely for fashion.
+
+**Decisions & Trade-Offs to Defend**
+
+- Access pattern before database brand — never choose Cosmos because it's "modern"
+- Partition skew matters more than average load — a hot partition throttles regardless of overall RU budget
+- Consistency choice is a business decision (strong/bounded-staleness/session/consistent-prefix/eventual), not a default left unexamined
+- Operational skill/cost is part of the technology choice
+
+**Likely Follow-Ups**
+
+**Q: Strong vs session consistency?**
+A: Choose the minimum consistency that satisfies business semantics; stronger consistency can affect latency/availability/RU cost. Session consistency (read-your-own-writes) is often sufficient and is Cosmos's default.
+
+**Q: Reporting/analytics across services' Cosmos containers?**
+A: Build reporting/read models via change feed → events → ETL/data platform rather than cross-service transactional joins, which would violate service data ownership.
+
+**What NOT to Say**
+
+- "Cosmos is NoSQL so it scales automatically regardless of partition key" — a bad key still creates hot partitions and throttling (429s) no matter how much RU/s is provisioned
+- Choosing Cosmos without validating access patterns first
+
+---
+
+### 21. Platform Engineering
+
+**COMPANY TAG:** Coforge
+
+**30-Second Answer**
+
+I build paved roads for common engineering needs — service templates, CI/CD, identity, observability, IaC and security — so product teams get autonomy inside safe defaults. I treat the platform as a product and measure adoption and time-to-production.
+
+**2-4 Minute Architect Answer**
+
+The platform team provides reusable capabilities rather than manually deploying every application. A new .NET service should be able to start from an approved template with logging/tracing, health checks, identity, container build, pipeline, IaC, policy checks and environment conventions already present. Teams can deviate through an explicit architecture exception when their requirements justify it.
+
+I prioritize developer experience, documentation, support and feedback. Metrics include onboarding time, deployment lead time, adoption, failure rate and security/operational defects. If teams bypass the platform, I investigate whether the paved road is too restrictive or slow rather than merely adding enforcement.
+
+**Decisions & Trade-Offs to Defend**
+
+- Self-service over tickets
+- Golden path, not golden cage — teams can deviate with an owned exception
+- Platform has product management and SLOs like any product
+- Automate compliance evidence (don't rely on manual checklists)
+
+**Likely Follow-Ups**
+
+**Q: Platform team vs DevOps team — same thing?**
+A: Platform provides reusable product capabilities (templates, tooling, paved roads); DevOps is a broader culture/practice of collaboration and automation that can exist inside product teams too. They're complementary, not identical.
+
+**Q: How do you avoid the platform team becoming a bottleneck?**
+A: APIs/templates/self-service instead of ticket queues, federated ownership of platform components where it scales better, and a feedback-driven roadmap prioritized by adoption data.
+
+**What NOT to Say**
+
+- Central team manually deploying every application (that's not a platform, that's a queue)
+- "Teams must use the platform with zero exceptions" (creates shadow IT instead of governance)
+
+---
+
+### 22. FinOps
+
+**COMPANY TAG:** Coforge
+
+**30-Second Answer**
+
+I first attribute the increase by service, tenant, environment, region and usage driver, correlate it with traffic/SLO changes, then optimize unit economics without breaking reliability.
+
+**2-4 Minute Architect Answer**
+
+I need allocation before optimization: tags/resource hierarchy and application metrics should connect cloud spend to products/tenants/transactions. For a 40% spike I compare time periods and identify whether it is AKS node growth, Cosmos RU, logging ingestion/retention, egress, storage, AI tokens, idle non-prod resources or a pricing/reservation change. I correlate spend with request volume and deployments.
+
+Optimization may include rightsizing, autoscaling, schedules for non-prod, reserved/savings options where utilization is stable, storage lifecycle, log sampling/retention, Cosmos capacity/partition/query tuning and AI prompt/retrieval/token controls. I express success as cost per tenant/transaction while maintaining SLOs, not simply a lower monthly bill.
+
+**Decisions & Trade-Offs to Defend**
+
+- Unit economics (cost per tenant/transaction) > total bill alone
+- Cost anomaly alerts belong in the same observability stack as reliability alerts
+- Shared platform cost allocation needs a transparent chargeback model
+- Reliability is a constraint on optimization, not something to sacrifice for savings
+
+**Likely Follow-Ups**
+
+**Q: How do you allocate shared AKS cluster cost across tenants?**
+A: Allocate using measured resource consumption (CPU/memory requests, or request-count/tenant metrics) with a transparent, documented shared-overhead rule for cluster-level costs (control plane, shared node pools).
+
+**Q: Logging costs spiked — what do you do?**
+A: Reduce noisy/verbose logs and high-cardinality dimensions, tune sampling and retention tiers, and separate audit-required logs (long retention) from debug telemetry (short retention).
+
+**What NOT to Say**
+
+- Blindly downsizing production resources without correlating to actual load/SLO headroom
+- Treating cost optimization as purely an infrastructure team's job disconnected from architecture decisions
+
+---
+
+### 23. Enterprise RAG
+
+**COMPANY TAG:** Coforge
+
+**30-Second Answer**
+
+I separate ingestion from retrieval: ingest and normalize documents, chunk and embed, store searchable vectors/metadata, retrieve with authorization filters, then ground Azure OpenAI with the retrieved evidence and return citations. Security and evaluation are first-class.
+
+**2-4 Minute Architect Answer**
+
+Ingestion reads approved sources, extracts text/layout, cleans it, chunks with document structure, enriches metadata including tenant/document ACL, generates embeddings and indexes content in Azure AI Search or another approved retrieval store. At query time I authenticate the user, derive entitlements, perform hybrid/vector retrieval with security filters, optionally rerank, build a bounded prompt and call Azure OpenAI. The response includes source citations.
+
+Enterprise controls include prompt-injection handling, data classification/PII, content filtering, model/data-region policy, audit, rate/token limits and evaluation. I create a representative question set and measure retrieval relevance, groundedness/citation correctness, answer quality, latency and cost. RAG is not a guarantee against hallucination; the system needs abstention/uncertainty behavior for insufficient evidence.
+
+**Decisions & Trade-Offs to Defend**
+
+- ACL filtering must occur before evidence reaches the model, not as a post-hoc check on the answer
+- Retrieval evaluation is separate from generation evaluation — measure each independently
+- Chunking/metadata quality matters more than model choice for most quality problems
+- Citations and abstention behavior improve trust more than raw model capability
+
+**Likely Follow-Ups**
+
+**Q: RAG vs fine-tuning — when do you use which?**
+A: RAG injects changing/private knowledge at query time; fine-tuning changes behavior/style/task patterns and is not a substitute for authoritative current data. They're often complementary, not either/or.
+
+**Q: How do you prevent cross-tenant leakage in the retrieval index?**
+A: Tenant/ACL metadata on every indexed chunk, identity-derived filters applied at retrieval time (not just at the UI), isolated indexes for regulated tenants where required, automated tests and audit logging of what was retrieved for whom.
+
+**What NOT to Say**
+
+- Sending the whole document corpus into the prompt "for safety" — expensive, slow, and doesn't fix retrieval quality
+- Claiming RAG eliminates hallucination
+
+---
+
+### 24. Agentic AI
+
+**COMPANY TAG:** Coforge
+
+**30-Second Answer**
+
+An agent can select tools and take actions, so the primary architecture problem is controlled authority. I give tools least privilege, validate every action, isolate tenant/data scope, require approval for high-impact operations and make the entire execution auditable.
+
+**2-4 Minute Architect Answer**
+
+I model the agent as an orchestrated workflow with planner/reasoner, retrieval, tool adapters and state. Tools expose narrow business operations rather than raw database/admin access. Authorization is evaluated at tool execution using the user's/service's permitted scope; the model cannot grant itself privileges. Parameters are schema-validated and high-impact actions — payment, deletion, access changes — require deterministic policy and often human approval.
+
+I limit iterations, time and token/tool cost; defend against prompt/tool injection by treating retrieved/external content as untrusted; log prompts/tool calls/results according to privacy policy; and evaluate task success plus unsafe-action rate. I begin with bounded workflows and expand autonomy only when reliability evidence supports it.
+
+**Decisions & Trade-Offs to Defend**
+
+- The model decides intent; deterministic code enforces authority — never the reverse
+- Human-in-the-loop for irreversible/high-risk actions
+- Tool outputs are untrusted input too (a tool's returned data could contain injected instructions)
+- Cost/loop controls (max iterations, timeouts, token budgets) are reliability controls, not just cost controls
+
+**Likely Follow-Ups**
+
+**Q: RAG vs agent — what's the difference?**
+A: RAG retrieves evidence to ground generation; an agent selects and executes tools/actions based on reasoning, and may use RAG as one of its capabilities. An agent is a superset concept that can include RAG.
+
+**Q: What if the agent tries to delete production data?**
+A: It should never possess unrestricted delete capability — the tool interface exposes only narrow, reversible operations by default; destructive actions require a separate policy check, explicit confirmation/approval workflow, and full audit trail.
+
+**What NOT to Say**
+
+- Giving the LLM raw production database credentials or admin API keys
+- "The model is smart enough to know not to do something dangerous" — authority must be enforced by code, not by trusting model judgment
 
 ---
 
@@ -875,9 +1168,307 @@ For multi-region Cosmos/SQL, I choose consistency level based on business need. 
 
 ## PART III: MBS GLOBAL – OPERATIONAL / INTEGRATION ARCHITECTURE
 
-### 29-40. [Detailed MBS Global Questions]
+### 29. Mission-Critical Cash/ATM/Field-Service Platform
 
-[Detailed content for cash/ATM, transaction integrity, offline mobile, incidents, vendor governance, portfolio modernization, SQL performance, DR/BCP, deduplication, EDI/SFTP, device security, audit trail.]
+**COMPANY TAG:** MBS Global
+
+**30-Second Answer**
+
+I design around transaction integrity and operations: mobile/ATM channels through secured APIs, domain services for work/cash/routing, asynchronous integration for enterprise systems, SQL for authoritative transactions, durable audit/reconciliation and offline-safe field workflows.
+
+**2-4 Minute Architect Answer**
+
+I first identify business transactions: service order, cash movement, ATM status, route assignment, proof of service and settlement/reconciliation. Each gets a stable business transaction ID and authoritative owner. Mobile/field clients call secured APIs when online and maintain an encrypted local work queue when offline. Operational services persist local transactions in SQL and publish integration events through a durable messaging layer using Outbox.
+
+Enterprise systems consume through APIs/messages/files based on capability. I design reconciliation independently of transport: expected versus received counts/amounts, duplicate detection, exception queue and manual resolution. Every state transition affecting money is auditable. Production architecture includes monitoring by business transaction, support runbooks, DR/BCP, controlled releases and clear vendor/team ownership.
+
+**Whiteboard**
+
+```
+Field Mobile / ATM / Ops UI
+          |
+       API Layer
+          |
+Work | Cash | Routing | Device/Service domains
+          |
+   SQL authoritative state
+          |
+Outbox -> Messaging / Integration -> Enterprise systems
+          |
+Audit + Reconciliation + Monitoring + ServiceNow/Support
+```
+
+**Decisions & Trade-Offs to Defend**
+
+- Financial correctness requires reconciliation, not just successful delivery
+- Stable business IDs propagate across every system in the chain
+- Offline sync is a workflow with explicit state, not just client-side caching
+- Audit records must be tamper-resistant/controlled per compliance requirements
+
+**Likely Follow-Ups**
+
+**Q: Broker says the message was delivered — are we done?**
+A: No; business processing and downstream settlement must still be reconciled. Transport acknowledgement is not business confirmation.
+
+**Q: Duplicate cash transaction arrives?**
+A: Idempotency/business uniqueness constraint prevents double application; exception handling preserves evidence for audit rather than silently discarding.
+
+**What NOT to Say**
+
+- Claiming exactly-once transport alone guarantees financial correctness
+- "The message queue handles reliability so we don't need reconciliation"
+
+---
+
+### 30. Transaction Integrity and Reconciliation
+
+**COMPANY TAG:** MBS Global
+
+**30-Second Answer**
+
+I use stable IDs, local ACID where ownership is local, idempotent integration, Outbox/Inbox, immutable/auditable state transitions and independent reconciliation. The goal is business correctness even when messages duplicate or systems are temporarily unavailable.
+
+**2-4 Minute Architect Answer**
+
+For a cash transaction I generate/accept one stable business identifier at the boundary and propagate it across API, database, message and downstream references. Within one service I use a local transaction. Cross-system propagation is asynchronous where appropriate and designed for at-least-once delivery. A unique business/idempotency constraint prevents duplicate application.
+
+Reconciliation compares source-of-truth expectations with downstream acknowledgements/settlements using amount/count/control totals and status. Exceptions are not silently retried forever; they enter an operational queue with reason, owner and audit. This is critical because a technically successful message can still produce an incorrect business outcome due to mapping, downstream logic or manual intervention.
+
+**Decisions & Trade-Offs to Defend**
+
+- Transport success ≠ business success
+- Reconciliation is architecture, not a support afterthought
+- Every manual correction must be auditable
+- Do not delete evidence to "fix" mismatches
+
+**Likely Follow-Ups**
+
+**Q: What if downstream is unavailable for 6 hours?**
+A: Durable queue absorbs the backlog, bounded retries/backoff prevent hammering, monitoring/age SLO alerts on staleness, and I capacity-plan for the catch-up surge plus reconcile once caught up.
+
+**Q: Duplicate arrives after a timeout?**
+A: Same idempotency key means the downstream either returns the prior result or safely ignores the duplicate — timeout-triggered retries must be idempotent-safe by design.
+
+**What NOT to Say**
+
+- Relying only on a distributed transaction across organizational/system boundaries — that's not achievable across autonomous systems and partners
+- "We haven't had a mismatch yet so we don't need reconciliation" — that's surviving on luck, not architecture
+
+---
+
+### 31. Offline-First Field/Mobile Architecture
+
+**COMPANY TAG:** MBS Global
+
+**30-Second Answer**
+
+I store the assigned work and pending changes locally in encrypted storage, make operations idempotent, synchronize through a durable queue when connectivity returns, and define explicit conflict rules instead of last-write-wins by accident.
+
+**2-4 Minute Architect Answer**
+
+The mobile app downloads authorized work packages with version/concurrency metadata. User actions are recorded locally as commands/events with stable IDs and timestamps; UI can show pending/synced/error state. When online, a sync engine sends bounded batches, retries transient failures and handles token renewal/re-authentication. Server APIs are idempotent because the same operation may be resent after uncertain connectivity.
+
+Conflict policy is domain-specific: some fields can merge, some use optimistic concurrency and user resolution, and financial/status transitions may require server validation. Device controls include encryption at rest, secure credential/token storage, remote management/wipe as required, minimal cached sensitive data and telemetry that works without leaking PII. Offline capability is tested with long disconnections and app upgrades, not only brief network toggles.
+
+**Decisions & Trade-Offs to Defend**
+
+- Pending/synced/error state is explicit and visible to the user, not hidden
+- Conflict resolution is business-specific — no universal default
+- Device loss is part of the threat model from day one
+- Server remains authoritative for protected invariants regardless of local state
+
+**Likely Follow-Ups**
+
+**Q: Token expires while offline?**
+A: Existing queued local work can proceed per policy, but protected/sensitive server operations require re-authentication with a valid token once reconnected — offline doesn't waive server-side authorization.
+
+**Q: Same work item edited by two technicians?**
+A: Version/concurrency check (rowversion-style) plus a domain-specific merge/reassign/reject workflow — never silent last-write-wins for financially or operationally significant fields.
+
+**What NOT to Say**
+
+- Using local device storage as the permanent source of truth
+- "Offline conflicts are rare so we'll handle them manually" without a defined workflow
+
+---
+
+### 32. Production Incident, RCA and Recurring P1
+
+**COMPANY TAG:** MBS Global
+
+**30-Second Answer**
+
+I prioritize safe service restoration and transaction integrity first, then perform a blameless evidence-based RCA and turn findings into owned permanent corrective actions measured for recurrence.
+
+**2-4 Minute Architect Answer**
+
+During a major incident I establish incident command, business impact, affected transactions and a communication cadence. I contain blast radius, fail over/rollback or disable a failing path as appropriate, restore service, and validate data integrity/reconciliation before declaring recovery. I preserve logs/traces/timelines.
+
+After stabilization I create a Problem/RCA: trigger, contributing technical/process factors, why monitoring/tests/change controls did not catch it, and corrective actions across code, architecture, tests, observability, runbooks and process. For a recurring vendor workaround I refuse to normalize recurrence: define a permanent-fix plan, acceptance evidence, owner/date and trend metrics. ServiceNow can connect Incident → Problem → Change → Release for controlled remediation.
+
+**Decisions & Trade-Offs to Defend**
+
+- Restore first, RCA after stabilization
+- Validate financial/data integrity before declaring closure
+- RCA addresses systemic contributors, not just "human error"
+- Permanent corrective actions need an owner, date and acceptance evidence
+
+**Likely Follow-Ups**
+
+**Q: Vendor says they cannot reproduce the issue?**
+A: Provide correlated evidence (logs/traces/timing), reproduce in a controlled environment/load test, define diagnostic instrumentation together and set contractual acceptance criteria for resolution.
+
+**Q: When do you roll back vs fix forward?**
+A: Roll back when the recent change is the likely cause and rollback is safe for data/schema; otherwise contain/failover and fix forward, especially if rollback would itself risk data inconsistency.
+
+**What NOT to Say**
+
+- Running the RCA meeting as blame assignment — this suppresses honest reporting and repeats the failure
+- Closing an incident before validating financial/data integrity
+
+---
+
+### 33. Vendor/MSP Technical Governance
+
+**COMPANY TAG:** MBS Global
+
+**30-Second Answer**
+
+I can outsource implementation capacity, but not architecture accountability. I set measurable acceptance criteria, require design/security/operational artifacts, inspect quality continuously and tie milestones to evidence rather than slide status.
+
+**2-4 Minute Architect Answer**
+
+At onboarding I define architecture standards, coding/security baselines, Definition of Done, environments, branching/release model, documentation and support expectations. For each design I review requirements/NFR traceability, data/integration, security, resilience, observability, cost and operational ownership. Delivery metrics include defect leakage, automated-test evidence, vulnerabilities, performance, SLA, milestone predictability and recurring production incidents.
+
+I create regular technical checkpoints but avoid micromanaging individual developers. If quality deteriorates, I use evidence, agree a corrective plan and escalate through commercial governance when necessary. Knowledge transfer and exit strategy are part of architecture risk management so the enterprise is not trapped by one vendor.
+
+**Decisions & Trade-Offs to Defend**
+
+- Acceptance evidence > status reporting
+- Architecture accountability remains internal even when delivery is outsourced
+- Avoid vendor lock-in through contracts/knowledge transfer/portable interfaces where justified
+- Track recurring defects as a trend, not isolated incidents
+
+**Likely Follow-Ups**
+
+**Q: Vendor proposes a proprietary component?**
+A: Evaluate business value, total cost of ownership, portability, support/exit risk and alternatives before approving; document the decision as an ADR.
+
+**Q: Offshore team consistently misses standards?**
+A: Improve templates/automation/training first (make the right way the easy way), then enforce acceptance gates if quality doesn't improve.
+
+**What NOT to Say**
+
+- Only checking quality at final UAT — defects should be caught continuously, not at the end
+- "It's the vendor's problem" — architecture accountability doesn't transfer with the contract
+
+---
+
+### 34. Portfolio Modernization: Retain, Invest, Modernize, Replace or Retire
+
+**COMPANY TAG:** MBS Global
+
+**30-Second Answer**
+
+I score applications by business criticality/value, technical health, security/compliance risk, supportability, cost, change demand and integration complexity, then build a phased portfolio roadmap rather than modernizing everything.
+
+**2-4 Minute Architect Answer**
+
+I create an inventory with business owner, users, dependencies, technology/support status, incidents, cost, vulnerabilities and change backlog. I classify systems: retain where stable/fit; invest where strategic; modernize where value is high but technical constraints impede change; replace when packaged/platform capability is better; consolidate duplicates; retire low-value systems.
+
+Sequencing considers dependency chains and operational risk. A fragile integration hub may need stabilization before downstream migration. I define target capabilities and measurable outcomes such as lower incident rate, shorter release lead time, reduced support cost or eliminated unsupported technology. The roadmap includes funding, vendor constraints, data migration and decommission criteria.
+
+**Decisions & Trade-Offs to Defend**
+
+- Portfolio decisions are business + technical, never technical alone
+- Decommission is a deliverable with its own acceptance criteria, not an afterthought
+- Dependencies drive sequence more than any single application's individual priority
+- Stabilization can precede modernization when the foundation is too fragile to build on
+
+**Likely Follow-Ups**
+
+**Q: 30 applications, limited budget — how do you prioritize?**
+A: Prioritize high business impact/high risk items and enabling dependencies first; make the deferred risk on deprioritized systems explicitly visible to stakeholders rather than silently accepted.
+
+**Q: When do you recommend a full rewrite?**
+A: Only when incremental modernization cannot economically meet target outcomes — rewrite is the expensive, high-risk option of last resort, not a default.
+
+**What NOT to Say**
+
+- Ranking applications solely by technology age ("it's old, replace it") without business-value context
+- Proposing modernization without a decommission plan for what it replaces
+
+---
+
+### 35. SQL Server Performance, Concurrency and Deadlocks
+
+**COMPANY TAG:** MBS Global
+
+**30-Second Answer**
+
+I diagnose with waits, blocking/deadlocks, Query Store/execution plans, indexes/statistics and application transaction/query patterns. I keep transactions short and choose isolation/concurrency based on business correctness.
+
+**2-4 Minute Architect Answer**
+
+A sudden slowdown can come from plan regression, blocking, changed data distribution, missing/stale statistics, resource saturation or a deployment. I correlate the time with releases and inspect Query Store/waits. For deadlocks I capture the deadlock graph and fix access order/index/query/transaction design; retrying the victim can be appropriate only when the operation is safe and does not hide a systemic issue.
+
+Isolation level balances anomalies against concurrency. I avoid holding DB transactions open across remote network calls. Optimistic concurrency with rowversion is useful for user-edit scenarios. Indexes are chosen from actual query patterns and write cost. For critical cash data, correctness rules determine transaction boundaries before performance tuning.
+
+**Decisions & Trade-Offs to Defend**
+
+- Short transactions, always
+- Deadlock graph > guessing at the cause
+- Indexes have write/storage cost — never free
+- Never keep a DB transaction open while calling an external API
+
+**Likely Follow-Ups**
+
+**Q: Should we use Serializable isolation everywhere for safety?**
+A: No — the strongest isolation severely reduces concurrency; use it only where a specific business invariant genuinely requires it, applied narrowly.
+
+**Q: Can we use NOLOCK to fix a timeout?**
+A: NOLOCK permits dirty/inconsistent reads — it's not a universal performance fix, and it's especially dangerous for financial data where a dirty read could show a transaction that later rolls back.
+
+**What NOT to Say**
+
+- Using NOLOCK to "solve" blocking in financial flows
+- "We'll just retry deadlocked transactions" without investigating the access-order root cause
+
+---
+
+### 36. DR/BCP and Production Readiness Review
+
+**COMPANY TAG:** MBS Global
+
+**30-Second Answer**
+
+I convert business continuity requirements into tested technical recovery and operational procedures. Before release I verify capacity, security, observability, support, backup/DR, rollback, dependencies and transaction-reconciliation readiness.
+
+**2-4 Minute Architect Answer**
+
+For BCP I identify critical business services and maximum tolerable outage, not just servers. I map people, vendor, network, identity, data, message/file integrations and downstream enterprise dependencies. Technical DR is then designed to meet RTO/RPO with appropriate replication/backups and alternate capability. Exercises include business users/support and validate reconciliation after recovery.
+
+Production Readiness Review is a go-live evidence review: architecture/NFRs, threat/vulnerability status, performance/capacity, monitoring/alerts, runbooks/on-call, backup/restore, DR, data migration, rollback, support handover, external dependencies and open risks with owners. A checklist is useful, but evidence and accountable acceptance matter more than a green spreadsheet.
+
+**Decisions & Trade-Offs to Defend**
+
+- BCP includes business operations (people, process), not only IT infrastructure
+- PRR must include rollback and data-compatibility verification, not just "did it deploy"
+- Open risks require named acceptance by an accountable stakeholder
+- Recovery testing should include integrity/reconciliation checks, not just "service came back up"
+
+**Likely Follow-Ups**
+
+**Q: A vendor dependency isn't DR-ready — what do you do?**
+A: Treat it as an explicit business-continuity risk, seek an alternate/manual fallback procedure, or pursue contractual remediation with the vendor — don't let it become a silent single point of failure.
+
+**Q: How often should DR be tested?**
+A: Based on criticality/regulatory policy — frequently enough to actually prove the stated RTO/RPO, and always again after material architecture changes.
+
+**What NOT to Say**
+
+- Calling backup alone a complete DR strategy — backup without tested restore/failover procedures is unproven
+- Signing off a PRR based on a checklist with no evidence attached
 
 ---
 
@@ -1002,9 +1593,384 @@ For immutability, use database constraints (only INSERTs, never UPDATE/DELETE) o
 
 ## PART IV: INNOVER DIGITAL – MODERNIZATION
 
-### 41-50. [Innover Detailed Questions]
+### 41. Modernize WPF/.NET Framework to .NET 8/10 and Blazor Server
 
-[Detailed content for WPF modernization, Blazor Server, lifecycle/state, Clean Architecture, EF Core, shared DB, gateways, AI-assisted modernization, Blazor authentication, feature flags.]
+**COMPANY TAG:** Innover Digital
+
+**30-Second Answer**
+
+I avoid a big-bang rewrite. I inventory dependencies and business workflows, define target domain/application boundaries, establish an API/anti-corruption seam, and migrate vertical slices using Strangler while old and new stacks coexist safely.
+
+**2-4 Minute Architect Answer**
+
+Discovery covers WPF UI/business logic coupling, .NET Framework libraries, COM/native dependencies, database stored procedures/schema coupling, authentication, integrations and deployment. I classify components as retain, refactor, replace or retire. The target uses Clean Architecture/DDD where complexity justifies it: Blazor presentation, application use cases, domain model and infrastructure adapters.
+
+I create seams before migration. Legacy functionality can remain behind an API/facade while new vertical slices are implemented in modern .NET/Blazor. Shared database coexistence uses backward-compatible expand-contract schema changes. I migrate by business capability so each increment is releasable and measurable. I prioritize high-change/high-risk areas rather than rewriting stable code. Testing includes characterization tests around legacy behavior, contract tests and side-by-side business validation.
+
+**Whiteboard**
+
+```
+WPF / .NET Framework
+       |
+  (facade / API seam)
+       v
+Modern API / BFF
+       |
+Application Use Cases
+       |
+Domain
+       |
+Infrastructure -> existing DB/integrations during transition
+       ^
+Blazor Server UI
+(Migration by vertical business slice)
+```
+
+**Decisions & Trade-Offs to Defend**
+
+- Strangler lowers migration risk versus a big-bang rewrite
+- Vertical slice migration beats layer-by-layer rewrite
+- Characterization tests protect unknown/undocumented legacy behavior
+- Temporary coexistence can be intentional architecture, not a failure state
+
+**Likely Follow-Ups**
+
+**Q: A legacy library cannot migrate to modern .NET?**
+A: Port/replace if economical; otherwise isolate it behind a process/API boundary (e.g., a small compatibility shim service) and migrate it later once the rest of the system has moved.
+
+**Q: How do you handle the shared database during transition?**
+A: Explicit ownership per table/schema area plus expand-contract migrations; prevent any new code from deepening direct cross-boundary coupling even though coexistence is temporary.
+
+**What NOT to Say**
+
+- Rewriting all screens before any production value is delivered
+- "We'll just do it all at once over a long code freeze" — high risk, no incremental validation
+
+---
+
+### 42. Blazor Server Architecture, Circuits and Scaling
+
+**COMPANY TAG:** Innover Digital
+
+**30-Second Answer**
+
+Blazor Server runs component logic on the server and maintains an interactive SignalR circuit per connected client. That simplifies server-side .NET reuse but makes connection quality, per-circuit memory/state and concurrent connection scale key architecture concerns.
+
+**2-4 Minute Architect Answer**
+
+The browser receives UI diffs/events over SignalR while component execution and most state live on the server. A circuit represents a user's interactive session. I do not store durable business state only in the circuit because disconnect/restart can lose it. Durable workflow state belongs in a database/distributed store; UI state can be reconstructed where possible.
+
+For scale I estimate concurrent circuits, memory per circuit, event rate and downstream load, then load-test realistic user behavior. Multiple app instances require appropriate SignalR/session routing architecture and externalized durable state. I design reconnect UX and protect expensive component operations. Blazor Server is attractive for enterprise intranet/controlled connectivity and rapid .NET modernization; WebAssembly or another client model may be preferable for offline/high-latency scenarios.
+
+**Decisions & Trade-Offs to Defend**
+
+- A circuit is not durable business storage
+- Concurrent connections matter more than raw HTTP RPS for capacity planning
+- Load-test actual interaction patterns, not synthetic page-load benchmarks
+- Choose the hosting model (Server vs WASM) from UX/network/security constraints, not habit
+
+**Likely Follow-Ups**
+
+**Q: Can this scale to 10,000 concurrent users?**
+A: I'd estimate concurrent active circuits and memory-per-circuit from measurement, scale instances/connections accordingly, externalize durable state so any instance can serve any user, and load-test before promising a number — I won't commit to a capacity figure without evidence.
+
+**Q: What happens on disconnect?**
+A: The client attempts reconnect and the circuit's UI state is recreated; any business-critical work must already be durably persisted server-side so a lost circuit never loses a completed business action, only in-progress UI state.
+
+**What NOT to Say**
+
+- Treating Blazor Server as stateless HTTP the way a typical Web API is
+- Storing an in-progress financial transaction's state only in circuit memory with no server-side persistence
+
+---
+
+### 43. Blazor Component Lifecycle and State Management
+
+**COMPANY TAG:** Innover Digital
+
+**30-Second Answer**
+
+I understand initialization, parameter updates, rendering and post-render phases, and I keep component state scoped to its real lifetime. Durable business state is not kept only in component/circuit memory.
+
+**2-4 Minute Architect Answer**
+
+Typical lifecycle points include SetParametersAsync, OnInitialized/OnInitializedAsync, OnParametersSet/Async, rendering and OnAfterRender/Async. I avoid triggering infinite renders from OnAfterRender and account for prerendering scenarios where initialization behavior can surprise developers. Async loading uses cancellation/error/loading state and avoids blocking calls.
+
+State choices: component-local state for local UI; cascading/scoped state for coordinated UI within an appropriate circuit; URL/query for navigable state; browser storage only for suitable non-sensitive client persistence; server database/distributed store for durable business workflow. I avoid global mutable singletons for user state because users can leak into one another.
+
+**Decisions & Trade-Offs to Defend**
+
+- State lifetime must match business lifetime — don't let UI convenience dictate where business state lives
+- A scoped service in Blazor Server is generally circuit-scoped, not per-event — a common source of subtle bugs
+- Server/API re-validates authorization regardless of client-side state
+
+**Likely Follow-Ups**
+
+**Q: When do you call StateHasChanged manually?**
+A: It requests a rerender; the framework normally rerenders automatically after event handlers complete, so I call it deliberately only for external notifications (e.g., a background timer or a message arriving from a service) that Blazor's normal event pipeline doesn't already trigger from.
+
+**Q: What's OnAfterRenderAsync for?**
+A: DOM/JS-interop-dependent work that needs the rendered markup to exist first (e.g., initializing a JS chart library); guard logic with the `firstRender` parameter to avoid repeating one-time setup on every render.
+
+**What NOT to Say**
+
+- Using a singleton service to hold per-user UI state (state leaks across users/circuits)
+- Assuming component-local state is safe to treat as the system of record for a business transaction
+
+---
+
+### 44. Clean Architecture + DDD in a Modern .NET Solution
+
+**COMPANY TAG:** Innover Digital; also Coforge
+
+**30-Second Answer**
+
+DDD defines domain language/boundaries; Clean Architecture controls dependency direction. I keep Domain independent, Application orchestrating use cases, Infrastructure implementing external adapters and Blazor/API as presentation.
+
+**2-4 Minute Architect Answer**
+
+The Domain contains business rules, entities/value objects/aggregates and domain services/events where needed, without EF/Blazor/Azure dependencies. Application contains use cases, ports/interfaces and authorization/orchestration policy that is application-specific. Infrastructure implements persistence, messaging and external APIs. Presentation maps HTTP/UI concerns to application use cases.
+
+I avoid mechanically creating four projects for every tiny service. The goal is testable boundaries and dependency direction. Cross-cutting concerns such as logging belong at appropriate outer boundaries. EF configurations and Azure SDK details stay outside Domain. DDD and Clean Architecture complement each other: one primarily addresses domain modeling/context, the other dependency/control flow.
+
+**Decisions & Trade-Offs to Defend**
+
+- Dependencies point inward, always
+- Domain should not know about EF, Blazor, or Azure SDKs
+- Application owns use-case orchestration, not Domain and not Infrastructure
+- Avoid ceremony (four projects, ten interfaces) without actual complexity that justifies it
+
+**Likely Follow-Ups**
+
+**Q: Should I have a repository per table?**
+A: No — repositories, if used at all, should align with aggregate/domain persistence needs rather than mirroring CRUD tables one-for-one; a single aggregate's repository may span multiple tables.
+
+**Q: Where does validation belong?**
+A: Input shape/format validation at the boundary (presentation/API), business invariants enforced inside the domain model itself, and use-case-specific orchestration rules in the application layer.
+
+**What NOT to Say**
+
+- Building an anemic "domain" that's just EF entities plus a pile of services containing every business rule (that's not DDD, it's a transaction-script pattern wearing DDD's clothes)
+- Creating a rigid four-project template for a genuinely tiny, low-complexity service
+
+---
+
+### 45. EF Core 8 Performance and Concurrency
+
+**COMPANY TAG:** Innover Digital
+
+**30-Second Answer**
+
+I optimize EF Core by measuring generated SQL and plans, projecting only required columns, using AsNoTracking for read-only queries, avoiding N+1 and unbounded result sets, indexing correctly and handling optimistic concurrency explicitly.
+
+**2-4 Minute Architect Answer**
+
+For a read screen I prefer Select projection directly to a DTO rather than Include-ing a large graph. AsNoTracking reduces tracking overhead when updates are not needed. I inspect query translation and SQL, use pagination — keyset where suitable for large/ordered feeds — and ensure indexes support filters/order. Split queries can avoid cartesian explosion for certain multi-collection includes, but add round trips; choose with measurement.
+
+For updates, DbContext is a short-lived unit of work. rowversion/concurrency tokens detect lost updates; DbUpdateConcurrencyException is handled according to business semantics: reload/merge, reject with latest data or retry only when safe. Bulk operations, compiled queries and raw SQL are tools for measured hotspots, not default patterns.
+
+**Decisions & Trade-Offs to Defend**
+
+- Projection first — load only what the screen/operation actually needs
+- AsNoTracking for every read-only query
+- Pagination is required for any potentially large dataset, no exceptions
+- A concurrency conflict resolution strategy is a business/UX decision, not a technical default
+
+**Likely Follow-Ups**
+
+**Q: What's an N+1 problem and how do you spot it?**
+A: One parent query followed by a repeated child query per parent row — visible in query logs as many near-identical small queries; fix by reshaping the query (projection, explicit join, or appropriate eager-loading strategy).
+
+**Q: Offset pagination vs keyset — when does it matter?**
+A: Offset (SKIP/TAKE) supports arbitrary page jumps but degrades and becomes unstable (page drift under concurrent writes) at scale; keyset pagination (using the last-seen sort key) is efficient and stable for forward navigation on large, frequently-changing datasets.
+
+**What NOT to Say**
+
+- Calling `.ToList()` early and then filtering/paging in memory — defeats the database's ability to optimize the query
+- Adding `AsNoTracking()` everywhere including on entities you're about to update
+
+---
+
+### 46. Shared Database Coexistence During Modernization
+
+**COMPANY TAG:** Innover Digital
+
+**30-Second Answer**
+
+I use explicit ownership and expand-contract schema evolution so legacy and modern versions can run simultaneously. New code must not deepen shared-database coupling just because coexistence is temporary.
+
+**2-4 Minute Architect Answer**
+
+Suppose a column must be replaced. Release 1 adds the new column/table while old remains. Code supports both and a backfill migrates historical data. Once all consumers use the new representation and reconciliation proves correctness, a later release removes the old schema. For writes, dual-write inside one database transaction may be temporarily acceptable when one database owns both representations, but I keep the migration period bounded.
+
+I assign migration ownership, version scripts, backup/rollback, compatibility windows and deployment sequence. If different bounded contexts currently share tables, I introduce APIs/views/events/read replicas or replicated read models gradually so ownership can separate. Reporting requirements are handled deliberately rather than used as a reason for every service to write the same schema.
+
+**Decisions & Trade-Offs to Defend**
+
+- Expand → migrate/backfill → contract, always in that order
+- Backward compatibility during the transition enables independent deployment of app and schema changes
+- A shared DB is a transition state to be actively exited, not a permanent target
+- Reconcile migrated data before removing the old schema
+
+**Likely Follow-Ups**
+
+**Q: We need to roll back after new code already wrote to the new schema — now what?**
+A: The old application version must remain compatible with the new schema during the entire rollout window — this is why expand-contract exists; destructive cleanup only happens in a later release once rollback is no longer a concern.
+
+**Q: What about legacy stored procedures?**
+A: Inventory their callers and contracts, then version/migrate them with the same compatibility discipline as any other schema change — don't let "it's just a stored proc" bypass the process.
+
+**What NOT to Say**
+
+- Dropping or renaming a column in the same release that ships the new code depending on it — that removes the rollback path entirely
+- "Coexistence is temporary so we can be sloppy about the shared schema" — sloppy temporary coupling has a way of becoming permanent
+
+---
+
+### 47. YARP vs Ocelot vs APIM and BFF
+
+**COMPANY TAG:** Innover Digital
+
+**30-Second Answer**
+
+I use APIM for enterprise API management/governance and YARP/Ocelot when an application needs an internal .NET gateway/reverse proxy/BFF-style boundary. A BFF shapes APIs for a specific frontend but should not absorb core domain logic.
+
+**2-4 Minute Architect Answer**
+
+YARP is a flexible .NET reverse-proxy toolkit that fits custom routing/transforms and integration into ASP.NET Core. Ocelot provides gateway-oriented features/conventions. APIM is a managed enterprise API-management platform with products/subscriptions/policies/analytics/developer lifecycle. The correct answer is not one-or-the-other: an enterprise may expose APIs through APIM while a Blazor-specific BFF/YARP layer aggregates UI needs internally.
+
+At the BFF I can centralize frontend-specific aggregation, token/session mediation where architecture requires, and shield the UI from service topology. Authorization remains enforced at downstream/domain boundaries too. I keep business workflows in application/domain services so the BFF does not become a new monolith.
+
+**Decisions & Trade-Offs to Defend**
+
+- Enterprise gateway (APIM) and BFF (YARP/Ocelot) solve different problems — don't collapse them into one layer
+- Avoid duplicating the same policy logic (auth, rate limiting) redundantly at every gateway layer
+- Choose by required managed capabilities (APIM's product/analytics/developer portal) vs need for custom control (YARP's code-level extensibility)
+- Health/rate/auth enforcement needs clear operational ownership per layer
+
+**Likely Follow-Ups**
+
+**Q: Why not have the Blazor UI call 12 microservices directly?**
+A: Chatty client-to-service coupling, token/security exposure to the browser, and tight UI dependency on internal service topology that changes over time — a BFF aggregates and insulates the UI from that.
+
+**Q: Can APIM and YARP coexist in the same system?**
+A: Yes — valid when external partner/enterprise API governance (APIM) and app-specific internal UI composition (YARP-based BFF) are genuinely distinct concerns with different audiences.
+
+**What NOT to Say**
+
+- Putting all business logic into gateway transforms/policies — untestable and hard to own
+- "We don't need a BFF, the UI can just call every service" for a complex multi-service UI
+
+---
+
+### 48. Cursor/Copilot/AI-Assisted Modernization Safely
+
+**COMPANY TAG:** Innover Digital
+
+**30-Second Answer**
+
+I use coding AI to accelerate understanding, boilerplate, tests and documentation, but architecture accountability and code acceptance remain human. AI output is treated as untrusted until reviewed, tested and security-scanned.
+
+**2-4 Minute Architect Answer**
+
+For legacy analysis I can ask the tool to summarize call graphs, identify coupling, propose characterization tests and draft migration candidates. I provide bounded context rather than entire sensitive repositories when policy does not allow it. For implementation it can draft adapters, DTO mappings, tests and documentation, but the developer validates API behavior, security, performance, licensing/provenance policy and architecture boundaries.
+
+I add normal engineering controls: PR review, unit/integration/contract tests, analyzers, SAST/SCA/secret scanning and benchmark/load tests for critical paths. I do not allow generated code to introduce new dependencies or architectural patterns without review. I measure whether AI reduces cycle time/defects rather than assuming productivity.
+
+**Decisions & Trade-Offs to Defend**
+
+- Follow corporate data/privacy policy for what can be shared with the AI tool
+- AI output is not authoritative — it's a draft requiring the same scrutiny as a junior developer's PR
+- Tests/security gates remain unchanged regardless of who/what authored the code
+- Use AI to accelerate migration evidence-gathering, not to replace architectural design decisions
+
+**Likely Follow-Ups**
+
+**Q: The AI tool suggests a full rewrite instead of incremental migration?**
+A: Treat it as one option to evaluate — validate its assumptions about dependencies, business behavior preservation and the actual economics of incremental vs big-bang before accepting or rejecting it.
+
+**Q: How do you handle sensitive/proprietary source code with these tools?**
+A: Only through approved enterprise tooling and configuration (e.g., enterprise Copilot with data-residency/no-training guarantees), following the organization's data-handling policy — never through a personal/unapproved account.
+
+**What NOT to Say**
+
+- Copy/pasting generated code directly to production without review
+- "AI-generated code is probably fine since the tests pass" — passing tests don't cover security, licensing, or architectural fit
+
+---
+
+### 49. Blazor Authentication and Token Handling (NEW)
+
+**COMPANY TAG:** Innover Digital
+
+**30-Second Answer**
+
+In Blazor Server, authentication state flows through the circuit via AuthenticationStateProvider; I still enforce authorization server-side on every API/data call because the circuit's client-side state is not a trust boundary.
+
+**2-4 Minute Architect Answer**
+
+Blazor Server authenticates the user via the normal ASP.NET Core pipeline (cookie or OIDC) at circuit initialization, and the AuthenticationStateProvider exposes the ClaimsPrincipal to components for UI-level conditional rendering (`<AuthorizeView>`, `[Authorize]` on pages). This is a UX convenience — it decides what to show, not what to allow.
+
+Every actual data operation — API call, database query, business action — is authorized again at the service/API boundary, because a compromised or stale circuit UI state must never be the sole gate for a sensitive action. For token-based downstream API calls, I acquire and cache tokens server-side (e.g., via a token acquisition service using MSAL/Entra), never expose raw tokens to client-side JS. Circuit reconnection after disconnect must re-validate the user's session/token validity rather than assuming the old state is still authorized.
+
+For Blazor WebAssembly (if used elsewhere in the estate), the trust model differs — the client holds tokens, so API-side authorization is even more critical since the client is fully untrusted code running in the browser.
+
+**Decisions & Trade-Offs to Defend**
+
+- UI-level `[Authorize]`/`<AuthorizeView>` is UX, not the security boundary
+- Server/API re-validates every sensitive operation regardless of what the circuit believes
+- Tokens stay server-side in Blazor Server — never exposed to client-side JS
+- Reconnect must re-validate authorization, never assume prior state still holds
+
+**Likely Follow-Ups**
+
+**Q: How do you handle token expiration mid-session in Blazor Server?**
+A: Silent server-side refresh via MSAL; if refresh fails, force re-authentication — the circuit must not silently continue making API calls with an expired/invalid token.
+
+**Q: Does the auth architecture differ for Blazor WebAssembly?**
+A: Significantly — Server keeps tokens/secrets server-side (smaller attack surface, but the SignalR connection itself needs securing); WebAssembly means the client is untrusted code, so the API must assume zero trust of anything the client asserts, including any claims shown in its UI.
+
+**What NOT to Say**
+
+- Treating `[Authorize]` on a Blazor page as sufficient protection for the underlying data operation it triggers
+- Passing raw access tokens to client-side JavaScript in a Blazor Server app
+
+---
+
+### 50. Feature Flags During Migration (NEW)
+
+**COMPANY TAG:** Innover Digital
+
+**30-Second Answer**
+
+I use feature flags to control cutover between legacy and modernized vertical slices per user/tenant/percentage, enabling safe rollback without a redeploy and supporting gradual, measurable migration.
+
+**2-4 Minute Architect Answer**
+
+During Strangler-style migration, a feature flag lets me route a specific business capability to either the legacy WPF/backend path or the new Blazor/modern-API path, without a code deployment to switch back. This de-risks cutover: if the new vertical slice has an issue in production, I flip the flag back to legacy instantly rather than executing an emergency rollback deployment.
+
+I scope flags by user, tenant, or percentage rollout — starting with internal users or a single low-risk tenant, then expanding as confidence grows. Flags must be short-lived by design: each flag has an owner and a removal date, because permanent flags accumulate into unmaintainable conditional complexity (flag debt). For data-writing paths, I'm careful that a flag flip mid-session doesn't split a single business transaction across old and new schemas inconsistently — flag boundaries should align with transaction/session boundaries, not cut through them.
+
+I combine flags with observability: dashboards split by flag variant so I can compare error rate/latency/business-success metrics between legacy and new paths before fully committing to the cutover.
+
+**Decisions & Trade-Offs to Defend**
+
+- Flags de-risk cutover but must be temporary, owned and dated — not permanent architecture
+- Flag boundaries must align with transaction boundaries, never split a transaction mid-flight
+- Compare metrics by flag variant before full cutover — don't just flip and hope
+
+**Likely Follow-Ups**
+
+**Q: How do you prevent "flag debt" (flags nobody ever removes)?**
+A: Every flag has an owner and a removal date tracked in the backlog; a periodic audit flags stale entries, and CI can even fail a build on flags older than a policy threshold.
+
+**Q: A flagged user hits an error mid-transaction on the new path — what happens?**
+A: The transaction fails cleanly and is retryable — it should never silently fall back to the legacy path mid-transaction, which could apply the same business action twice across two different systems.
+
+**What NOT to Say**
+
+- Using feature flags as permanent architecture (a flag alive for two years is just unmanaged conditional logic at that point)
+- Flipping a flag for a user mid-transaction without considering transaction-boundary consistency
 
 ---
 
@@ -1053,6 +2019,41 @@ public async Task HandleAsync(OrderCreated message, CancellationToken ct)
 
 ---
 
+### 53. Global Exception Handling in Modern ASP.NET Core
+
+```csharp
+public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> log)
+    : IExceptionHandler
+{
+    public async ValueTask<bool> TryHandleAsync(
+        HttpContext context, Exception ex, CancellationToken ct)
+    {
+        log.LogError(ex, "Unhandled error. TraceId={TraceId}",
+            context.TraceIdentifier);
+
+        context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+
+        await context.Response.WriteAsJsonAsync(new ProblemDetails
+        {
+            Status = 500,
+            Title = "An unexpected error occurred",
+            Extensions = { ["traceId"] = context.TraceIdentifier }
+        }, ct);
+
+        return true;
+    }
+}
+
+// Registration:
+// builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+// builder.Services.AddProblemDetails();
+// app.UseExceptionHandler();
+```
+
+**Explain:** Map known validation/not-found/conflict exceptions to deliberate status codes (via typed exceptions or a result pattern), log unexpected errors once at the boundary, and never expose stack traces/secrets in the response body. `IExceptionHandler` (the .NET 8 pattern) replaces the older custom exception-handling middleware for most cases.
+
+---
+
 ### 54. Outbox Pattern Code
 
 ```csharp
@@ -1094,6 +2095,141 @@ public async Task PublishPendingAsync(CancellationToken ct)
     await db.SaveChangesAsync(ct);
 }
 ```
+
+**Explain:** The business write and the outbox row commit atomically in one local transaction — this is what closes the dual-write failure window. A separate publisher process reads unpublished rows and sends them; if it crashes between send and marking-published, the message can be resent, which is why consumers must be idempotent (see Q52).
+
+---
+
+### 55. EF Core Projection + Keyset Pagination
+
+```csharp
+var page = await db.Orders
+    .AsNoTracking()
+    .Where(x => x.TenantId == tenantId && x.Id > lastId)
+    .OrderBy(x => x.Id)
+    .Select(x => new OrderListItem(x.Id, x.Number, x.Status, x.Total))
+    .Take(pageSize)
+    .ToListAsync(ct);
+```
+
+**Explain:** Projection avoids loading unnecessary columns/entities; `AsNoTracking` reduces read overhead since this data isn't being updated; keyset pagination (`x.Id > lastId` instead of `.Skip(n)`) avoids large OFFSET scans for forward paging and stays stable even if rows are inserted/deleted between page requests. Ensure the sort/filter combination (`TenantId`, `Id`) is supported by a matching composite index.
+
+---
+
+### 56. Optimistic Concurrency with rowversion
+
+```csharp
+public class WorkItem
+{
+    public long Id { get; set; }
+    public string Status { get; set; } = "";
+
+    [Timestamp]
+    public byte[] Version { get; set; } = Array.Empty<byte>();
+}
+
+try
+{
+    await db.SaveChangesAsync(ct);
+}
+catch (DbUpdateConcurrencyException)
+{
+    // Reload latest values and apply domain-specific merge/reject policy.
+    throw;
+}
+```
+
+**Explain:** The `[Timestamp]` column (SQL Server `rowversion`) is checked on UPDATE; if another transaction changed the row first, EF Core throws `DbUpdateConcurrencyException`. Do not blindly retry a user's conflicting update — decide whether to merge, reject with the latest state shown to the user, or retry, based on the actual business operation (e.g., a status transition might reject; a non-conflicting field edit might safely merge).
+
+---
+
+### 57. Thread-Safe Increment
+
+```csharp
+private long _processed;
+
+public void MarkProcessed() => Interlocked.Increment(ref _processed);
+```
+
+**Explain:** `count++` is a read-modify-write sequence and can lose increments under concurrent access from multiple threads. `Interlocked` is appropriate for simple atomic operations on a single value; use a `lock`/`SemaphoreSlim` or redesign the data structure (e.g., `ConcurrentDictionary`) for multi-step invariants that can't be expressed as one atomic operation.
+
+---
+
+### 58. Policy-Based Authorization
+
+```csharp
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("CanApprove",
+        p => p.RequireClaim("permission", "payments.approve"));
+});
+
+[Authorize(Policy = "CanApprove")]
+[HttpPost("{id:long}/approve")]
+public Task<IActionResult> Approve(long id, CancellationToken ct)
+    => ...;
+```
+
+**Explain:** Authentication proves identity; the policy expresses permission. This example checks a claim, which is sufficient for coarse-grained "can this user ever approve payments" checks. Resource/tenant-level authorization ("can this user approve *this specific* payment, in *this tenant*") typically requires a custom `IAuthorizationHandler` that inspects the actual resource, not just the claim.
+
+---
+
+### 59. Multi-Stage Dockerfile
+
+```dockerfile
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+COPY ["MyApp/MyApp.csproj", "MyApp/"]
+RUN dotnet restore "MyApp/MyApp.csproj"
+COPY . .
+WORKDIR /src/MyApp
+RUN dotnet publish -c Release -o /app/publish --no-restore
+
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
+WORKDIR /app
+COPY --from=build /app/publish .
+USER $APP_UID
+ENTRYPOINT ["dotnet", "MyApp.dll"]
+```
+
+**Explain:** Copying the project file and restoring *before* copying the rest of the source lets Docker cache the restore layer across builds when only source (not dependencies) changed — a significant CI speedup. The final image is based on the smaller `aspnet` runtime image (no SDK/build tools), reducing attack surface and image size. `USER $APP_UID` avoids running as root. Verify the exact base-image tags/user conventions against your current .NET version's official documentation.
+
+---
+
+### 60. LINQ Rapid-Fire
+
+```csharp
+// Second-highest DISTINCT salary
+var second = employees.Select(e => e.Salary)
+    .Distinct()
+    .OrderByDescending(x => x)
+    .Skip(1)
+    .FirstOrDefault();
+
+// Duplicate values
+var duplicates = values.GroupBy(x => x)
+    .Where(g => g.Count() > 1)
+    .Select(g => g.Key)
+    .ToList();
+
+// Top N per group (e.g., top 3 orders per customer)
+var topNPerGroup = orders
+    .GroupBy(o => o.CustomerId)
+    .Select(g => new
+    {
+        CustomerId = g.Key,
+        TopOrders = g.OrderByDescending(o => o.Total).Take(3)
+    });
+
+// Join
+var result = customers
+    .Join(orders,
+        c => c.Id,
+        o => o.CustomerId,
+        (c, o) => new { c.Name, o.Total });
+```
+
+**Explain:** Clarify "second highest" semantics up front — does it mean second-highest *distinct* value, or the second row when sorted (which could tie with the first if duplicates exist)? `IEnumerable<T>` executes LINQ-to-Objects over already-materialized/enumerable data in memory; `IQueryable<T>` builds an expression tree that a provider such as EF Core translates to SQL — so not every .NET method (e.g., a custom C# method call inside `.Where()`) is translatable, and using one where the provider can't translate it either throws or silently pulls the whole table into memory first. Deferred execution means a LINQ query isn't actually run until enumerated (`.ToList()`, `foreach`, etc.) — a common source of "why did this run twice" bugs when a query variable is enumerated more than once.
 
 ---
 
