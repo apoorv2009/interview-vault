@@ -8,7 +8,7 @@
 
 **Your profile:** ~20 years .NET/Azure architecture experience. No invented project stories.
 
-**Structure note:** This guide is ordered to match your study sequence — Foundation (Parts I–IV, common to all three interviews) first, then Coforge, then MBS Global, then Innover Digital, then final-prep tips. Question numbers (Q1, Q16, Q61, Q76, etc.) are kept as stable IDs throughout and do **not** change even though the Part numbers around them do — so "Q29" always means the same question regardless of where you jump in from. Part IV (Deep Microservices & Tactical DDD, Q76–89) was added because it's directly called out in Coforge's JD and is the kind of "show me the code" depth a training-course-level drill can expose that a pure architecture-decision guide won't.
+**Structure note:** This guide is ordered to match your study sequence — Foundation (Parts I–IV, common to all three interviews) first, then Coforge, then MBS Global, then Innover Digital, then final-prep tips. Question numbers run sequentially from Q1 to Q89 in the exact order they appear in the document, so Part I is Q1–15, Part II is Q16–25, Part III is Q26–40, Part IV is Q41–54, Part V (Coforge) is Q55–67, Part VI (MBS Global) is Q68–79, and Part VII (Innover Digital) is Q80–89. Part IV (Deep Microservices & Tactical DDD, Q41–54) was added because it's directly called out in Coforge's JD and is the kind of "show me the code" depth a training-course-level drill can expose that a pure architecture-decision guide won't.
 
 ---
 
@@ -32,90 +32,90 @@
 15. [Architecture vs Deadline Leadership](#15-leadership-architecture-vs-deadline)
 
 ### PART II: FOUNDATION — HANDS-ON CODING (All Three Companies)
-51. [Parallel I/O with Cancellation](#51-parallel-io-with-cancellation)
-52. [Idempotent Consumer](#52-idempotent-consumer)
-53. [Global Exception Handler](#53-global-exception-handling-in-modern-aspnet-core)
-54. [Outbox Pattern Code](#54-outbox-pattern-code)
-55. [EF Core Projection + Keyset](#55-ef-core-projection-keyset-pagination)
-56. [Optimistic Concurrency](#56-optimistic-concurrency-with-rowversion)
-57. [Thread-Safe Increment](#57-thread-safe-increment)
-58. [Policy-Based Authorization](#58-policy-based-authorization)
-59. [Dockerfile Multi-Stage](#59-multi-stage-dockerfile)
-60. [LINQ Rapid-Fire](#60-linq-rapid-fire)
+16. [Parallel I/O with Cancellation](#16-parallel-io-with-cancellation)
+17. [Idempotent Consumer](#17-idempotent-consumer)
+18. [Global Exception Handler](#18-global-exception-handling-in-modern-aspnet-core)
+19. [Outbox Pattern Code](#19-outbox-pattern-code)
+20. [EF Core Projection + Keyset](#20-ef-core-projection-keyset-pagination)
+21. [Optimistic Concurrency](#21-optimistic-concurrency-with-rowversion)
+22. [Thread-Safe Increment](#22-thread-safe-increment)
+23. [Policy-Based Authorization](#23-policy-based-authorization)
+24. [Dockerfile Multi-Stage](#24-multi-stage-dockerfile)
+25. [LINQ Rapid-Fire](#25-linq-rapid-fire)
 
 ### PART III: FOUNDATION — DAY-TO-DAY & BEHAVIORAL (All Three Companies)
-61. [Day-to-Day Work as an Architect](#61-day-to-day-work-as-an-architect)
-62. [What You Check in a General PR Review](#62-what-you-check-in-a-general-pr-review)
-63. [What You Check in a SQL-Related PR](#63-what-you-check-in-a-sql-related-pr)
-64. [What You Check When a New Table Is Created](#64-what-you-check-when-a-new-table-is-created)
-65. [Database Design: Users/UserGroup/Page/PageGroup](#65-database-design-users-usergroup-page-pagegroup)
-66. [User Experience When a Microservice Fails](#66-user-experience-when-a-microservice-fails)
-67. [Preventing DB Load Spike After Deployment/IIS Reset](#67-preventing-db-load-spike-after-deployment-iis-reset)
-68. [Nightly Batch Suddenly Slow — Diagnosis](#68-nightly-batch-suddenly-slow-diagnosis)
-69. [Fixing DB-Side Slowness](#69-fixing-db-side-slowness)
-70. [Fixing App-Side Slowness](#70-fixing-app-side-slowness)
-71. [Cloud Architecture Patterns](#71-cloud-architecture-patterns)
-72. [Technical Risk Escalation Management](#72-technical-risk-escalation-management)
-73. [Architect Deliverables](#73-architect-deliverables)
-74. [Documents Written as an Architect](#74-documents-written-as-an-architect)
-75. [Reporting Structure (Up and Down)](#75-reporting-structure-up-and-down)
+26. [Day-to-Day Work as an Architect](#26-day-to-day-work-as-an-architect)
+27. [What You Check in a General PR Review](#27-what-you-check-in-a-general-pr-review)
+28. [What You Check in a SQL-Related PR](#28-what-you-check-in-a-sql-related-pr)
+29. [What You Check When a New Table Is Created](#29-what-you-check-when-a-new-table-is-created)
+30. [Database Design: Users/UserGroup/Page/PageGroup](#30-database-design-users-usergroup-page-pagegroup)
+31. [User Experience When a Microservice Fails](#31-user-experience-when-a-microservice-fails)
+32. [Preventing DB Load Spike After Deployment/IIS Reset](#32-preventing-db-load-spike-after-deployment-iis-reset)
+33. [Nightly Batch Suddenly Slow — Diagnosis](#33-nightly-batch-suddenly-slow-diagnosis)
+34. [Fixing DB-Side Slowness](#34-fixing-db-side-slowness)
+35. [Fixing App-Side Slowness](#35-fixing-app-side-slowness)
+36. [Cloud Architecture Patterns](#36-cloud-architecture-patterns)
+37. [Technical Risk Escalation Management](#37-technical-risk-escalation-management)
+38. [Architect Deliverables](#38-architect-deliverables)
+39. [Documents Written as an Architect](#39-documents-written-as-an-architect)
+40. [Reporting Structure (Up and Down)](#40-reporting-structure-up-and-down)
 
 ### PART IV: FOUNDATION — DEEP MICROSERVICES & TACTICAL DDD (All Three; Highest-Weight for Coforge JD)
-76. [Tactical DDD Building Blocks: Entity vs Value Object vs Aggregate](#76-tactical-ddd-building-blocks-entity-vs-value-object-vs-aggregate)
-77. [Value Objects: Immutability, Equality and Collision Handling](#77-value-objects-immutability-equality-and-collision-handling)
-78. [Aggregate Root: Invariant Enforcement and Encapsulation](#78-aggregate-root-invariant-enforcement-and-encapsulation)
-79. [Factory Pattern: GOF Factory vs DDD Factory](#79-factory-pattern-gof-factory-vs-ddd-factory)
-80. [CQRS with Commands, Command Handlers and MediatR](#80-cqrs-with-commands-command-handlers-and-mediatr)
-81. [Query Handlers, Read Models and Query-Side Design](#81-query-handlers-read-models-and-query-side-design)
-82. [Domain Events vs Integration Events](#82-domain-events-vs-integration-events)
-83. [Event Sourcing vs Traditional CRUD Storage](#83-event-sourcing-vs-traditional-crud-storage)
-84. [Persisting DDD Aggregates with EF Core](#84-persisting-ddd-aggregates-with-ef-core-multiple-dbcontexts-and-aggregate-boundaries)
-85. [Message Broker Fundamentals: AMQP, Exchanges, Bindings, Topics](#85-message-broker-fundamentals-amqp-exchanges-bindings-queues-and-topics)
-86. [Resiliency Implementation with Polly](#86-resiliency-implementation-with-polly)
-87. [API Gateway Implementation: Ocelot](#87-api-gateway-implementation-ocelot-and-how-it-compares-to-yarpapim)
-88. [Service Discovery & Distributed Configuration: Consul](#88-service-discovery-and-distributed-configuration-consul-and-the-azure-native-alternative)
-89. [Debugging Distributed Microservices](#89-debugging-distributed-microservices-across-service-boundaries)
+41. [Tactical DDD Building Blocks: Entity vs Value Object vs Aggregate](#41-tactical-ddd-building-blocks-entity-vs-value-object-vs-aggregate)
+42. [Value Objects: Immutability, Equality and Collision Handling](#42-value-objects-immutability-equality-and-collision-handling)
+43. [Aggregate Root: Invariant Enforcement and Encapsulation](#43-aggregate-root-invariant-enforcement-and-encapsulation)
+44. [Factory Pattern: GOF Factory vs DDD Factory](#44-factory-pattern-gof-factory-vs-ddd-factory)
+45. [CQRS with Commands, Command Handlers and MediatR](#45-cqrs-with-commands-command-handlers-and-mediatr)
+46. [Query Handlers, Read Models and Query-Side Design](#46-query-handlers-read-models-and-query-side-design)
+47. [Domain Events vs Integration Events](#47-domain-events-vs-integration-events)
+48. [Event Sourcing vs Traditional CRUD Storage](#48-event-sourcing-vs-traditional-crud-storage)
+49. [Persisting DDD Aggregates with EF Core](#49-persisting-ddd-aggregates-with-ef-core-multiple-dbcontexts-and-aggregate-boundaries)
+50. [Message Broker Fundamentals: AMQP, Exchanges, Bindings, Topics](#50-message-broker-fundamentals-amqp-exchanges-bindings-queues-and-topics)
+51. [Resiliency Implementation with Polly](#51-resiliency-implementation-with-polly)
+52. [API Gateway Implementation: Ocelot](#52-api-gateway-implementation-ocelot-and-how-it-compares-to-yarpapim)
+53. [Service Discovery & Distributed Configuration: Consul](#53-service-discovery-and-distributed-configuration-consul-and-the-azure-native-alternative)
+54. [Debugging Distributed Microservices](#54-debugging-distributed-microservices-across-service-boundaries)
 
 ### PART V: COFORGE — Study First (Tue 15 Sept)
-16. [Multi-Tenant SaaS on Azure](#16-multi-tenant-saas-design)
-17. [Tenant Isolation](#17-tenant-isolation)
-18. [AKS Architecture & Scaling](#18-aks-architecture)
-19. [APIM & API Governance](#19-apim-governance)
-20. [Cosmos DB Partitioning](#20-cosmos-db-partitioning)
-21. [Platform Engineering](#21-platform-engineering)
-22. [FinOps & Cost Optimization](#22-finops)
-23. [Enterprise RAG](#23-enterprise-rag)
-24. [Agentic AI](#24-agentic-ai)
-25. [API Versioning Strategy](#25-api-versioning-strategy-new)
-26. [Azure KeyVault & Secret Rotation](#26-azure-keyvault-secret-rotation-new)
-27. [Front Door + WAF](#27-azure-front-door-waf-new)
-28. [Multi-Region Failover](#28-multi-region-failover-new)
+55. [Multi-Tenant SaaS on Azure](#55-multi-tenant-saas-design)
+56. [Tenant Isolation](#56-tenant-isolation)
+57. [AKS Architecture & Scaling](#57-aks-architecture)
+58. [APIM & API Governance](#58-apim-governance)
+59. [Cosmos DB Partitioning](#59-cosmos-db-partitioning)
+60. [Platform Engineering](#60-platform-engineering)
+61. [FinOps & Cost Optimization](#61-finops)
+62. [Enterprise RAG](#62-enterprise-rag)
+63. [Agentic AI](#63-agentic-ai)
+64. [API Versioning Strategy](#64-api-versioning-strategy-new)
+65. [Azure KeyVault & Secret Rotation](#65-azure-keyvault-secret-rotation-new)
+66. [Front Door + WAF](#66-azure-front-door-waf-new)
+67. [Multi-Region Failover](#67-multi-region-failover-new)
 
 ### PART VI: MBS GLOBAL — Study Second (Wed 16 Sept)
-29. [Mission-Critical Cash/ATM Platform](#29-mission-critical-cashatmfield-service-platform)
-30. [Transaction Integrity & Reconciliation](#30-transaction-integrity-and-reconciliation)
-31. [Offline-First Mobile](#31-offline-first-fieldmobile-architecture)
-32. [Production Incidents & RCA](#32-production-incident-rca-and-recurring-p1)
-33. [Vendor/MSP Governance](#33-vendormsp-technical-governance)
-34. [Portfolio Modernization](#34-portfolio-modernization-retain-invest-modernize-replace-or-retire)
-35. [SQL Server Performance](#35-sql-server-performance-concurrency-and-deadlocks)
-36. [DR/BCP & PRR](#36-drbcp-and-production-readiness-review)
-37. [Message Deduplication](#37-message-deduplication-new)
-38. [EDI/SFTP File Integration](#38-edisftp-file-integration-new)
-39. [Device Security & MDM](#39-device-security-mdm-new)
-40. [Audit Trail Design](#40-audit-trail-design-new)
+68. [Mission-Critical Cash/ATM Platform](#68-mission-critical-cashatmfield-service-platform)
+69. [Transaction Integrity & Reconciliation](#69-transaction-integrity-and-reconciliation)
+70. [Offline-First Mobile](#70-offline-first-fieldmobile-architecture)
+71. [Production Incidents & RCA](#71-production-incident-rca-and-recurring-p1)
+72. [Vendor/MSP Governance](#72-vendormsp-technical-governance)
+73. [Portfolio Modernization](#73-portfolio-modernization-retain-invest-modernize-replace-or-retire)
+74. [SQL Server Performance](#74-sql-server-performance-concurrency-and-deadlocks)
+75. [DR/BCP & PRR](#75-drbcp-and-production-readiness-review)
+76. [Message Deduplication](#76-message-deduplication-new)
+77. [EDI/SFTP File Integration](#77-edisftp-file-integration-new)
+78. [Device Security & MDM](#78-device-security-mdm-new)
+79. [Audit Trail Design](#79-audit-trail-design-new)
 
 ### PART VII: INNOVER DIGITAL — Study Third
-41. [WPF to .NET 8 & Blazor](#41-modernize-wpfnet-framework-to-net-810-and-blazor-server)
-42. [Blazor Server Architecture](#42-blazor-server-architecture-circuits-and-scaling)
-43. [Blazor Lifecycle & State](#43-blazor-component-lifecycle-and-state-management)
-44. [Clean Architecture + DDD](#44-clean-architecture-ddd-in-a-modern-net-solution)
-45. [EF Core Performance](#45-ef-core-8-performance-and-concurrency)
-46. [Shared DB Coexistence](#46-shared-database-coexistence-during-modernization)
-47. [YARP vs Ocelot vs APIM](#47-yarp-vs-ocelot-vs-apim-and-bff)
-48. [AI-Assisted Modernization](#48-cursorcopilotai-assisted-modernization-safely)
-49. [Blazor Authentication](#49-blazor-authentication-and-token-handling-new)
-50. [Feature Flags During Migration](#50-feature-flags-during-migration-new)
+80. [WPF to .NET 8 & Blazor](#80-modernize-wpfnet-framework-to-net-810-and-blazor-server)
+81. [Blazor Server Architecture](#81-blazor-server-architecture-circuits-and-scaling)
+82. [Blazor Lifecycle & State](#82-blazor-component-lifecycle-and-state-management)
+83. [Clean Architecture + DDD](#83-clean-architecture-ddd-in-a-modern-net-solution)
+84. [EF Core Performance](#84-ef-core-8-performance-and-concurrency)
+85. [Shared DB Coexistence](#85-shared-database-coexistence-during-modernization)
+86. [YARP vs Ocelot vs APIM](#86-yarp-vs-ocelot-vs-apim-and-bff)
+87. [AI-Assisted Modernization](#87-cursorcopilotai-assisted-modernization-safely)
+88. [Blazor Authentication](#88-blazor-authentication-and-token-handling-new)
+89. [Feature Flags During Migration](#89-feature-flags-during-migration-new)
 
 ### PART VIII: FRAMEWORK & TIPS — Final Prep (Use Throughout)
 - [How to Say "I Don't Know"](#how-to-say-i-dont-know)
@@ -714,7 +714,7 @@ A: Delivery result plus defect/reliability/security/debt metrics.
 
 ## PART II: FOUNDATION — HANDS-ON CODING (All Three Companies)
 
-### 51. Parallel I/O with Cancellation
+### 16. Parallel I/O with Cancellation
 
 ```csharp
 using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -733,7 +733,7 @@ var orders   = await ordersTask;
 
 ---
 
-### 52. Idempotent Consumer
+### 17. Idempotent Consumer
 
 ```csharp
 public async Task HandleAsync(OrderCreated message, CancellationToken ct)
@@ -757,7 +757,7 @@ public async Task HandleAsync(OrderCreated message, CancellationToken ct)
 
 ---
 
-### 53. Global Exception Handling in Modern ASP.NET Core
+### 18. Global Exception Handling in Modern ASP.NET Core
 
 ```csharp
 public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> log)
@@ -792,7 +792,7 @@ public sealed class GlobalExceptionHandler(ILogger<GlobalExceptionHandler> log)
 
 ---
 
-### 54. Outbox Pattern Code
+### 19. Outbox Pattern Code
 
 ```csharp
 public async Task CreateOrderAsync(Order order, CancellationToken ct)
@@ -834,11 +834,11 @@ public async Task PublishPendingAsync(CancellationToken ct)
 }
 ```
 
-**Explain:** The business write and the outbox row commit atomically in one local transaction — this is what closes the dual-write failure window. A separate publisher process reads unpublished rows and sends them; if it crashes between send and marking-published, the message can be resent, which is why consumers must be idempotent (see Q52).
+**Explain:** The business write and the outbox row commit atomically in one local transaction — this is what closes the dual-write failure window. A separate publisher process reads unpublished rows and sends them; if it crashes between send and marking-published, the message can be resent, which is why consumers must be idempotent (see Q17).
 
 ---
 
-### 55. EF Core Projection + Keyset Pagination
+### 20. EF Core Projection + Keyset Pagination
 
 ```csharp
 var page = await db.Orders
@@ -854,7 +854,7 @@ var page = await db.Orders
 
 ---
 
-### 56. Optimistic Concurrency with rowversion
+### 21. Optimistic Concurrency with rowversion
 
 ```csharp
 public class WorkItem
@@ -881,7 +881,7 @@ catch (DbUpdateConcurrencyException)
 
 ---
 
-### 57. Thread-Safe Increment
+### 22. Thread-Safe Increment
 
 ```csharp
 private long _processed;
@@ -893,7 +893,7 @@ public void MarkProcessed() => Interlocked.Increment(ref _processed);
 
 ---
 
-### 58. Policy-Based Authorization
+### 23. Policy-Based Authorization
 
 ```csharp
 builder.Services.AddAuthorization(options =>
@@ -912,7 +912,7 @@ public Task<IActionResult> Approve(long id, CancellationToken ct)
 
 ---
 
-### 59. Multi-Stage Dockerfile
+### 24. Multi-Stage Dockerfile
 
 ```dockerfile
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
@@ -934,7 +934,7 @@ ENTRYPOINT ["dotnet", "MyApp.dll"]
 
 ---
 
-### 60. LINQ Rapid-Fire
+### 25. LINQ Rapid-Fire
 
 ```csharp
 // Second-highest DISTINCT salary
@@ -977,7 +977,7 @@ These questions test whether you actually operate as an architect day-to-day, or
 
 ---
 
-### 61. Day-to-Day Work as an Architect
+### 26. Day-to-Day Work as an Architect
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -1015,7 +1015,7 @@ A: [Prepare one real, recent, concrete example — this must come from your actu
 
 ---
 
-### 62. What You Check in a General PR Review
+### 27. What You Check in a General PR Review
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -1059,7 +1059,7 @@ A: I flag that as a process issue first — large PRs should be decomposed into 
 
 ---
 
-### 63. What You Check in a SQL-Related PR
+### 28. What You Check in a SQL-Related PR
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -1102,7 +1102,7 @@ A: Request execution plan analysis with representative statistics, use a sanitiz
 
 ---
 
-### 64. What You Check When a New Table Is Created
+### 29. What You Check When a New Table Is Created
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -1146,7 +1146,7 @@ A: Depends on distribution needs — identity/sequential is better for single-wr
 
 ---
 
-### 65. Database Design: Users / UserGroup / Page / PageGroup
+### 30. Database Design: Users / UserGroup / Page / PageGroup
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -1271,7 +1271,7 @@ A: Add a ParentPageGroupId self-reference on PageGroups and resolve access recur
 
 ---
 
-### 66. User Experience When a Microservice Fails
+### 31. User Experience When a Microservice Fails
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -1313,7 +1313,7 @@ A: Persist wizard state server-side/session so the user can resume rather than l
 
 ---
 
-### 67. Preventing DB Load Spike After Deployment / IIS Reset
+### 32. Preventing DB Load Spike After Deployment / IIS Reset
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -1356,7 +1356,7 @@ A: Warm the highest-frequency/highest-cost lookups (usually a small set — refe
 
 ---
 
-### 68. Nightly Batch Suddenly Slow — Diagnosis
+### 33. Nightly Batch Suddenly Slow — Diagnosis
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -1406,7 +1406,7 @@ A: Add batch-duration and stage-duration as monitored metrics with alerting on a
 
 ---
 
-### 69. Fixing DB-Side Slowness
+### 34. Fixing DB-Side Slowness
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -1448,7 +1448,7 @@ A: Look at parameter sniffing (same plan cached for very different parameter val
 
 ---
 
-### 70. Fixing App-Side Slowness
+### 35. Fixing App-Side Slowness
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -1489,7 +1489,7 @@ A: It masks the symptom and buys time, but if the root cause is inefficient CPU/
 
 ---
 
-### 71. Cloud Architecture Patterns
+### 36. Cloud Architecture Patterns
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -1532,7 +1532,7 @@ A: Sidecar is a general co-located helper process (logging, config, proxy) attac
 
 ---
 
-### 72. Technical Risk Escalation Management
+### 37. Technical Risk Escalation Management
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -1575,7 +1575,7 @@ A: I frame everything as options with trade-offs rather than blockers — my job
 
 ---
 
-### 73. Architect Deliverables
+### 38. Architect Deliverables
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -1606,7 +1606,7 @@ A: [Tell me your real answer — likely ADRs + architecture diagrams + PRR artif
 
 ---
 
-### 74. Documents Written as an Architect
+### 39. Documents Written as an Architect
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -1639,7 +1639,7 @@ A: ADRs are immutable historical record (superseded, not edited) so they never g
 
 ---
 
-### 75. Reporting Structure (Up and Down)
+### 40. Reporting Structure (Up and Down)
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -1672,7 +1672,7 @@ A: [Your real number — teams, engineers, or applications under your architectu
 
 ---
 
-### 76. Tactical DDD Building Blocks: Entity vs Value Object vs Aggregate
+### 41. Tactical DDD Building Blocks: Entity vs Value Object vs Aggregate
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -1727,7 +1727,7 @@ A: Only by ID (e.g., `Order` holds a `CustomerId`, not a `Customer` object refer
 
 ---
 
-### 77. Value Objects: Immutability, Equality and Collision Handling
+### 42. Value Objects: Immutability, Equality and Collision Handling
 
 **COMPANY TAGS:** Coforge • Innover Digital
 
@@ -1780,7 +1780,7 @@ A: Yes — EF Core 8 supports them as *owned entity types* / complex types, mapp
 
 ---
 
-### 78. Aggregate Root: Invariant Enforcement and Encapsulation
+### 43. Aggregate Root: Invariant Enforcement and Encapsulation
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -1837,7 +1837,7 @@ A: Per aggregate root only — `IOrderRepository`, not `IOrderLineRepository`. C
 
 ---
 
-### 79. Factory Pattern: GOF Factory vs DDD Factory
+### 44. Factory Pattern: GOF Factory vs DDD Factory
 
 **COMPANY TAGS:** Coforge
 
@@ -1895,7 +1895,7 @@ A: Prototype clones an existing instance to produce a new one (useful when const
 
 ---
 
-### 80. CQRS with Commands, Command Handlers and MediatR
+### 45. CQRS with Commands, Command Handlers and MediatR
 
 **COMPANY TAGS:** Coforge • MBS Global
 
@@ -1922,7 +1922,7 @@ public sealed class ShipOrderCommandHandler(IOrderRepository repo, IUnitOfWork u
 
         order.Ship(); // business rule lives in the aggregate, not here
 
-        await uow.SaveChangesAsync(ct); // also persists raised domain events (see Q82)
+        await uow.SaveChangesAsync(ct); // also persists raised domain events (see Q47)
         return Result.Success();
     }
 }
@@ -1937,7 +1937,7 @@ public async Task<IActionResult> Ship(Guid id, [FromServices] IMediator mediator
 
 - Command handlers orchestrate; aggregates enforce invariants — don't let business logic leak into the handler "just this once"
 - MediatR pipeline behaviors centralize cross-cutting concerns (validation via FluentValidation, logging, transactions) instead of repeating them in every handler
-- CQRS ≠ separate databases ≠ Event Sourcing — each is an independent decision layered on top only when justified by a real requirement (see Q83)
+- CQRS ≠ separate databases ≠ Event Sourcing — each is an independent decision layered on top only when justified by a real requirement (see Q48)
 
 **Likely Follow-Ups**
 
@@ -1954,7 +1954,7 @@ A: It shouldn't, directly — either restructure into one command per aggregate 
 
 ---
 
-### 81. Query Handlers, Read Models and Query-Side Design
+### 46. Query Handlers, Read Models and Query-Side Design
 
 **COMPANY TAGS:** Coforge • MBS Global
 
@@ -1981,7 +1981,7 @@ public sealed class GetOrderSummaryQueryHandler(AppDbContext db)
 }
 ```
 
-For read-heavy or reporting-shaped queries where the write-side relational model is a poor fit (e.g., a dashboard aggregating across many aggregates), the next step up is a genuinely separate read model — a denormalized table/view/document kept in sync via domain-event projections — but that's a deliberate additional-infrastructure decision (see Q83/Q84), not the default for every query.
+For read-heavy or reporting-shaped queries where the write-side relational model is a poor fit (e.g., a dashboard aggregating across many aggregates), the next step up is a genuinely separate read model — a denormalized table/view/document kept in sync via domain-event projections — but that's a deliberate additional-infrastructure decision (see Q48/Q49), not the default for every query.
 
 **Decisions & Trade-Offs to Defend**
 
@@ -2004,7 +2004,7 @@ A: In the query handler or a pipeline behavior wrapping it (e.g., filtering by t
 
 ---
 
-### 82. Domain Events vs Integration Events
+### 47. Domain Events vs Integration Events
 
 **COMPANY TAGS:** Coforge • MBS Global; useful Innover
 
@@ -2014,7 +2014,7 @@ A Domain Event is raised by an aggregate to record "something happened" inside o
 
 **2-4 Minute Architect Answer**
 
-When `Order.Ship()` runs, it appends an `OrderShipped` **domain event** to an in-memory list on the aggregate (see the `_domainEvents` field in Q78) rather than publishing anything immediately — this keeps the aggregate free of any messaging/infrastructure dependency. After `SaveChangesAsync` commits the aggregate's state change, an interceptor or a post-save step in the Unit of Work dispatches those domain events in-process via MediatR's `INotification`/`INotificationHandler` — other handlers *within the same service* react (e.g., decrement inventory, update a denormalized read model) as part of the same logical unit of work, often the same DB transaction.
+When `Order.Ship()` runs, it appends an `OrderShipped` **domain event** to an in-memory list on the aggregate (see the `_domainEvents` field in Q43) rather than publishing anything immediately — this keeps the aggregate free of any messaging/infrastructure dependency. After `SaveChangesAsync` commits the aggregate's state change, an interceptor or a post-save step in the Unit of Work dispatches those domain events in-process via MediatR's `INotification`/`INotificationHandler` — other handlers *within the same service* react (e.g., decrement inventory, update a denormalized read model) as part of the same logical unit of work, often the same DB transaction.
 
 If another *service* needs to know ("Shipping" needs to tell "Notifications" and "Billing"), that's an **integration event** — a separate, versioned, serializable contract (`OrderShippedIntegrationEvent`) published onto Service Bus/RabbitMQ, and per Q4 this publish should go through the Outbox pattern so the domain-state commit and the "we will eventually publish this" commitment happen atomically. It's a common and important architect-level distinction: domain events are an internal implementation detail of one bounded context and can change freely; integration events are a public contract other teams' services depend on and require the same versioning discipline as any public API.
 
@@ -2022,7 +2022,7 @@ If another *service* needs to know ("Shipping" needs to tell "Notifications" and
 // Domain event — internal, in-process
 public sealed record OrderShipped(Guid OrderId, DateTime ShippedAtUtc) : IDomainEvent;
 
-// A domain event handler translates to an integration event + outbox row (see Q54)
+// A domain event handler translates to an integration event + outbox row (see Q19)
 public sealed class PublishOrderShippedIntegrationEvent
     : INotificationHandler<DomainEventNotification<OrderShipped>>
 {
@@ -2056,7 +2056,7 @@ A: Yes — e.g., `OrderShipped` might produce both a `Notifications`-bound event
 
 ---
 
-### 83. Event Sourcing vs Traditional CRUD Storage
+### 48. Event Sourcing vs Traditional CRUD Storage
 
 **COMPANY TAGS:** Coforge
 
@@ -2089,11 +2089,11 @@ A: A dedicated event store (EventStoreDB, or Cosmos DB/Azure Table Storage used 
 **What NOT to Say**
 
 - "We use Event Sourcing everywhere for audit purposes" without acknowledging the query-complexity and team-learning-curve cost — that's a red flag for over-engineering
-- Confusing Event Sourcing (the persistence/audit mechanism) with domain events (the in-process notification mechanism from Q82) — they're related but distinct concepts
+- Confusing Event Sourcing (the persistence/audit mechanism) with domain events (the in-process notification mechanism from Q47) — they're related but distinct concepts
 
 ---
 
-### 84. Persisting DDD Aggregates with EF Core: Multiple DbContexts and Aggregate Boundaries
+### 49. Persisting DDD Aggregates with EF Core: Multiple DbContexts and Aggregate Boundaries
 
 **COMPANY TAGS:** Coforge • Innover Digital
 
@@ -2105,7 +2105,7 @@ I map each aggregate root to its own EF Core configuration with child entities a
 
 The `DbContext` naturally maps to the Unit of Work pattern — one `SaveChangesAsync()` call commits everything changed since it was loaded, in one transaction, which aligns with "one aggregate, one transaction" as long as I don't let a single `SaveChanges` span multiple *unrelated* aggregates from different use cases. For a single bounded context (one microservice), I typically use one `DbContext` with all its aggregates' `DbSet<TRoot>` exposed — `DbSet<Order>` yes, but `DbSet<OrderLine>` no, since `OrderLine` is only ever reached via `order.Lines`, configured in EF Core as an owned collection or a regular navigation with a private backing field and a public `IReadOnlyList<T>`.
 
-Multiple `DbContext`s become relevant in two situations: (1) when one microservice genuinely spans more than one bounded context temporarily during modernization (a *smell*, ideally temporary — see the Innover shared-DB-coexistence content in Q46), or (2) when CQRS's read side uses a lighter, no-tracking-by-default `DbContext` pointed at the same or a replicated database, tuned purely for projection queries and separate from the write-side context that carries the full aggregate configuration. I configure the mapping so private fields (`_lines`) are used via `UsePropertyAccessMode(PropertyAccessMode.Field)` and a private/protected constructor lets EF Core materialize the aggregate via reflection without exposing that constructor to application code — this keeps the persistence concern from leaking `public` mutation surface back onto the domain model.
+Multiple `DbContext`s become relevant in two situations: (1) when one microservice genuinely spans more than one bounded context temporarily during modernization (a *smell*, ideally temporary — see the Innover shared-DB-coexistence content in Q85), or (2) when CQRS's read side uses a lighter, no-tracking-by-default `DbContext` pointed at the same or a replicated database, tuned purely for projection queries and separate from the write-side context that carries the full aggregate configuration. I configure the mapping so private fields (`_lines`) are used via `UsePropertyAccessMode(PropertyAccessMode.Field)` and a private/protected constructor lets EF Core materialize the aggregate via reflection without exposing that constructor to application code — this keeps the persistence concern from leaking `public` mutation surface back onto the domain model.
 
 ```csharp
 public class OrderConfiguration : IEntityTypeConfiguration<Order>
@@ -2131,9 +2131,9 @@ public class OrderConfiguration : IEntityTypeConfiguration<Order>
 
 **Decisions & Trade-Offs to Defend**
 
-- Never expose a public `DbSet<TChild>` for anything that lives inside an aggregate — that's the EF-level equivalent of the public-setter mistake in Q78
+- Never expose a public `DbSet<TChild>` for anything that lives inside an aggregate — that's the EF-level equivalent of the public-setter mistake in Q43
 - One `DbContext` per bounded context for the write side; a separate, simpler read-side context is a deliberate CQRS optimization, not automatic
-- Domain events live in memory on the aggregate and are dispatched after `SaveChanges`, not persisted as a column — persisting them is an Outbox row's job (Q54), a different concern
+- Domain events live in memory on the aggregate and are dispatched after `SaveChanges`, not persisted as a column — persisting them is an Outbox row's job (Q19), a different concern
 
 **Likely Follow-Ups**
 
@@ -2150,7 +2150,7 @@ A: They can share one `SaveChangesAsync` call (same `DbContext`, same transactio
 
 ---
 
-### 85. Message Broker Fundamentals: AMQP, Exchanges, Bindings, Queues and Topics
+### 50. Message Broker Fundamentals: AMQP, Exchanges, Bindings, Queues and Topics
 
 **COMPANY TAGS:** Coforge • MBS Global
 
@@ -2185,7 +2185,7 @@ A: Both support a **Dead-Letter Queue** — after a configured max-delivery-coun
 
 ---
 
-### 86. Resiliency Implementation with Polly
+### 51. Resiliency Implementation with Polly
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -2228,7 +2228,7 @@ builder.Services.AddHttpClient<IOrderServiceClient, OrderServiceClient>(client =
 });
 ```
 
-The key architectural discipline is *policy layering order and idempotency*: retry should only apply to operations that are safe to repeat (GET, or a POST protected by an idempotency key per Q4/Q52) and only for transient failure classes (5xx, timeout, 429) — never for 4xx validation/auth errors, which will just fail identically on retry. The circuit breaker sits around the retry, not inside it, so that once the breaker is open, calls fail fast without even attempting a retry sequence, protecting a struggling downstream from being hammered further. I also make sure retry policies aren't stacked redundantly across layers (gateway retries + service retries + SDK retries can turn one client request into dozens of downstream attempts) — the composed pipeline above should be the *single* place retry/circuit-breaker policy for that dependency lives.
+The key architectural discipline is *policy layering order and idempotency*: retry should only apply to operations that are safe to repeat (GET, or a POST protected by an idempotency key per Q4/Q17) and only for transient failure classes (5xx, timeout, 429) — never for 4xx validation/auth errors, which will just fail identically on retry. The circuit breaker sits around the retry, not inside it, so that once the breaker is open, calls fail fast without even attempting a retry sequence, protecting a struggling downstream from being hammered further. I also make sure retry policies aren't stacked redundantly across layers (gateway retries + service retries + SDK retries can turn one client request into dozens of downstream attempts) — the composed pipeline above should be the *single* place retry/circuit-breaker policy for that dependency lives.
 
 **Decisions & Trade-Offs to Defend**
 
@@ -2251,13 +2251,13 @@ A: Bulkhead limits *concurrency* to a dependency (e.g., max 20 concurrent calls)
 
 ---
 
-### 87. API Gateway Implementation: Ocelot (and How It Compares to YARP/APIM)
+### 52. API Gateway Implementation: Ocelot (and How It Compares to YARP/APIM)
 
 **COMPANY TAGS:** Coforge • Innover Digital
 
 **30-Second Answer**
 
-Ocelot is a .NET, JSON/config-driven API gateway — routes, load balancing, rate limiting, and downstream authentication are declared in `ocelot.json` rather than in code, which makes it fast to stand up for straightforward routing/aggregation needs, whereas YARP (Q47) is a code-first toolkit better suited when routing logic itself needs custom, programmatic control.
+Ocelot is a .NET, JSON/config-driven API gateway — routes, load balancing, rate limiting, and downstream authentication are declared in `ocelot.json` rather than in code, which makes it fast to stand up for straightforward routing/aggregation needs, whereas YARP (Q86) is a code-first toolkit better suited when routing logic itself needs custom, programmatic control.
 
 **2-4 Minute Architect Answer**
 
@@ -2289,7 +2289,7 @@ An Ocelot gateway is configured almost entirely declaratively: each entry in `oc
 }
 ```
 
-For request aggregation (combine responses from multiple downstream services into one response) Ocelot has built-in support via `RouteIsCaseSensitive`/aggregation config, which is convenient for simple fan-out-and-merge scenarios but becomes awkward once the aggregation logic needs real branching/transformation — at that point I'd rather write that composition explicitly in a small BFF service (possibly YARP-based) than fight a config file. In the Coforge/enterprise context, Ocelot (or YARP) typically sits as an *internal*, application-level gateway/BFF layer, while APIM remains the outward-facing, governed enterprise API boundary (Q19, Q47) — they're complementary layers, not competing choices for the same job.
+For request aggregation (combine responses from multiple downstream services into one response) Ocelot has built-in support via `RouteIsCaseSensitive`/aggregation config, which is convenient for simple fan-out-and-merge scenarios but becomes awkward once the aggregation logic needs real branching/transformation — at that point I'd rather write that composition explicitly in a small BFF service (possibly YARP-based) than fight a config file. In the Coforge/enterprise context, Ocelot (or YARP) typically sits as an *internal*, application-level gateway/BFF layer, while APIM remains the outward-facing, governed enterprise API boundary (Q58, Q86) — they're complementary layers, not competing choices for the same job.
 
 **Decisions & Trade-Offs to Defend**
 
@@ -2312,7 +2312,7 @@ A: When the routing/aggregation needs are genuinely simple and config-expressibl
 
 ---
 
-### 88. Service Discovery and Distributed Configuration: Consul (and the Azure-Native Alternative)
+### 53. Service Discovery and Distributed Configuration: Consul (and the Azure-Native Alternative)
 
 **COMPANY TAGS:** Coforge
 
@@ -2338,7 +2338,7 @@ In an AKS-based Azure architecture (which is what Coforge's scenario assumes), K
 A: Consul Connect (service mesh) offers mTLS between services and richer traffic-shaping than raw Kubernetes networking — but on AKS, Istio/Linkerd or Azure's own service mesh add-on typically covers that need without adding a second discovery system alongside Kubernetes' own.
 
 **Q: How does health-check-driven discovery avoid routing to a service that's up but degraded?**
-A: A basic health check often only confirms the process/port is responding (liveness); a well-designed discovery health check should hit a readiness endpoint that verifies the service can actually serve traffic (DB connectivity, dependency health) — the same liveness-vs-readiness distinction covered in Q18 for Kubernetes probes.
+A: A basic health check often only confirms the process/port is responding (liveness); a well-designed discovery health check should hit a readiness endpoint that verifies the service can actually serve traffic (DB connectivity, dependency health) — the same liveness-vs-readiness distinction covered in Q57 for Kubernetes probes.
 
 **What NOT to Say**
 
@@ -2347,7 +2347,7 @@ A: A basic health check often only confirms the process/port is responding (live
 
 ---
 
-### 89. Debugging Distributed Microservices Across Service Boundaries
+### 54. Debugging Distributed Microservices Across Service Boundaries
 
 **COMPANY TAGS:** Coforge • MBS Global • Innover Digital
 
@@ -2359,7 +2359,7 @@ I trace a request across services using a propagated correlation/trace ID (W3C T
 
 The core problem: a single user-facing request to a gateway might fan out to five services, three of which call a shared database and one of which publishes a message another service consumes minutes later — a stack trace from any one service, in isolation, shows only its own slice. OpenTelemetry's automatic instrumentation for ASP.NET Core/HttpClient generates a `TraceId` at the point of ingress (or accepts one propagated via the `traceparent` header from an upstream caller) and a new `SpanId` for each unit of work; every outbound `HttpClient` call automatically propagates `traceparent` onward, and I extend the same propagation into message headers (Service Bus's `ApplicationProperties`) so a trace continues correctly even across an asynchronous hop through a queue, not just synchronous HTTP calls.
 
-For actual debugging, I follow a specific sequence: start from the symptom (an alert, a slow p99, a user-reported error) and pull the trace by TraceId or by a business identifier (OrderId) if that's what's indexed; the trace's span tree immediately shows *which* service/call in the chain took the most time or returned the error, collapsing "is it slow" from a five-service guessing game into "span 3 of 7, the call to the pricing service, took 4.2s." From there, logs filtered to that TraceId (or that specific SpanId) within that specific service give the detailed error/exception, and metrics (that service's own error-rate/saturation dashboards) confirm whether this was an isolated request or part of a broader incident. I also always include the correlation ID in error responses returned to the caller (in a `ProblemDetails.Extensions["traceId"]`, as in Q53) specifically so a user-reported bug can be handed straight to a TraceId lookup instead of starting from "it was slow around 2pm yesterday."
+For actual debugging, I follow a specific sequence: start from the symptom (an alert, a slow p99, a user-reported error) and pull the trace by TraceId or by a business identifier (OrderId) if that's what's indexed; the trace's span tree immediately shows *which* service/call in the chain took the most time or returned the error, collapsing "is it slow" from a five-service guessing game into "span 3 of 7, the call to the pricing service, took 4.2s." From there, logs filtered to that TraceId (or that specific SpanId) within that specific service give the detailed error/exception, and metrics (that service's own error-rate/saturation dashboards) confirm whether this was an isolated request or part of a broader incident. I also always include the correlation ID in error responses returned to the caller (in a `ProblemDetails.Extensions["traceId"]`, as in Q18) specifically so a user-reported bug can be handed straight to a TraceId lookup instead of starting from "it was slow around 2pm yesterday."
 
 **Decisions & Trade-Offs to Defend**
 
@@ -2384,7 +2384,7 @@ A: Local debugging (breakpoints, a debugger attached to one process) works fine 
 
 ## PART V: COFORGE – PRINCIPAL / ENTERPRISE ARCHITECT (Study First — Tue 15 Sept)
 
-### 16. Multi-Tenant SaaS Design
+### 55. Multi-Tenant SaaS Design
 
 **30-Second Answer**
 
@@ -2448,7 +2448,7 @@ A: Isolation model must support tenant-level backup/export/recovery or dedicated
 
 ---
 
-### 17. Tenant Isolation
+### 56. Tenant Isolation
 
 **COMPANY TAG:** Coforge
 
@@ -2498,7 +2498,7 @@ A: Automated cross-tenant access tests in CI, documented data-flow diagrams show
 
 ---
 
-### 18. AKS Architecture
+### 57. AKS Architecture
 
 **COMPANY TAG:** Coforge
 
@@ -2537,7 +2537,7 @@ A: App Service is simpler operationally for standard stateless APIs; AKS earns i
 
 ---
 
-### 19. APIM Governance
+### 58. APIM Governance
 
 **COMPANY TAG:** Coforge
 
@@ -2573,7 +2573,7 @@ A: Design tier/region availability to the required SLO (Premium tier supports mu
 
 ---
 
-### 20. Cosmos DB Partitioning
+### 59. Cosmos DB Partitioning
 
 **COMPANY TAG:** Coforge
 
@@ -2609,7 +2609,7 @@ A: Build reporting/read models via change feed → events → ETL/data platform 
 
 ---
 
-### 21. Platform Engineering
+### 60. Platform Engineering
 
 **COMPANY TAG:** Coforge
 
@@ -2645,7 +2645,7 @@ A: APIs/templates/self-service instead of ticket queues, federated ownership of 
 
 ---
 
-### 22. FinOps
+### 61. FinOps
 
 **COMPANY TAG:** Coforge
 
@@ -2681,7 +2681,7 @@ A: Reduce noisy/verbose logs and high-cardinality dimensions, tune sampling and 
 
 ---
 
-### 23. Enterprise RAG
+### 62. Enterprise RAG
 
 **COMPANY TAG:** Coforge
 
@@ -2717,7 +2717,7 @@ A: Tenant/ACL metadata on every indexed chunk, identity-derived filters applied 
 
 ---
 
-### 24. Agentic AI
+### 63. Agentic AI
 
 **COMPANY TAG:** Coforge
 
@@ -2753,7 +2753,7 @@ A: It should never possess unrestricted delete capability — the tool interface
 
 ---
 
-### 25. API Versioning Strategy (NEW)
+### 64. API Versioning Strategy (NEW)
 
 **COMPANY TAG:** Coforge
 
@@ -2784,7 +2784,7 @@ A: Possible but less discoverable; URL is clearer for enterprise APIs.
 
 ---
 
-### 26. Azure KeyVault & Secret Rotation (NEW)
+### 65. Azure KeyVault & Secret Rotation (NEW)
 
 **COMPANY TAG:** Coforge
 
@@ -2807,7 +2807,7 @@ I design the application to gracefully handle transient KeyVault unavailability 
 
 ---
 
-### 27. Azure Front Door + WAF (NEW)
+### 66. Azure Front Door + WAF (NEW)
 
 **COMPANY TAG:** Coforge
 
@@ -2829,7 +2829,7 @@ Authentication and authorization remain at the API layer—WAF is a perimeter de
 
 ---
 
-### 28. Multi-Region Failover (NEW)
+### 67. Multi-Region Failover (NEW)
 
 **COMPANY TAG:** Coforge
 
@@ -2856,7 +2856,7 @@ For multi-region Cosmos/SQL, I choose consistency level based on business need. 
 
 ## PART VI: MBS GLOBAL – OPERATIONAL / INTEGRATION ARCHITECTURE (Study Second — Wed 16 Sept)
 
-### 29. Mission-Critical Cash/ATM/Field-Service Platform
+### 68. Mission-Critical Cash/ATM/Field-Service Platform
 
 **COMPANY TAG:** MBS Global
 
@@ -2908,7 +2908,7 @@ A: Idempotency/business uniqueness constraint prevents double application; excep
 
 ---
 
-### 30. Transaction Integrity and Reconciliation
+### 69. Transaction Integrity and Reconciliation
 
 **COMPANY TAG:** MBS Global
 
@@ -2944,7 +2944,7 @@ A: Same idempotency key means the downstream either returns the prior result or 
 
 ---
 
-### 31. Offline-First Field/Mobile Architecture
+### 70. Offline-First Field/Mobile Architecture
 
 **COMPANY TAG:** MBS Global
 
@@ -2980,7 +2980,7 @@ A: Version/concurrency check (rowversion-style) plus a domain-specific merge/rea
 
 ---
 
-### 32. Production Incident, RCA and Recurring P1
+### 71. Production Incident, RCA and Recurring P1
 
 **COMPANY TAG:** MBS Global
 
@@ -3016,7 +3016,7 @@ A: Roll back when the recent change is the likely cause and rollback is safe for
 
 ---
 
-### 33. Vendor/MSP Technical Governance
+### 72. Vendor/MSP Technical Governance
 
 **COMPANY TAG:** MBS Global
 
@@ -3052,7 +3052,7 @@ A: Improve templates/automation/training first (make the right way the easy way)
 
 ---
 
-### 34. Portfolio Modernization: Retain, Invest, Modernize, Replace or Retire
+### 73. Portfolio Modernization: Retain, Invest, Modernize, Replace or Retire
 
 **COMPANY TAG:** MBS Global
 
@@ -3088,7 +3088,7 @@ A: Only when incremental modernization cannot economically meet target outcomes 
 
 ---
 
-### 35. SQL Server Performance, Concurrency and Deadlocks
+### 74. SQL Server Performance, Concurrency and Deadlocks
 
 **COMPANY TAG:** MBS Global
 
@@ -3124,7 +3124,7 @@ A: NOLOCK permits dirty/inconsistent reads — it's not a universal performance 
 
 ---
 
-### 36. DR/BCP and Production Readiness Review
+### 75. DR/BCP and Production Readiness Review
 
 **COMPANY TAG:** MBS Global
 
@@ -3160,7 +3160,7 @@ A: Based on criticality/regulatory policy — frequently enough to actually prov
 
 ---
 
-### 37. Message Deduplication (NEW)
+### 76. Message Deduplication (NEW)
 
 **COMPANY TAG:** MBS Global
 
@@ -3188,7 +3188,7 @@ For transactional messaging systems like Service Bus, deduplication windows exis
 
 ---
 
-### 38. EDI/SFTP File Integration (NEW)
+### 77. EDI/SFTP File Integration (NEW)
 
 **COMPANY TAG:** MBS Global
 
@@ -3218,7 +3218,7 @@ P/SFTP is not ideal (no acknowledgement at application level), but it's a common
 
 ---
 
-### 39. Device Security & MDM (NEW)
+### 78. Device Security & MDM (NEW)
 
 **COMPANY TAG:** MBS Global
 
@@ -3248,7 +3248,7 @@ Network: prefer VPN/private connectivity where feasible, though mobile devices a
 
 ---
 
-### 40. Audit Trail Design (NEW)
+### 79. Audit Trail Design (NEW)
 
 **COMPANY TAG:** MBS Global
 
@@ -3281,7 +3281,7 @@ For immutability, use database constraints (only INSERTs, never UPDATE/DELETE) o
 
 ## PART VII: INNOVER DIGITAL – MODERNIZATION (Study Third)
 
-### 41. Modernize WPF/.NET Framework to .NET 8/10 and Blazor Server
+### 80. Modernize WPF/.NET Framework to .NET 8/10 and Blazor Server
 
 **COMPANY TAG:** Innover Digital
 
@@ -3336,7 +3336,7 @@ A: Explicit ownership per table/schema area plus expand-contract migrations; pre
 
 ---
 
-### 42. Blazor Server Architecture, Circuits and Scaling
+### 81. Blazor Server Architecture, Circuits and Scaling
 
 **COMPANY TAG:** Innover Digital
 
@@ -3372,7 +3372,7 @@ A: The client attempts reconnect and the circuit's UI state is recreated; any bu
 
 ---
 
-### 43. Blazor Component Lifecycle and State Management
+### 82. Blazor Component Lifecycle and State Management
 
 **COMPANY TAG:** Innover Digital
 
@@ -3407,7 +3407,7 @@ A: DOM/JS-interop-dependent work that needs the rendered markup to exist first (
 
 ---
 
-### 44. Clean Architecture + DDD in a Modern .NET Solution
+### 83. Clean Architecture + DDD in a Modern .NET Solution
 
 **COMPANY TAG:** Innover Digital; also Coforge
 
@@ -3443,7 +3443,7 @@ A: Input shape/format validation at the boundary (presentation/API), business in
 
 ---
 
-### 45. EF Core 8 Performance and Concurrency
+### 84. EF Core 8 Performance and Concurrency
 
 **COMPANY TAG:** Innover Digital
 
@@ -3479,7 +3479,7 @@ A: Offset (SKIP/TAKE) supports arbitrary page jumps but degrades and becomes uns
 
 ---
 
-### 46. Shared Database Coexistence During Modernization
+### 85. Shared Database Coexistence During Modernization
 
 **COMPANY TAG:** Innover Digital
 
@@ -3515,7 +3515,7 @@ A: Inventory their callers and contracts, then version/migrate them with the sam
 
 ---
 
-### 47. YARP vs Ocelot vs APIM and BFF
+### 86. YARP vs Ocelot vs APIM and BFF
 
 **COMPANY TAG:** Innover Digital
 
@@ -3551,7 +3551,7 @@ A: Yes — valid when external partner/enterprise API governance (APIM) and app-
 
 ---
 
-### 48. Cursor/Copilot/AI-Assisted Modernization Safely
+### 87. Cursor/Copilot/AI-Assisted Modernization Safely
 
 **COMPANY TAG:** Innover Digital
 
@@ -3587,7 +3587,7 @@ A: Only through approved enterprise tooling and configuration (e.g., enterprise 
 
 ---
 
-### 49. Blazor Authentication and Token Handling (NEW)
+### 88. Blazor Authentication and Token Handling (NEW)
 
 **COMPANY TAG:** Innover Digital
 
@@ -3625,7 +3625,7 @@ A: Significantly — Server keeps tokens/secrets server-side (smaller attack sur
 
 ---
 
-### 50. Feature Flags During Migration (NEW)
+### 89. Feature Flags During Migration (NEW)
 
 **COMPANY TAG:** Innover Digital
 
@@ -3717,7 +3717,7 @@ Your response: "A billion users isn't a uniform load. Who are they? What do they
 
 **Before Tuesday:**
 
-1. Draw Question 16 (Multi-Tenant SaaS) from memory. Time yourself: 3 minutes to sketch, 1 minute to label.
+1. Draw Question 55 (Multi-Tenant SaaS) from memory. Time yourself: 3 minutes to sketch, 1 minute to label.
 2. Explain the diagram aloud. Can you defend every component?
 3. Practice erasing and redrawing during explanation—show adaptability.
 
@@ -3756,7 +3756,7 @@ Tell me which area and I'll ask targeted questions to help you build one.
 
 **72 Hours Before Coforge:**
 
-- [ ] Whiteboard Question 16 three times
+- [ ] Whiteboard Question 55 three times
 - [ ] Recite 30-sec answers for Q1-Q15
 - [ ] Prepare 5 personal stories (one per bullet above)
 - [ ] Review your resume and name specific projects/metrics
@@ -3771,7 +3771,7 @@ Tell me which area and I'll ask targeted questions to help you build one.
 
 **Morning Of:**
 
-- [ ] Whiteboard Question 16 once (confidence builder)
+- [ ] Whiteboard Question 55 once (confidence builder)
 - [ ] Recite top 10 decisions to defend
 - [ ] One deep breath: "I have 20 years of experience. I know this."
 
@@ -3782,31 +3782,31 @@ Tell me which area and I'll ask targeted questions to help you build one.
 **Foundation (study once, applies to all three interviews):**
 
 - Master PART I (Common Core, Q1–15) completely
-- Code PART II (Foundation Coding Drills, Q51–60) once
-- Read through PART III (Day-to-Day & Behavioral, Q61–75) — these can come up in any of the three interviews
-- Master PART IV (Deep Microservices & Tactical DDD, Q76–89) — this is Coforge JD-critical but applies to all three; prioritize Q76–82 (DDD building blocks, CQRS/MediatR, domain vs integration events) if time is short
+- Code PART II (Foundation Coding Drills, Q16–25) once
+- Read through PART III (Day-to-Day & Behavioral, Q26–40) — these can come up in any of the three interviews
+- Master PART IV (Deep Microservices & Tactical DDD, Q41–54) — this is Coforge JD-critical but applies to all three; prioritize Q41–47 (DDD building blocks, CQRS/MediatR, domain vs integration events) if time is short
 - Prepare all 5 personal stories (see Personal Experience Stories below)
 
 **Until Tuesday (Coforge — study PART V):**
 
-- Master PART V (Coforge, Q16–28) completely
-- Be able to whiteboard Question 16 (Multi-Tenant SaaS) from memory
-- Be able to whiteboard Question 78 (Aggregate Root) and Question 80 (CQRS/MediatR) with code from memory — Coforge's JD calls these out explicitly
+- Master PART V (Coforge, Q55–67) completely
+- Be able to whiteboard Question 55 (Multi-Tenant SaaS) from memory
+- Be able to whiteboard Question 43 (Aggregate Root) and Question 45 (CQRS/MediatR) with code from memory — Coforge's JD calls these out explicitly
 
 **Tuesday Evening (MBS Global — study PART VI):**
 
 - Refresh PART I (skim Q3, Q4, Q5, Q7 — messaging/reconciliation/resilience)
-- Refresh PART IV (Q82 domain vs integration events, Q85 message brokers — directly relevant to MBS's integration-heavy domain)
-- Master PART VI (MBS Global, Q29–40) completely
-- Whiteboard Question 29 (Cash/ATM Platform) and explain reconciliation, offline sync, incident/RCA, vendor governance and PRR
+- Refresh PART IV (Q47 domain vs integration events, Q50 message brokers — directly relevant to MBS's integration-heavy domain)
+- Master PART VI (MBS Global, Q68–79) completely
+- Whiteboard Question 68 (Cash/ATM Platform) and explain reconciliation, offline sync, incident/RCA, vendor governance and PRR
 - Prepare 2–3 MBS-specific stories
 
 **After MBS (Innover Digital — study PART VII):**
 
 - Refresh PART I (skim Q2 DDD, Q6 OAuth/OIDC, Q10–14)
-- Refresh PART IV (Q76–79 tactical DDD, Q84 EF Core aggregate persistence — directly relevant to Innover's Clean Architecture/DDD focus)
-- Master PART VII (Innover Digital, Q41–50) completely
-- Practice Blazor/EF Core code (Q55–56)
+- Refresh PART IV (Q41–44 tactical DDD, Q49 EF Core aggregate persistence — directly relevant to Innover's Clean Architecture/DDD focus)
+- Master PART VII (Innover Digital, Q80–89) completely
+- Practice Blazor/EF Core code (Q20–21)
 - Practice explaining Blazor circuits/lifecycle/state and shared-DB expand-contract
 
 **Last Hour Before Any Interview:**
