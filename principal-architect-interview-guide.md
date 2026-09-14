@@ -3738,17 +3738,57 @@ Your response: "A billion users isn't a uniform load. Who are they? What do they
 
 ### Personal Experience Stories
 
-**You must prepare these from YOUR resume, not templates:**
+Built from your real Capital Access work (S&P Global) — a multi-tenant SaaS platform for Investor Relations teams at 2,500+ corporate issuer clients, on Angular 18 + Azure microservices. This project is a strong real-world backup for **Q55 (Multi-Tenant SaaS Design)** specifically — if Coforge asks "have you actually built something like this," this is your answer: JWT with tenant/role claims validated once at the APIM gateway, six microservices each owning its own database (Cosmos DB for high-volume ownership time-series, Azure SQL for relational data, Redis cache-aside for hot reads), Service Bus pub/sub for cross-service events, and Azure Functions for long-running async report generation.
 
-1. **End-to-end architecture ownership:** A system you designed, alternatives you rejected, stakeholder alignment, delivery result.
-2. **Performance improvement:** Baseline metric → diagnosis → change → measured improvement.
-3. **Modernization:** Legacy constraint → strangler approach → incremental releases → measurable outcome.
-4. **Leadership/conflict:** Stakeholder disagreement → how you surfaced options → decision → lesson.
-5. **Production incident:** Impact → diagnosis → response → permanent prevention → recurrence reduction.
+**Story 1 — End-to-End Architecture Ownership: OIDC Authentication for a Multi-Tenant Platform**
 
-**If your resume doesn't support a story:**
+- **Situation:** Capital Access serves 2,500+ corporate issuer clients on one shared platform — every API call has to be provably scoped to the calling tenant, in a regulated financial-services context where a cross-tenant data leak isn't a bug, it's an incident.
+- **Risk:** Authentication alone ("who is this user") doesn't answer authorization ("can this user see this tenant's data") — and if that check isn't enforced consistently across six independent microservices, one team's oversight becomes every tenant's exposure.
+- **Options considered:** (a) let each of the six microservices independently validate tenant access, (b) a shared library every service must remember to call correctly, (c) enforce it once, centrally, before any request reaches a service.
+- **My recommendation:** OIDC via Okta issuing a JWT carrying custom tenant-ID and role claims, validated at the Azure API Management gateway — the single entry point every request passes through — before it's ever routed to a microservice. Tokens live in memory only (never localStorage), with an HTTP interceptor handling silent renewal before expiry and a 401-triggered refresh-then-retry before forcing logout.
+- **Execution:** Implemented the full flow end-to-end — Okta redirect and callback handling, JWT claim design (tenant ID + role), gateway-level validation, and the client-side interceptor for token lifecycle.
+- **Result:** This became the security foundation the whole platform trusts — every one of the six microservices relies on the tenant/role claim validated once at the gateway, instead of each service re-implementing its own tenant check (and each being a place that check could be missed).
+- **Lesson:** Tenant isolation has to be enforced at the boundary every request passes through, not left to be independently correct in every downstream service — the same principle behind Q56 (Tenant Isolation) and the general rule that UI/individual-service checks are never the actual security boundary.
 
-Tell me which area and I'll ask targeted questions to help you build one.
+**Story 2 — Performance Improvement: Bundle-Size Reduction with a Permanent Guardrail**
+
+- **Situation:** The Angular frontend's legacy NgModule-based build was pulling the entire application into the initial bundle regardless of which of the 8+ feature modules a given IR team actually used — slow first load for every one of 2,500+ clients' users.
+- **Baseline:** Measured initial bundle size and load time before any change, to have a real before/after comparison rather than an impression.
+- **Diagnosis:** The eager-loaded NgModule architecture had no boundary forcing code-splitting — everything shipped on first paint.
+- **Change:** Migrated to Angular 18 standalone components and switched the build to esbuild, enabling proper lazy-loading boundaries per module.
+- **Measured improvement:** 30% reduction in bundle size.
+- **Permanent prevention:** Added a bundle-size gate directly into the Azure DevOps CI/CD pipeline, so a future PR can't silently reintroduce the regression — the fix is enforced structurally, not just achieved once.
+- **Lesson:** A performance win that isn't backed by a pipeline gate erodes silently over the next dozen PRs — the guardrail is what makes the improvement permanent.
+
+**Story 3 — Modernization: Incremental Migration Under Live Traffic**
+
+- **Situation:** Same underlying migration as Story 2, told with a different emphasis — a live platform serving 2,500+ paying enterprise clients, running on a legacy webpack + NgModule Angular architecture across 8+ feature modules, needed modernizing without an outage window.
+- **Why not big-bang:** A full rewrite carries real risk to a platform this size — any regression is immediately visible to every client, and a multi-week code freeze isn't acceptable for an actively-used enterprise product.
+- **Approach:** Migrated module-by-module to Angular 18 standalone components, with old and new coexisting during the transition, validating each migrated module in production before moving to the next.
+- **Result:** 30% bundle-size reduction, a modernized build pipeline, zero downtime across the whole migration.
+- **Lesson:** Incremental modernization under live traffic beats a rewrite whenever the system can't tolerate the downtime or risk a rewrite implies — the same "temporary coexistence can be deliberate architecture" principle behind Innover's Q80 (WPF/Blazor modernization).
+
+**Story 4 — Leadership/Conflict: Resolving a Disagreement with Evidence, Not Argument**
+
+- **Situation:** A peer architect on Capital Access wanted the Reports module to call the Engagement service *synchronously* to get a real-time count, arguing the eventual-consistency lag from consuming Service Bus events was unacceptable for that one screen.
+- **The disagreement:** I held that a synchronous cross-service call was exactly the tight coupling the event-driven design existed to avoid, and that a real-time count on one dashboard likely wasn't worth reintroducing it — but that was my judgment against his, with neither side having real data.
+- **How I resolved it:** Rather than arguing from principle, I proposed we timebox a measurement — how stale was the eventually-consistent count in actual practice, under real production traffic.
+- **Result:** The measured lag was under 2 seconds in the vast majority of cases. That was acceptable to him once he saw the actual number instead of the worst-case scenario he'd been assuming — the disagreement resolved because we'd agreed in advance on what evidence would settle it.
+- **Lesson:** Architecture disagreements between two reasonable people are rarely won by out-arguing the other person — they're resolved by agreeing upfront on what measurement would change either person's mind, then getting that measurement.
+
+**Story 5 — Production Incident: [You need to supply this one]**
+
+No verified real incident is on file for this yet — rather than invent one, here's exactly what a real answer needs to cover, matched to how Coforge is likely to probe it (per the failure-scenario list: downstream service fails, message duplicates, region fails, deployment fails):
+
+1. **Impact:** What broke, which users/tenants were affected, how you knew (which alert/dashboard fired first)
+2. **Immediate response:** Contain blast radius — rollback, failover, or disable the failing path — before root-causing
+3. **Diagnosis:** What tooling led you to the actual cause (correlation ID → trace → logs, the same Application Insights + Splunk pattern from Capital Access's observability story)
+4. **Data/business integrity check:** Did you verify no data was corrupted/duplicated before declaring the incident resolved
+5. **Root cause:** The actual technical or process failure, not just "a bug"
+6. **Permanent fix:** What changed afterward — a test, a monitor, a process, an architecture change — so this can't recur the same way
+7. **Measured recurrence reduction:** Did the fix actually hold, if enough time has passed to know
+
+If something like this happened on Capital Access, or at an earlier role, tell me what you remember — even partial details ("we had a bad deploy once that we had to roll back," "a message got processed twice and double-charged something") — and I'll help you structure it properly rather than you having to write it from scratch.
 
 ---
 
@@ -3758,7 +3798,8 @@ Tell me which area and I'll ask targeted questions to help you build one.
 
 - [ ] Whiteboard Question 55 three times
 - [ ] Recite 30-sec answers for Q1-Q15
-- [ ] Prepare 5 personal stories (one per bullet above)
+- [ ] Rehearse Stories 1–4 out loud (Capital Access — OIDC, bundle-size, modernization, architect disagreement) until they flow without reading
+- [ ] Supply a real Story 5 (production incident) — see the gap noted above — or be ready to say honestly you haven't owned one yet if asked directly
 - [ ] Review your resume and name specific projects/metrics
 - [ ] Prepare 2–3 follow-up questions to ask them
 
