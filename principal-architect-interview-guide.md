@@ -3314,6 +3314,14 @@ Blazor Server UI
 (Migration by vertical business slice)
 ```
 
+**⭐ Rehearse This as ONE Fluent Flow — Highest-Probability Question for the L1 Screening**
+
+This is the single most JD-weighted topic (the "Master System-Design Scenario" *is* this question). Don't answer it as separate facts — say the whole sequence as one continuous 60–90 second flow, in this exact order, until it comes out without stitching:
+
+> "First, **Discovery / Dependency Analysis** — map the WPF UI/business-logic coupling, .NET Framework library dependencies, stored-procedure/schema coupling, auth, integrations. Then I **classify every component as Retain, Refactor, Replace, or Retire** — not everything needs to move. For what's moving, I define the **target architecture**: Clean Architecture + DDD, Blazor Server presentation. I put an **API / Anti-Corruption Layer** in front of the legacy system as a seam. Then I run a **Strangler migration**, moving **vertical business slices** one at a time — each slice cut through UI-to-DB, not layer-by-layer — onto **modern .NET APIs** and **Blazor Server**. During the transition, the shared database uses **controlled coexistence** via **expand-contract schema migration** — add new, support both, backfill, then remove old in a later release. Finally, **legacy components retire gradually** as each slice proves out in production, not all at once."
+
+**Flashcard — memorize the exact four words:** **Retain → Refactor → Replace → Retire**. This is a named classification model in the JD; know the label, not just the concept, because "how do you triage the legacy codebase" is a natural follow-up and the interviewer may be listening for this exact framework.
+
 **Decisions & Trade-Offs to Defend**
 
 - Strangler lowers migration risk versus a big-bang rewrite
@@ -3659,6 +3667,44 @@ A: The transaction fails cleanly and is retryable — it should never silently f
 
 - Using feature flags as permanent architecture (a flag alive for two years is just unmanaged conditional logic at that point)
 - Flipping a flag for a user mid-transaction without considering transaction-boundary consistency
+
+---
+
+## INNOVER DIGITAL — 5-DAY SPRINT PLAN (L1 Confirmed: 21 Sept 2026, 9:00 PM, 30-min screening)
+
+**Company facts confirmed via research (17 Sept 2026):** Innover Digital — HQ Alpharetta, GA; delivery centers in India (Bengaluru) and Mexico. Company-wide positioning is "AI-first Engineering Solutions" (GenAI, agentic AI, cloud-native), but a live ".NET Architect (10–12 yrs)" opening in Bengaluru explicitly says *"design .NET 8 solutions and guide migration from .NET Framework 4.6.2"* — this confirms the WPF/.NET Framework → .NET 8/Blazor modernization framing below is the real, current mandate for this role, not just an inferred JD theme. Industries served: Manufacturing/Logistics, Telecom, Tech/Media, Consumer/Retail, Energy/Utilities, Banking & Financial Services, Tax Technology.
+
+**Interview process (Glassdoor-aggregated):** Typically 3–4 rounds (technical + a written assignment + HR); 71% positive candidate experience; difficulty ~2.5/5 ("moderately easy"). One reported offer within 24–48 hours of a good interview.
+
+**Calibration — this changes how you prepare:** A 30-min L1 is *screening*, not a deep whiteboard session. Structure is likely: background walkthrough (~5–8 min) → a handful of pointed technical questions, not one deep design problem (~15–18 min) → your questions for them (~5 min). Optimize for breadth + fast, confident recall over deep rehearsal — save deep whiteboard drilling for L2/L3 if you clear this round.
+
+**JD weight analysis:** The single most JD-weighted theme is **legacy modernization strategy** (Strangler pattern, Retain/Refactor/Replace/Retire, expand-contract coexistence) — it's literally the "Master System-Design Scenario," and the JD states its own guiding principle in prose: *"Temporary coexistence can be deliberate architecture. Avoid big-bang rewrites."* Blazor Server internals (Q81–82) and EF Core performance (Q84) are the two next-most-detailed supporting clusters. Gateways/AI-modernization/Blazor-auth/feature-flags (Q86–89) are the lowest-weighted cluster — read-once material, not drill material, for this round.
+
+### Day 1 (17 Sept) — Foundation + Modernization Core
+- *1 hr:* Company/role context above + draft 2-min "who I am / why this role" pitch, anchored on the real .NET Framework 4.6.2 → .NET 8 migration language, using Story 1/3 (Capital Access) as proof of real architecture ownership
+- *2 hrs:* Part VII Q80–82 (WPF/.NET Framework modernization, Blazor Server architecture, Blazor lifecycle) — read + say each 30-sec answer out loud
+- *1 hr:* Skim Part I Common Core (Q1–15) 30-sec answers only — fast recall refresh, not deep re-study
+
+### Day 2 (18 Sept) — Architecture Depth + The Master Flow
+- **Priority exercise (do this first):** Rehearse the "⭐ Rehearse This as ONE Fluent Flow" callout under Q80 — the full Discovery → Retain/Refactor/Replace/Retire → target architecture → ACL seam → Strangler → vertical slices → Blazor Server → expand-contract → gradual retire sequence, said out loud as ONE continuous 60–90 second answer, three times, until it doesn't need stitching together
+- *1.5 hrs:* Part VII Q83–85 (Clean Architecture+DDD, EF Core performance, shared-DB expand-contract coexistence)
+- *30 min:* Part IV cross-reference (Q41–44 tactical DDD, Q49 EF Core aggregate persistence) — light touch/skim only, lower priority than the master flow above
+
+### Day 3 (19 Sept) — Lower-Priority Cluster (Compressed) + First Mock
+- *45 min:* Part VII Q86–89 (YARP/Ocelot/APIM, AI-assisted modernization, Blazor auth, feature flags) — single read-through, know the 30-sec answer only, do not drill deeply
+- *1 hr:* Coding drills Q20 (EF Core projection/keyset) and Q21 (optimistic concurrency) — directly Innover-relevant
+- *2.25 hrs:* **Mock interview** — opens with "walk me through modernizing this WPF app," not a random pick from Q80–89, matching how the JD actually reads
+
+### Day 4 (20 Sept) — Full Dry Run
+- *1 hr:* Full timed run-through: pitch + "why Innover" + rapid Q&A across Part VII, capped at 30 min like the real call
+- *1 hr:* Prepare 2–3 smart questions for them (e.g., "Is the .NET 8 migration Blazor Server or WASM-targeted?", "What's the team structure for this modernization?", "Which client/industry is this engagement for?")
+- *1 hr:* Second mock interview, cold, no notes, leading with the master flow again
+- *1 hr:* Close remaining gaps found in the two mocks
+
+### Day 5 (21 Sept — Interview Day) — Light Only
+- *1–2 hrs max, morning:* Re-recite the master flow once, skim Part VII "Decisions & Trade-Offs" and "What NOT to Say" bullets only — no new material
+- Logistics: Aadhar/PAN ready, test the call link, quiet space, calendar reminder for 9:00 PM
+- Rest of the day: don't cram — a screening round rewards calm and fluency more than fresh facts
 
 ---
 
