@@ -3678,20 +3678,32 @@ A: The transaction fails cleanly and is retryable — it should never silently f
 
 **Calibration — this changes how you prepare:** A 30-min L1 is *screening*, not a deep whiteboard session. Structure is likely: background walkthrough (~5–8 min) → a handful of pointed technical questions, not one deep design problem (~15–18 min) → your questions for them (~5 min). Optimize for breadth + fast, confident recall over deep rehearsal — save deep whiteboard drilling for L2/L3 if you clear this round.
 
-**JD weight analysis:** The single most JD-weighted theme is **legacy modernization strategy** (Strangler pattern, Retain/Refactor/Replace/Retire, expand-contract coexistence) — it's literally the "Master System-Design Scenario," and the JD states its own guiding principle in prose: *"Temporary coexistence can be deliberate architecture. Avoid big-bang rewrites."* Blazor Server internals (Q81–82) and EF Core performance (Q84) are the two next-most-detailed supporting clusters. Gateways/AI-modernization/Blazor-auth/feature-flags (Q86–89) are the lowest-weighted cluster — read-once material, not drill material, for this round.
+**JD weight analysis:** The single most JD-weighted theme is **legacy modernization strategy** (Strangler pattern, Retain/Refactor/Replace/Retire, expand-contract coexistence) — it's literally the "Master System-Design Scenario," and the JD states its own guiding principle in prose: *"Temporary coexistence can be deliberate architecture. Avoid big-bang rewrites."* Blazor Server internals (Q81–82) and EF Core performance (Q84) are the two next-most-detailed supporting clusters. The lowest-weighted cluster for this round is Q86–89 — read-once material, not drill material:
+- Q86: "How would you choose between YARP, Ocelot, and APIM for gateway/BFF needs during this migration?"
+- Q87: "How do you use Cursor/Copilot safely during modernization without introducing untrusted or insecure code?"
+- Q88: "How does Blazor Server handle authentication and token management across a circuit?"
+- Q89: "How would you use feature flags to control cutover during the Strangler migration?"
 
 ### Day 1 (17 Sept) — Foundation + Modernization Core
 - *1 hr:* Company/role context above + draft 2-min "who I am / why this role" pitch, anchored on the real .NET Framework 4.6.2 → .NET 8 migration language, using Story 1/3 (Capital Access) as proof of real architecture ownership
-- *2 hrs:* Part VII Q80–82 (WPF/.NET Framework modernization, Blazor Server architecture, Blazor lifecycle) — read + say each 30-sec answer out loud
+- *2 hrs:* Part VII Q80–82 — read + say each 30-sec answer out loud:
+  - Q80: "How would you modernize a large WPF/.NET Framework application to .NET 8/10 and Blazor Server?"
+  - Q81: "How does Blazor Server architecture work under the hood, and how do you scale it?"
+  - Q82: "Walk me through Blazor's component lifecycle and how you manage state."
 - *1 hr:* Skim Part I Common Core (Q1–15) 30-sec answers only — fast recall refresh, not deep re-study
 
 ### Day 2 (18 Sept) — Architecture Depth + The Master Flow
 - **Priority exercise (do this first):** Rehearse the "⭐ Rehearse This as ONE Fluent Flow" callout under Q80 — the full Discovery → Retain/Refactor/Replace/Retire → target architecture → ACL seam → Strangler → vertical slices → Blazor Server → expand-contract → gradual retire sequence, said out loud as ONE continuous 60–90 second answer, three times, until it doesn't need stitching together
-- *1.5 hrs:* Part VII Q83–85 (Clean Architecture+DDD, EF Core performance, shared-DB expand-contract coexistence)
-- *30 min:* Part IV cross-reference (Q41–44 tactical DDD, Q49 EF Core aggregate persistence) — light touch/skim only, lower priority than the master flow above
+- *1.5 hrs:* Part VII Q83–85:
+  - Q83: "How do Clean Architecture and DDD fit together in a modern .NET solution?"
+  - Q84: "How do you optimize EF Core 8 performance and handle concurrency?"
+  - Q85: "How do you handle a shared database during modernization without breaking either system?"
+- *30 min:* Part IV cross-reference — light touch/skim only, lower priority than the master flow above:
+  - Q41–44: "How do you model Value Objects, Aggregate Roots, and Factories in tactical DDD?"
+  - Q49: "How do you persist DDD aggregates with EF Core, including multiple DbContexts?"
 
 ### Day 3 (19 Sept) — Lower-Priority Cluster (Compressed) + First Mock
-- *45 min:* Part VII Q86–89 (YARP/Ocelot/APIM, AI-assisted modernization, Blazor auth, feature flags) — single read-through, know the 30-sec answer only, do not drill deeply
+- *45 min:* Part VII Q86–89 — single read-through of the four questions above (gateway choice, AI-assisted modernization safety, Blazor auth/tokens, feature-flag cutover), know each 30-sec answer only, do not drill deeply
 - *1 hr:* Coding drills Q20 (EF Core projection/keyset) and Q21 (optimistic concurrency) — directly Innover-relevant
 - *2.25 hrs:* **Mock interview** — opens with "walk me through modernizing this WPF app," not a random pick from Q80–89, matching how the JD actually reads
 
