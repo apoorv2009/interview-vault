@@ -111,6 +111,23 @@
 76. [Why not just give both reports to ChatGPT? And if chunks go to third-party LLMs anyway, how is that compliant?](#q76)
 77. [Your web app uses Okta. Why does the Teams bot use Entra SSO and not Okta?](#q77)
 
+**Part J — Deployment, MLOps and LLMOps**
+78. [You don't train models. So what does MLOps mean for your system? What exactly do you version?](#q78)
+79. [Walk me through the CI/CD pipeline for the AI services.](#q79)
+80. [How are the services hosted and the infrastructure deployed?](#q80)
+81. [How do you test LLM components in a pipeline when outputs are non-deterministic?](#q81)
+82. [You can't use production client data in dev and test. How do you build realistic environments?](#q82)
+83. [How do you ship a new embedding model or chunking strategy to production?](#q83)
+84. [A provider announces your model version is deprecated in 90 days. What's your process?](#q84)
+85. [How do you roll back — and is rolling back a prompt the same as rolling back code?](#q85)
+86. [How do you A/B test a new prompt or model in production?](#q86)
+87. [What does production monitoring look like for an LLM system — what is "drift" here?](#q87)
+88. [How do you deploy the Teams bot itself? Anything unusual compared to a web app?](#q88)
+89. [Who is allowed to change a production prompt, and how is that governed and audited?](#q89)
+90. [If you had to self-host a small open-weights model — for MNPI or cost — how would you deploy and operate it?](#q90)
+91. [Running evals with an LLM judge on every build costs money. How do you keep CI cost under control?](#q91)
+92. [A prompt change passed CI but production answer quality dropped. What happened and what do you change?](#q92)
+
 ---
 
 <a id="architecture"></a>
@@ -1166,11 +1183,194 @@ Concede: yes, data leaves the app. **Compliance is not zero egress** — by that
 
 ---
 
+# Part J — Deployment, MLOps and LLMOps
+
+<a id="q78"></a>
+### Q78. You don't train models. So what does MLOps mean for your system? What exactly do you version?
+
+**Say this:** "Since we consume foundation models rather than train them, it's **LLMOps**: the 'model' is really a **system configuration**, and every part of it that changes behaviour is a versioned artifact, deployed and rolled back like code. That's more than people expect:
+- **Prompts** — system prompts, agent prompts, per-tier templates.
+- **Model identifiers** — pinned, dated model versions per task and per tier, plus the fallback order.
+- **Tool schemas** — the function definitions agents can call.
+- **Retrieval config** — top-k, hybrid weights, reranker, filters.
+- **Ingestion config** — OCR model, chunking strategy and sizes, metadata schema, **embedding model** — together these define an **index version**.
+- **Guardrail rules** — injection classifier, output schemas, numeric-verification rules.
+- **Evaluation assets** — golden set, judge prompts, thresholds.
+All of it lives in Git, goes through PR review and the eval gate, and every logged answer records which versions produced it."
+
+**Trap:** "Where do prompts live — in code or a prompt management tool?" → In Git as versioned files, loaded by configuration; a registry or portal is fine for experimentation, but production prompts must be reviewable, diffable and tied to a release.
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q79"></a>
+### Q79. Walk me through the CI/CD pipeline for the AI services.
+
+**Say this:** "Same Azure DevOps backbone as the rest of Capital Access, with one extra quality gate.
+1. **PR stage:** build, lint, unit tests on deterministic code (chunking, parsers, routing rules, validators), contract tests for event schemas and tool schemas, security scanning (dependencies, secrets, containers), and a **fast eval subset** (~50 critical golden cases) if prompts, models or retrieval config changed.
+2. **Merge → Dev:** infrastructure as code (Bicep or Terraform) applied, services deployed, integration tests against real dependencies with dev keys.
+3. **Staging:** **full golden-set evaluation** with LLM-as-judge, load test against provider rate limits, cost-per-query check against budget.
+4. **Production:** canary — deployment slots for Functions and App Service, revisions with traffic splitting for containers — plus feature flags in Azure App Configuration for prompt and model switches; automatic rollback on error rate, latency, cost or judge-score regression."
+
+**Key points:** The eval gate blocks the release exactly like a failing unit test would. Quality is a release criterion, not a dashboard someone looks at later.
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q80"></a>
+### Q80. How are the services hosted and the infrastructure deployed?
+
+**Say this:** "All infrastructure is code — Bicep or Terraform modules per component, parameterised per environment, deployed by the pipeline, never by hand in the portal. Hosting follows the workload: the orchestrator and gateway as stateless containers or App Service with autoscale; ingestion and report generation on Azure Functions (Durable for long documents); the FastAPI extraction service as a container — Container Apps or AKS — scaled on queue depth. Secrets are in Key Vault accessed by managed identity; network access to Pinecone and model providers goes through private endpoints where available and egress allow-lists otherwise."
+
+**Trap:** "Why containers for FastAPI but Functions for ingestion?" → Extraction is a long-running Python service with heavy dependencies and steady batch load — containers fit. Ingestion is bursty and event-triggered — Functions fit.
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q81"></a>
+### Q81. How do you test LLM components in a pipeline when outputs are non-deterministic?
+
+**Say this:** "Layered, from cheap and deterministic to expensive and statistical:
+1. **Unit tests** for everything deterministic — chunkers, parsers, routing rules, schema validators, numeric verification.
+2. **Mocked LLM tests** — the gateway is stubbed with recorded responses, so orchestration logic, retries, fallbacks and error paths are tested deterministically and for free.
+3. **Structural assertions** on real calls — valid JSON against the schema, citations present and resolvable, no forbidden content — not exact string matches.
+4. **Golden-set evaluation** with the judge — scored, thresholded, compared to the previous release.
+5. **Adversarial suite** — prompt-injection samples, out-of-scope questions, cross-tenant probes, 'delete everything' style requests; must refuse or stay in scope.
+Cost control: a small critical subset on every PR, the full suite nightly and before release, and cached results when nothing relevant changed."
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q82"></a>
+### Q82. You can't use production client data in dev and test. How do you build realistic environments?
+
+**Say this:** "Client data never leaves production. Dev and test use **synthetic tenants** — generated reports with realistic structure and fake companies, holders and contacts — plus publicly available filings for realism. The golden set is built from production failure patterns but **anonymised** before it leaves prod, or the full eval runs **inside** the production boundary against a restricted eval tenant. Each environment has separate provider keys, quotas and budgets, so a runaway test can't eat production capacity."
+
+**Trap:** "Then how do you debug a production-only issue?" → Traces carry chunk IDs and versions, not raw content; engineers with approved access investigate inside prod through the restricted store, with access logged.
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q83"></a>
+### Q83. How do you ship a new embedding model or chunking strategy to production?
+
+**Say this:** "It's an **index release**, not a code release, because it changes every stored vector. Pipeline: provision a new index version; re-ingest from source (Blob and structured data) with the new config in a throttled background job; dual-write new reports to both indexes during migration; run the retrieval golden set on the new index — recall and precision must beat or match the old one; then flip the **index alias and query-embedding model together** via configuration; keep the old index for a rollback window; delete it after. Quarter-end is a change freeze for this."
+
+**Key points:** Ingestion config + embedding model + index = one versioned unit. See also [Q18](#q18).
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q84"></a>
+### Q84. A provider announces your model version is deprecated in 90 days. What's your process?
+
+**Say this:** "We expect this — providers retire model versions routinely — so it's a runbook, not a fire drill. Track deprecation dates for every pinned model in a register. For the replacement: run the golden set per task type on the new model with its own tuned prompt, compare quality, latency and cost; **shadow-test** it on sampled live traffic — responses scored but not shown to users; then canary behind a feature flag and ramp. The gateway makes it a configuration change; the evaluation is the real work, and it takes weeks, not days — which is why the register gives us lead time."
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q85"></a>
+### Q85. How do you roll back — and is rolling back a prompt the same as rolling back code?
+
+**Say this:** "No — each artifact rolls back differently:
+- **Code:** swap deployment slots or shift traffic back to the previous revision — seconds.
+- **Prompt or model switch:** flip the feature flag back to the previous version — seconds, no redeploy.
+- **Index / embedding change:** flip the alias back to the old index — possible only because we kept it.
+- **Database schema:** expand-and-contract migrations, so the previous code version still works with the new schema; destructive changes only after the old version is gone.
+- **Event schema:** additive only; old consumers keep working.
+- **Durable Functions orchestrations:** in-flight instances must finish on the version they started — use orchestration versioning or a side-by-side deployment rather than changing orchestrator code under running instances."
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q86"></a>
+### Q86. How do you A/B test a new prompt or model in production?
+
+**Say this:** "Feature flags assign a percentage of traffic — sticky per user or per conversation so one user doesn't flip between variants mid-chat. Both variants log prompt and model versions on every trace. Compare on quality (judge scores on sampled answers, thumbs-down and escalation rate), latency (TTFT, total), and cost per answer. Decide on a pre-agreed metric and sample size, not on eyeballing a few answers. Regulated or high-risk task types — anything feeding board reports — get shadow testing first rather than live exposure."
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q87"></a>
+### Q87. What does production monitoring look like for an LLM system — what is "drift" here?
+
+**Say this:** "Three kinds of drift, each with its own signal:
+- **Input drift** — users start asking new kinds of questions (e.g., ESG questions the golden set doesn't cover). Signal: intent-classifier distribution changes and rising 'I couldn't find that' rates. Action: add cases to the golden set, extend retrieval.
+- **Retrieval drift** — new report formats or template changes break chunking. Signal: falling retrieval scores, fewer citations per answer, ingestion chunk-count anomalies.
+- **Model / quality drift** — provider-side changes or prompt edits. Signal: judge scores on sampled traffic, thumbs-down and escalation rates.
+Plus the operational set: TTFT and latency per tier, fallback rate, cache hit rate, cost per tenant, ingestion lag from Generated to Indexed, DLQ depth. Alerts go to on-call with runbooks."
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q88"></a>
+### Q88. How do you deploy the Teams bot itself? Anything unusual compared to a web app?
+
+**Say this:** "Two layers. The **bot backend** is an ordinary service behind the gateway — deployed through the normal pipeline with slots and canaries, invisible to Teams. The **Teams app package** — the manifest with the bot ID, commands and permissions — is different: each client's Teams admin must approve and publish it to their organisation's app catalog, or it's distributed through the Teams store after Microsoft validation. So backend changes ship any time, but **manifest changes** — new commands, new permissions — need re-approval by every client's IT and roll out slowly. Design implication: keep the manifest stable and put behaviour in the backend, gated by feature flags."
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q89"></a>
+### Q89. Who is allowed to change a production prompt, and how is that governed and audited?
+
+**Say this:** "Prompts are production code: changes go through a PR with review by the owning team, the eval gate, and release approval — no editing prompts live in a portal. High-impact task types — onboarding extraction, board-report answers — need sign-off from the product owner as well. Every change is traceable: Git history shows who changed what and why, the release records which prompt versions shipped, and every answer's trace records the versions used. That's what lets us answer an auditor's question like 'which prompt produced this answer on 3 March?'"
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q90"></a>
+### Q90. If you had to self-host a small open-weights model — for MNPI or cost — how would you deploy and operate it?
+
+**Say this:** "It becomes classic MLOps plus GPU operations. Serve with an inference engine built for LLMs — such as vLLM — which handles continuous batching and KV-cache efficiency, on a GPU node pool (e.g., AKS) inside our network. Choose the smallest model and quantisation that passes the golden set for that task. Scale on queue depth and GPU utilisation; keep a warm minimum because model load times are long. Register it in the gateway as just another tier, with the same circuit breaker, metering and evaluation as external models. Versioning: model weights and serving config pinned and stored in our registry, deployed blue-green because swapping a model in place drops in-flight requests. Trade-off to state clearly: full data control and predictable cost at high volume, in exchange for GPU capacity planning and an on-call burden we don't have with managed APIs."
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q91"></a>
+### Q91. Running evals with an LLM judge on every build costs money. How do you keep CI cost under control?
+
+**Say this:** "Tier the evaluation by what changed. Code-only changes that don't touch prompts, models, retrieval or tools skip the LLM eval entirely — deterministic tests are enough. Prompt or config changes run the critical subset on the PR and the full set before release. Cache results keyed by the versions of everything that affects the output, so unchanged cases aren't re-scored. Use a cheaper judge for coarse checks and the strong judge only for borderline or critical cases. Track eval cost as its own budget line — it's small next to the cost of shipping a regression to board-level users."
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q92"></a>
+### Q92. Walk me through a bad release: a prompt change passed CI but production answer quality dropped. What happened and what do you change?
+
+**Say this (structure as an incident review):**
+1. **Detect:** judge scores on sampled production traffic and thumbs-down rate fell after the canary ramped — alert fired.
+2. **Mitigate:** flip the feature flag back to the previous prompt version — seconds, no redeploy.
+3. **Diagnose:** traces show the drop is concentrated in one question type — say multi-period comparisons — which the golden set under-represented, so CI passed on average while failing a slice.
+4. **Fix the system, not just the prompt:** add those production cases to the golden set; report eval scores **per question type**, not only as one average; make the canary compare per-slice metrics before ramping.
+5. **Blameless write-up** shared with the team.
+
+**Key points:** An average score hides slice regressions. Saying "we added per-slice gating" signals mature LLMOps thinking.
+
+[⬆ Back to top](#top)
+
+---
+
 ## Night-before checklist
 
 - [ ] Say the 60-second pitch out loud three times, timed.
 - [ ] Be able to explain the **generated vs searchable race** (Q2–Q4) without notes — it's the likely opener.
 - [ ] Know your own numbers: 5x, 2–3 hrs → 10 min, 7,500+ profiles, three tiers — and how each was measured.
+- [ ] For deployment questions, remember the LLMOps line: *prompts, model IDs, retrieval and ingestion config, and eval sets are all versioned artifacts — each with its own rollback path.*
 - [ ] Memorise the phrases that signal depth: *fencing token, transactional outbox, claim check, tolerant reader, sessions for per-entity ordering, PACELC, bulkheads, deadline propagation, retrieval vs generation evaluation, prompt caching, batch API.*
 - [ ] For every "why X" question: criteria → decision → trade-off → what you'd revisit. Never defend a choice as perfect.
 
