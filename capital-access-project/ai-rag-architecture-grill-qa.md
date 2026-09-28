@@ -1,3 +1,5 @@
+<a id="top"></a>
+
 # AI Report Analytics & Client Onboarding — Principal Architect Grill (Q&A Bank)
 
 **Project:** AI-Powered Report Analytics (multi-agent RAG in MS Teams) + Client Onboarding Automation (Claude-powered extraction)
@@ -116,6 +118,8 @@
 
 Underneath, reports are generated asynchronously through Service Bus and Azure Functions, stored in Blob, and a 'report ready' event triggers ingestion — OCR, chunking, metadata enrichment, embeddings, Pinecone. All model calls go through one **LLM gateway** that does per-tenant rate limiting, cost metering, a 3-tier complexity router — Haiku for simple extraction, Sonnet for RAG answers, Opus for multi-report synthesis — plus circuit breakers with fallback. An evaluation pipeline scores groundedness, relevance and citation accuracy and gates deployments."
 
+[⬆ Back to top](#top)
+
 ---
 
 # Part A — Foundational design decisions
@@ -131,6 +135,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "Guardrails at the end?" — No. Input guardrails run **first**, before any retrieval or tool call. Output guardrails run **last**. Say both.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q2"></a>
@@ -144,6 +150,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 3. Better still: notify the user only when the report is searchable (Q3).
 
 **Trap:** "Compare with the last generated report" is wrong — if Q1 was regenerated three times, "last generated" is a Q1 variant. Compare with the **previous fiscal period, same tenant and report type, latest published version**. You need a period/version identity model, not "latest by timestamp".
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -159,6 +167,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "Who owns that table?" → The Knowledge/Search bounded context owns ingestion status. Reporting owns report metadata. See Q37.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q4"></a>
@@ -173,6 +183,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "What if a stale **old** version is still visible after re-generation?" → Filter by `version = current` in the query, and delete old-version vectors asynchronously **after** the new version is confirmed indexed (never before — that creates a gap with zero results).
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q5"></a>
@@ -185,6 +197,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 - Structured lane also enables **exact numeric answers via tools** (Q14).
 
 **Trap:** "Then why did you build it with OCR?" → Be honest: the first version treated all documents uniformly to ship fast; the historical archive was PDFs only. The structured lane is the improvement roadmap. Never pretend a trade-off was a masterstroke.
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -199,6 +213,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "Isn't multi-agent just hype here?" → Agree that it's often over-used; justify with the per-step model routing and independent evaluation, and show the short-circuit path.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q7"></a>
@@ -209,6 +225,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 **Key points:** Criteria — data residency/private networking, hybrid search support, tenant isolation model, scale, ops burden, cost, and team skills.
 
 **Trap:** "So you picked wrong?" → "I picked for speed of delivery and scale; the gateway and retrieval abstraction mean swapping the store is a re-index, not a rewrite."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -223,6 +241,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "If Gemini embeddings go down, can users still ask questions?" → Query embedding is on the read path. Mitigation: cache query embeddings, keyword-only fallback (BM25) with a degraded-quality banner. You cannot fall back to a *different* embedding model for queries — the vectors wouldn't be comparable.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q9"></a>
@@ -234,6 +254,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "Durable Functions replay — any gotchas?" → Orchestrator code must be deterministic; all I/O and LLM calls live in activities, never in the orchestrator function.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q10"></a>
@@ -244,6 +266,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 **Key points:** On Azure, API Management already offers AI-gateway capabilities — token limits, token metrics, semantic caching, backend pools with circuit breakers. Build only what APIM doesn't cover (e.g., the complexity router).
 
 **Trap:** "Single point of failure?" → See Q38.
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -260,6 +284,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "How do you choose chunk size?" → Empirically, against the retrieval golden set (recall at k), not by folklore.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q12"></a>
@@ -270,6 +296,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 **Key points:** Reranking adds latency (~100–300 ms, illustrative) — worth it for quality; skip for simple lookups.
 
 **Trap:** "Does Pinecone do BM25?" → It supports sparse-dense hybrid vectors; alternatively Azure AI Search does hybrid natively. Know which one you'd use.
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -282,6 +310,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "Why keep full chat history?" → You keep a summarised memory plus recent turns to fit the context window; the rewrite step uses it so retrieval stays accurate.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q14"></a>
@@ -292,6 +322,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 **Key points:** LLMs are unreliable at arithmetic; never let them compute percentages or deltas that matter.
 
 **Trap:** "What if the source itself has an OCR error?" → That's why the structured lane (Q5) matters for our own reports.
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -309,6 +341,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "How big is the golden set?" → Start 100–200 cases covering question types and tenants; grow it from production failures and reviewer corrections.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q16"></a>
@@ -317,6 +351,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 **Say this:** "Groundedness only measures faithfulness to the **retrieved** context, not correctness. If retrieval returned the wrong period, a stale version, or another report type, the answer is perfectly grounded and still wrong. You catch it by evaluating **retrieval separately**: did the retrieved chunks match the expected report, period and version? That's a retrieval-level metric — context precision and recall against the golden set. In production, a check that all cited chunks match the entities the planner resolved — if the question was about Q2 and a citation points to Q1, flag it."
 
 **Key points:** Split evaluation into **retrieval quality** and **generation quality**. Most "hallucinations" in RAG are actually retrieval failures.
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -329,6 +365,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "Doesn't escalation double the cost?" → Only for the small fraction that fails; overall cost is still far lower than sending everything to the top tier. Show you've thought in fractions, not absolutes.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q18"></a>
@@ -340,6 +378,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "What must flip together?" → The query-embedding model and the index. Flipping one without the other returns garbage.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q19"></a>
@@ -349,6 +389,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Key points:** Be ready to say how many analysts/tasks were measured and that it's a median, not the best case. Don't inflate — interviewers probe numbers.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q20"></a>
@@ -357,6 +399,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 **Say this (illustrative math):** "A typical RAG answer is about 6–10k input tokens — system prompt, rewritten query, 5–8 reranked chunks — and 500–1,000 output tokens. At Sonnet-class pricing of roughly \$3 per million input and \$15 per million output, that's about 3–5 cents per answer; planner calls on Haiku are a fraction of a cent. Controls: the router, reranking to send fewer but better chunks, **prompt caching** of the static system prompt and tool definitions, response caching per tenant, per-tenant token budgets at the gateway, and cost-per-tenant dashboards with alerts."
 
 **Trap:** "What's your most expensive query type?" → Multi-report Opus synthesis — so it's reserved for explicit comparison requests and capped by a token ceiling.
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -368,6 +412,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 **Say this:** "Mid-stream failure is the hard case — the user has already seen half an answer. I don't splice a second model's continuation onto the first; I show 'the answer was interrupted, regenerating' and restart the request on the fallback tier. The fallback isn't automatically trustworthy: prompts don't transfer cleanly between models, so each tier has its **own prompt template** and has passed the golden set. If a tier hasn't passed evaluation for a task type, it's not eligible as a fallback for that task — I'd rather return 'assistant at capacity, try again shortly' than a wrong financial answer."
 
 **Key points:** Fallback order is per task type. The final tier is a cached answer or a graceful message — never silent degradation.
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -383,6 +429,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Key points:** CAP only matters during partitions; in normal operation it's the PACELC trade-off — latency vs consistency. Say PACELC; it signals depth.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q23"></a>
@@ -394,6 +442,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 - **What never breaks:** report generation and download — they don't depend on AI services. That separation is deliberate.
 
 **Trap:** "Do your retries make the partition worse when it heals?" → Exponential backoff with **jitter** and retry budgets, so thousands of clients don't reconnect at the same instant.
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -407,6 +457,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "Locks expire. Then what?" → See Q25 — fencing.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q25"></a>
@@ -419,6 +471,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Key points:** The term **fencing token** is what the interviewer is fishing for.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q26"></a>
@@ -430,6 +484,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 - **Whale tenants:** they get dedicated rate-limit budgets so they can't starve others, may warrant a dedicated index or pod, and are the first to watch for hot partitions. Size the partition key so no single logical partition exceeds limits.
 
 **Trap:** "Namespace per tenant for 2,500+ tenants — any limits?" → Check the provider's namespace limits per index; if needed, shard tenants across multiple indexes with a tenant→index routing table.
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -445,12 +501,16 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Key points:** Every cache key that touches client data includes **tenant ID**. Cross-tenant cache leakage is a data breach, not a bug.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q28"></a>
 ### Q28. Quarter-end: thousands of users ask the same question the moment reports land and Redis is cold. What happens?
 
 **Say this:** "Without protection, a cache stampede — every request misses and hits the LLM at once, which blows provider rate limits and cost. Defences: **request coalescing** — identical in-flight requests (same tenant, same key) wait on the first one's result; **proactive warming** — on `ReportIndexed`, precompute the standard questions every IR team asks ('top holder changes', 'new entrants') for that tenant in the background; and **rate limits** at the gateway as the last line. If Redis itself is down, bypass it — but coalescing in-process still protects the LLM."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -461,12 +521,16 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "How long is that rebuild?" → Be honest: hours for a full re-embed, so the assistant has a longer RTO than core reporting — that's an explicit, agreed business decision. Could pre-provision a warm standby index if the RTO must be shorter.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q30"></a>
 ### Q30. Report v1 and v2 of the same quarter are both in flight. How do you avoid last-writer-wins corruption?
 
 **Say this:** "Every report has a monotonic **version number** assigned at generation. Ingestion processes carry it end to end: chunk IDs include the version, status updates are conditional on version, and queries filter on 'latest indexed version'. If v1's ingestion finishes after v2's — out of order — its conditional status write fails because v2 is already current, and its vectors are cleaned up as superseded. Never use wall-clock timestamps to decide 'latest' across instances — clocks skew."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -485,6 +549,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Key points:** The core domain is IR insight and client data quality; the AI platform is a supporting capability. Say "ubiquitous language": "report version", "period", "indexed" mean the same thing everywhere.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q32"></a>
@@ -493,6 +559,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 **Say this:** "A **domain event** is internal to a bounded context and can carry rich internal detail — e.g., inside Onboarding, `FieldExtractionCompleted` or `ReviewApproved`. An **integration event** crosses context boundaries, is a published contract, and must be stable and minimal — e.g., `ReportGenerated` from Reporting to Knowledge, or `ClientProfileCreated` from Onboarding to Client Profile and downstream CRM. Integration events carry IDs, version and a pointer (claim check), not internal structures, and they're versioned because other teams depend on them."
 
 **Trap:** "Why not just publish domain events externally?" → It couples consumers to your internal model; every refactor becomes a breaking change.
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -503,6 +571,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Key points:** Microservice boundaries follow bounded contexts and scaling needs, not code units.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q34"></a>
@@ -511,6 +581,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 **Say this:** "Database-per-service makes this a distributed operation, so it's orchestrated as a **saga** triggered by a `TenantOffboarded` integration event. Every context that holds tenant data subscribes and deletes its own: Blob (reports, uploaded docs), Pinecone (drop the tenant namespace), Cosmos (chat memory by partition), Redis (tenant-prefixed keys), Client Profile, review queues, and evaluation datasets that contain that tenant's samples. Each confirms completion back; the saga tracks status and alerts on anything outstanding. Also: logs and traces must not have stored raw prompts with that tenant's data, or must be purged, and LLM providers must be under zero-retention terms."
 
 **Key points:** Namespace-per-tenant pays off here — one call instead of filtering millions of vectors. Backups: document the retention window after which deleted data ages out.
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -521,6 +593,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "Orchestration or choreography?" → Orchestration here — the flow has a human step and needs visible state for ops; choreography would scatter that state across services.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q36"></a>
@@ -530,6 +604,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Key points:** Also a **reconciliation job**: periodically find reports with status Generated but no Indexed after N minutes and re-publish. Belt and braces.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q37"></a>
@@ -537,12 +613,16 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Say this:** "Two owners, two facts. Reporting owns *report* metadata — tenant, period, type, version, Blob location — and is the source of truth for 'which reports exist'. Knowledge owns *ingestion* state — chunk count, index version, status — the source of truth for 'what's searchable'. The orchestrator reads both: Reporting's catalog to resolve 'the Q2 report', Knowledge's status to know if it's queryable. Knowledge keeps a local read model of report metadata built from `ReportGenerated` events, so it doesn't call Reporting synchronously on every query."
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q38"></a>
 ### Q38. Isn't the shared LLM gateway a distributed-monolith risk and a single point of failure?
 
 **Say this:** "It's a shared **platform capability**, like an API gateway — the risk is coupling and outage blast radius. Mitigations: it's stateless and horizontally scaled across zones; it has a stable, versioned API so services don't co-deploy with it; business logic stays out of it — it knows about models, budgets and routing, never about reports or clients; and callers have **timeouts and their own fallback behaviour** if the gateway is unavailable. Bulkheads inside it — separate connection pools and budgets for interactive Q&A vs batch onboarding — so a batch job can't starve live users."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -559,12 +639,16 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "What if re-chunking produces a different number of chunks?" → Old chunks beyond the new count become orphans. Delete by version prefix after the new set is confirmed.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q40"></a>
 ### Q40. Do you need message ordering? Where and how do you get it on Service Bus?
 
 **Say this:** "Global ordering — no; it kills throughput. **Per-entity ordering** — yes, for events about the same report (Generated v1, Generated v2, Deleted). Service Bus **sessions** with session ID = report ID give FIFO and exclusive processing per report while different reports process in parallel. Where ordering can't be guaranteed, version numbers make consumers order-tolerant — an older version arriving late is ignored."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -575,12 +659,16 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Key points:** Monitor DLQ **depth and age**, not just count. A DLQ nobody watches is a data-loss mechanism.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q42"></a>
 ### Q42. You need to add a field to the "report ready" event. How do you evolve the schema without breaking consumers?
 
 **Say this:** "Integration events are contracts. Rules: **additive changes only** within a version — new optional fields; consumers are **tolerant readers** that ignore unknown fields. Breaking changes — renaming, removing, changing meaning — get a new event version (`ReportGenerated.v2`) published side by side with v1 until all consumers migrate, then v1 is retired. Use a standard envelope (CloudEvents-style: type, version, source, ID, time) and a schema registry or contract tests in CI so producers can't ship a breaking change unnoticed."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -589,12 +677,16 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Say this:** "Messages carry IDs and pointers — tenant, report ID, version, Blob URI, content hash — the **claim-check** pattern. Reasons: broker size limits, cost, and security — the payload in a message is copied into DLQs and logs. The consumer fetches the Blob using its own identity (managed identity), so access control stays at the storage layer."
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q44"></a>
 ### Q44. Why a queue for report generation but a topic for "report ready"?
 
 **Say this:** "Report generation is a **command** — one job, exactly one worker should do it → queue (competing consumers). 'Report ready' is an **event** — a fact that several independent parties care about: ingestion, notifications, audit, cache warming → topic with a subscription per consumer, each with its own retry and DLQ. Adding a new consumer never touches the publisher."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -605,12 +697,16 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Key points:** Backpressure = bounded concurrency + queue buffering + honest SLAs. Scaling out without limits just moves the failure to the provider.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q46"></a>
 ### Q46. How do you present eventual consistency to the user so it doesn't look like a bug?
 
 **Say this:** "Make the state visible. The Teams assistant says 'Q2 report is being indexed — about 2 minutes. I can answer from Q1 now, or read the Q2 PDF directly (slower).' Answers show which report version they're based on in the citations. When indexing completes, a proactive Teams message says 'Q2 is ready for questions'. Eventual consistency becomes a bug only when it's invisible."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -627,12 +723,16 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 5. **Load shedding** — when saturated, return a fast 'at capacity' instead of a slow failure.
 6. **Deadline propagation** — if the user's deadline has passed, downstream calls are abandoned, not completed for nobody."
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q48"></a>
 ### Q48. How exactly is your circuit breaker configured for LLM calls?
 
 **Say this:** "Per **provider + model + region** — one slow deployment shouldn't trip all of them. Trip conditions: failure ratio over a sampling window (for example, 50% over 30 seconds with a minimum throughput so a handful of calls can't trip it), and slow-call ratio — latency counts as failure. **429s are treated differently** from 5xx: a 429 means 'slow down' — honour Retry-After and shift traffic, don't declare the provider dead. Open state: route to fallback. After a cooldown, half-open lets a few canary calls through; success closes the circuit. In .NET this is Polly resilience pipelines; at the edge, APIM backend circuit breakers."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -641,12 +741,16 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Say this:** "Three layers. **Per user** at the API gateway — abuse protection, requests per minute. **Per tenant** — token budgets, not just request counts, because one request can be 500 tokens or 50,000; tiered by subscription. **Global against provider quotas** — our organisation's provider limits (requests and tokens per minute) are shared by every tenant, so the gateway allocates that capacity with priorities: interactive > onboarding batch > re-indexing. Noisy neighbour: a whale tenant hits its own budget and gets downgraded or queued; it can never consume the shared provider quota. Over-budget behaviour is **downgrade, not fail** — route to a cheaper tier — except for abuse, which gets a 429."
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q50"></a>
 ### Q50. Teams expects a fast response but your answer takes 8 seconds. How do you handle the timeout budget?
 
 **Say this:** "Acknowledge fast, deliver progressively. The bot acknowledges the incoming activity immediately and does the work asynchronously. The user sees a typing indicator, then a **streamed** response — Teams supports streamed bot messages — or a placeholder message that's updated when the answer is ready. For long analyses, like a four-quarter comparison, it becomes an async job: 'working on it', then a proactive message with the result. Internally, a latency budget is split across stages — guardrails, planning, retrieval, generation — and each stage has its own timeout."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -659,6 +763,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 - The AI assistant has a longer RTO than core reporting on purpose — users can still generate and download reports during an AI outage.
 Run DR drills — an untested restore is a hope, not a plan."
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q52"></a>
@@ -668,12 +774,16 @@ Run DR drills — an untested restore is a hope, not a plan."
 
 **Dashboards:** cost per tenant, P95 latency and TTFT per tier, fallback rate, cache hit rate, judge scores over time, escalation/thumbs-down rate, DLQ depth, ingestion lag (Generated → Indexed).
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q53"></a>
 ### Q53. Break down end-to-end latency. Where's the bottleneck and what did you do about it?
 
 **Say this (illustrative):** "Roughly: gateway and guardrails ~100 ms, planner on Haiku ~300–500 ms, query embedding ~100 ms, hybrid search ~100–200 ms, rerank ~200 ms, synthesis on Sonnet — time to first token ~1 s, full answer 4–7 s. **Generation dominates**, and output length drives it, because output tokens are generated one at a time. Optimisations: stream to cut perceived latency; cap output length; fewer but better chunks via reranking so prefill is smaller; prompt caching for the static prefix; run independent retrievals in parallel; skip the planner for obvious single-intent questions; response cache for repeated questions."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -682,6 +792,8 @@ Run DR drills — an untested restore is a hope, not a plan."
 
 **Say this:** "Hard limits, enforced in code, not in the prompt: a maximum number of steps per request, a maximum tool calls per step, a per-request token budget and wall-clock deadline, and detection of repeated identical tool calls. On limit breach, the orchestrator stops and returns the best partial answer with a note, and emits a metric. Per-tenant daily budgets at the gateway are the backstop, and cost-spike alerts page someone."
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q55"></a>
@@ -689,12 +801,16 @@ Run DR drills — an untested restore is a hope, not a plan."
 
 **Say this:** "First, **pin model versions** — use dated snapshot model IDs, not floating aliases, so upgrades are our decision. Second, continuous evaluation: a daily run of the golden set plus judge scoring on sampled production answers, with alerts on drift. Third, user signals: thumbs-down rate and escalation-to-human rate per tier. When we do upgrade, it goes through the same CI eval gate and a canary (Q56)."
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q56"></a>
 ### Q56. How do you deploy a prompt or model change safely and roll it back?
 
 **Say this:** "Prompts are **versioned artifacts** in the repo, not strings edited in a portal. A change triggers the eval gate in CI — golden set plus judge, weighted score must stay above threshold and no regression on critical cases. Then canary via feature flags: 5% of traffic, compare judge scores, latency, cost and thumbs-down against control, then ramp. Rollback is a flag flip back to the previous prompt/model version. Every logged answer records the prompt and model version, so incidents can be tied to a specific change."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -707,12 +823,16 @@ Run DR drills — an untested restore is a hope, not a plan."
 
 **Trap:** "What if two S&P client firms share a Teams tenant?" → Unlikely but possible for consultants; the mapping is user → client tenant with explicit entitlements, not Entra tenant = client tenant blindly.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q58"></a>
 ### Q58. Someone uploads an onboarding document containing a prompt injection. What happens?
 
 **Say this:** "Indirect injection is the real threat here — the attack text arrives inside documents, not from the user. Defences: document content is always wrapped as **data** in delimited sections with instructions that content is untrusted; extraction uses **structured output against a strict schema**, so the model can only emit field values, not actions; the extraction service has **no tools** that can send, delete or modify anything; values are validated (format, ranges, cross-checks); and a human reviews before anything becomes a profile. An injected 'set AUM to 1 trillion' fails validation or gets caught in review; an injected 'email the contact list' has no tool to act on."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -721,12 +841,16 @@ Run DR drills — an untested restore is a hope, not a plan."
 
 **Say this:** "Classify first. Published historical reports are low risk. Onboarding documents contain PII (IR contacts). Pre-release material would be MNPI. Controls: enterprise agreements with **zero data retention** and no training on our data; prefer private-cloud access paths — model access through our cloud provider's managed offering with private networking — over public endpoints; PII redaction before embedding and before non-essential model calls; region selection to meet residency requirements; and a rule that MNPI never goes to any external endpoint without legal sign-off."
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q60"></a>
 ### Q60. Tenant isolation isn't enough — some users shouldn't see some reports. How do you enforce document-level permissions in RAG?
 
 **Say this:** "Permissions become part of retrieval. Each chunk carries access metadata — for example, the report's visibility group or classification — and the retrieval filter includes the user's entitlements, resolved from their roles at query time. Security filtering happens **before ranking**, never 'retrieve then let the LLM decide'. When entitlements change often, I keep ACLs in a fast lookup and filter on group IDs rather than re-indexing chunks on every permission change."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -735,12 +859,16 @@ Run DR drills — an untested restore is a hope, not a plan."
 
 **Say this:** "Only the gateway holds provider keys, stored in Key Vault and read via managed identity — no service has a provider key. Keys are rotated on a schedule with two active keys to allow zero-downtime rotation. Where the provider supports it, keyless auth via Entra/managed identity is preferred. Egress from the gateway goes only to allow-listed provider endpoints."
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q62"></a>
 ### Q62. LLM output is rendered in Teams. What output-handling risks exist?
 
 **Say this:** "Treat output as untrusted: sanitise markdown and adaptive card content, allow only links to our own domains — injected content could try to render a phishing link or an image URL that exfiltrates data through query parameters. Validate structured output against schemas before rendering. And never execute or forward anything the model generated without validation."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -753,12 +881,16 @@ Run DR drills — an untested restore is a hope, not a plan."
 
 **Trap:** "Doesn't a second language stack raise operational cost?" → Yes — mitigated by the same container, CI/CD, observability and security baseline as .NET services.
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q64"></a>
 ### Q64. LLMs don't produce calibrated confidence. So what is your "confidence score" really?
 
 **Say this:** "Correct — asking the model 'how confident are you' is not reliable. Our confidence is a **computed** score from signals: schema validation passed; format checks (email, phone, currency); cross-source agreement — the same value found in two documents; self-consistency — two extraction passes agree; presence of a supporting quote from the source for that field; and business-rule plausibility (AUM within sane range for the firm type). Fields that fail signals are flagged for review, and thresholds were tuned against reviewer decisions."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -767,12 +899,16 @@ Run DR drills — an untested restore is a hope, not a plan."
 
 **Say this:** "It's a batch workload, so treat it like one: queue-based with bounded concurrency sized to provider limits; the provider's **batch API** where latency doesn't matter — typically at a significant discount; Haiku for the bulk of simple fields; prompt caching for the shared schema and instructions; idempotent jobs with checkpoints so a failure resumes rather than restarts; and a separate budget from interactive traffic so the backfill never degrades live users."
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q66"></a>
 ### Q66. Two documents give different AUM figures for the same client. What does the system do?
 
 **Say this:** "Don't let the model pick silently. Extract both values **with their sources and dates**; apply a precedence rule (most recent audited source beats marketing deck); if values still conflict beyond a tolerance, flag the field for review showing both values and citations side by side. The reviewer's decision is recorded with the reason — that becomes training data for improving the rules."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -781,12 +917,16 @@ Run DR drills — an untested restore is a hope, not a plan."
 
 **Say this:** "The review UI shows each field with its extracted value, confidence signals, and the highlighted source snippet — reviewers verify, not re-type, which is where 'days to minutes' comes from. High-confidence fields can be bulk-approved; flagged fields need an explicit decision. Every correction is stored — field, original value, corrected value, reason — and feeds back: new golden-set cases, prompt and rule fixes, and threshold tuning. Correction rate per field is a quality metric we track."
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q68"></a>
 ### Q68. The same client gets onboarded twice under slightly different names. How do you prevent duplicates?
 
 **Say this:** "Entity resolution before profile creation: normalise names (legal suffixes, punctuation), match on strong identifiers first — LEI, registration number, domain, CIK where available — then fuzzy name plus address matching. Candidates above a threshold go to review as 'possible duplicate of X'. Profile creation itself is idempotent on the resolved entity key, so a retried workflow can't create a second record."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -799,12 +939,16 @@ Run DR drills — an untested restore is a hope, not a plan."
 
 **Why this answer works:** it shows self-critique with specifics, not "nothing".
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q70"></a>
 ### Q70. What's the biggest weakness in your design right now?
 
 **Say this:** "Freshness and correctness of period-specific answers. Similarity search on quarterly reports is dangerous because every quarter looks alike — the system is only as correct as its entity resolution and metadata filters. That's where I've invested: hard period filters, ingestion status checks, and a citation-period guard in the output checks."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -813,12 +957,16 @@ Run DR drills — an untested restore is a hope, not a plan."
 
 **Say this:** "Not our services — they scale horizontally. **Provider quotas** break first: token-per-minute limits across the shared organisation account. Then cost. Then Pinecone query throughput for whale tenants. Plan: negotiate higher quotas and multi-deployment/multi-region capacity; more caching and warming; push more traffic to smaller tiers after verifying quality; and per-tenant budgets so growth in one tenant doesn't starve others."
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q72"></a>
 ### Q72. The CFO says cut LLM cost 50% next quarter. What do you do?
 
 **Say this:** "Measure first — cost per tenant, per task type, per tier — then attack the biggest lines: re-route more tasks to cheaper tiers where the golden set proves quality holds; batch API for all offline work; prompt caching for static prefixes; smaller retrieved context via better reranking; response caching and proactive warming for the common quarterly questions; and trimming output length. Each change goes through the eval gate so we're cutting cost, not quality. Report cost per resolved question, not just total spend."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -827,6 +975,8 @@ Run DR drills — an untested restore is a hope, not a plan."
 
 **Say this:** "Fine-tuning teaches style and behaviour, not reliable facts — and our facts change every quarter. RAG gives current data, citations for trust, tenant isolation, and deletion — you can't delete one client's data from model weights. Fine-tuning could still help later for narrow tasks, like a small model for field extraction to cut cost, but not as the knowledge store."
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q74"></a>
@@ -834,12 +984,16 @@ Run DR drills — an untested restore is a hope, not a plan."
 
 **Say this:** "Buy where it's commodity, build where it's differentiating. Teams hosting, identity and the bot channel are bought. The differentiating parts are domain-specific: period-aware retrieval over IR reports, numeric verification, client-data extraction schemas and review workflow, strict per-tenant isolation for 2,500+ issuers, and cost control per tenant. Managed platforms were evaluated; the gaps were control over retrieval, evaluation, and tenant isolation. The architecture keeps options open — the gateway and retrieval layer can sit behind a managed front end if that changes."
 
+[⬆ Back to top](#top)
+
 ---
 
 <a id="q75"></a>
 ### Q75. Explain the business value to a non-technical executive in one minute.
 
 **Say this:** "IR teams used to spend hours digging through past reports to answer questions from their CEO or board. Now they ask in Teams and get an answer in minutes, with links to the exact page it came from, so they can trust it. For onboarding, instead of staff typing client details from documents for days, the system fills in the profile and a person just reviews it — minutes instead of days, across 7,500+ clients. Both are built to protect each client's data and to keep AI costs under control."
+
+[⬆ Back to top](#top)
 
 ---
 
@@ -850,5 +1004,7 @@ Run DR drills — an untested restore is a hope, not a plan."
 - [ ] Know your own numbers: 5x, 2–3 hrs → 10 min, 7,500+ profiles, three tiers — and how each was measured.
 - [ ] Memorise the phrases that signal depth: *fencing token, transactional outbox, claim check, tolerant reader, sessions for per-entity ordering, PACELC, bulkheads, deadline propagation, retrieval vs generation evaluation, prompt caching, batch API.*
 - [ ] For every "why X" question: criteria → decision → trade-off → what you'd revisit. Never defend a choice as perfect.
+
+[⬆ Back to top](#top)
 
 *Last updated: 28 Sept 2026 | Companion to [capital-access-interview-story.md](capital-access-interview-story.md)*
