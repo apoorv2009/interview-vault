@@ -109,6 +109,7 @@
 74. [Why build this at all instead of buying Copilot Studio or a managed agent platform?](#q74)
 75. [Explain the business value to a non-technical executive in one minute.](#q75)
 76. [Why not just give both reports to ChatGPT? And if chunks go to third-party LLMs anyway, how is that compliant?](#q76)
+77. [Your web app uses Okta. Why does the Teams bot use Entra SSO and not Okta?](#q77)
 
 ---
 
@@ -1130,6 +1131,36 @@ Concede: yes, data leaves the app. **Compliance is not zero egress** — by that
 **Say this:** "Yes, retrieved chunks go to an external model — the claim isn't that data never leaves, it's that it leaves under enterprise controls: contractual no-training and zero retention, private networking in an approved region, minimum necessary data with PII redacted, classification so MNPI never goes out, and every call access-controlled and audited. An analyst pasting a report into a personal chatbot has none of that — same reason the firm can use Azure but staff can't email client files to a personal Gmail."
 
 **Honesty point (credibility):** "If the firm licensed an enterprise edition of ChatGPT or Claude with equivalent terms, the compliance gap largely closes — then our value rests on retrieval across periods and versions, verified numbers, live-data joins and workflow. Compliance is a strong reason, not our only moat."
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q77"></a>
+### Q77. Your web app uses Okta. Why does the Teams bot use Entra SSO and not Okta?
+
+**Say this:** "Teams authenticates users with their **employer's Entra ID** — JPMorgan's or BNY's Microsoft 365 tenant, not ours. Silent SSO in a Teams bot, with no login prompt, requires Entra tokens; Okta can't do that inside Teams. But Okta remains the source of truth for Capital Access entitlements. We link the two: a one-time Okta sign-in maps the user's Entra identity to their Capital Access account and tenant. After that, Entra proves **who** they are and Okta decides **what they can see** — checked on every request, so deprovisioning takes effect immediately. Where client IT allows, I'd prefer federating Okta with the client's Entra so linking is automatic."
+
+**Key points — it's not Entra vs Okta, they do different jobs:**
+
+| | Entra ID | Okta |
+|---|---|---|
+| Role | Proves who the user is **in Teams** (their employer's identity) | Says who they are **in Capital Access** (tenant, roles, entitlements) |
+| Owned by | The client's IT | S&P |
+| Used for | Silent sign-in to the bot | Authorisation decisions |
+
+**How they connect:**
+1. Bot receives the Teams SSO **Entra token**; validates issuer and audience (multi-tenant app registration); records Entra tenant ID + user object ID.
+2. **Account linking** — first time only, the user signs into Okta through a sign-in card; the bot stores (Entra tenant, user ID) → (Okta user, Capital Access tenant). Silent afterwards.
+3. Each request: the gateway resolves the link and enforces **Okta-derived entitlements**.
+4. Alternative: Okta federated with the client's Entra (client Entra as an external identity provider in Okta) makes linking automatic — depends on each client's IT, so manual linking is the safe default.
+
+**Traps:**
+- **"Can you use Entra tenant ID as the client tenant ID?"** — No. Consultants, shared tenants and M&A break that assumption. Always go through the explicit link and entitlements.
+- **"User leaves the client firm — does the bot still answer them?"** — No. Entitlements are checked against Okta per request (or cached with a short TTL), never baked into the link permanently. Their Entra account is also disabled by the client, and the client's Conditional Access policies (MFA, device compliance) apply in Teams automatically.
+- **"Why not just use Okta via a sign-in card and skip Entra SSO?"** — Valid option: one identity system, simpler model, at the cost of an extra sign-in prompt and more frequent re-authentication inside Teams. Trade-off is user friction vs identity-stack simplicity.
+
+> **Before the interview:** confirm which flow you actually built — Entra SSO + Okta linking, or Okta-only via sign-in card — and describe that one. Don't claim the other.
 
 [⬆ Back to top](#top)
 
