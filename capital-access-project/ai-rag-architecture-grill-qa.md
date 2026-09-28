@@ -108,6 +108,7 @@
 73. [Why didn't you fine-tune a model instead of RAG?](#q73)
 74. [Why build this at all instead of buying Copilot Studio or a managed agent platform?](#q74)
 75. [Explain the business value to a non-technical executive in one minute.](#q75)
+76. [Why not just give both reports to ChatGPT? And if chunks go to third-party LLMs anyway, how is that compliant?](#q76)
 
 ---
 
@@ -1093,6 +1094,42 @@ Run DR drills — an untested restore is a hope, not a plan."
 ### Q75. Explain the business value to a non-technical executive in one minute.
 
 **Say this:** "IR teams used to spend hours digging through past reports to answer questions from their CEO or board. Now they ask in Teams and get an answer in minutes, with links to the exact page it came from, so they can trust it. For onboarding, instead of staff typing client details from documents for days, the system fills in the profile and a person just reviews it — minutes instead of days, across 7,500+ clients. Both are built to protect each client's data and to keep AI costs under control."
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q76"></a>
+### Q76. Why not just give both reports to ChatGPT or Claude? What value does your app add? And if chunks go to third-party LLMs anyway, how is that compliant?
+
+**Say this — concede first:** "For a one-off comparison of two PDFs you already have, a general assistant is fine. If that were the whole use case, this app shouldn't exist. Our users had three problems it doesn't solve."
+
+**Then the value:**
+1. **Finding the right data is the hard part, not comparing.** Real questions span many periods, report types and versions — "how has our top-holder base shifted over 8 quarters, and which of those funds did we meet?" That needs retrieval across hundreds of documents, resolving "Q2" to the right version, and joining live ownership and meeting data that isn't in any PDF. You can't paste 30 forty-page reports into a chat — and even if it fits, long-context quality drops and cost explodes. Most of the 2–3 hours saved was **finding and assembling**, not comparing.
+2. **Compliance — enterprise controls instead of shadow IT** (see follow-up below).
+3. **Board-grade numbers.** A general model reads tables imperfectly and does its own arithmetic. We compute changes deterministically from structured data, verify every number against its source, and cite report, version and page. One wrong ownership percentage in a board pack is a credibility incident.
+4. **Connected to live data** — reports joined with ownership, peers and meeting history.
+5. **Workflow and consistency** — inside Teams, proactive "Q2 is ready" notifications, the same answer to the same question across the team, and quality measured by the evaluation pipeline.
+
+**Principal-level finish:** "The moat around the chat UI is shrinking — Copilot and Claude now connect to enterprise data. The durable value is governed retrieval, domain logic and verified numbers, so I'd expose our retrieval and analysis as a tool — for example an MCP server — that any assistant the client prefers can use securely. The value is the platform, not the chat box."
+
+**Follow-up trap: "But your chunks go to third-party LLMs too — how is that compliant?"**
+
+Concede: yes, data leaves the app. **Compliance is not zero egress** — by that definition running on Azure would be non-compliant too. It means data leaves **under controls**:
+
+| Control | Consumer chatbot (personal account) | Our app |
+|---|---|---|
+| Contract | Personal terms; may be retained or used for training depending on settings; no DPA | Enterprise API terms: no training, **zero data retention** by agreement, signed DPA, vendor security review |
+| Path | Public internet to vendor | Through the cloud provider's managed model service (e.g., Bedrock, Azure AI Foundry, Vertex) over **private networking**, **region-pinned** |
+| Minimisation | Whole report uploaded | Only top-k relevant chunks, **PII redacted**, one tenant; numbers computed in-house so the model often sees aggregates |
+| Classification | Anything can be pasted, including pre-release material | Data-class → model-tier policy; **MNPI never goes to an external endpoint** — in-tenant/self-hosted model or not processed |
+| Access control | None | Entra identity, tenant isolation, document-level permissions before retrieval |
+| Audit | None | Every call logged: who, what data, which model, when |
+| Deletion | Copies in personal chat history | Offboarding deletes across stores; vendor retains nothing |
+
+**Say this:** "Yes, retrieved chunks go to an external model — the claim isn't that data never leaves, it's that it leaves under enterprise controls: contractual no-training and zero retention, private networking in an approved region, minimum necessary data with PII redacted, classification so MNPI never goes out, and every call access-controlled and audited. An analyst pasting a report into a personal chatbot has none of that — same reason the firm can use Azure but staff can't email client files to a personal Gmail."
+
+**Honesty point (credibility):** "If the firm licensed an enterprise edition of ChatGPT or Claude with equivalent terms, the compliance gap largely closes — then our value rests on retrieval across periods and versions, verified numbers, live-data joins and workflow. Compliance is a strong reason, not our only moat."
 
 [⬆ Back to top](#top)
 
