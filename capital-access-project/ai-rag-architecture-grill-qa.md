@@ -13,6 +13,7 @@
 
 ## Table of Contents
 
+- [Architecture diagram](#architecture)
 - [0. The 60-second architecture pitch](#pitch)
 
 **Part A — Foundational design decisions**
@@ -107,6 +108,106 @@
 73. [Why didn't you fine-tune a model instead of RAG?](#q73)
 74. [Why build this at all instead of buying Copilot Studio or a managed agent platform?](#q74)
 75. [Explain the business value to a non-technical executive in one minute.](#q75)
+
+---
+
+<a id="architecture"></a>
+## Architecture diagram
+
+> Live, editable version: [Excalidraw room](https://excalidraw.com/#room=9fb970273da3b28e42b3,gBt8LaXPVZMJEG3py3kwWg). Below is the same architecture in Mermaid, which GitHub renders inline. Solid arrows = request/data flow, dashed arrows = tool call or fallback.
+
+```mermaid
+flowchart TB
+    subgraph Entry["Entry points"]
+        Client(["Web client"])
+        Teams["MS Teams Bot<br/>Azure Bot Service + Entra SSO"]
+    end
+
+    APIGW["API Gateway<br/>Auth · Rate limiter · Load balancing"]
+    Client --> APIGW
+    Teams --> APIGW
+
+    subgraph ReportPath["Report generation (async)"]
+        RG["Report Generation service"]
+        Q[["Service Bus queue"]]
+        RGF["Report Generation<br/>Azure Function"]
+        Blob[("Blob Storage")]
+        Topic[["Topic: report ready"]]
+        Fetch["Fetch Report Service<br/>SAS URL"]
+    end
+    APIGW --> RG
+    RG -- publish --> Q
+    Q --> RGF
+    RGF --> Blob
+    RGF --> Topic
+    APIGW --> Fetch
+    Fetch -- read report PDF --> Blob
+
+    subgraph Ingest["RAG ingestion pipeline"]
+        Trig["Trigger RAG<br/>Azure Function"]
+        OCR["OCR · Gemini 3.6 Flash<br/>+ clean and PII redact"]
+        Chunk["Chunking<br/>semantic / recursive / sliding window"]
+        Meta["Metadata enrichment<br/>tenantId, company, quarter, doc type"]
+        Emb["Embedding<br/>gemini-embedding-001"]
+        Vec[("Pinecone vector DB<br/>namespace per tenant")]
+    end
+    Topic -- report ready event --> Trig
+    Trig -- blob path --> OCR
+    OCR --> Chunk
+    Chunk --> Meta
+    Meta --> Emb
+    Emb --> Vec
+
+    subgraph Orch["RAG Orchestrator (multi-agent)"]
+        Plan["Planner / router agent<br/>intent and entities"]
+        Retr["Retrieval agent<br/>hybrid search + rerank, tenant filter"]
+        Anal["Analysis agent<br/>compare quarters, KPIs"]
+        Syn["Citation and synthesis agent<br/>answer + source links"]
+        Guard["Guardrails<br/>injection filter, output schema, citation check"]
+        Plan --> Retr
+        Retr --> Anal
+        Anal --> Syn
+        Syn --> Guard
+    end
+    APIGW --> Plan
+    Retr -- "top-k search, tenantId filter" --> Vec
+    Anal -. "tool: get_report()" .-> Fetch
+    Orch --> Mem[("Chat memory<br/>Cosmos DB")]
+    Orch --> Cache[("Response cache<br/>Redis, per tenant")]
+
+    GW["LLM Gateway: single exit to all models<br/>Auth/keys · per-tenant rate limit · token and cost metering<br/>3-tier complexity router · circuit breaker + fallback<br/>semantic cache per tenant · PII scrub · output validation"]
+    Orch --> GW
+    GW --> Haiku["Haiku · tier 1<br/>field extraction, intent routing"]
+    GW --> Sonnet["Sonnet · tier 2<br/>RAG answers"]
+    GW --> Opus["Opus · tier 3<br/>multi-report synthesis"]
+    GW -. "fallback only (circuit open)" .-> GPT6["GPT6"]
+
+    subgraph Onb["Client onboarding extraction"]
+        Up["Ops uploads client docs<br/>IR decks, filings, forms"]
+        Ext["Extraction Service<br/>FastAPI + Claude + Pydantic schema"]
+        Val["Validation<br/>schema + confidence score"]
+        Rev["Human review UI<br/>accept / edit"]
+        Prof[("Client Profiles DB<br/>7,500+ profiles")]
+        Up --> Ext
+        Ext --> Val
+        Val --> Rev
+        Rev --> Prof
+    end
+    APIGW --> Up
+    Ext -- "Haiku for fields, Sonnet/Opus for synthesis" --> GW
+
+    subgraph Eval["Evaluation pipeline (LLM-as-judge)"]
+        Gold["Golden set<br/>IR questions + expected citations"]
+        Judge["Judge model<br/>groundedness, relevance, citation accuracy"]
+        Gate["CI gate + online sampling<br/>block deploy below threshold"]
+        Gold --> Judge
+        Judge --> Gate
+    end
+    Orch -- answers sampled for scoring --> Judge
+    Gate --> Obs["Observability<br/>App Insights + Splunk<br/>TTFT, tokens, cost per tenant, judge scores"]
+```
+
+[⬆ Back to top](#top)
 
 ---
 
