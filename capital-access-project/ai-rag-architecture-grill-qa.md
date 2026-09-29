@@ -148,6 +148,7 @@
 107. [LangChain vs LangGraph vs a custom orchestrator — when would you use each?](#q107)
 108. [Agents in healthcare: how do you stop an agent from taking a harmful action?](#q108)
 109. [Do you need two APIM instances — one to route to services and one to route to LLM models?](#q109)
+110. [How are you handling hybrid search? (Deep dive)](#q110)
 - [Questions to ask the Optum panel + leadership STAR template](#optum-questions)
 
 **Part L — Coding: end-to-end RAG pipeline**
@@ -1621,6 +1622,40 @@ Plus the operational set: TTFT and latency per tier, fallback rate, cache hit ra
 **Trap:** "Where does the routing decision live?" → The orchestrator picks the tier (it knows the task type); the gateway enforces budgets, applies fallback and meters cost.
 
 > **Before the interview:** know what you actually deployed — one APIM, two, or APIM plus a custom gateway service — and describe that.
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q110"></a>
+### Q110. How are you handling hybrid search? (Deep dive — extends [Q12](#q12))
+
+**Say this:** "Dense search handles meaning but blurs exact identifiers like fund names and fiscal periods; keyword search is the opposite. So retrieval runs **both in parallel** with the **same hard tenant and period filters**, fuses the results with **Reciprocal Rank Fusion** — ranks, because the two scores aren't comparable — and then a **cross-encoder reranks** the top 30 down to 5–8 chunks. We tune the weighting and candidate depth against a retrieval golden set, measuring recall at k. In Pinecone that's separate dense and sparse indexes merged in the retrieval agent; on Azure, AI Search does it natively with RRF and a semantic reranker."
+
+**Why hybrid:** IR questions mix both needs — "How did **Vanguard Total Stock Market Index** change its position in **Q2 FY26**?" The fund name and period need exact matching; "change its position" needs semantic matching. Dense search blurs "Vanguard Total Stock Market Index" and "Vanguard Total International" into near-neighbours.
+
+**Pipeline:**
+1. **Parallel retrieval**, top 30–50 each — dense (same embedding model as ingestion) and sparse (BM25, or learned sparse like SPLADE, which also handles synonyms).
+2. **Same hard filters on both legs** — tenant namespace + period, report type, version. Filtering only one leg reopens the Q1-vs-Q2 problem.
+3. **Fusion with RRF** — each document scores the sum of 1 / (60 + rank) across both lists. Rank-based, so cosine and BM25 scales don't matter.
+4. **Rerank** the fused top ~30 with a cross-encoder (reads question and chunk together) → keep 5–8. Removes near-duplicates and "similar but not relevant" chunks, and cuts prompt tokens.
+5. Chunks with citation metadata → synthesis agent.
+
+**Implementation options:**
+- **Pinecone:** a single sparse-dense index with an alpha weighting, or **separate dense and sparse indexes** merged in code — the more flexible pattern, pairs naturally with a reranker.
+- **Azure AI Search:** native hybrid (keyword + vector in one query, RRF fusion, optional semantic reranker) inside the Azure boundary — strong answer to "why Pinecone?" ([Q7](#q7)).
+
+**Tuning and trade-offs:**
+- Tune sparse/dense balance and candidate depth on the **retrieval golden set** (recall@k, MRR), not gut feel; the planner can raise keyword weight for identifier-heavy queries.
+- BM25 corpus statistics are per tenant or per index and must refresh as reports are ingested.
+- Latency: parallel legs ~100–200 ms; reranking ~100–300 ms (illustrative) — worth it; skip reranking for trivial lookups.
+- Cost: reranking 30 candidates is far cheaper than sending 30 chunks to the LLM.
+
+**Traps:**
+- "Why not just add the two scores?" → Different scales and distributions; weighted sums need normalisation and re-tuning whenever data changes. RRF is robust by design.
+- "Does reranking replace filters?" → Never. Security and period filters apply **before** ranking; the reranker only orders what the user is allowed to see.
+
+> **Honesty check:** the "hybrid search + rerank" label was added to the diagram during prep. If your system is dense-only today, say: "Today retrieval is dense with hard metadata filters; hybrid search with reranking is the next improvement, for exactly the identifier problem" — and give the design above.
 
 [⬆ Back to top](#top)
 
