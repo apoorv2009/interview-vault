@@ -151,6 +151,8 @@
 110. [How are you handling hybrid search? (Deep dive)](#q110)
 111. [Why didn't you use an MCP server? Where would MCP fit in your current app?](#q111)
 112. [What is two-phase commit? Did you use it anywhere in your project?](#q112)
+113. [Are your agents separate APIs talking to the LLM? Should agents be part of the LLM Gateway?](#q113)
+114. [What are the deployment strategies, and which did you follow?](#q114)
 - [Questions to ask the Optum panel + leadership STAR template](#optum-questions)
 
 **Part L — Coding: end-to-end RAG pipeline**
@@ -1729,6 +1731,84 @@ Plus the operational set: TTFT and latency per tier, fallback rate, cache hit ra
 **Say this:** "Two-phase commit coordinates an atomic commit across resources — prepare and vote with locks, then commit. Strong consistency, but it blocks if the coordinator fails, holds locks across round-trips, and needs every participant up and XA-capable. We didn't use it: our flows span Service Bus, Blob, Pinecone, Cosmos and LLM APIs, which can't participate, and onboarding has a days-long human step. Instead: local transactions with a transactional outbox, an orchestrated saga for onboarding, and idempotent consumers with version fencing for ingestion — eventual consistency with guaranteed delivery."
 
 **Trap:** "Then how do you prevent inconsistency?" → Outbox (events never lost) + idempotent consumers (duplicates harmless) + saga compensation (partial failures undone) + reconciliation jobs (catch anything stuck, e.g., "generated" but not "indexed" after N minutes).
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q113"></a>
+### Q113. Are your agents separate APIs talking to the LLM? Should agents be part of the LLM Gateway?
+
+**Short answer:** Neither. Agents are **modules inside one Orchestrator service** (application layer), and **only the LLM Gateway talks to model providers**. Agents don't belong in the gateway either.
+
+**Runtime shape — one question, one orchestrator process:**
+- Guardrails (input) → LLM Gateway → Haiku
+- Planner agent → LLM Gateway → Haiku
+- Retrieval agent → Pinecone (mostly code; optional reranker)
+- Analysis agent → LLM Gateway → Sonnet, plus tool call to Fetch Report Service
+- Synthesis agent → LLM Gateway → Sonnet / Opus
+- Guardrails (output) → LLM Gateway → Haiku
+
+Each agent is a function/class — a **node** in LangGraph terms — with its own prompt, model tier and tools. They share one **in-memory request state** (question, entities, chunks, draft answer) instead of calling each other over the network. Separate services are those with different owners, scaling or triggers: LLM Gateway, Fetch Report Service, Onboarding Backend API, Extraction Service, ingestion Functions.
+
+**Why agents aren't separate APIs:** 4–6 steps inside a few-second budget (hops add latency and serialisation); shared context (splitting means shipping large payloads); no independent scaling benefit; every hop adds timeouts, retries and partial failures — a distributed monolith.
+
+**When you *would* split an agent out:** different owning team; different scaling or runtime (GPU, another language); reuse by other apps (expose via MCP — [Q111](#q111) — or an agent-to-agent protocol such as A2A); **security isolation** for agents with write tools (own identity, least-privilege credentials, audit).
+
+**Why agents don't belong in the LLM Gateway:**
+
+| | LLM Gateway (platform) | Agents (application) |
+|---|---|---|
+| Knows about | Models, providers, keys, budgets, tokens | Reports, periods, clients, onboarding rules |
+| Contains | Auth/keys, per-tenant budgets, tier → model mapping, fallback, caching, metering, generic PII/content-safety | Prompts, workflow, tool calls, domain guardrails |
+| Data access | **None** — relays prompts only | Tenant data via tools and retrieval |
+| Owner / change rate | Platform team, rarely | Product team, frequently |
+| Consumers | Every AI app | One application |
+
+1. **Coupling / blast radius** — every prompt change would redeploy the component all AI apps depend on ([Q38](#q38)).
+2. **Security** — the most shared component would hold the widest data permissions; the opposite of least privilege.
+3. **Change rates** — agent prompts change weekly behind eval gates; gateway policies should be stable.
+4. **Reuse** — a gateway stays reusable because it's domain-agnostic.
+
+**Grey areas — how to split:**
+- **Routing:** the agent decides the **task type**; the gateway maps the **tier to a model** and applies fallback ([Q109](#q109)).
+- **Guardrails:** generic (PII, content safety, size limits) in the gateway; domain (citations, period guard, numeric verification) with the agents.
+- **Prompts:** always the application's.
+
+**Say this:** "The agents are modules inside a single orchestrator service, sharing request state in memory, each with its own prompt, model tier and tools. None calls a provider directly — all model calls go through the LLM Gateway. And agents don't belong in the gateway: the gateway is a domain-agnostic platform component with no data access, while agents are application logic with tenant-data access and a fast change rate. The agent decides what kind of task it is; the gateway decides which model serves it."
+
+> **Check:** describe your real implementation. If your agents are separate APIs, justify with ownership, independent deployment or isolation, and explain how you contain the added latency.
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q114"></a>
+### Q114. What are the deployment strategies, and which did you follow?
+
+**The strategies:**
+
+| Strategy | How | Pros | Cons |
+|---|---|---|---|
+| Recreate (big bang) | Stop old, start new | Simple | Downtime; rollback = redeploy |
+| Rolling | Replace instances a few at a time | No downtime, no extra capacity | Mixed versions; slow rollback; errors spread gradually |
+| Blue-green | New version beside old, switch all traffic at once | Instant switch-back; no mixed versions | Double capacity during switch; everyone exposed at switch moment |
+| Canary | Small % of traffic to new version, watch, ramp | Limits blast radius; real-traffic signal | Needs good metrics and automated checks; slower |
+| Feature flags (dark launch) | Deploy code off, enable per user/percentage | Separates deploy from release; rollback in seconds | Flag debt; both paths must be tested |
+| Shadow (mirroring) | Copy live traffic to new version, hide its responses | Zero user risk, real inputs | Double cost; side effects must be disabled |
+| A/B test | Split users between variants for a business metric | Data-driven decisions | Needs statistical rigour and time |
+
+**What we followed — per component** (consistent with [capital-access-operations.md](capital-access-operations.md)):
+1. **Services** (orchestrator, LLM gateway, Onboarding Backend API, extraction): **blue-green slots with a canary traffic shift** — staging slot + smoke/E2E tests → **10% → 25% → 50% → 100%** → automatic checks on error rate, P95 latency and **cost per request** → automatic swap-back if a check fails (e.g., error rate > 1%).
+2. **Prompts and models:** **feature flags** (Azure App Configuration), **1% → 5% → 25% → 100%**, sticky per conversation; rollback = flag flip. **Model upgrades shadow-tested first** — judge-scored, never shown to users ([Q84](#q84), [Q86](#q86)).
+3. **Vector index / embedding model:** **blue-green at the data layer** — build and evaluate the new index, switch the alias, keep the old one ([Q18](#q18), [Q83](#q83)).
+4. **Ingestion Functions:** slots where the plan supports them; in-flight **Durable orchestrations finish on their starting version** — orchestration versioning or side-by-side deploy ([Q85](#q85)).
+5. **Database schema:** **expand and contract** — rollback stays possible at every step.
+6. **Teams manifest:** rarely changed; behaviour in the backend behind flags — manifest changes need each client admin's approval ([Q88](#q88)).
+
+**Why canary matters more for AI:** "A normal regression shows up as errors or latency. An AI regression usually shows up as **worse answers with a 200 OK**. So the canary also watches **judge scores on sampled answers by question type, plus thumbs-down and escalation rates**."
+
+**Say this:** "We chose per component. Services use blue-green slots with a canary traffic shift — 10, 25, 50, 100 percent — gated on error rate, latency and cost, with automatic swap-back on failure. Prompt and model changes ship behind feature flags — 1, 5, 25, 100 percent, sticky per conversation — with shadow testing before any model upgrade. Index and embedding changes are blue-green at the data layer with an alias switch. Schema changes use expand and contract. And for AI, the canary also watches judge scores by question type, because AI regressions show up as worse answers, not errors."
 
 [⬆ Back to top](#top)
 

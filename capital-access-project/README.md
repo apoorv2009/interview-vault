@@ -15,7 +15,7 @@ This directory contains **complete, production-grade interview prep** for the Ca
 | **Interview narrative & architecture** | [capital-access-interview-story.md](capital-access-interview-story.md) ⭐ START HERE | 30 min |
 | **Technical patterns & services** | [capital-access-deep-dives.md](capital-access-deep-dives.md) | 2-3 hrs |
 | **Production operations & CI/CD** | [capital-access-operations.md](capital-access-operations.md) | 1-2 hrs |
-| **AI RAG + onboarding architecture grill + Optum prep (112 Q&A + RAG code)** | [ai-rag-architecture-grill-qa.md](ai-rag-architecture-grill-qa.md) | 2-3 hrs |
+| **AI RAG + onboarding architecture grill + Optum prep (114 Q&A + RAG code)** | [ai-rag-architecture-grill-qa.md](ai-rag-architecture-grill-qa.md) | 2-3 hrs |
 
 ---
 
