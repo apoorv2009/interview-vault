@@ -149,6 +149,8 @@
 108. [Agents in healthcare: how do you stop an agent from taking a harmful action?](#q108)
 109. [Do you need two APIM instances — one to route to services and one to route to LLM models?](#q109)
 110. [How are you handling hybrid search? (Deep dive)](#q110)
+111. [Why didn't you use an MCP server? Where would MCP fit in your current app?](#q111)
+112. [What is two-phase commit? Did you use it anywhere in your project?](#q112)
 - [Questions to ask the Optum panel + leadership STAR template](#optum-questions)
 
 **Part L — Coding: end-to-end RAG pipeline**
@@ -1665,6 +1667,68 @@ Plus the operational set: TTFT and latency per tier, fallback rate, cache hit ra
 - "Does reranking replace filters?" → Never. Security and period filters apply **before** ranking; the reranker only orders what the user is allowed to see.
 
 > **Honesty check:** the "hybrid search + rerank" label was added to the diagram during prep. If your system is dense-only today, say: "Today retrieval is dense with hard metadata filters; hybrid search with reranking is the next improvement, for exactly the identifier problem" — and give the design above.
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q111"></a>
+### Q111. Why didn't you use an MCP server? Where would MCP fit in your current app?
+
+**Get the relationship right first:** **function calling** is what the *model* does — decide to call a tool and produce arguments. **MCP (Model Context Protocol)** is a standard *protocol* for exposing and discovering tools and data **across process and application boundaries**, so any MCP-capable client or agent can use them without custom integration. MCP doesn't replace function calling — it standardises where tools live and how they're connected.
+
+**Why not in v1:** "Every tool had exactly one consumer — our orchestrator. Retrieval, analysis and Fetch Report tools lived inside or beside that service, so plain function calling with typed schemas was simplest: no extra hop, no extra protocol surface to secure, tenant isolation enforced in one place. MCP pays off with **many consumers or many tool providers** — we didn't have that yet." *(Confirm this matches your real reason — "MCP wasn't mature when we started" is also acceptable.)*
+
+**Where it fits now:**
+1. **Expose Report Analytics as an MCP server** — `search_reports`, `get_report`, `compare_periods`, `get_top_holders` — so any assistant the client uses (Copilot in Teams, Claude, internal agents) gets our **governed** retrieval: tenant and period filters, verified numbers, citations. This is [Q76](#q76) made concrete — "the value is the platform, not the chat box."
+2. **Shared tools across agents** — wrap Fetch Report, Ownership and Client Profiles as MCP servers so the RAG orchestrator, onboarding extraction and future agents reuse **one** tool definition owned by the team that owns the data. Fits DDD: each bounded context publishes its capabilities.
+3. **Onboarding client lookup / entity resolution** — `find_client(name)`, `get_client_by_LEI(id)` — used by extraction to catch duplicates ([Q68](#q68)) and by ops users' assistants.
+
+**Where it does NOT fit:** the ingestion pipeline (deterministic, event-driven, no model choosing tools) and hot-path internal calls like retrieval → Pinecone inside one service (direct call is faster).
+
+**Design points that show seniority:**
+- **Identity:** remote MCP servers use OAuth; the server derives tenant and permissions **from the user's token** (Entra/Okta), never from tool arguments — otherwise one injection reads another client's data ([Q57](#q57)).
+- **Least privilege:** read-only tools first, narrow scopes, human approval for side effects.
+- **MCP-specific risks:** poisoned tool descriptions, indirect injection via tool results, confused-deputy problems → allow-list of approved servers, pinned versions, audit log of every tool call, rate limits.
+- **Hosting:** behind the existing API Gateway — Azure API Management can expose existing REST APIs as MCP servers, keeping the same auth, quotas and monitoring.
+- **Versioning:** tool schemas are contracts like integration events — additive changes, versioned names for breaking ones.
+
+**Say this:** "In v1 every tool had one consumer, our orchestrator, so plain function calling was simpler and easier to secure. MCP makes sense now in two places: exposing our report analytics as an MCP server so any assistant the client uses gets our governed retrieval with tenant isolation and verified numbers, and publishing shared tools — Fetch Report, Ownership, Client Profiles — once for every agent. Not in the ingestion pipeline or hot-path internal calls. The critical rule: the server derives the tenant from the user's OAuth token, never from tool arguments."
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q112"></a>
+### Q112. What is two-phase commit? Did you use it anywhere in your project?
+
+**What it is:** a protocol to make one transaction **atomic across multiple resources**.
+- **Phase 1 — prepare (voting):** a coordinator asks every participant "can you commit?" Each does the work, writes it durably, **locks** the affected rows and votes yes or no.
+- **Phase 2 — commit or abort:** all yes → coordinator tells everyone to commit; any no or timeout → everyone rolls back. Locks released.
+- In .NET: `TransactionScope` escalating to MSDTC; in Java: XA transactions.
+
+**Why architects avoid it in distributed systems:**
+1. **Blocking** — if the coordinator crashes after participants voted yes, they sit "in doubt" holding locks until it recovers (3PC tries to fix this; rarely used).
+2. **Latency and lock contention** — multiple round-trips with locks held.
+3. **Availability** — every participant must be up simultaneously.
+4. **Limited support** — most cloud/SaaS services don't support XA: message brokers, vector databases, blob storage, and certainly LLM APIs.
+
+**Did you use it? No — deliberately:** "Our transactions span Service Bus, Blob, Pinecone, Cosmos and external LLM APIs — none can participate, and you can't 'prepare' an LLM call and roll it back. Onboarding has a human review step that can take days — you can't hold locks for days. So: **local ACID transactions plus reliable asynchronous messaging**, with idempotent consumers."
+
+**Where 2PC would have been tempting — and what we used instead:**
+
+| Place | The 2PC temptation | What we used |
+|---|---|---|
+| Report Generation saves metadata and publishes "report generated" | DB write + message send atomically | **Transactional outbox** — event written in the same local transaction, relay publishes ([Q36](#q36)) |
+| Onboarding: extraction → review → profile → CRM sync | One distributed transaction | **Orchestrated saga** with per-step state, retries, compensation ([Q35](#q35)) |
+| Ingestion: upsert vectors and mark report indexed | Pinecone + status DB atomically | **Idempotent upserts** with deterministic IDs, **version fencing** on status, reconciliation job ([Q25](#q25), [Q39](#q39)) |
+| Tenant offboarding: delete everywhere | Atomic delete across stores | **Saga** from a `TenantOffboarded` event, each store confirms ([Q34](#q34)) |
+
+**Where atomicity does exist (used locally):** local database transactions (the outbox depends on it); **Cosmos DB transactional batch** within one partition key; **Service Bus transactions** within one namespace — e.g., complete the incoming message and send the next one atomically, preventing "processed but never forwarded."
+
+**Say this:** "Two-phase commit coordinates an atomic commit across resources — prepare and vote with locks, then commit. Strong consistency, but it blocks if the coordinator fails, holds locks across round-trips, and needs every participant up and XA-capable. We didn't use it: our flows span Service Bus, Blob, Pinecone, Cosmos and LLM APIs, which can't participate, and onboarding has a days-long human step. Instead: local transactions with a transactional outbox, an orchestrated saga for onboarding, and idempotent consumers with version fencing for ingestion — eventual consistency with guaranteed delivery."
+
+**Trap:** "Then how do you prevent inconsistency?" → Outbox (events never lost) + idempotent consumers (duplicates harmless) + saga compensation (partial failures undone) + reconciliation jobs (catch anything stuck, e.g., "generated" but not "indexed" after N minutes).
 
 [⬆ Back to top](#top)
 
