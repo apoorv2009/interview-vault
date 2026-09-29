@@ -232,12 +232,21 @@ flowchart TB
     GW -. "fallback only (circuit open)" .-> GPT6["GPT6"]
 
     subgraph Onb["Client onboarding extraction"]
-        Up["Ops uploads client docs<br/>IR decks, filings, forms"]
-        Ext["Extraction Service<br/>FastAPI + Claude + Pydantic schema"]
+        Up["Ops user starts onboarding case<br/>admin portal"]
+        OnbAPI["Onboarding API<br/>creates case, issues SAS URL"]
+        OnbBlob[("Blob: client docs<br/>direct upload via SAS")]
+        OnbQ[["Service Bus queue<br/>onboarding-requests + DLQ"]]
+        Backfill["Batch backfill job<br/>7,500 existing profiles"]
+        Ext["Extraction Service<br/>FastAPI + Claude, queue-triggered worker"]
         Val["Validation<br/>schema + confidence score"]
         Rev["Human review UI<br/>accept / edit"]
         Prof[("Client Profiles DB<br/>7,500+ profiles")]
-        Up --> Ext
+        Up --> OnbAPI
+        OnbAPI -- SAS upload --> OnbBlob
+        OnbAPI -- "on submit: OnboardingRequested (outbox)" --> OnbQ
+        Backfill --> OnbQ
+        OnbQ --> Ext
+        Ext -. reads docs .-> OnbBlob
         Ext --> Val
         Val --> Rev
         Rev --> Prof
