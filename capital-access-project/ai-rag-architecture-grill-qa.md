@@ -147,6 +147,7 @@
 106. [How would you build and grow a GenAI engineering team?](#q106)
 107. [LangChain vs LangGraph vs a custom orchestrator — when would you use each?](#q107)
 108. [Agents in healthcare: how do you stop an agent from taking a harmful action?](#q108)
+109. [Do you need two APIM instances — one to route to services and one to route to LLM models?](#q109)
 - [Questions to ask the Optum panel + leadership STAR template](#optum-questions)
 
 **Part L — Coding: end-to-end RAG pipeline**
@@ -1590,6 +1591,36 @@ Plus the operational set: TTFT and latency per tier, fallback rate, cache hit ra
 ### Q108. Agents in healthcare: how do you stop an agent from taking a harmful action?
 
 **Say this:** "Least privilege and human approval. Agents get only the tools the task needs, and read-only by default. Any action with real-world effect — submitting a prior-auth request, sending a member message, updating a record — goes through **plan → approve → execute**: the agent proposes, a human or a policy check approves, then a narrowly scoped service executes it. Identity and member scope are injected by code, never chosen by the model. Hard limits on steps, tokens and time; every action logged for audit. In LangGraph this is an interrupt before the action node."
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q109"></a>
+### Q109. Do you need two APIM instances — one to route to services and one to route to LLM models?
+
+**Say this:** "Logically they're two gateways with different jobs: the **edge gateway** handles inbound identity, tenant claims and routing to services; the **LLM gateway** handles outbound model access, token budgets, tier routing, fallback and cost metering. Physically, I'd start with **one APIM instance** — separate APIs, policies and internal-only exposure for AI traffic — and split into a second instance when network exposure, ownership or scaling needs diverge. And the **orchestrator decides the tier** because it knows the task type; the gateway enforces budgets and handles fallback. Complexity classification is application logic, not gateway policy."
+
+**Key points — two different jobs:**
+
+| | API Gateway (edge) | LLM Gateway (AI gateway) |
+|---|---|---|
+| Direction | Clients → services (inbound) | Services → model providers (outbound) |
+| Callers | Teams bot, web app, ops users | Orchestrator, extraction service |
+| Concerns | JWT validation, tenant claims, per-user rate limits, WAF, routing | Token budgets per tenant, tier selection, provider fallback, token and cost metering, semantic cache, PII scrubbing |
+| Exposure | Public (behind Front Door) | Internal only |
+
+**Three deployment options:**
+1. **One APIM instance, two logical gateways** — `/api/*` to microservices, `/ai/*` to model backends, AI APIs internal-only. Simplest to run and secure. Risk: shared blast radius and capacity — long streaming LLM calls compete with normal API traffic; one bad policy change hits both.
+2. **Two APIM instances** — when there's a concrete reason: public edge vs VNet-only AI gateway, different owning teams, independent scaling/SLAs (LLM traffic is spiky and holds connections open), or a dedicated audited egress point for PHI. Middle ground: **APIM workspaces** — one instance, isolated per team, optionally with separate runtime gateways.
+3. **APIM at the edge + a custom LLM gateway service** — often the most realistic, because:
+   - Tier routing needs logic — APIM policies can route on a field the caller sends (`tier: "haiku"`), but *deciding* the tier by classifying the request doesn't fit policy expressions.
+   - APIM's built-in LLM policies (token limits, token metrics, semantic cache) are designed around OpenAI-compatible APIs; Claude and Gemini native APIs may need an adapter or metering in your own code.
+   - So: APIM for auth, quotas and backend pools with circuit breakers; a small gateway service for tier selection, provider adapters and per-tenant cost metering.
+
+**Trap:** "Where does the routing decision live?" → The orchestrator picks the tier (it knows the task type); the gateway enforces budgets, applies fallback and meters cost.
+
+> **Before the interview:** know what you actually deployed — one APIM, two, or APIM plus a custom gateway service — and describe that.
 
 [⬆ Back to top](#top)
 
