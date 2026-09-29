@@ -170,11 +170,13 @@ flowchart TB
     subgraph Entry["Entry points"]
         Client(["Web client"])
         Teams["MS Teams Bot<br/>Azure Bot Service + Entra SSO"]
+        OnbUI["Onboarding UI<br/>Angular admin portal: upload docs, submit case, review"]
     end
 
     APIGW["API Gateway<br/>Auth · Rate limiter · Load balancing"]
     Client --> APIGW
     Teams --> APIGW
+    OnbUI --> APIGW
 
     subgraph ReportPath["Report generation (async)"]
         RG["Report Generation service"]
@@ -232,18 +234,16 @@ flowchart TB
     GW -. "fallback only (circuit open)" .-> GPT6["GPT6"]
 
     subgraph Onb["Client onboarding extraction"]
-        Up["Ops user starts onboarding case<br/>admin portal"]
-        OnbAPI["Onboarding API<br/>creates case, issues SAS URL"]
-        OnbBlob[("Blob: client docs<br/>direct upload via SAS")]
-        OnbQ[["Service Bus queue<br/>onboarding-requests + DLQ"]]
+        OnbAPI["Onboarding Backend API<br/>creates case, stores docs, triggers extraction job"]
+        OnbBlob[("Blob: client docs<br/>stored by Backend API")]
+        OnbQ[["Service Bus queue<br/>extraction jobs + DLQ"]]
         Backfill["Batch backfill job<br/>7,500 existing profiles"]
         Ext["Extraction Service<br/>FastAPI + Claude, queue-triggered worker"]
         Val["Validation<br/>schema + confidence score"]
-        Rev["Human review UI<br/>accept / edit"]
+        Rev["Human review screen<br/>in Onboarding UI: accept / edit"]
         Prof[("Client Profiles DB<br/>7,500+ profiles")]
-        Up --> OnbAPI
-        OnbAPI -- SAS upload --> OnbBlob
-        OnbAPI -- "on submit: OnboardingRequested (outbox)" --> OnbQ
+        OnbAPI -- store docs --> OnbBlob
+        OnbAPI -- "on submit: enqueue ExtractionRequested, 202 + jobId to UI" --> OnbQ
         Backfill --> OnbQ
         OnbQ --> Ext
         Ext -. reads docs .-> OnbBlob
@@ -251,7 +251,7 @@ flowchart TB
         Val --> Rev
         Rev --> Prof
     end
-    APIGW --> Up
+    APIGW -- REST --> OnbAPI
     Ext -- "Haiku for fields, Sonnet/Opus for synthesis" --> GW
 
     subgraph Eval["Evaluation pipeline (LLM-as-judge)"]
