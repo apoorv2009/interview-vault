@@ -1415,12 +1415,12 @@ Plus the operational set: TTFT and latency per tier, fallback rate, cache hit ra
 <a id="q93"></a>
 ### Q93. Tell me about yourself. (Senior Manager, GenAI framing)
 
-**Say this (≈90 seconds):** "I have 16 years in software engineering — distributed systems, cloud platforms and multi-tenant SaaS — and for the last few years I've focused on taking GenAI from prototype to production. Most recently at S&P Global, on Capital Access, I led the design and delivery of two GenAI products: a multi-agent RAG assistant in Microsoft Teams that cut IR report analysis from 2–3 hours to about 10 minutes, and a Claude-based extraction service that turned days of manual client onboarding into minutes of review across 7,500+ profiles. What I bring is the production side of GenAI that many teams struggle with — evaluation pipelines that gate releases, cost control through model routing, and strict data isolation — plus leading engineers through that shift. That's why this role appeals to me: taking GenAI to production at Optum's scale, in a domain where accuracy and privacy really matter."
+**Use the single final introduction:** [behavioural-answers.md → Tell me about yourself](../behavioural/behavioural-answers.md#q-tell-me-about-yourself--walk-me-through-your-career-journey) (finalised 3 Oct 2026). Don't maintain a second version here.
 
 **Rules:**
-- State your AI years **honestly**. Frame the strength: production engineering depth + GenAI delivery.
-- End with *why this role* — it hands the interviewer a natural next question.
-- Fill in your real team size in one clause ("leading a team of N engineers").
+- About 3 minutes; pause after *"worse than no answer"* and *"the solution to hallucination."*
+- Have your team size ready — manager roles will ask "how many people do you lead?" even if the intro doesn't say it.
+- For a specific company, add one closing sentence on *why this role* — it hands the interviewer a natural next question.
 
 [⬆ Back to top](#top)
 

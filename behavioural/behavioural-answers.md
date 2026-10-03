@@ -4,7 +4,7 @@
 
 ## Table of Contents
 
-### **Track 1: EPAM / Architect (16 yrs, Capital Access)**
+### **Track 1: EPAM / Architect (17 yrs, Capital Access)**
 1. [Tell me about yourself / Career journey](#q-tell-me-about-yourself--walk-me-through-your-career-journey)
 2. [Tell me about your previous project](#q-tell-me-about-your-previous-project--roles-and-responsibilities)
 3. [What value does your project bring?](#q-what-value-does-your-project-bring-to-the-client)
@@ -83,7 +83,7 @@
 
 ---
 
-## EPAM / Architect Track (16 yrs, Capital Access)
+## EPAM / Architect Track (17 yrs, Capital Access)
 
 *Framing for the EPAM Application Architect role at S&P Global — 16-year Application Architect narrative, most recent project Capital Access.*
 
@@ -91,19 +91,39 @@
 
 ## Q: Tell me about yourself / Walk me through your career journey
 
-"Hi, I'm Apoorv Jain — Application Architect with 16 years of experience, based in Hyderabad. My expertise is in Azure cloud architecture, full-stack .NET and Angular development, and more recently AI and GenAI systems.
+> ✅ **FINAL VERSION (finalised 3 Oct 2026)** — this is the only Architect-track introduction. About 3 minutes spoken. Pause after *"worse than no answer"* and after *"the solution to hallucination."*
 
-I started my career in 2010 at **Cerebrata Software**, where I built Azure Storage management tools — Cerebrata Azure Management Studio — which at its peak was used by over **100,000 Azure developers worldwide**. That's where I got very deep into Azure fundamentals early on, well before it was mainstream.
+"I have around 17 years of experience in software engineering. I started as a .NET developer and, over the years, moved into technical leadership and solution architecture, working extensively with distributed systems, microservices, Azure, security and enterprise integrations.
 
-From there I joined **Applied Information Services**, where I spent 9 years growing from Software Engineer all the way to Module Lead. I delivered **15+ enterprise projects** across healthcare, insurance, and eCommerce — leading teams of 5 to 12 developers. This is where I matured as an architect — I designed multi-tenant SaaS platforms on Azure SQL supporting 50,000 concurrent users, established Angular front-end standards adopted across 6 project teams, and led SQL Server migrations to Azure SQL Managed Instance achieving **40% infrastructure cost reduction**.
+That journey changed the way I approach problems — from asking, "How do I build this feature?" to "How should the whole system be designed so that it's scalable, secure, reliable and maintainable?"
 
-In 2022 I moved to **Wipro as Application Architect**, where I worked at much larger scale — I led cloud migration programmes for Fortune 500 clients, defining target-state Azure architectures across IaaS, PaaS, and SaaS workloads. I also architected JTI-TERA, an enterprise mobility platform serving **5,000 field sales users across 20 markets**, with an offline-first sync architecture on Azure Service Bus.
+Currently, I'm a Lead SDE at S&P Global working on the Capital Access platform. Along with my core platform responsibilities, more recently I've been working on applying GenAI to real enterprise problems.
 
-Since December 2024 I've been at **S&P Global as Application Architect** on Capital Access — an enterprise investor relations SaaS platform serving **500+ institutional clients**. I own the front-end platform architecture on Angular 18 and NgRx, designed OIDC authentication flows, led a migration from legacy webpack to Angular 18 standalone components cutting **bundle size by 30%**, and drive the overall CI/CD strategy on Azure DevOps.
+One of the key use cases was Investor Relations report analytics.
 
-Outside of work, I recently built **Aagam Mitra** — a production RAG and Agentic AI assistant for a Jain temple community app, using Groq, Pinecone, and Gemini Embeddings. This gave me deep hands-on experience in LLM integration, vector search, and agentic function calling — which I'm actively bringing into my architecture thinking.
+Analysts could spend two to three hours going through historical reports, finding the relevant information, correlating it and validating the answer. Our goal was to reduce that effort dramatically without compromising the level of trust required for financial information.
 
-So in summary — 16 years across capital markets, healthcare, insurance and eCommerce, from developer to architect, with a strong Azure foundation and now an AI layer on top. I'm excited about EPAM because of the scale and diversity of engineering challenges you work on."
+I led the architecture of a multi-agent RAG solution where users can ask questions through Microsoft Teams and receive answers grounded in historical reports, with citations back to the original sources.
+
+The area I focused on most was reliability, because in this domain, a fluent but incorrect answer can be worse than no answer.
+
+So instead of treating RAG itself as the solution to hallucination, I designed quality controls at multiple layers.
+
+For example, the question is resolved against the appropriate report and reporting period before retrieval, so a question about Q2 doesn't accidentally get answered using Q1 data. For numerical calculations, we prefer deterministic tools rather than asking the LLM to perform the calculation itself.
+
+On top of that, we introduced an LLM-based evaluation pipeline to measure generated responses for groundedness, relevance and citation accuracy.
+
+I also designed model routing based on task complexity. Simpler extraction tasks can go to a smaller model like Haiku, while more complex analysis and synthesis can be routed to Sonnet or Opus. That allows us to balance quality, latency and cost instead of using the most expensive model for every request.
+
+As a result, an analysis workflow that previously took two to three hours could be completed in roughly ten minutes.
+
+A second use case was client onboarding, where we used Claude-based document extraction with structured schemas and human review. That changed the process from days of manual data entry to minutes of validating AI-extracted information across more than 7,500 client profiles.
+
+For me, that's where my earlier experience becomes very relevant. I don't see GenAI as just a model or chatbot problem. I look at the complete production system — data, security, retrieval, orchestration, evaluation, observability, latency and cost.
+
+That's the direction I'm building toward: combining enterprise architecture with Applied AI to build systems that can actually be trusted in production.
+
+I'm happy to go deeper into the RAG architecture, agent orchestration, evaluation approach or any of the design trade-offs."
 
 **Career timeline at a glance:**
 
