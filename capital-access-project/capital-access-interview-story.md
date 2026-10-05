@@ -31,7 +31,7 @@
 
 Capital Access integrates data from **S&P Capital IQ Pro** and **Visible Alpha** for financial intelligence, and syncs communications with **Outlook** and **Gmail** via Capital Access Mail.
 
-2,500+ Corporate Issuers
+7,500+ Corporate Issuers
 8+ Feature Modules
 Multi-tenant SaaS
 Azure Hosted
@@ -41,14 +41,14 @@ Azure Hosted
 
 > 🗣️ **Say this:**
 >
-> Capital Access is a web platform used by Investor Relations (IR) teams in public companies. It helps them find and connect with investors, track who owns their company's shares, and manage investor communication — all in one place. The platform is used by over 2,500 companies worldwide and uses S&P Global data such as Capital IQ Pro and Visible Alpha.
+> Capital Access is a web platform used by Investor Relations (IR) teams in public companies. It helps them find and connect with investors, track who owns their company's shares, and manage investor communication — all in one place. The platform is used by over 7,500 companies worldwide and uses S&P Global data such as Capital IQ Pro and Visible Alpha.
 >
 > I work as a Lead Software Development Engineer on the frontend using Angular 18. I also work with Azure-based microservices, Okta authentication, and CI/CD pipelines.
 
 ## How to Explain the Full Project Flow Verbally (Interview Script)
 
 **What is Capital Access:**
-"Capital Access is an enterprise SaaS platform built by S&P Global for Investor Relations teams at publicly listed companies. Think of it as a CRM plus data intelligence platform — a corporate IR officer logs in and can see which institutional investors own their company's shares, identify new investors to target, manage meetings and roadshows, send communications, and generate board-level reports. It serves over 2,500 corporate clients and is a multi-tenant cloud platform hosted entirely on Azure."
+"Capital Access is an enterprise SaaS platform built by S&P Global for Investor Relations teams at publicly listed companies. Think of it as a CRM plus data intelligence platform — a corporate IR officer logs in and can see which institutional investors own their company's shares, identify new investors to target, manage meetings and roadshows, send communications, and generate board-level reports. It serves over 7,500 corporate clients and is a multi-tenant cloud platform hosted entirely on Azure."
 
 **How a user logs in — Authentication flow:**
 "When a user opens the application, they're redirected to Okta — our identity provider. Okta handles the login and issues a JWT token. What makes this interesting is that the JWT carries custom claims — specifically a tenant ID and the user's roles. The tenant ID is critical because this is a multi-tenant system — every API call must be scoped to the correct client's data, and the tenant ID in the token ensures that."
@@ -87,7 +87,7 @@ You joined as **Lead Software Development Engineer** in December 2024. Your owne
 
 | Area | What you own | Impact |
 | --- | --- | --- |
-| **Feature Development** | Angular 18 front-end features across 8+ modules | 2,500+ corporate IR teams consume what you build |
+| **Feature Development** | Angular 18 front-end features across 8+ modules | 7,500+ corporate IR teams consume what you build |
 | **Authentication** | Full OIDC flow — token refresh, silent renewal, role-scoped access | Security foundation for the entire SaaS product |
 | **Platform Modernisation** | Legacy webpack → Angular 18 standalone component migration | 30% bundle reduction, faster build pipeline |
 
@@ -216,11 +216,11 @@ Azure App Service is the compute tier where all 6 microservices (Ownership, Prof
 
 **Compared to VMs (Azure VMs):**
 - VMs require manual OS patching, security updates, and dependency management — each patch is an operational decision and a risk vector
-- Capital Access serves 2,500+ regulated clients; every unpatched VM is a compliance audit question
+- Capital Access serves 7,500+ regulated clients; every unpatched VM is a compliance audit question
 - VMs force you to manage infrastructure — provisioning, decommissioning, networking — that scales linearly with team size
 - **App Service abstracts the OS away:** Microsoft patches automatically, certification is simpler, and you focus on code
 
-> **Anticipate this follow-up:** *"But Virtual Machine Scale Sets (VMSS) can autoscale too — so why not VMs?"* — True, and worth saying so directly rather than getting caught out by it. VMSS gives metric-based and schedule-based autoscaling structurally similar to App Service's. **Autoscaling capability was never the differentiator.** The actual reason is *operational ownership of the layer underneath the scaling*: with VMSS you still own OS patching, VM image management, and networking/NSG configuration yourself. With App Service, Microsoft owns everything below the application layer. For a team serving 2,500+ regulated clients, that patching/compliance ownership — not scaling — is what tips the decision toward App Service.
+> **Anticipate this follow-up:** *"But Virtual Machine Scale Sets (VMSS) can autoscale too — so why not VMs?"* — True, and worth saying so directly rather than getting caught out by it. VMSS gives metric-based and schedule-based autoscaling structurally similar to App Service's. **Autoscaling capability was never the differentiator.** The actual reason is *operational ownership of the layer underneath the scaling*: with VMSS you still own OS patching, VM image management, and networking/NSG configuration yourself. With App Service, Microsoft owns everything below the application layer. For a team serving 7,500+ regulated clients, that patching/compliance ownership — not scaling — is what tips the decision toward App Service.
 
 **Compared to AKS (Azure Kubernetes Service):**
 - AKS is optimized for systems with 50+ microservices, complex inter-service networking, and polyglot workloads
@@ -481,7 +481,7 @@ public class OwnershipDbContext : DbContext
 }
 ```
 
-All 6 App Service instances run the same code but with the tenant ID enforced at the middleware and database layer. There's no need for separate App Service instances per tenant — one set of instances serves all 2,500 tenants.
+All 6 App Service instances run the same code but with the tenant ID enforced at the middleware and database layer. There's no need for separate App Service instances per tenant — one set of instances serves all 7,500 tenants.
 
 ### Networking & Security
 
@@ -646,7 +646,7 @@ AFTER (Angular 18 Standalone):
 
 ## Multi-Tenancy in the Frontend
 
-Capital Access serves 2,500+ corporate issuers from one codebase. Each client is a separate tenant with potentially different feature sets, branding, and data.
+Capital Access serves 7,500+ corporate issuers from one codebase. Each client is a separate tenant with potentially different feature sets, branding, and data.
 
 ```
 At login, the JWT access token contains:
@@ -682,7 +682,7 @@ Capital Access is an enterprise product used at institutional clients — legal 
 
 > 🗣️ **Say this:**
 >
-> I currently work at S&P Global as a Lead Software Development Engineer on Capital Access — it's S&P's web platform for Investor Relations teams at publicly listed companies. The platform serves over 2,500 corporate issuers worldwide, helping them find and connect with investors, track ownership, and manage investor communications.
+> I currently work at S&P Global as a Lead Software Development Engineer on Capital Access — it's S&P's web platform for Investor Relations teams at publicly listed companies. The platform serves over 7,500 corporate issuers worldwide, helping them find and connect with investors, track ownership, and manage investor communications.
 >
 > The backend is a microservices architecture on Azure — five core services each with their own data store: an Ownership Service that holds institutional ownership percentages and historical data in Cosmos DB, a Profiles Service for company financials and metadata in Azure SQL, a Targeting Service for investor targeting scores backed by Azure SQL with Redis caching for fast reads, a Contacts Service for IR relationship management, and a Notifications Service for ownership change alerts. Services communicate asynchronously through Azure Service Bus Topics — when ownership data changes, the Service Bus event fans out to both the Targeting and Notifications services independently without any tight coupling between them.
 >
@@ -733,7 +733,7 @@ Answer:
 Answer:
         The silent renewal timer fires before expiry and gets a new access token invisibly via Okta's refresh token flow. If silent renewal fails — network issue or Okta session expired — the HTTP interceptor on the next API call catches the 401, attempts one token refresh, and if that fails, redirects to login. We preserve the current URL in state so after login the user is returned exactly to where they were. For a financial workflow like building an investor targeting list, losing progress on session expiry would be unacceptable.
 
-**Q: Q: How does role-based access work across 2,500+ clients?**
+**Q: Q: How does role-based access work across 7,500+ clients?**
 
 Answer:
         Each client company is a separate application or group in Okta. When users from ClientA log in, Okta issues a JWT containing their tenant ID and the specific roles their company has subscribed to — configured as custom claims in Okta's authorization server. For example, roles: ["investor_targeting", "shareholder_analytics"]. The Angular route guards decode these claims and only allow access to matching routes. If Client B hasn't subscribed to Roadshow Management, that route is simply unreachable — the guard redirects them. This is enforced both client-side in routing and server-side in the API — the client-side guard is UX, the server-side check is the actual security boundary.

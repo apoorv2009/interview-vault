@@ -130,7 +130,7 @@ The story in one breath: a user logs in through **Okta**, hits the SPA through *
 
 ## 1. Okta (Identity / OIDC)
 
-**The Capital Access problem it solves:** 2,500+ corporate IR teams need to log in, and the platform needs to know not just *who* they are but *which company* they belong to and *which modules* their company has paid for — without the frontend ever touching a password.
+**The Capital Access problem it solves:** 7,500+ corporate IR teams need to log in, and the platform needs to know not just *who* they are but *which company* they belong to and *which modules* their company has paid for — without the frontend ever touching a password.
 
 **Core idea:** Okta is the Identity Provider. OAuth2 answers "what can this app do on the user's behalf," OIDC adds the identity layer ("who is this user"). Okta issues a JWT carrying custom claims — `tid` (tenant ID) and `roles` — that the Angular app and every microservice both trust. Tokens live in memory only, never localStorage, because localStorage is readable by any injected script (XSS). Silent renewal fires 5 minutes before expiry via the refresh token, invisibly. If that fails, the app falls back to a full redirect to Okta's hosted login page. PKCE protects the Authorization Code flow since there's no server-side secret in a SPA.
 

@@ -310,7 +310,7 @@ Feature toggles are not optional at Capital Access — they are **mandatory for 
 
 **Without feature toggles, you have two bad choices:**
 
-1. **Release to 100% of users immediately** — if there's a bug, all 2,500 clients are affected at once. Rollback means a new deployment + downtime.
+1. **Release to 100% of users immediately** — if there's a bug, all 7,500 clients are affected at once. Rollback means a new deployment + downtime.
 
 2. **Hold features in a branch until "perfect"** — branches live for weeks, diverge from main, merge conflicts explode, and you end up testing against stale code.
 
@@ -1286,7 +1286,7 @@ These are the questions that separate senior engineers from mid-level: not just 
 ### Q1. How do you manage traffic while keeping costs efficient, and monitor/troubleshoot failures?
 
 **The Problem:**
-Capital Access sees bursty traffic — quiet all day, then 9:00 AM (market open) all 2,500 IR teams hit the platform simultaneously to check overnight ownership changes. At 3:00 PM, traffic drops to 10% of peak. If we provision for peak, we waste 90% of infrastructure costs during off-peak. If we provision for average, we fail at 9 AM.
+Capital Access sees bursty traffic — quiet all day, then 9:00 AM (market open) all 7,500 IR teams hit the platform simultaneously to check overnight ownership changes. At 3:00 PM, traffic drops to 10% of peak. If we provision for peak, we waste 90% of infrastructure costs during off-peak. If we provision for average, we fail at 9 AM.
 
 **The Solution — Auto-scaling + Reserved Capacity:**
 
@@ -1358,7 +1358,7 @@ During actual traffic spikes, we don't use static thresholds. We use:
 ### Q3. How do you find the tracecode for scaling decisions? How do you set up distributed tracing?
 
 **The Problem:**
-A request from one Angular user flows through APIM → Ownership Service → Cosmos DB → Targeting Service → Azure SQL → back to the user. If it's slow, which hop took the time? With 2,500 tenants making requests, how do you find the slow one?
+A request from one Angular user flows through APIM → Ownership Service → Cosmos DB → Targeting Service → Azure SQL → back to the user. If it's slow, which hop took the time? With 7,500 tenants making requests, how do you find the slow one?
 
 **The Solution — Correlation ID:**
 

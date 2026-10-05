@@ -151,7 +151,7 @@
 
     <h3>Scale</h3>
     <div style="margin: 12px 0;">
-      <span class="metric">2,500+ <span>Corporate Issuers</span></span>
+      <span class="metric">7,500+ <span>Corporate Issuers</span></span>
       <span class="metric">8+ <span>Feature Modules</span></span>
       <span class="metric">Multi-tenant <span>SaaS</span></span>
       <span class="metric">Azure <span>Hosted</span></span>
@@ -160,7 +160,7 @@
     <div class="callout blue"><strong>Why this matters for interviews:</strong> Capital Access is not a simple CRUD app. It serves regulated public companies and their IR programmes with strict security (multi-tenant data isolation), high availability, performance requirements (real-time surveillance), and AI-driven analytics. That context makes your work on OIDC, microservices architecture, and multi-tenancy highly meaningful.</div>
 
     <h3>What to Say in the Interview</h3>
-    <div class="speak">Capital Access is a web platform used by Investor Relations (IR) teams in public companies. It helps them find and connect with investors, track who owns their company's shares, and manage investor communication — all in one place. The platform is used by over 2,500 companies worldwide and uses S&amp;P Global data such as Capital IQ Pro and Visible Alpha.
+    <div class="speak">Capital Access is a web platform used by Investor Relations (IR) teams in public companies. It helps them find and connect with investors, track who owns their company's shares, and manage investor communication — all in one place. The platform is used by over 7,500 companies worldwide and uses S&amp;P Global data such as Capital IQ Pro and Visible Alpha.
 
 I work as a Lead Software Development Engineer on the frontend using Angular 18. I also work with Azure-based microservices, Okta authentication, and CI/CD pipelines.</div>
   </div>
@@ -177,7 +177,7 @@ I work as a Lead Software Development Engineer on the frontend using Angular 18.
 
     <table>
       <tr><th>Area</th><th>What you own</th><th>Impact</th></tr>
-      <tr><td><strong>Feature Development</strong></td><td>Angular 18 front-end features across 8+ modules</td><td>2,500+ corporate IR teams consume what you build</td></tr>
+      <tr><td><strong>Feature Development</strong></td><td>Angular 18 front-end features across 8+ modules</td><td>7,500+ corporate IR teams consume what you build</td></tr>
       <tr><td><strong>Authentication</strong></td><td>Full OIDC flow — token refresh, silent renewal, role-scoped access</td><td>Security foundation for the entire SaaS product</td></tr>
       <tr><td><strong>Platform Modernisation</strong></td><td>Legacy webpack → Angular 18 standalone component migration</td><td>30% bundle reduction, faster build pipeline</td></tr>
     </table>
@@ -828,7 +828,7 @@ Angular Route Config:
 }</div>
 
     <h3>Trickiest Challenge — SAML to Okta Migration</h3>
-    <div class="callout red"><strong>Why this is hard:</strong> Migrating auth on a live multi-tenant SaaS is like changing the locks on a building while people are inside. If anything breaks, 2,500+ companies lose access instantly.</div>
+    <div class="callout red"><strong>Why this is hard:</strong> Migrating auth on a live multi-tenant SaaS is like changing the locks on a building while people are inside. If anything breaks, 7,500+ companies lose access instantly.</div>
 
     <h4>What changed technically</h4>
     <table>
@@ -852,7 +852,7 @@ Angular Route Config:
     <div class="callout amber"><strong>Important boundary to set clearly in the interview:</strong> User migration from SAML to Okta (provisioning accounts, syncing directories) was handled by a separate platform/infrastructure team. My ownership was end-to-end on the frontend auth flow and the per-tenant rollout strategy.</div>
 
     <h3>What to Say in the Interview</h3>
-    <div class="speak">The trickiest thing I've worked on was the SAML to Okta OIDC migration. We were moving auth on a live platform serving 2,500+ companies — if anything broke, nobody could log in. My ownership was the frontend side: I replaced the SAML redirect flow with Okta's OIDC flow using okta-auth-js, built the HTTP interceptor to attach Bearer JWTs and handle token refresh on 401, and implemented silent token renewal so users never see an unexpected logout. The riskiest part was the cutover. We handled it using per-tenant feature flags — we migrated one tenant at a time, so we could roll forward or roll back per client without a full outage. The user provisioning side was handled by a separate infra team, so I can speak to the frontend auth flow in detail.</div>
+    <div class="speak">The trickiest thing I've worked on was the SAML to Okta OIDC migration. We were moving auth on a live platform serving 7,500+ companies — if anything broke, nobody could log in. My ownership was the frontend side: I replaced the SAML redirect flow with Okta's OIDC flow using okta-auth-js, built the HTTP interceptor to attach Bearer JWTs and handle token refresh on 401, and implemented silent token renewal so users never see an unexpected logout. The riskiest part was the cutover. We handled it using per-tenant feature flags — we migrated one tenant at a time, so we could roll forward or roll back per client without a full outage. The user provisioning side was handled by a separate infra team, so I can speak to the frontend auth flow in detail.</div>
   </div>
 
 
@@ -911,7 +911,7 @@ AFTER (Angular 18 Standalone):
       <h2 class="stitle">Multi-Tenancy in the Frontend</h2>
     </div>
 
-    <p>Capital Access serves 2,500+ corporate issuers from one codebase. Each client is a separate tenant with potentially different feature sets, branding, and data.</p>
+    <p>Capital Access serves 7,500+ corporate issuers from one codebase. Each client is a separate tenant with potentially different feature sets, branding, and data.</p>
 
     <h3>How multi-tenancy works in the Angular SPA</h3>
     <div class="flow">At login, the JWT access token contains:
@@ -989,7 +989,7 @@ Angular App Bootstrap:
 
     <h3>Opening — "Tell me about your current project"</h3>
     <div class="speak">
-I currently work at S&P Global as a Lead Software Development Engineer on Capital Access — it's S&P's web platform for Investor Relations teams at publicly listed companies. The platform serves over 2,500 corporate issuers worldwide, helping them find and connect with investors, track ownership, and manage investor communications.
+I currently work at S&P Global as a Lead Software Development Engineer on Capital Access — it's S&P's web platform for Investor Relations teams at publicly listed companies. The platform serves over 7,500 corporate issuers worldwide, helping them find and connect with investors, track ownership, and manage investor communications.
 
 The backend is a microservices architecture on Azure — five core services each with their own data store: an Ownership Service that holds institutional ownership percentages and historical data in Cosmos DB, a Profiles Service for company financials and metadata in Azure SQL, a Targeting Service for investor targeting scores backed by Azure SQL with Redis caching for fast reads, a Contacts Service for IR relationship management, and a Notifications Service for ownership change alerts. Services communicate asynchronously through Azure Service Bus Topics — when ownership data changes, the Service Bus event fans out to both the Targeting and Notifications services independently without any tight coupling between them.
 
@@ -1066,7 +1066,7 @@ The 30% bundle reduction meant the initial page load dropped noticeably for clie
     </div>
 
     <div class="qa">
-      <div class="qa-q">Q: How does role-based access work across 2,500+ clients?</div>
+      <div class="qa-q">Q: How does role-based access work across 7,500+ clients?</div>
       <div class="qa-a">
         <span class="label">Answer:</span>
         Each client company is a separate application or group in Okta. When users from ClientA log in, Okta issues a JWT containing their tenant ID and the specific roles their company has subscribed to — configured as custom claims in Okta's authorization server. For example, roles: ["investor_targeting", "shareholder_analytics"]. The Angular route guards decode these claims and only allow access to matching routes. If Client B hasn't subscribed to Roadshow Management, that route is simply unreachable — the guard redirects them. This is enforced both client-side in routing and server-side in the API — the client-side guard is UX, the server-side check is the actual security boundary.
@@ -1373,7 +1373,7 @@ My ownership: frontend auth flow end-to-end.</div>
       <div class="qa-q">Q: How did you handle the SAML to Okta migration without downtime?</div>
       <div class="qa-a">
         <span class="label">Answer:</span>
-        We used per-tenant feature flags. Rather than switching all 2,500+ clients at once, we migrated one tenant at a time. Each tenant had a flag that controlled whether their auth flow used the old SAML redirect or the new Okta OIDC flow. We started with internal test tenants, validated everything, then gradually rolled out to production clients. If a specific tenant had issues, we flipped their flag back to SAML without affecting anyone else. The user provisioning side was handled by the infra team. My side — the Angular auth flow — was ready ahead of the tenant rollout so each migration was just a flag change.
+        We used per-tenant feature flags. Rather than switching all 7,500+ clients at once, we migrated one tenant at a time. Each tenant had a flag that controlled whether their auth flow used the old SAML redirect or the new Okta OIDC flow. We started with internal test tenants, validated everything, then gradually rolled out to production clients. If a specific tenant had issues, we flipped their flag back to SAML without affecting anyone else. The user provisioning side was handled by the infra team. My side — the Angular auth flow — was ready ahead of the tenant rollout so each migration was just a flag change.
       </div>
     </div>
 

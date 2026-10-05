@@ -71,7 +71,7 @@
 42. [You need to add a field to the "report ready" event. How do you evolve the schema without breaking consumers?](#q42)
 43. [What goes in the event payload? Why not put the report in the message?](#q43)
 44. [Why a queue for report generation but a topic for "report ready"?](#q44)
-45. [Quarter-end surge: 2,500 tenants generate reports in the same hour. How does the pipeline cope?](#q45)
+45. [Quarter-end surge: 7,500 tenants generate reports in the same hour. How does the pipeline cope?](#q45)
 46. [How do you present eventual consistency to the user so it doesn't look like a bug?](#q46)
 
 **Part F — Operations and failure scenarios**
@@ -646,7 +646,7 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 - **Cosmos DB chat memory:** partition key is tenant ID + conversation ID (hierarchical partition keys) so a large tenant's data spreads across physical partitions and one conversation stays together.
 - **Whale tenants:** they get dedicated rate-limit budgets so they can't starve others, may warrant a dedicated index or pod, and are the first to watch for hot partitions. Size the partition key so no single logical partition exceeds limits.
 
-**Trap:** "Namespace per tenant for 2,500+ tenants — any limits?" → Check the provider's namespace limits per index; if needed, shard tenants across multiple indexes with a tenant→index routing table.
+**Trap:** "Namespace per tenant for 7,500+ tenants — any limits?" → Check the provider's namespace limits per index; if needed, shard tenants across multiple indexes with a tenant→index routing table.
 
 [⬆ Back to top](#top)
 
@@ -854,7 +854,7 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 ---
 
 <a id="q45"></a>
-### Q45. Quarter-end surge: 2,500 tenants generate reports in the same hour. How does the pipeline cope?
+### Q45. Quarter-end surge: 7,500 tenants generate reports in the same hour. How does the pipeline cope?
 
 **Say this:** "The queue absorbs the burst — that's its job. Functions scale out on queue depth, but the real bottleneck is **downstream quotas**: OCR and embedding rate limits and Pinecone write throughput. So I cap concurrency deliberately (max scale-out and batch sizes) to stay under provider limits rather than hammering them into 429s. Prioritise: interactive Q&A traffic has a separate budget from bulk ingestion, and premium tenants or explicitly requested reports can go to a priority queue. The user-facing promise becomes 'indexed within X minutes at quarter-end', measured and alerted on."
 
@@ -1145,7 +1145,7 @@ Run DR drills — an untested restore is a hope, not a plan."
 <a id="q74"></a>
 ### Q74. Why build this at all instead of buying Copilot Studio or a managed agent platform?
 
-**Say this:** "Buy where it's commodity, build where it's differentiating. Teams hosting, identity and the bot channel are bought. The differentiating parts are domain-specific: period-aware retrieval over IR reports, numeric verification, client-data extraction schemas and review workflow, strict per-tenant isolation for 2,500+ issuers, and cost control per tenant. Managed platforms were evaluated; the gaps were control over retrieval, evaluation, and tenant isolation. The architecture keeps options open — the gateway and retrieval layer can sit behind a managed front end if that changes."
+**Say this:** "Buy where it's commodity, build where it's differentiating. Teams hosting, identity and the bot channel are bought. The differentiating parts are domain-specific: period-aware retrieval over IR reports, numeric verification, client-data extraction schemas and review workflow, strict per-tenant isolation for 7,500+ issuers, and cost control per tenant. Managed platforms were evaluated; the gaps were control over retrieval, evaluation, and tenant isolation. The architecture keeps options open — the gateway and retrieval layer can sit behind a managed front end if that changes."
 
 [⬆ Back to top](#top)
 

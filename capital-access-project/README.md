@@ -114,7 +114,7 @@ The Capital Access documentation is organized into **3 focused files** for effic
 Your main interview story and system overview.
 
 **Contains:**
-- ✅ What is Capital Access (product context for 2,500 corporate issuers)
+- ✅ What is Capital Access (product context for 7,500 corporate issuers)
 - ✅ How to explain it verbally (complete interview script)
 - ✅ Your role and ownership (feature dev, auth, platform modernization)
 - ✅ Architecture diagram (Okta → Front Door → APIM → 6 microservices → data stores)
@@ -316,7 +316,7 @@ For each: understand WHY, remember the example, explain the code.
 2. **Explain out loud** — interviews are spoken, not read
 3. **Ask "why"** — for every pattern, understand the constraint it solves
 4. **Use Correlation IDs** as your mental model for tracing requests
-5. **Remember the constraints** — 2,500 tenants, high availability, regulated industry
+5. **Remember the constraints** — 7,500 tenants, high availability, regulated industry
 6. **Practice under pressure** — time your STAR story, record yourself
 7. **Know the differences** — between Orchestration/Choreography, SAGA patterns, CQRS benefits
 
@@ -324,7 +324,7 @@ For each: understand WHY, remember the example, explain the code.
 
 ## 🚀 You're Ready!
 
-This is a production-grade, real-world system. Everything here is based on real architecture decisions made at S&P Global for 2,500+ enterprise customers.
+This is a production-grade, real-world system. Everything here is based on real architecture decisions made at S&P Global for 7,500+ enterprise customers.
 
 **Key message for interviews:** This isn't a toy project — it's a regulated financial services platform serving public companies. Your microservices decisions, security patterns, and operational rigor directly impact real companies' IR programs.
 

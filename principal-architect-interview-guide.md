@@ -3796,11 +3796,11 @@ Your response: "A billion users isn't a uniform load. Who are they? What do they
 
 ### Personal Experience Stories
 
-Built from your real Capital Access work (S&P Global) — a multi-tenant SaaS platform for Investor Relations teams at 2,500+ corporate issuer clients, on Angular 18 + Azure microservices. This project is a strong real-world backup for **Q55 (Multi-Tenant SaaS Design)** specifically — if Coforge asks "have you actually built something like this," this is your answer: JWT with tenant/role claims validated once at the APIM gateway, six microservices each owning its own database (Cosmos DB for high-volume ownership time-series, Azure SQL for relational data, Redis cache-aside for hot reads), Service Bus pub/sub for cross-service events, and Azure Functions for long-running async report generation.
+Built from your real Capital Access work (S&P Global) — a multi-tenant SaaS platform for Investor Relations teams at 7,500+ corporate issuer clients, on Angular 18 + Azure microservices. This project is a strong real-world backup for **Q55 (Multi-Tenant SaaS Design)** specifically — if Coforge asks "have you actually built something like this," this is your answer: JWT with tenant/role claims validated once at the APIM gateway, six microservices each owning its own database (Cosmos DB for high-volume ownership time-series, Azure SQL for relational data, Redis cache-aside for hot reads), Service Bus pub/sub for cross-service events, and Azure Functions for long-running async report generation.
 
 **Story 1 — End-to-End Architecture Ownership: OIDC Authentication for a Multi-Tenant Platform**
 
-- **Situation:** Capital Access serves 2,500+ corporate issuer clients on one shared platform — every API call has to be provably scoped to the calling tenant, in a regulated financial-services context where a cross-tenant data leak isn't a bug, it's an incident.
+- **Situation:** Capital Access serves 7,500+ corporate issuer clients on one shared platform — every API call has to be provably scoped to the calling tenant, in a regulated financial-services context where a cross-tenant data leak isn't a bug, it's an incident.
 - **Risk:** Authentication alone ("who is this user") doesn't answer authorization ("can this user see this tenant's data") — and if that check isn't enforced consistently across six independent microservices, one team's oversight becomes every tenant's exposure.
 - **Options considered:** (a) let each of the six microservices independently validate tenant access, (b) a shared library every service must remember to call correctly, (c) enforce it once, centrally, before any request reaches a service.
 - **My recommendation:** OIDC via Okta issuing a JWT carrying custom tenant-ID and role claims, validated at the Azure API Management gateway — the single entry point every request passes through — before it's ever routed to a microservice. Tokens live in memory only (never localStorage), with an HTTP interceptor handling silent renewal before expiry and a 401-triggered refresh-then-retry before forcing logout.
@@ -3810,7 +3810,7 @@ Built from your real Capital Access work (S&P Global) — a multi-tenant SaaS pl
 
 **Story 2 — Performance Improvement: Bundle-Size Reduction with a Permanent Guardrail**
 
-- **Situation:** The Angular frontend's legacy NgModule-based build was pulling the entire application into the initial bundle regardless of which of the 8+ feature modules a given IR team actually used — slow first load for every one of 2,500+ clients' users.
+- **Situation:** The Angular frontend's legacy NgModule-based build was pulling the entire application into the initial bundle regardless of which of the 8+ feature modules a given IR team actually used — slow first load for every one of 7,500+ clients' users.
 - **Baseline:** Measured initial bundle size and load time before any change, to have a real before/after comparison rather than an impression.
 - **Diagnosis:** The eager-loaded NgModule architecture had no boundary forcing code-splitting — everything shipped on first paint.
 - **Change:** Migrated to Angular 18 standalone components and switched the build to esbuild, enabling proper lazy-loading boundaries per module.
@@ -3820,7 +3820,7 @@ Built from your real Capital Access work (S&P Global) — a multi-tenant SaaS pl
 
 **Story 3 — Modernization: Incremental Migration Under Live Traffic**
 
-- **Situation:** Same underlying migration as Story 2, told with a different emphasis — a live platform serving 2,500+ paying enterprise clients, running on a legacy webpack + NgModule Angular architecture across 8+ feature modules, needed modernizing without an outage window.
+- **Situation:** Same underlying migration as Story 2, told with a different emphasis — a live platform serving 7,500+ paying enterprise clients, running on a legacy webpack + NgModule Angular architecture across 8+ feature modules, needed modernizing without an outage window.
 - **Why not big-bang:** A full rewrite carries real risk to a platform this size — any regression is immediately visible to every client, and a multi-week code freeze isn't acceptable for an actively-used enterprise product.
 - **Approach:** Migrated module-by-module to Angular 18 standalone components, with old and new coexisting during the transition, validating each migrated module in production before moving to the next.
 - **Result:** 30% bundle-size reduction, a modernized build pipeline, zero downtime across the whole migration.

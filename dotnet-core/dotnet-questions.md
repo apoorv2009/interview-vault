@@ -2398,7 +2398,7 @@ await Task.WhenAll(t1, t2, t3, t4);
 var ownership = await t1; var profile = await t2;
 
 // Parallel.ForEach — CPU-bound work spread across multiple CPU cores
-// Capital Access: calculating targeting scores for 2500 companies (pure computation)
+// Capital Access: calculating targeting scores for 7500 companies (pure computation)
 Parallel.ForEach(allCompanies, company =>
 {
     var score = CalculateTargetingScore(company); // CPU work — each on its own thread
@@ -2417,7 +2417,7 @@ Parallel.ForEach(companyIds, async id =>
 | Best for | I/O bound (DB, HTTP, Service Bus) | CPU bound (calculations, transformations) |
 | Threads during wait | 0 — released | 1 per item from thread pool |
 | async support | Native | Problematic |
-| Capital Access use | Report data aggregation (4 services) | Score calculations for 2500 companies |
+| Capital Access use | Report data aggregation (4 services) | Score calculations for 7500 companies |
 
 ---
 
@@ -2644,7 +2644,7 @@ var tasks = companies.Select(async company =>
     try { return await _api.GetScoreAsync(company.Id); }
     finally { semaphore.Release(); }
 });
-await Task.WhenAll(tasks); // 10 at a time, not 2500 simultaneously ✅
+await Task.WhenAll(tasks); // 10 at a time, not 7500 simultaneously ✅
 ```
 
 > **Interview line**: "The most common async deadlock in .NET is mixing sync and async — calling .Result on an async method in old ASP.NET caused the continuation to wait for the blocked calling thread, which was waiting for the continuation. In ASP.NET Core there's no SynchronizationContext so it doesn't deadlock the same way, but the pattern is still wrong. In Capital Access, we maintain async all the way — from controller to repository. For shared state like our tenant cache, we use SemaphoreSlim which supports async waiting so threads aren't blocked."
@@ -2703,7 +2703,7 @@ catch (Exception ex)
 }
 
 // PROBLEM 5: Thundering herd — too many parallel tasks overwhelm downstream
-var tasks = companies.Select(c => _api.GetScoreAsync(c.Id)); // 2500 at once ❌
+var tasks = companies.Select(c => _api.GetScoreAsync(c.Id)); // 7500 at once ❌
 // Fix: SemaphoreSlim to throttle — see deadlock section above
 ```
 
@@ -4335,7 +4335,7 @@ Weak Reference:
 **Scenario 1 — Memory-sensitive cache (most common):**
 ```csharp
 // Capital Access: large report PDFs cached after generation
-// Strong cache: if 2500 tenants each have a cached PDF (3MB each) → 7.5GB ❌
+// Strong cache: if 7500 tenants each have a cached PDF (3MB each) → 22.5GB ❌
 // WeakReference cache: GC evicts least recently used PDFs under memory pressure
 private readonly ConcurrentDictionary<Guid, WeakReference<byte[]>> _reportCache = new();
 

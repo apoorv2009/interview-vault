@@ -2019,10 +2019,10 @@ else:
 **7. Fact-checking with external API**
 
 ```
-LLM generates: "Capital Access serves 2,500+ institutional clients"
+LLM generates: "Capital Access serves 7,500+ institutional clients"
 
 Fact-check:
-1. Extract claim: "Capital Access serves 2,500+ clients"
+1. Extract claim: "Capital Access serves 7,500+ clients"
 2. Check against knowledge base: ✅ Verified
 3. Show answer with confidence badge
 

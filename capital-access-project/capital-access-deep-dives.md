@@ -23,11 +23,11 @@ Azure App Service is the compute tier where all 6 microservices (Ownership, Prof
 
 **Compared to VMs (Azure VMs):**
 - VMs require manual OS patching, security updates, and dependency management — each patch is an operational decision and a risk vector
-- Capital Access serves 2,500+ regulated clients; every unpatched VM is a compliance audit question
+- Capital Access serves 7,500+ regulated clients; every unpatched VM is a compliance audit question
 - VMs force you to manage infrastructure — provisioning, decommissioning, networking — that scales linearly with team size
 - **App Service abstracts the OS away:** Microsoft patches automatically, certification is simpler, and you focus on code
 
-> **Anticipate this follow-up:** *"But Virtual Machine Scale Sets (VMSS) can autoscale too — so why not VMs?"* — True, and worth saying so directly rather than getting caught out by it. VMSS gives metric-based and schedule-based autoscaling structurally similar to App Service's. **Autoscaling capability was never the differentiator.** The actual reason is *operational ownership of the layer underneath the scaling*: with VMSS you still own OS patching, VM image management, and networking/NSG configuration yourself. With App Service, Microsoft owns everything below the application layer. For a team serving 2,500+ regulated clients, that patching/compliance ownership — not scaling — is what tips the decision toward App Service.
+> **Anticipate this follow-up:** *"But Virtual Machine Scale Sets (VMSS) can autoscale too — so why not VMs?"* — True, and worth saying so directly rather than getting caught out by it. VMSS gives metric-based and schedule-based autoscaling structurally similar to App Service's. **Autoscaling capability was never the differentiator.** The actual reason is *operational ownership of the layer underneath the scaling*: with VMSS you still own OS patching, VM image management, and networking/NSG configuration yourself. With App Service, Microsoft owns everything below the application layer. For a team serving 7,500+ regulated clients, that patching/compliance ownership — not scaling — is what tips the decision toward App Service.
 
 **Compared to AKS (Azure Kubernetes Service):**
 - AKS is optimized for systems with 50+ microservices, complex inter-service networking, and polyglot workloads
@@ -288,7 +288,7 @@ public class OwnershipDbContext : DbContext
 }
 ```
 
-All 6 App Service instances run the same code but with the tenant ID enforced at the middleware and database layer. There's no need for separate App Service instances per tenant — one set of instances serves all 2,500 tenants.
+All 6 App Service instances run the same code but with the tenant ID enforced at the middleware and database layer. There's no need for separate App Service instances per tenant — one set of instances serves all 7,500 tenants.
 
 ### Networking & Security
 
@@ -1055,7 +1055,7 @@ From APIM's perspective, each microservice is a single endpoint (e.g., `ownershi
 
 **The common interview question: "Why didn't you choose VMs or Kubernetes for more control?"**
 
-For a multi-tenant SaaS platform like Capital Access serving 2,500 enterprises, **App Service is actually MORE secure than VMs, not less.**
+For a multi-tenant SaaS platform like Capital Access serving 7,500 enterprises, **App Service is actually MORE secure than VMs, not less.**
 
 **Patch Management (Critical for SaaS):**
 - **App Service**: Microsoft patches the OS and runtime automatically. We never miss a patch.
@@ -1172,7 +1172,7 @@ Angular Route Config:
 ```
 
 > 🚩
-> **Why this is hard:** Migrating auth on a live multi-tenant SaaS is like changing the locks on a building while people are inside. If anything breaks, 2,500+ companies lose access instantly.
+> **Why this is hard:** Migrating auth on a live multi-tenant SaaS is like changing the locks on a building while people are inside. If anything breaks, 7,500+ companies lose access instantly.
 
 | Before (SAML) | After (Okta OIDC) |
 | --- | --- |
@@ -1193,7 +1193,7 @@ Angular Route Config:
 
 > 🗣️ **Say this:**
 >
-> The trickiest thing I've worked on was the SAML to Okta OIDC migration. We were moving auth on a live platform serving 2,500+ companies — if anything broke, nobody could log in. My ownership was the frontend side: I replaced the SAML redirect flow with Okta's OIDC flow using okta-auth-js, built the HTTP interceptor to attach Bearer JWTs and handle token refresh on 401, and implemented silent token renewal so users never see an unexpected logout. The riskiest part was the cutover. We handled it using per-tenant feature flags — we migrated one tenant at a time, so we could roll forward or roll back per client without a full outage. The user provisioning side was handled by a separate infra team, so I can speak to the frontend auth flow in detail.
+> The trickiest thing I've worked on was the SAML to Okta OIDC migration. We were moving auth on a live platform serving 7,500+ companies — if anything broke, nobody could log in. My ownership was the frontend side: I replaced the SAML redirect flow with Okta's OIDC flow using okta-auth-js, built the HTTP interceptor to attach Bearer JWTs and handle token refresh on 401, and implemented silent token renewal so users never see an unexpected logout. The riskiest part was the cutover. We handled it using per-tenant feature flags — we migrated one tenant at a time, so we could roll forward or roll back per client without a full outage. The user provisioning side was handled by a separate infra team, so I can speak to the frontend auth flow in detail.
 
 
 ---
@@ -1339,7 +1339,7 @@ Answer:
 **Q: Q: How did you handle the SAML to Okta migration without downtime?**
 
 Answer:
-        We used per-tenant feature flags. Rather than switching all 2,500+ clients at once, we migrated one tenant at a time. Each tenant had a flag that controlled whether their auth flow used the old SAML redirect or the new Okta OIDC flow. We started with internal test tenants, validated everything, then gradually rolled out to production clients. If a specific tenant had issues, we flipped their flag back to SAML without affecting anyone else. The user provisioning side was handled by the infra team. My side — the Angular auth flow — was ready ahead of the tenant rollout so each migration was just a flag change.
+        We used per-tenant feature flags. Rather than switching all 7,500+ clients at once, we migrated one tenant at a time. Each tenant had a flag that controlled whether their auth flow used the old SAML redirect or the new Okta OIDC flow. We started with internal test tenants, validated everything, then gradually rolled out to production clients. If a specific tenant had issues, we flipped their flag back to SAML without affecting anyone else. The user provisioning side was handled by the infra team. My side — the Angular auth flow — was ready ahead of the tenant rollout so each migration was just a flag change.
 
 
 ---
