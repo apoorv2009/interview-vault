@@ -1,6 +1,6 @@
 # Capital Access — Interview Preparation
 
-**Production SaaS platform for Investor Relations teams.** My role: Lead Software Development Engineer, S&P Global (Dec 2024 – Present).
+**Production SaaS platform for Investor Relations teams.** My role: Application Architect, S&P Global (Dec 2024 – Present).
 
 This directory contains **complete, production-grade interview prep** for the Capital Access microservices architecture, operations, and deployment strategy. Everything is self-contained — no external references needed.
 

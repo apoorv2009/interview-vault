@@ -144,7 +144,7 @@ STAR-format answers for behavioural interview questions — leadership, conflict
 
 ## capital-access-project
 
-Interview prep tied to my current role: S&P Global, Lead Software Development Engineer, Capital Access (Dec 2024 – Present).
+Interview prep tied to my current role: S&P Global, Application Architect, Capital Access (Dec 2024 – Present).
 
 - `capital-access-interview-story.html` — single-file doc (open in browser). Covers: role overview, OIDC auth, Angular 18 migration, multi-tenancy, CI/CD, STAR story, and Azure service deep dives.
 - `README.md` — checklist of deep dives done vs. planned.

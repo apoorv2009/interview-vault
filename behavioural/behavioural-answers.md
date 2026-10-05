@@ -97,7 +97,7 @@
 
 That journey changed the way I approach problems — from asking, "How do I build this feature?" to "How should the whole system be designed so that it's scalable, secure, reliable and maintainable?"
 
-Currently, I'm a Lead SDE at S&P Global working on the Capital Access platform. Along with my core platform responsibilities, more recently I've been working on applying GenAI to real enterprise problems.
+Currently, I'm an Application Architect at S&P Global working on the Capital Access platform. Along with my core platform responsibilities, more recently I've been working on applying GenAI to real enterprise problems.
 
 One of the key use cases was Investor Relations report analytics.
 

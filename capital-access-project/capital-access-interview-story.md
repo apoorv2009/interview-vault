@@ -43,7 +43,7 @@ Azure Hosted
 >
 > Capital Access is a web platform used by Investor Relations (IR) teams in public companies. It helps them find and connect with investors, track who owns their company's shares, and manage investor communication — all in one place. The platform is used by over 7,500 companies worldwide and uses S&P Global data such as Capital IQ Pro and Visible Alpha.
 >
-> I work as a Lead Software Development Engineer on the frontend using Angular 18. I also work with Azure-based microservices, Okta authentication, and CI/CD pipelines.
+> I work as an Application Architect on Capital Access, owning the application architecture and back-end service design for our .NET Core microservices on Azure, and leading the AI initiatives: RAG-based report analytics and Claude-powered client onboarding. I also guide the Angular 18 frontend, Okta authentication, and CI/CD pipelines.
 
 ## How to Explain the Full Project Flow Verbally (Interview Script)
 
@@ -83,7 +83,7 @@ An important architectural decision here is that each service has its own databa
 
 ## Your Role & Ownership
 
-You joined as **Lead Software Development Engineer** in December 2024. Your ownership spans three distinct areas:
+You joined as **Application Architect** in December 2024. Your ownership spans three distinct areas:
 
 | Area | What you own | Impact |
 | --- | --- | --- |
@@ -682,7 +682,7 @@ Capital Access is an enterprise product used at institutional clients — legal 
 
 > 🗣️ **Say this:**
 >
-> I currently work at S&P Global as a Lead Software Development Engineer on Capital Access — it's S&P's web platform for Investor Relations teams at publicly listed companies. The platform serves over 7,500 corporate issuers worldwide, helping them find and connect with investors, track ownership, and manage investor communications.
+> I currently work at S&P Global as an Application Architect on Capital Access — it's S&P's web platform for Investor Relations teams at publicly listed companies. The platform serves over 7,500 corporate issuers worldwide, helping them find and connect with investors, track ownership, and manage investor communications.
 >
 > The backend is a microservices architecture on Azure — five core services each with their own data store: an Ownership Service that holds institutional ownership percentages and historical data in Cosmos DB, a Profiles Service for company financials and metadata in Azure SQL, a Targeting Service for investor targeting scores backed by Azure SQL with Redis caching for fast reads, a Contacts Service for IR relationship management, and a Notifications Service for ownership change alerts. Services communicate asynchronously through Azure Service Bus Topics — when ownership data changes, the Service Bus event fans out to both the Targeting and Notifications services independently without any tight coupling between them.
 >
