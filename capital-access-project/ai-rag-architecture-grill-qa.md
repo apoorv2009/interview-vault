@@ -398,6 +398,11 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Say this:** "Each was chosen on a benchmark for its task: the Gemini Flash-class model was strong and cheap for OCR over complex PDF layouts, Gemini embeddings scored well on our retrieval golden set, and Claude was strongest on grounded synthesis and structured extraction. The liabilities are real: three data-processing agreements, three sets of rate limits, three outage surfaces, and cross-cloud data egress. The gateway contains that — one place for keys, routing, metering and fallback."
 
+**Embedding model: Google `gemini-embedding-001`** (confirmed by Apoorv). Say the full name, not "Gemini-001". Facts: GA mid-2025 via Gemini API / Vertex AI; **3072 dims default** with **Matryoshka (MRL) truncation** (768 / 1536 / 3072 recommended); ~2,048-token input limit; **task types** (retrieval-document vs retrieval-query); multilingual, top of MTEB multilingual at launch.
+- ⚠️ To confirm before quoting: **which dimension was stored in Pinecone** and **whether task types were used**.
+- "Why not Claude embeddings?" → **Anthropic has no embedding model**; its docs point to Voyage AI (incl. finance-specific `voyage-finance-2`). If asked whether you benchmarked a finance model and you didn't: "worth adding to the benchmark — I'd only switch if it beats recall@k by enough to justify a full re-index."
+- On Azure today: benchmark against **text-embedding-3-large / -small** and **Cohere embed in Foundry** to keep everything inside the Azure boundary.
+
 **Key points:**
 - **Embedding choice is the stickiest decision** — switching means re-embedding everything (Q18). Generation models are easy to swap; embeddings are not.
 - Data governance: all providers under zero-retention / enterprise terms, ideally via private cloud offerings rather than public endpoints (Q59).
@@ -1669,6 +1674,15 @@ Plus the operational set: TTFT and latency per tier, fallback rate, cache hit ra
 - "Does reranking replace filters?" → Never. Security and period filters apply **before** ranking; the reranker only orders what the user is allowed to see.
 
 > **Honesty check:** the "hybrid search + rerank" label was added to the diagram during prep. If your system is dense-only today, say: "Today retrieval is dense with hard metadata filters; hybrid search with reranking is the next improvement, for exactly the identifier problem" — and give the design above.
+
+**Reranker model — Claude Haiku as an LLM reranker (⚠️ recollection, to confirm).** Apoorv recalls Haiku was used; exact setup not verified. If confident, say:
+
+"After hybrid retrieval and filtering, the top ~30 candidates went to **Claude Haiku in one listwise call** — structured output (chunk ID + relevance score), temperature 0 — and we kept the top 5–8. Why Haiku: it was **already behind our LLM gateway** (no new vendor, DPA or outage surface on top of Gemini, Claude and Pinecone), it could apply **IR-specific relevance rules** a generic reranker can't ('a chunk about a different fund or period is irrelevant even if it looks similar'), and it was the **fastest tier in our stack**. Prompt caching on the fixed instructions kept cost down."
+
+- Say "fastest tier in our stack", **not** "fastest reranker" — dedicated cross-encoders (Cohere, bge, Pinecone-hosted) are usually faster and cheaper per query.
+- **Trade-offs + mitigations:** higher cost/latency than a cross-encoder → one batched call, short chunk text, skip for simple lookups; non-determinism → temperature 0 + fixed score scale; **position bias** → shuffle candidate order; Haiku failure → **fall back to RRF order**; proof of value → recall@5 / MRR with vs without reranking on the golden set.
+- **Today on Azure:** benchmark Haiku against the **AI Search semantic ranker** (built in) and **Cohere Rerank** (Foundry catalog); keep LLM reranking only if its domain judgment clearly wins.
+- **If unsure in the interview:** "a cross-encoder-style rerank step; the exact model was pinned in config" — own the decision and the evaluation, not the model name.
 
 [⬆ Back to top](#top)
 
