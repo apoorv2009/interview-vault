@@ -1606,7 +1606,17 @@ Plus the operational set: TTFT and latency per tier, fallback rate, cache hit ra
 
 **Why they were required:** one IR question needs decisions (skip planner), loops (weak retrieval → retry), shared state across agents, memory across turns and bounded execution — that's graph orchestration, not a linear chain. LangGraph gave checkpointing, interrupts and the graph model without building them ourselves; LangChain saved integration work across three vendors.
 
-⚠️ Know before quoting: **which checkpointer backend** (in-memory / Postgres / Redis / Cosmos-backed custom) — the vault elsewhere says conversation memory lived in **Cosmos DB** (Q13); and whether interrupts were actually used in production or only designed.
+**✅ Checkpointer confirmed (Apoorv, Oct 2026): Cosmos DB-backed LangGraph checkpointer.** (LangGraph's official savers are in-memory/SQLite/Postgres/Redis, so Cosmos was a community package or our own implementation of the checkpoint-saver interface — if unsure which, just say "a Cosmos DB-backed checkpointer".)
+
+**Say this:** "Short-term memory was LangGraph's **checkpointer, backed by Cosmos DB**. Each conversation was a **thread keyed by tenant + conversation ID**; after every node the graph state — messages, resolved entities (period, report), retrieved chunk IDs, draft — was checkpointed, which is what makes follow-ups like 'and vs last year?' work and lets a run resume after a failure. **Why Cosmos:** already in our Azure platform; **hierarchical partition key tenant ID + conversation ID** (Q26); **session consistency** is enough; continuous backup + **TTL** for retention. We never sent full history to the model — **rolling summary + last few turns**. Tenant ID is **injected by code, never chosen by the model**."
+
+- **Checkpointer vs store:** checkpointer = per-thread short-term state (multi-turn, resume, interrupts, time-travel); **store** = cross-thread long-term memory. No long-term memory in the vault → "deliberately per-conversation only — cross-session memory in a regulated product raises retention and minimisation questions; if added, LangGraph store with tenant-scoped namespaces."
+- **Why not Postgres?** Most mature LangGraph checkpointer and a good default, but Cosmos was already our platform store with partitioning, backup and ops in place — not worth a new database just for checkpoints.
+- **Why not Redis?** Conversation state is **state, not cache** — needs durability and backup.
+- **Size/cost:** TTL retention, store **chunk IDs not chunk text** in state, summarise old turns, keep large payloads out of state.
+- **Microsoft mapping:** Agent Framework threads are serialisable with a pluggable message store (Cosmos); Foundry Agent Service standard setup can use **your own Cosmos DB** for conversation state.
+
+⚠️ Still to confirm: whether **interrupts** were used in production or only designed.
 
 **Foundry / Microsoft tie-in:** a LangGraph agent can run unchanged as a **Foundry hosted agent** (hosting, scaling, Entra identity, tracing); for a .NET-first Capgemini client the equivalent is **Microsoft Agent Framework** workflows.
 
