@@ -4,12 +4,27 @@
 
 **Project:** AI-Powered Report Analytics (multi-agent RAG in MS Teams) + Client Onboarding Automation (Claude-powered extraction)
 **Persona:** Architect track — Capital Access, S&P Global
-**Interview:** 30 Sept 2026
+**Interviews:** Optum 30 Sept 2026 · Capgemini (Director round, Agentic AI Architect) Oct 2026
 **Architecture diagram:** [Excalidraw room](https://excalidraw.com/#room=9fb970273da3b28e42b3,gBt8LaXPVZMJEG3py3kwWg)
 
 > **Optum interview (30 Sept, 1 hr):** start with [Part K](#q93) and [Part L](#code-l1), then the project deep-dive parts.
 >
 > **How to use this file:** Read the "Say this" part out loud — interviews are spoken. "Key points" is what the panel is listening for. "Trap" is where interviewers push next. Answers are verbal theory — no code needed.
+>
+> **Capgemini (Agentic AI Architect, Microsoft stack, Oct 2026):** start with [Part M](#part-m), then Q7, Q11, Q15, Q27, Q53, Q74, Q107, Q109, Q110.
+
+### Confirmed project facts (Oct 2026) — single source of truth
+
+| Area | Confirmed | Where |
+|---|---|---|
+| Orchestration | **LangGraph** (orchestrator) + **LangChain** (building blocks) — not a custom orchestrator | [Q107](#q107) |
+| Conversation memory | **Cosmos DB-backed LangGraph checkpointer**, thread = tenant + conversation ID | [Q107](#q107), [Q116](#q116) |
+| Embeddings | Google **gemini-embedding-001** | [Q8](#q8) |
+| Reranker | **Claude Haiku as LLM reranker** (recollection — confirm) | [Q110](#q110) |
+| Output guardrail | Deterministic checks + **Claude Haiku** for claim-level groundedness | [Q115](#q115) |
+| Golden set | Seeded by the **IR business team** (questions + answers); engineering added sources, entities, tags | [Q118](#q118) |
+
+**⚠️ Still to confirm before quoting:** Pinecone vector dimension and whether Gemini task types were used (Q8) · whether LangGraph interrupts ran in production (Q107) · offline judge model — Gemini (cross-family) or Opus (Q119) · streaming vs verify-then-show (Q53) · Bicep or Terraform, and where the orchestrator / extraction service run (Q80) · LLM gateway: APIM only, or APIM + FastAPI gateway service; orchestrator on FastAPI? (Q109) · how onboarding extraction was evaluated (Q118) · real latency numbers (Q53).
 
 ---
 
@@ -154,6 +169,18 @@
 113. [Are your agents separate APIs talking to the LLM? Should agents be part of the LLM Gateway?](#q113)
 114. [What are the deployment strategies, and which did you follow?](#q114)
 - [Questions to ask the Optum panel + leadership STAR template](#optum-questions)
+
+**Part M — Capgemini: agentic AI on the Microsoft stack + confirmed deep dives**
+115. [What guardrails did you implement in LangGraph, and which model runs the output guardrail?](#q115)
+116. [What is memory management in an agent, how did you do it, and what is episodic memory?](#q116)
+117. [How do you handle hallucinations end to end?](#q117)
+118. [How did you build the golden data set, how do you keep it updated, and where do evals run?](#q118)
+119. [Which model is the LLM judge — and should the judge be a higher or lower model?](#q119)
+120. [Can APIM route calls to different models without code? What is Foundry's model router?](#q120)
+121. [Why did you build all this when Azure AI Foundry exists? What would Foundry have changed?](#q121)
+122. [How would you take a Foundry agent from POC to production?](#q122)
+123. [How does your LangGraph design map to Semantic Kernel and Microsoft Agent Framework?](#q123)
+124. [What does "deploying a model" in Foundry mean — does data go to OpenAI or Anthropic?](#q124)
 
 **Part L — Coding: end-to-end RAG pipeline**
 - [L1. RAG from scratch — no framework](#code-l1)
@@ -389,6 +416,21 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "So you picked wrong?" → "I picked for speed of delivery and scale; the gateway and retrieval abstraction mean swapping the store is a re-index, not a rewrite."
 
+**Follow-up: "Why Pinecone over Qdrant or another vector DB?"** (Oct 2026). Present it as a criteria-based choice; only say "we benchmarked Qdrant" if you did.
+- **Why Pinecone won then:** fully managed serverless (zero ops — no clusters, sharding, upgrades); **namespace per tenant** for 7,500+ issuers (isolation, performance, tenant deletion = drop namespace); sparse-dense hybrid plus hosted inference/reranking options; scale to millions of chunks; mature LangChain integration → speed of delivery.
+
+| Option | Strength | Why not then |
+|---|---|---|
+| **Qdrant** | Open source (Rust), very strong filtering, tenant-aware payload indexes, quantisation; self-host or Qdrant Cloud (incl. Azure) | Self-hosting = running it ourselves; Qdrant Cloud closes most of that gap. Strong pick when data must stay in your own environment |
+| **Weaviate** | Open source, built-in hybrid | Same managed-vs-self-hosted trade-off |
+| **Milvus / Zilliz** | Billions of vectors, GPU indexes | More than we needed |
+| **pgvector** | Joins with relational data | Tuning at millions of chunks × many tenants |
+| **Azure AI Search** | Native hybrid (RRF) + semantic ranker, security filters, private endpoints inside Azure | Strongest Azure alternative — **evaluate first today** |
+| **Cosmos DB vector search** | DiskANN vectors + full-text + hybrid in the store we already used for chat memory | Worth evaluating today to keep one data boundary |
+
+- **Say:** "Today, for an Azure client with strict data boundaries, I'd benchmark Azure AI Search and Cosmos DB vector search first, and Qdrant where self-hosting is required — on the same golden set: recall@k, latency, cost per query."
+- **Namespace limits:** check namespaces per index for 7,500+ tenants; if needed shard tenants across indexes with a tenant→index routing table.
+
 [⬆ Back to top](#top)
 
 ---
@@ -452,6 +494,25 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "How do you choose chunk size?" → Empirically, against the retrieval golden set (recall at k), not by folklore.
 
+**Follow-up: "What chunking strategies exist?"** (Oct 2026)
+
+| Strategy | Good for | Weakness |
+|---|---|---|
+| Fixed-size | Baselines | Cuts sentences and tables |
+| Fixed + overlap (sliding window) | Facts on boundaries | More chunks, near-duplicates |
+| Recursive (section → paragraph → sentence) | General default | No real semantics |
+| **Structure-aware (layout/heading)** | **Reports, contracts** | Needs good parsing |
+| Semantic (split where embeddings shift) | Unstructured narrative | Slow, variable sizes |
+| **Table-aware (rows + repeated header + caption)** | **Financial tables** | Large tables need row grouping |
+| **Parent-child (small-to-big)** | Precision + context | Two levels to manage |
+| Sentence-window | Fact Q&A | Narrow context |
+| Contextual chunking (prepend doc context) | Chunks meaningless alone | Extra LLM cost at ingestion |
+
+- **Ours:** structure-aware recursive for narrative + table-aware for tables + parent-child + rich metadata + deterministic chunk IDs, sized on recall@k.
+- **"Exact chunk size?"** → "Different per content type, tuned on recall@k — moderate narrative chunks with small overlap; tables sized by row groups." Don't invent exact numbers.
+- **"Why not semantic chunking?"** → Reports already have strong structure; using it was more accurate and much cheaper.
+- **On Azure:** AI Search **Document Layout skill** (split by markdown headers, tables preserved), **Text Split skill** with overlap, integrated vectorization; captions via a GenAI prompt or custom skill.
+
 [⬆ Back to top](#top)
 
 ---
@@ -478,6 +539,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 
 **Trap:** "Why keep full chat history?" → You keep a summarised memory plus recent turns to fit the context window; the rewrite step uses it so retrieval stays accurate.
 
+**See also:** memory management and the Cosmos DB-backed LangGraph checkpointer — [Q116](#q116), [Q107](#q107). Resolved entities live as explicit fields in graph state, so they survive summarisation exactly.
+
 [⬆ Back to top](#top)
 
 ---
@@ -490,6 +553,8 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 **Key points:** LLMs are unreliable at arithmetic; never let them compute percentages or deltas that matter.
 
 **Trap:** "What if the source itself has an OCR error?" → That's why the structured lane (Q5) matters for our own reports.
+
+**See also:** the full four-layer hallucination answer (prevent → detect → respond → measure) — [Q117](#q117).
 
 [⬆ Back to top](#top)
 
@@ -508,6 +573,10 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 **Key points:** Golden set of real IR questions with expected answers and expected sources; run in CI on every prompt/model change and on a sample of live traffic.
 
 **Trap:** "How big is the golden set?" → Start 100–200 cases covering question types and tenants; grow it from production failures and reviewer corrections.
+
+**Layered metrics (Oct 2026):** retrieval (recall@k, MRR, context precision/recall, **period/entity match**) → generation (claim-level groundedness, relevance, citation accuracy, **numeric accuracy**) → system (escalation rate per tier, TTFT/latency, cost per query/tenant, guardrail block rate) → users/business (thumbs-down, escalation to human, 2–3 h → ~10 min). Most RAG "hallucinations" are retrieval failures — measure retrieval separately.
+
+**See also:** golden-set creation, maintenance and the eight places evals run — [Q118](#q118); which judge model and why — [Q119](#q119). ⚠️ Onboarding extraction metrics aren't recorded — if asked, field-level precision/recall/F1, schema-validity rate, human-correction rate and auto-accept share are the standard set; say "how I'd measure it" unless you used them.
 
 [⬆ Back to top](#top)
 
@@ -668,6 +737,10 @@ Underneath, reports are generated asynchronously through Service Bus and Azure F
 5. **Chat memory** is state, not cache.
 
 **Key points:** Every cache key that touches client data includes **tenant ID**. Cross-tenant cache leakage is a data breach, not a bug.
+
+**Design rules (Oct 2026):** prefer **version-based keys** over TTL-based invalidation (correctness doesn't wait for expiry); semantic cache only where entities don't change the answer, with a high similarity threshold; caches are **optional for availability** — bypass Redis if it's down, never fail the request; **cache hit rate** is on the dashboard. Platform side: Targeting Service cache-aside with Redis (1-hour TTL, invalidated on score recompute); entitlements cached with a short TTL.
+- **"How do you normalise questions?"** → Lowercase, trim, collapse whitespace — and above all key on the **resolved entities**, not the wording, so rephrasings share an entry.
+- **On Azure:** APIM semantic-caching policy (Azure Managed Redis) + provider prompt caching; caveat — APIM's built-in LLM policies target OpenAI-compatible / Foundry APIs, so native Claude/Gemini APIs needed caching in our gateway code.
 
 [⬆ Back to top](#top)
 
@@ -951,6 +1024,16 @@ Run DR drills — an untested restore is a hope, not a plan."
 
 **Say this (illustrative):** "Roughly: gateway and guardrails ~100 ms, planner on Haiku ~300–500 ms, query embedding ~100 ms, hybrid search ~100–200 ms, rerank ~200 ms, synthesis on Sonnet — time to first token ~1 s, full answer 4–7 s. **Generation dominates**, and output length drives it, because output tokens are generated one at a time. Optimisations: stream to cut perceived latency; cap output length; fewer but better chunks via reranking so prefill is smaller; prompt caching for the static prefix; run independent retrievals in parallel; skip the planner for obvious single-intent questions; response cache for repeated questions."
 
+**Optimisations grouped (Oct 2026):**
+- **Do less work:** versioned response cache; skip planner via a LangGraph conditional edge; model routing (Haiku for planner/guardrails/rerank, Sonnet/Opus only for synthesis); skip rerank and full groundedness for simple lookups.
+- **Faster calls:** rerank to 5–8 chunks; prompt caching (static prefix first); cap output length; one batched Haiku call for rerank and for claim checks.
+- **Parallelise:** dense + sparse legs in parallel; per-period retrievals in parallel; deterministic checks first (ms), then Haiku.
+- **Perceived latency (Q50):** immediate Teams ack + typing indicator; progress updates; async jobs + proactive message for long analyses; per-stage timeout budget.
+- **Infra:** query-embedding cache; gateway fallback/circuit breaker; connection reuse (keep-alive) to providers and Pinecone.
+- **Biggest single win:** rerank to fewer chunks + cap output length, then response caching.
+
+> ⚠️ **Resolve before quoting — streaming vs verification.** This file says both "stream the answer" and "verify, then stream" (L5). You can't stream raw tokens *and* verify the whole answer first. Pick what you built: **(1) verify-then-show** with progress updates (best fit for finance — "an unverified number shown then retracted is worse than waiting two seconds"); **(2) stream narrative, hold back sentences with numbers** until they pass numeric verification; **(3) stream then verify** — avoid claiming unless true. Use real P95/TTFT numbers if you have them.
+
 [⬆ Back to top](#top)
 
 ---
@@ -1152,6 +1235,10 @@ Run DR drills — an untested restore is a hope, not a plan."
 
 **Say this:** "Buy where it's commodity, build where it's differentiating. Teams hosting, identity and the bot channel are bought. The differentiating parts are domain-specific: period-aware retrieval over IR reports, numeric verification, client-data extraction schemas and review workflow, strict per-tenant isolation for 7,500+ issuers, and cost control per tenant. Managed platforms were evaluated; the gaps were control over retrieval, evaluation, and tenant isolation. The architecture keeps options open — the gateway and retrieval layer can sit behind a managed front end if that changes."
 
+> ⚠️ Only say "managed platforms were evaluated" if true; otherwise "we assessed managed agent platforms in general — the gaps for us were control over retrieval, evaluation and tenant isolation." Orchestration was **LangGraph** (an open framework), not built from scratch.
+
+**See also:** the Azure AI Foundry version of this question and the capability-by-capability comparison — [Q121](#q121).
+
 [⬆ Back to top](#top)
 
 ---
@@ -1273,6 +1360,10 @@ All of it lives in Git, goes through PR review and the eval gate, and every logg
 **Say this:** "All infrastructure is code — Bicep or Terraform modules per component, parameterised per environment, deployed by the pipeline, never by hand in the portal. Hosting follows the workload: the orchestrator and gateway as stateless containers or App Service with autoscale; ingestion and report generation on Azure Functions (Durable for long documents); the FastAPI extraction service as a container — Container Apps or AKS — scaled on queue depth. Secrets are in Key Vault accessed by managed identity; network access to Pinecone and model providers goes through private endpoints where available and egress allow-lists otherwise."
 
 **Trap:** "Why containers for FastAPI but Functions for ingestion?" → Extraction is a long-running Python service with heavy dependencies and steady batch load — containers fit. Ingestion is bursty and event-triggered — Functions fit.
+
+> ⚠️ **Name one of each in the interview** — "X or Y" about your own system sounds like you weren't there. Confirm: **Bicep or Terraform**; where the **LangGraph orchestrator** runs (Container Apps / AKS / App Service for Containers) and whether it's a **FastAPI** service; where the **FastAPI extraction service** runs; whether the **LLM gateway** is APIM only or APIM + a FastAPI gateway service (Q109). Core .NET microservices: **App Service with staging slots**; Teams bot: **Azure Bot Service**.
+
+**Component map (Oct 2026):** six .NET microservices → App Service (autoscale, slots) · LangGraph orchestrator (Python) → container ⚠️ · LLM gateway → APIM ± gateway service ⚠️ · extraction (FastAPI) → container scaled on queue depth ⚠️ · ingestion/report generation → Functions (Durable for long docs) · data → Cosmos DB (chat memory/checkpoints), Pinecone, Blob, Azure SQL, Redis.
 
 [⬆ Back to top](#top)
 
@@ -1661,6 +1752,8 @@ Plus the operational set: TTFT and latency per tier, fallback rate, cache hit ra
 
 > **Before the interview:** know what you actually deployed — one APIM, two, or APIM plus a custom gateway service — and describe that.
 
+**See also:** can APIM route to models with policies alone, and what Foundry's model router does — [Q120](#q120). If the gateway was a FastAPI service: "APIM in front for auth, quotas and internal-only exposure; the FastAPI gateway is the only component allowed to call providers — adapters for Claude and Gemini native APIs, tier→model mapping, fallback, per-tenant metering, semantic cache, PII scrub."
+
 [⬆ Back to top](#top)
 
 ---
@@ -1703,6 +1796,15 @@ Plus the operational set: TTFT and latency per tier, fallback rate, cache hit ra
 - **Trade-offs + mitigations:** higher cost/latency than a cross-encoder → one batched call, short chunk text, skip for simple lookups; non-determinism → temperature 0 + fixed score scale; **position bias** → shuffle candidate order; Haiku failure → **fall back to RRF order**; proof of value → recall@5 / MRR with vs without reranking on the golden set.
 - **Today on Azure:** benchmark Haiku against the **AI Search semantic ranker** (built in) and **Cohere Rerank** (Foundry catalog); keep LLM reranking only if its domain judgment clearly wins.
 - **If unsure in the interview:** "a cross-encoder-style rerank step; the exact model was pinned in config" — own the decision and the evaluation, not the model name.
+
+**Retrieval strategies landscape (Oct 2026)** — for "what retrieval strategies exist?":
+- **Before search:** query rewriting, **entity extraction / self-query (filters)**, multi-query, query decomposition, HyDE, routing to the right index/source.
+- **Search:** dense, sparse (BM25 / SPLADE), **hybrid with RRF**, **metadata filtering**, graph RAG.
+- **After search:** **cross-encoder or LLM reranking**, MMR (diversity), **parent-child**, sentence-window, contextual compression.
+- **Agentic:** corrective RAG (grade → rewrite → retry), self-RAG / iterative, Azure AI Search **agentic retrieval** (LLM plans sub-queries).
+- **Ours:** rewrite + entity resolution (clarify if ambiguous) → hard tenant/period/version filters before ranking → hybrid + RRF → rerank to 5–8 → parent-child with citation metadata → parallel retrieval per period for comparisons → numbers from tools. Tuned on recall@k and MRR.
+- **Retrieval quality is measured separately from generation** (recall@k, MRR, nDCG) — if retrieval misses, generation can't recover.
+- **Claude has no embedding or reranking model of its own**; Anthropic's docs point to Voyage AI (`voyage-4` family, finance-specific `voyage-finance-2`, `voyage-context-4`, `rerank-3`).
 
 [⬆ Back to top](#top)
 
@@ -1863,6 +1965,241 @@ Each agent is a function/class — a **node** in LangGraph terms — with its ow
 | Handled an underperformer | | | |
 | Stakeholder disagreement on an AI initiative | | | |
 | Prioritised or stopped an AI initiative | | | |
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="part-m"></a>
+# Part M — Capgemini: agentic AI on the Microsoft stack + confirmed deep dives
+
+> **Context:** Capgemini Agentic AI Architect JD — Foundry, Azure OpenAI, AI Search, Semantic Kernel / Agent Framework, LangChain/LangGraph, APIM, Functions, Logic Apps, Service Bus, governance. Interviewer is a Foundry / multi-agent specialist: **never bluff Foundry or Semantic Kernel** — use the bridge answers here. Project facts below are the confirmed ones from the table at the top.
+
+<a id="q115"></a>
+### Q115. What guardrails did you implement in LangGraph, and which model runs the output guardrail?
+
+**Say this:** "Two layers. **Generic guardrails in the LLM gateway** — PII scrub, content safety, size limits, per-tenant token budgets — so every AI app gets them. **Domain guardrails as nodes and edges in the LangGraph graph**, because only the application understands reports, periods and tenants. Order matters: input guardrails run first, before any retrieval or tool call; output guardrails run last."
+
+**In the graph** (`guard_input → planner → retrieval → rerank → analysis → synthesis → verify_output → respond`):
+1. **Input node:** Haiku injection classifier via the gateway, scope check (out-of-scope / other-company requests), size limits; **conditional edge → END with a safe refusal** — no retrieval or model calls after a block.
+2. **Tenant isolation by code:** tenant ID from the Entra token through the gateway, **written into state by code, never chosen by the model**; hard filter on every retrieval and tool call.
+3. **Period/entity guard (planner):** resolved period, report, version become hard filters; ambiguous reference → **clarifying question**.
+4. **Loop and cost limits:** graph recursion limit (max steps), retry limit on rewrite-and-retry, per-request and per-tenant token budgets; graceful degradation (skip reranker → RRF order).
+5. **Tool safety:** read-only, least-privilege tools; **no tool can send, delete or modify**; numbers from deterministic tools.
+6. **Output node:** schema check; **citation check** (exists, same tenant, matches resolved period/report); **numeric verification** (every number traceable to a cited chunk or tool output); **claim-level groundedness**. Conditional edge: pass → respond; fail → one stricter retry → safe "I couldn't verify this" with sources.
+7. **Observability:** every guardrail decision is a trace span; raw prompts kept out of logs or redacted.
+
+**Output guardrail model:** "Mostly deterministic code — schema, citation existence and entity match, numeric verification. **Claude Haiku** only for the semantic part — claim-level groundedness and 'does this source support this sentence?'. Haiku because it's on the critical path and the task is narrow; deterministic checks carry the highest-risk items."
+
+**Onboarding (Q58):** documents wrapped as untrusted data; strict-schema structured output; extraction service has no action tools; value validation; human review before anything becomes a profile. **Data (Q59):** PII redaction, MNPI never to external endpoints, zero-retention terms. **Testing:** adversarial suite in CI (injection, cross-tenant probes, out-of-scope, "delete everything").
+
+**Trap:** "Same-family bias — Haiku checking Sonnet?" → Runtime check is narrow and mostly deterministic; **offline evaluation** uses a separately calibrated judge (Q119).
+**Trap:** "Why not rely on the system prompt?" → Prompts are guidance, not enforcement; anything that matters is in code and graph structure.
+**Trap:** "Did you use LangGraph interrupts?" → ⚠️ answer honestly; safe line: "Human review was a separate onboarding step; in analytics, answers were read-only so no approval was needed — interrupts were available in the design."
+**Foundry bridge:** Foundry guardrails (Prompt Shields direct + indirect, PII, content categories at user input / tool call / tool response / output) would replace the **generic** layer; domain guardrails stay as our own nodes or middleware on any platform.
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q116"></a>
+### Q116. What is memory management in an agent, how did you do it, and what is episodic memory?
+
+**Concept:** memory management = what the agent remembers and **what goes into the context window**. Types: **working** (current request state), **short-term / conversation** (this thread), **long-term** (across sessions), **semantic** (facts/knowledge — the RAG index), **episodic** (specific past experiences and their outcomes), **procedural** (instructions, prompts, rules). Why manage it: limited context window and "lost in the middle", token cost and latency, stale memories, **cross-tenant leakage and PII build-up**. (If they mean .NET memory management, that's GC — clarify.)
+
+**Say this:** "Four levels.
+1. **Working memory** — LangGraph graph state per request: question, resolved entities, retrieved **chunk IDs** (not chunk text), draft answer.
+2. **Conversation memory** — the **Cosmos DB-backed LangGraph checkpointer**; thread keyed by **tenant + conversation ID** (hierarchical partition key), session consistency, continuous backup, **TTL** retention. The model never gets full history — a **rolling summary plus the last few turns**; the planner rewrites follow-ups into standalone queries, and resolved entities are explicit state fields so they survive summarisation exactly.
+3. **Long-term memory — deliberately none.** Cross-session memory in a regulated financial product raises retention and minimisation questions, and users didn't need it.
+4. **Caches** (performance, not memory) — per-tenant response cache, semantic cache, prompt caching, query-embedding cache (Q27).
+Everything is tenant-scoped by code; PII kept out of logs."
+
+**Checkpointer vs store:** checkpointer = per-thread short-term state (multi-turn, resume after failure, interrupts, time-travel); **store** = cross-thread long-term memory (namespaced, often with vector search).
+
+**Episodic memory:** "Remembering specific past experiences — situation, actions, outcome — and retrieving similar ones to guide a new task, as few-shot examples or reflected lessons (Reflexion). Benefit: improves without retraining. Risks: wrong lessons, stale episodes, PII, cross-user leakage — store only verified successes, scoped and with retention." **Ours:** "No runtime episodic memory. Our learning from experience was **offline** — production failures and reviewer corrections fed the golden set. If I added it: the planner remembering a user's confirmed resolution of an ambiguous 'Q2 report', scoped to tenant and user."
+
+**Traps:** "Why not keep full history — big context windows?" → cost, latency, quality. "Summary loses a detail?" → entities are explicit state fields. "Why Cosmos, not Postgres or Redis?" → already our platform store with partitioning/backup; conversation state is **state, not cache**.
+**Microsoft mapping:** Agent Framework threads (serialisable, pluggable Cosmos store), chat-history reduction, context providers for long-term memory/RAG; Foundry Agent Service managed threads, Memory (preview), BYO Cosmos DB in a standard setup.
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q117"></a>
+### Q117. How do you handle hallucinations end to end?
+
+**Say this:** "In financial reporting a fluent but wrong answer is worse than no answer, so hallucination is a **system design problem, not a prompt problem** — four layers, and most RAG 'hallucinations' are really retrieval failures.
+1. **Prevent:** planner resolves period/report/version and asks when ambiguous; hard tenant and period filters; hybrid search + rerank to 5–8 chunks; tables chunked intact; **numbers from deterministic tools**; grounded prompt ('answer only from sources, otherwise say so'), temperature 0; citations required in a structured schema.
+2. **Detect:** LangGraph output node — numeric verification, citation existence + entity match, schema check, Haiku claim-level groundedness (Q115).
+3. **Respond:** one stricter retry, then 'I couldn't verify this' with sources; 'not in the documents' is a valid, tested answer; clickable citations to the page; human review for onboarding.
+4. **Measure:** retrieval and generation evaluated separately; groundedness, citation and numeric accuracy; unanswerable questions in the golden set; CI release gate + continuous scoring of sampled production answers; failures fed back into the golden set."
+
+**Key point — grounded but wrong (Q16):** groundedness proves faithfulness to the *retrieved* text, not correctness — so we check citations against the planner's resolved entities and evaluate retrieval separately.
+
+**Traps:** "Can you eliminate hallucinations?" → No — reduce them and make them **detectable and visible**; an unverified claim never reaches the user as fact. **Foundry:** groundedness detection at the output intervention point + groundedness/relevance evaluators; numeric and citation verification stay custom.
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q118"></a>
+### Q118. How did you build the golden data set, how do you keep it updated, and where do evals run?
+
+**Built (confirmed: seeded by the business):** "The **IR business team gave us the seed set** — real questions analysts and clients ask, with answers they'd stand behind; they own what 'correct' means. My team turned it into an evaluation asset: added **expected sources** (report, version, page) and **resolved entities** (tenant, period, report type) so retrieval is measurable separately; **tagged question types** (lookup, multi-period comparison, trend, ambiguous, not-in-document) and filled gaps — refusal cases, ambiguous references, an **adversarial suite**; **cross-checked answers against source reports**, with disagreements going back to the business owner; versioned in Git." Plus a **~50-case human-scored calibration set** for the judge. Built from **published historical reports** — no MNPI, PII masked. Started ~100–200 cases. ⚠️ Use your real count if you know it.
+
+**Kept current:**
+- **Sources of new cases:** production failures (guardrail flags, low judge scores on sampled traffic), thumbs-down / escalations, reviewer corrections, new question types (input drift, e.g. ESG), new report templates / types / large tenants, new features or tools, red-team findings, **incidents** ("not closed until a test reproduces it").
+- **Process:** weekly triage → business approves expected answer → engineering adds sources, entities, tags → mask data → PR review (judge prompts and thresholds versioned alongside) → mark critical cases for the PR subset.
+- **Staleness:** cases **pinned to report version and period**; relative questions ("latest quarter") carry a fixed **as-of date**; restated reports trigger review; retire duplicates.
+- **Balance:** compare the set's question-type mix to production; report **per slice**; keep the critical subset small.
+- **Cadence:** weekly triage; quarterly coverage review, adversarial refresh and **judge re-calibration** (and on any judge model change).
+- **Comparability:** every run records the golden-set version; releases are compared on the same set version.
+
+**Eight places evals run:** (1) **design benchmarks** — chose embedding model, chunk size, hybrid weights, reranker, tiers; (2) **PR** — ~50 critical cases when prompts/models/retrieval/tools change; (3) **staging release gate** — full set vs previous release + cost and load checks; (4) **nightly** — full + adversarial; (5) **canary** — per-slice comparison before ramping; (6) **continuous production** — daily golden run + judge on sampled live answers, drift alerts; (7) **model and index releases** — upgrades, deprecations, embedding/chunking changes, per-tier quality floors; (8) **runtime checks** per answer (output guardrail — protects one answer, distinct from evaluating the system).
+
+**Traps:** "Synthetic data?" → ⚠️ only if true; "every expected answer human-verified — unverified synthetic labels measure the model against itself." "Adding failures biases the set?" → yes, deliberately; keep a representative base set separate from the known-failures set. **Foundry:** datasets from traces, synthetic and simulated conversations, built-in + custom evaluators, continuous evaluation, CI via SDK/azd.
+**Director line:** "The golden set is co-owned — business owns the definition of quality, engineering makes it measurable and automated. That's also what builds their trust."
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q119"></a>
+### Q119. Which model is the LLM judge — and should the judge be a higher or lower model?
+
+> ⚠️ **Not confirmed.** Q15 says the judge is "a different model family than the one being evaluated"; generation is Claude, so that implies **Gemini** (already in the stack). If it was **Claude Opus**, drop the "different family" claim and lean on calibration.
+
+**If Gemini:** "The offline judge was a **Gemini Pro-class model** — deliberately a different family from our Claude generator, to avoid self-preference bias. It was already in our stack under the same gateway and enterprise terms, strong enough for claim-level judging, version-pinned, **calibrated against ~50 human-scored examples** and re-calibrated on any version change. Runtime output checks were separate — Haiku plus deterministic code."
+**If Opus:** "Claude **Opus**, a stronger tier than the Sonnet generator; we managed same-family risk through human calibration, rubrics with examples, and deterministic numeric/citation checks. In hindsight I'd add a cross-family judge for borderline cases."
+**If unsure:** "A different, stronger model than the generator, version-pinned and human-calibrated — the calibration mattered more than the name."
+
+**Higher or lower?** "As a rule **at least as capable as the generator, ideally stronger and cross-family** — it has to catch errors the generator made, and a weak judge gives false confidence. But I pick by **agreement with human scores on that specific check**, not size. Narrow checks (is this claim supported — yes/no; did it refuse) can use a small model once calibrated." **Tiered:** runtime → small fast model + deterministic code; routine offline → mid-tier; release gate / borderline → strongest, cross-family; humans → final calibration. Rules: calibrate, cross-family, rubrics with examples, code wherever possible, pin and re-calibrate.
+**Foundry:** AI-assisted evaluators use a judge deployment you choose (e.g. GPT-4.1-class — cross-family to Claude); custom evaluators for citation and numeric accuracy.
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q120"></a>
+### Q120. Can APIM route calls to different models without code? What is Foundry's model router?
+
+**APIM without code — yes, if the decision is simple:**
+- **Route on request data:** `choose/when` + `set-backend-service` on a header (`x-task-type`), body field (`tier`), query, path, **JWT claim** (tenant, role) or **subscription/product** → model deployment (extraction/rerank → Haiku, RAG answer → Sonnet, synthesis → Opus).
+- **Resilience:** backend pools with **priority and weights**, **circuit breaker** per backend, retry to another backend on 429.
+- **AI gateway controls:** token limits per key, token metrics per tenant, semantic caching, content safety, logging.
+- **Where it gets hard:** *deciding* complexity (policy expressions are a limited C# subset); a classifier via `send-request` adds latency and failure points to every call; different provider API formats (Claude Messages vs OpenAI-style) need transformations; built-in LLM policies target OpenAI-compatible / Foundry APIs; XML policies are hard to unit-test.
+- **Say this:** "The orchestrator decides the task type and sends it as a header; APIM maps it to a model and enforces budgets, fallback, metrics and caching. We needed a small gateway service because Claude and Gemini native APIs needed adapters and per-tenant metering; with Claude now GA on Azure via Foundry, more of that can move into APIM."
+
+**Foundry model router:** one deployment, one endpoint; a **trained routing model** reads the full request (system, user, tools, history) and picks the best-suited model per prompt, within your access, deployment type and **Data Zone**; doesn't store prompts; response says which model answered.
+- **Modes:** **Balanced** (default — cheapest within ~1–2% of best quality), **Cost** (~5–6% band), **Quality** (best, ignore cost); mode changes take ~5 min.
+- **Models:** version 2025-11-18 routes across **18 models** — GPT plus **Claude, DeepSeek, Llama, Grok**; **Claude must be deployed first**. **Model subsets** restrict the pool (compliance) and double as the failover set; new models not added automatically. Guardrails set **once at router level**.
+- **Limits:** context window = smallest model in the pool; **prompt caching weaker** (only helps if the same model repeats); routing less predictable/explainable; routes on the prompt, not business rules; **pin the router version**.
+- **Say this:** "Model router does automatically what we did deliberately. We routed by task type — predictable, testable per tier, which mattered in a regulated product. I'd use model router, pinned and limited to an approved subset, for open-ended chat, and keep explicit routing for well-defined tasks — and keep evaluating quality per model."
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q121"></a>
+### Q121. Why did you build all this when Azure AI Foundry exists? What would Foundry have changed?
+
+**30-second answer:** "We didn't build everything. We bought the commodity layers — Teams and Bot Service, Entra, APIM, Application Insights — and used **LangGraph and LangChain** for orchestration. We built only what's domain-specific and no platform gives you: period-aware retrieval, numeric and citation verification, tenant isolation for 7,500+ issuers, per-tenant cost control. We used Claude and wanted a model-independent gateway. Today I'd seriously evaluate Foundry for hosting, generic guardrails, tracing and evaluation — and our LangGraph orchestrator can run there **unchanged as a hosted agent**."
+
+**"Have you used Foundry?" (honest bridge):** "Not in production — our stack was LangGraph + LangChain, an APIM-based gateway, our own guardrail layer and eval pipeline. I've worked through it hands-on [only if done: agents with file search and code interpreter, guardrails with Prompt Shields, tracing, groundedness evaluations]. It maps directly: hosted agents host what LangGraph runs, deployment/agent guardrails cover my gateway's generic layer, built-in evaluators overlap my pipeline."
+
+**Capability comparison** (✅ Foundry replaces · 🟡 partly · ❌ stays custom):
+
+| Capability | What we built | Foundry | Verdict |
+|---|---|---|---|
+| Teams channel | Azure Bot Service + Entra SSO | Publish to Teams / M365 Copilot | ✅ (Bot Service gave finer streaming / proactive control) |
+| Edge gateway, tenant mapping, rate limits | APIM | Project RBAC is for teams, not 7,500 end clients | ❌ APIM stays |
+| Orchestrator | LangGraph | **Hosted agent** (LangGraph unchanged) or Agent Framework workflows | 🟡 hosting managed, logic still ours |
+| Period resolution | Planner + hard filter | — | ❌ domain logic |
+| Vector store + hybrid + rerank | Pinecone + RRF + Haiku rerank | **Azure AI Search** hybrid + semantic ranker, private endpoints | ✅ likely better fit today |
+| Tenant isolation in retrieval | Namespaces + hard filter | AI Search security filters, enforced by our code | 🟡 |
+| Numbers from tools | Deterministic functions | Function tools / Functions / Code Interpreter | 🟡 |
+| Numeric + citation verification | Output node | — (groundedness detection is close, not number-level) | ❌ core differentiator |
+| Generic guardrails | Gateway + nodes | Prompt Shields, PII, content categories per intervention point | ✅ |
+| Model routing | Gateway tier→model + fallback | Deployments in one resource; **model router**; Claude GA on Azure | 🟡 |
+| Per-tenant budgets / metering | Gateway | Per resource/deployment, not per end client | ❌ APIM AI gateway stays |
+| Conversation memory | Cosmos checkpointer | Threads + Memory (preview), BYO Cosmos | ✅ / 🟡 |
+| Evaluation | Golden set + calibrated judge | Built-in evaluators, continuous eval, CI; custom evaluator for citations | ✅ / 🟡 |
+| Tracing | OTel → App Insights + Splunk | Agent-aware tracing → App Insights | ✅ (Splunk stays) |
+| Ingestion | Custom pipeline + ReportIndexed | AI Search indexers + integrated vectorization | 🟡 ("searchable" event is still our design) |
+| Red teaming | Ad hoc / adversarial suite | AI Red Teaming Agent | ✅ addition |
+| Onboarding extraction | FastAPI + Claude + schema + review | Claude in Foundry or **Content Understanding**; workflow HITL | 🟡 validation rules and review UI stay |
+
+**Verdict line:** "About half of what we built was platform plumbing Foundry now provides; the other half — period resolution, numeric/citation verification, tenant isolation, per-tenant cost control — stays custom on any platform because that's where the business value is. Use the platform for commodity layers, own the parts that carry business risk."
+
+**Traps:** "Higher maintenance cost?" → yes; move the generic layer to a managed platform now, keep the small domain layer. "Model independence = lock-in excuse?" → model quality and price change every few months; switching a task is a config change validated by the eval set. "Recommend Foundry to a client?" → yes, as the default platform for Azure clients — plus a gateway pattern and client-owned domain verification.
+⚠️ **Timeline caution:** Claude in Foundry arrived as an Anthropic-hosted preview (Nov 2025) and went **GA Azure-hosted on 29 June 2026** — only say "Claude wasn't production-ready inside Azure when we built this" if your start date supports it.
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q122"></a>
+### Q122. How would you take a Foundry agent from POC to production?
+
+**Say this:** "The portal is for prototyping and observing; production is **everything as code**.
+- **Platform infra** — Foundry resource, projects, **model deployments**, private endpoints, managed identities, App Insights, AI Search, Key Vault → **Bicep / Terraform**.
+- **Platform policy** — **guardrails** (an RAI policy assigned to deployments by name), connections, RBAC → IaC.
+- **Agent definition** — instructions, model, tools, knowledge, memory → **code or declarative YAML in Git**, deployed via SDK/REST by the pipeline.
+- **Tools and business logic** — our own services / **MCP servers** behind APIM, with their own tests.
+- **Domain guardrails** — our middleware / nodes.
+- **Quality** — golden set, evaluators, thresholds in the repo; **eval gate in CI/CD**.
+- **Operations** — traces, metrics, evaluation history viewed in the portal and App Insights."
+
+**Three production patterns:** (1) **prompt agent as code** — simple agents, Foundry runs them; (2) **hosted agent** — Agent Framework / LangGraph / Anthropic Agent SDK in a container, Foundry provides hosting, scaling, Entra identity, tracing — **fits our multi-agent design**; (3) **Responses API from your own app** ("ephemeral agent") — definition versioned with the app.
+**Pipeline:** PR → unit tests on tools + eval run in dev project → merge → IaC applies infra and guardrail changes → new agent version (or hosted-agent container) in test → smoke + eval → approval → prod → tracing + continuous evaluation; **rollback = previous agent version**.
+**Governance:** prod portal is **read-only** for people; only the pipeline identity changes anything (no click-ops drift).
+**Project model (if asked "one project per app?"):** Foundry **resource** = deployments, networking, identity, guardrail policy, quota, billing; **project** = a team's or use case's agents, files, evals, traces, connections, own RBAC. Projects share the resource's deployments and quota; **dev/test/prod = separate resources**; hard isolation (compliance, region) = separate resources; per-team chargeback via own deployments/resources or APIM token metering. Enterprise pattern: central platform team owns resources in an **AI landing zone**; app teams get projects.
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q123"></a>
+### Q123. How does your LangGraph design map to Semantic Kernel and Microsoft Agent Framework?
+
+**Honest framing:** "We built on LangGraph and LangChain, not Semantic Kernel — the concepts map one-to-one, and for a .NET-first client I'd use **Microsoft Agent Framework** (GA 3 April 2026; successor to Semantic Kernel + AutoGen)."
+
+| Our LangGraph component | Semantic Kernel | Agent Framework |
+|---|---|---|
+| Fetch Report Service, calculators | Native-function / OpenAPI **plugins** | **Function tools** (or deterministic **executors**) |
+| Planner → retrieval → analysis → synthesis | Sequential / handoff **orchestration** of ChatCompletionAgents | **Workflow** with agent executors / sequential orchestration |
+| Period resolution, numeric verification | Native functions + filters | Deterministic executors + **conditional edges** |
+| Input/output guardrails | Prompt-render + function-invocation **filters** | Agent-run / function / chat-client **middleware** |
+| Max steps | Max auto-invocations / auto-invocation filter | Iteration limits + middleware termination |
+| Model routing via gateway | Multiple chat services behind APIM | Different chat client per agent behind APIM |
+| Cosmos checkpointer | Chat history + reducers, persisted | Serialisable **threads**, workflow **checkpointing** |
+| Pinecone retrieval | Vector store connector | Retrieval tool or **context provider** |
+| Onboarding with human review | **Process Framework** step | Workflow **human-in-the-loop request** + checkpointing |
+| OTel spans | Built-in OpenTelemetry | Built-in OpenTelemetry |
+
+**SK essentials:** Kernel (services + plugins, DI), plugins (native, prompt, OpenAPI, MCP, Logic Apps), function calling (Auto / Required / None; planners deprecated), filters, vector store abstractions, agents + orchestrations (sequential, concurrent, handoff, group chat, magentic), Process Framework, OTel.
+**Agent Framework essentials:** agents (chat client agent on any provider incl. Claude, threads, function / hosted / MCP tools, approval-required tools, context providers, three-level middleware) + **workflows** (executors, typed edges incl. conditional / fan-out / fan-in, superstep execution, checkpointing, HITL requests, workflow-as-agent) + built-in orchestrations + declarative YAML + hosting on Foundry, durable agents on Functions, MCP, A2A (v1.0 GA in Agent Service), DevUI, OTel.
+**Traps:** "Why LangGraph over SK/Agent Framework?" → Python-first AI team; LangGraph most mature for stateful graphs then; Agent Framework not GA until April 2026. "Have you used SK?" → "Not in production; the design maps one-to-one — the hard part was the decisions, not the SDK."
+
+[⬆ Back to top](#top)
+
+---
+
+<a id="q124"></a>
+### Q124. What does "deploying a model" in Foundry mean — does data go to OpenAI or Anthropic?
+
+**Say this:** "Deploying doesn't copy the model into your subscription. It creates a **named deployment** in your Foundry resource — endpoint name, **deployment type**, quota (TPM or provisioned), version and upgrade policy, assigned **guardrail** — running on Microsoft-hosted capacity."
+
+| Model | Runs | Vendor sees prompts? |
+|---|---|---|
+| Azure OpenAI models | Microsoft in Azure | **No**; not used for training |
+| Other "sold directly by Azure" | Microsoft in Azure | No |
+| **Claude, Azure-hosted (GA 29 Jun 2026)** | End to end on Azure; global or US Data Zone; billed via Azure | No |
+| **Claude, Anthropic-hosted (preview)** | Anthropic infrastructure | **Yes**, under Anthropic's terms |
+
+**Deployment type decides where inference runs:** **Global** (any Azure region; data at rest stays in geography), **Data Zone** (US or EU only), **Regional** (resource region only) — the key data-residency decision.
+**Caveats:** Azure OpenAI abuse monitoring may retain up to 30 days (modified abuse monitoring for approved regulated customers; never used for training); "in Azure" ≠ "in your subscription" — private endpoints secure the **network path**, compute is Microsoft-managed; agent data (files, vector stores, threads) can use **BYO Storage, AI Search, Cosmos DB** in a standard setup.
+**Director line:** "For regulated clients: Data Zone or Regional deployments, private endpoints, modified abuse monitoring where approved, BYO storage — data leaves the app only under controls (Q76)."
 
 [⬆ Back to top](#top)
 
