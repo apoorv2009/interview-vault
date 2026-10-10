@@ -1600,6 +1600,16 @@ Plus the operational set: TTFT and latency per tier, fallback rate, cache hit ra
 
 "My orchestrator maps directly onto a LangGraph design: planner, retrieval, analysis, synthesis and guardrails are nodes; the shared state carries the question, resolved entities, retrieved chunks and draft answer; conditional edges handle retry and fallback; the checkpointer holds conversation memory per thread."
 
+**✅ Confirmed (Apoorv, Oct 2026): Capital Access used LangGraph and LangChain in production.** Say "built on LangGraph", **not** "custom orchestrator".
+
+**What each did — say this:** "**LangGraph** was the orchestration layer: planner, retrieval, analysis, synthesis and guardrails as nodes over a typed shared state (question, resolved entities, chunks, draft answer); conditional edges for 'grade retrieval → rewrite and retry' and for skipping the planner on simple lookups; a max-step bound; a checkpointer for per-thread conversation memory; interrupts available for human review. **LangChain** gave the building blocks: Claude and Gemini model wrappers, loaders and text splitters for ingestion, the Pinecone vector-store integration, prompt templates and structured-output parsing. **Our own code** kept tenant filters, period resolution, numeric/citation verification and the LLM gateway — business-critical logic never depends on framework abstractions; framework versions pinned."
+
+**Why they were required:** one IR question needs decisions (skip planner), loops (weak retrieval → retry), shared state across agents, memory across turns and bounded execution — that's graph orchestration, not a linear chain. LangGraph gave checkpointing, interrupts and the graph model without building them ourselves; LangChain saved integration work across three vendors.
+
+⚠️ Know before quoting: **which checkpointer backend** (in-memory / Postgres / Redis / Cosmos-backed custom) — the vault elsewhere says conversation memory lived in **Cosmos DB** (Q13); and whether interrupts were actually used in production or only designed.
+
+**Foundry / Microsoft tie-in:** a LangGraph agent can run unchanged as a **Foundry hosted agent** (hosting, scaling, Entra identity, tracing); for a .NET-first Capgemini client the equivalent is **Microsoft Agent Framework** workflows.
+
 **Trap:** "Isn't LangChain too much abstraction for production?" → It can be. Use it where it saves time, keep business-critical logic (tenant filters, guardrails, verification) in your own code, pin versions, and keep the gateway independent of any framework.
 
 [⬆ Back to top](#top)
