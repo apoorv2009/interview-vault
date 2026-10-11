@@ -24,6 +24,7 @@ My interview prep notes, organized by topic. Most answers are framed around the 
 | [aagam-mitra](https://github.com/apoorv2009/interview-vault/tree/main/aagam-mitra) | Production agentic AI system: RAG, LLMs, multi-agent orchestration, enterprise governance, prompt engineering, cache invalidation | 107 questions |
 | [angular-interview-prep-app](https://github.com/apoorv2009/interview-vault/tree/main/angular-interview-prep-app) | Hands-on Angular 19 app for practising concepts | App |
 | [mock-interview-debrief](https://github.com/apoorv2009/interview-vault/tree/main/mock-interview-debrief) | Verdicts and targeted drill sets from real interview recordings | Per-recording |
+| [tjx-prep](https://github.com/apoorv2009/interview-vault/tree/main/tjx-prep) | TJX Sr Staff Engineer – StoreWeb Modernization: interview stories, follow-ups, TJX bridge lines | Per-role |
 
 ---
 
@@ -139,6 +140,12 @@ Docker and container deployment Q&A — multi-stage Dockerfile for a .NET micros
 ## behavioural
 
 STAR-format answers for behavioural interview questions — leadership, conflict resolution, dealing with ambiguity, most challenging project, stakeholder management. Two tracks kept clearly separate since they report different tenure/most-recent-project: the **EPAM/Architect track** (16 yrs, Capital Access) and the **Other Company Rounds track** (9 yrs Senior Full Stack, Entity Management System — Wipro/Decos Global/Infosys/Virtusa), including a full production-incident (OOM) triage story.
+
+---
+
+## tjx-prep
+
+Prep for TJX Senior Staff Engineer – StoreWeb Modernization (Hyderabad). `tjx-storeweb-prep.md` holds the Wells Fargo migration story (6 Rs triage, Strangler-Fig seam via internal APIM, SQL Server CDC data sync, cutover choreography) with follow-up grill questions and TJX bridge lines.
 
 ---
 
