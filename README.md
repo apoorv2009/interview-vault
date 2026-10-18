@@ -145,7 +145,7 @@ STAR-format answers for behavioural interview questions — leadership, conflict
 
 ## tjx-prep
 
-Prep for TJX Senior Staff Engineer – StoreWeb Modernization (Hyderabad). `tjx-storeweb-prep.md` holds the Wells Fargo migration story (6 Rs triage, Strangler-Fig seam via internal APIM, SQL Server CDC data sync, cutover choreography) with follow-up grill questions and TJX bridge lines. `tjx-azure-services-qa.md` covers the JD's Azure services (APIM, App Service/AKS, Functions, Service Bus/Event Grid, Azure SQL, Cosmos DB) plus Front Door and App Gateway deep dives, a basics + scenario question bank, and model answers for every question.
+Prep for TJX Senior Staff Engineer – StoreWeb Modernization (Hyderabad). `tjx-storeweb-prep.md` holds the Wells Fargo migration story (6 Rs triage, Strangler-Fig seam via internal APIM, SQL Server CDC data sync, cutover choreography) with follow-up grill questions and TJX bridge lines. `tjx-azure-services-qa.md` covers the JD's Azure services (APIM, App Service/AKS, Functions, Service Bus/Event Grid, Azure SQL, Cosmos DB) plus Front Door and App Gateway deep dives, a basics + scenario question bank, and model answers for every question. `retail-activation-modernization-story.md` is the anonymised deep project story (on-prem → Azure rehost → Strangler-Fig modernisation, database decomposition with outbox/CDC/reverse sync, carrier integration and commissions services) with Mermaid architecture diagrams.
 
 ---
 
