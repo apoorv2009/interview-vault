@@ -15,6 +15,8 @@ Persona: **Architect track** (Capital Access at S&P Global + Wells Fargo migrati
   - [Q5. How do you keep Function instances pre-warmed on an App Service Plan?](#q5-how-do-you-keep-function-instances-pre-warmed-on-an-app-service-plan)
 - [Part 2 — API Management and Networking](#part-2--api-management-and-networking)
   - [Q1. What is Azure API Management, and how does it work with backend APIs?](#q1-what-is-azure-api-management-and-how-does-it-work-with-backend-apis)
+    - [APIM deep dive — the parts and how each one works](#apim-deep-dive--the-parts-and-how-each-one-works)
+    - [How rules are applied — policies step by step](#how-rules-are-applied--policies-step-by-step)
   - [Q2. How do you implement APIM policies and validate incoming requests?](#q2-how-do-you-implement-apim-policies-and-validate-incoming-requests)
   - [Q3. How do you securely connect APIM → backend API → Azure SQL?](#q3-how-do-you-securely-connect-apim--backend-api--azure-sql)
   - [Q4. How can public APIM APIs reach a backend inside a VNet with a private endpoint?](#q4-how-can-public-apim-apis-reach-a-backend-inside-a-vnet-with-a-private-endpoint)
@@ -168,6 +170,190 @@ On Premium: set **always-ready** instances + a **pre-warmed buffer**.
 **Live example (Capital Access):** "Every SPA request went through **APIM**, which validated the Okta JWT and tenant/role claims and routed to the right microservice. Services still self-validated the JWT for service-to-service calls — defence in depth."
 **Live example (Wells Fargo):** "APIM sat in front of **legacy and new endpoints**; moving a route was a routing-rule change, rollback was flipping it back."
 **TJX tie-in:** APIM is where you strangle the StoreWeb monolith route by route, invisible to stores.
+
+#### APIM deep dive — the parts and how each one works
+
+APIM has **three main parts** plus monitoring. Think of a large office: the **gateway** is the reception desk that handles every visitor, the **management plane** is the head office that writes the rule book, the **developer portal** is the public help desk and catalogue, and **monitoring** is the CCTV and visitor register.
+
+```
+                ┌──────────────── Management plane (control plane) ────────────────┐
+  Portal / CLI  │ APIs · operations · products · subscriptions · policies ·         │
+  Bicep / APIOps│ named values · backends · certificates · users/groups · versions  │
+                └──────────────┬──────────────────────────────┬─────────────────────┘
+                               │ pushes config                │ publishes docs
+                               ▼                              ▼
+  Client ──HTTPS──►  Gateway (data plane)  ──►  Backend      Developer portal
+  (POS, SPA,         runs policies on every       (App Service,  (docs, try-it,
+   partner)          call                          AKS, Func)     self-service keys)
+                               │
+                               ▼
+                 App Insights / Azure Monitor / Event Hubs (logs, metrics, traces)
+```
+
+**1. Gateway (data plane) — does the actual work on every call**
+
+What it does, in order, for each request:
+1. **Receives** the HTTPS call on its hostname (e.g. `api.storeweb.tjx.com`) and terminates TLS.
+2. **Finds the API** by matching the URL path prefix (API URL suffix, e.g. `/store-ops/v1`).
+3. **Finds the operation** by HTTP method + URL template (e.g. `GET /stores/{storeId}/inventory/{sku}`).
+4. **Identifies the caller**: reads the subscription key (header `Ocp-Apim-Subscription-Key`) if the API requires one, and works out which **product** the key belongs to.
+5. **Runs inbound policies** in scope order: global → product → API → operation (auth, rate limit, validation, rewrite).
+6. **Forwards** the request to the backend (a URL or a **backend** entity with circuit breaker / load-balanced pool).
+7. **Runs outbound policies** on the response (remove internal headers, reshape body, cache).
+8. If anything fails, runs **on-error** policies (clean error, log).
+9. **Logs** the call (App Insights, Azure Monitor, Event Hubs) and updates metrics and quotas.
+
+Where it runs: **managed** in Azure (scaled by adding **units** in classic tiers), **self-hosted** as a container on-prem/edge, or a **workspace gateway** per team. It scales out; the `Capacity` metric tells you when to add units.
+
+**2. Management plane (control plane) — defines everything, carries no traffic**
+
+You use it through the Azure portal, Azure CLI/PowerShell, the REST API, **Bicep/Terraform**, or **APIOps** pipelines. Whatever you configure here is pushed to every gateway. Main objects:
+
+| Object | Plain meaning |
+|---|---|
+| **API** | A group of operations with one URL prefix. Import from OpenAPI, WSDL, or directly from App Service, Function App, Container App, Logic App |
+| **Operation** | One endpoint: method + URL template (`GET /stores/{id}`) |
+| **Product** | A bundle of APIs offered to a consumer group with its own limits and terms (e.g. "Store Apps", "Partners") |
+| **Subscription** | A pair of keys (primary/secondary) that lets one consumer call a product, one API, or all APIs. Can be revoked or rotated per consumer |
+| **Users & groups** | Who can see which products in the developer portal |
+| **Policy** | The rules (XML) — see below |
+| **Named value** | A reusable setting or secret used in policies as `{{name}}`; can link to **Key Vault** |
+| **Backend** | A reusable backend definition: URL, credentials, circuit breaker, load-balanced pool |
+| **Policy fragment** | A reusable block of policy XML shared across APIs |
+| **Versions / revisions** | Side-by-side contracts (`v1`, `v2`) / safe changes inside a version |
+| **Certificates, loggers** | Client certs for mTLS to backends; log targets (App Insights, Event Hubs) |
+
+**3. Developer portal — for API consumers.** Auto-generated website with docs from OpenAPI, a try-it console and self-service subscription keys, with access controlled by groups and Entra ID. Optional; mainly useful for partners or many consuming teams. Details in [Part 5](#part-5--apim-tiers-versions-gateway-types).
+
+**4. Monitoring (alongside).** Built-in analytics (calls per API/product/subscription, latency, errors), plus diagnostic logs to **App Insights** (end-to-end traces with a correlation ID), **Azure Monitor / Log Analytics** (KQL), and **Event Hubs** for custom pipelines.
+
+#### How rules are applied — policies step by step
+
+**What a policy is:** a small XML document with four sections. APIM runs each section at a fixed stage of the call.
+
+```xml
+<policies>
+  <inbound>   <!-- before the backend is called: auth, limits, validation, rewrite -->
+  </inbound>
+  <backend>   <!-- how the call is forwarded: retries, timeouts -->
+  </backend>
+  <outbound>  <!-- on the response: strip headers, reshape, cache -->
+  </outbound>
+  <on-error>  <!-- if anything above fails -->
+  </on-error>
+</policies>
+```
+
+**Where you attach it (scopes)** — from widest to narrowest:
+
+| Scope | Applies to | Typical rules |
+|---|---|---|
+| **Global** (all APIs) | Every call through this APIM | CORS, correlation ID, remove internal headers |
+| **Product** | All APIs in a product | Rate limits and quotas per consumer group |
+| **API** | All operations of one API | JWT validation, backend routing |
+| **Operation** | One endpoint | Body validation, caching, special rewrites |
+
+**How inheritance works:** each scope's policy contains a `<base />` tag. Wherever `<base />` sits, the **parent scope's rules run at that point**. Remove `<base />` and the parent's rules are skipped for that scope. So the effective inbound order is normally global → product → API → operation.
+
+**Worked example — StoreWeb Inventory API** (`GET /store-ops/v1/stores/{storeId}/inventory/{sku}`):
+
+*Global scope* — applies to everything:
+```xml
+<policies>
+  <inbound>
+    <cors allow-credentials="true">
+      <allowed-origins><origin>https://storeweb.tjx.com</origin></allowed-origins>
+      <allowed-methods><method>GET</method><method>POST</method></allowed-methods>
+      <allowed-headers><header>*</header></allowed-headers>
+    </cors>
+    <!-- one ID that follows the request through every service and log -->
+    <set-header name="X-Correlation-Id" exists-action="skip">
+      <value>@(context.RequestId.ToString())</value>
+    </set-header>
+  </inbound>
+  <backend><forward-request /></backend>
+  <outbound>
+    <set-header name="X-Powered-By" exists-action="delete" />
+    <set-header name="X-AspNet-Version" exists-action="delete" />
+  </outbound>
+  <on-error />
+</policies>
+```
+
+*Product scope ("Store Apps")* — fair use per store:
+```xml
+<inbound>
+  <base />
+  <!-- 600 calls per minute per store; the store ID comes from a header set by the POS -->
+  <rate-limit-by-key calls="600" renewal-period="60"
+      counter-key="@(context.Request.Headers.GetValueOrDefault("X-Store-Id", "unknown"))" />
+  <quota-by-key calls="1000000" renewal-period="86400"
+      counter-key="@(context.Subscription.Id)" />
+</inbound>
+```
+
+*API scope (Inventory API)* — who is calling, and where to send it:
+```xml
+<inbound>
+  <base />
+  <validate-jwt header-name="Authorization" failed-validation-httpcode="401"
+                failed-validation-error-message="Unauthorized">
+    <openid-config url="https://login.microsoftonline.com/{{tenant-id}}/v2.0/.well-known/openid-configuration" />
+    <audiences><audience>api://storeweb-inventory</audience></audiences>
+    <required-claims>
+      <claim name="roles" match="any"><value>Inventory.Read</value></claim>
+    </required-claims>
+  </validate-jwt>
+  <!-- Strangler-Fig: this API now goes to the new service; flip back to "inventory-legacy" to roll back -->
+  <set-backend-service backend-id="inventory-new" />
+</inbound>
+```
+
+*Operation scope (POST adjustments only)* — reject bad bodies at the edge:
+```xml
+<inbound>
+  <base />
+  <validate-content unspecified-content-type-action="prevent" max-size="102400"
+                    size-exceeded-action="prevent" errors-variable-name="bodyErrors">
+    <content type="application/json" validate-as="json" action="prevent" />
+  </validate-content>
+</inbound>
+```
+
+**What happens for one call:** CORS check → correlation ID added → per-store rate limit and daily quota → JWT checked (signature, audience, `Inventory.Read` role) → routed to the new Inventory service → (POST only) body checked against the OpenAPI schema → backend responds → internal headers removed → response returned. A failed check stops the pipeline immediately with 401 / 429 / 400, and the backend is never called.
+
+**Policy expressions:** anything in `@( ... )` is a C# expression evaluated per request, with access to `context.Request`, `context.Subscription`, `context.User`, `context.Variables`. `{{name}}` reads a **named value** (optionally from Key Vault), so secrets never appear in policy text.
+
+**Main policy categories to name:**
+- **Access restriction:** `validate-jwt`, `validate-azure-ad-token`, `check-header`, `ip-filter`, `rate-limit(-by-key)`, `quota(-by-key)`
+- **Authentication to backends:** `authentication-managed-identity`, `authentication-certificate`
+- **Validation:** `validate-content`, `validate-parameters`, `validate-headers`, `validate-status-code`
+- **Transformation:** `set-header`, `set-query-parameter`, `rewrite-uri`, `set-body`, `json-to-xml` / `xml-to-json`
+- **Routing:** `set-backend-service`, `forward-request` (timeout)
+- **Caching:** `cache-lookup` / `cache-store`, `cache-lookup-value` / `cache-store-value`
+- **Advanced flow:** `choose` (if/else), `retry`, `send-request` (call another service), `return-response`, `mock-response`
+- **Logging:** `trace`, `log-to-eventhub`, `emit-metric`
+- **AI gateway:** token limits, semantic caching and token metrics for LLM backends
+
+**How you actually apply policies:**
+1. **Portal** — open the API / operation → *Inbound processing* → form editor or code editor. Fine for learning, not for production.
+2. **IaC** — keep each policy as an `.xml` file in Git and deploy it with Bicep or Terraform:
+   ```bicep
+   resource inventoryPolicy 'Microsoft.ApiManagement/service/apis/policies@2023-05-01-preview' = {
+     parent: inventoryApi
+     name: 'policy'
+     properties: {
+       format: 'rawxml'
+       value: loadTextContent('policies/inventory-api.xml')
+     }
+   }
+   ```
+3. **APIOps** — extract the whole APIM config to Git, review policy changes in pull requests, and publish through pipelines dev → QA → prod with environment values in named values.
+4. **Test safely** — try changes in a **revision** first, use the test console with request **tracing** to see each policy step, then make the revision current.
+
+**Subscription keys vs JWT — when to use which:** a subscription key identifies the **calling application** and links it to a product's limits; a JWT identifies the **user or service identity** and its roles. Production APIs usually use **JWT** for security and optionally keys for per-app tracking and quotas. Keys alone are not strong authentication — they're shared secrets.
+
+**Answer to say (extended version, if they ask "explain how APIM works in detail"):** "APIM has three parts. The gateway handles every call: it matches the API and operation from the URL, identifies the caller by subscription key or token, runs the policies, forwards to the backend and runs the response policies. The management plane is where we define APIs, products, subscriptions, backends and policies, and we drive it through IaC and APIOps rather than the portal. The developer portal is the self-service site for consumers. Rules are XML policies in four stages — inbound, backend, outbound and on-error — attached at global, product, API or operation scope, and the base tag controls how they inherit. So we set CORS and correlation IDs globally, rate limits per product, JWT validation and routing per API, and schema validation per operation."
 
 ### Q2. How do you implement APIM policies and validate incoming requests?
 
