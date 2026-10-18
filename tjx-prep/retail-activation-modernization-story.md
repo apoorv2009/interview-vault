@@ -22,6 +22,11 @@ Role in this story: **individual contributor (senior engineer)**. Use **"I"** fo
 - [12. How to tell it in the interview](#12-how-to-tell-it-in-the-interview)
 - [13. ⚠️ Read before using — what to verify](#13--read-before-using-what-to-verify)
 - [14. Likely follow-up questions](#14-likely-follow-up-questions)
+- [15. Strangler-Fig end to end — 15 questions answered from this project](#15-strangler-fig-end-to-end--15-questions-answered-from-this-project)
+  - [Phase 1 — Assessment, identification and planning](#phase-1--assessment-identification-and-planning)
+  - [Phase 2 — Architecture and design decisions](#phase-2--architecture-and-design-decisions)
+  - [Phase 3 — Development, testing and QA](#phase-3--development-testing-and-qa)
+  - [Phase 4 — Integration, deployment and production](#phase-4--integration-deployment-and-production)
 
 ---
 
@@ -744,6 +749,9 @@ flowchart LR
 | **Logic in procs, SSRS, Windows Services** | Typical for WebForms apps of that era — confirm it feels right |
 | **Ownership** | You owned carrier integration + commissions; "we" for everything else |
 | **No numbers, no dates, no names** | Keep it that way |
+| **Team structure** ([§15 Q8](#q8-how-does-conways-law-affect-the-migration-why-can-the-old-team-structure-break-it)) | Domain teams + platform group, you on carrier/commissions team — change if your teams were organised differently |
+| **Testing details** ([§15 Q9–Q10](#q9-how-does-tdd--pinning-legacy-behaviour-with-tests--protect-against-regressions)) | Golden-master replay for commissions, recorded carrier request/response pairs — drop if you can't picture it |
+| **Walking skeleton + shadow traffic** ([§15 Q13](#q13-how-do-you-deploy-a-skeleton-service-to-production-before-it-has-business-logic)) | Realistic and safe — confirm it fits |
 | **Not claimed here** | AKS, OpenTelemetry, Bicep, Durable Functions → "today I'd…" or Capital Access stories |
 
 ---
@@ -764,3 +772,137 @@ flowchart LR
 | How did you prevent double activations? | "A request ID created on first submit; the service stores it with the result, and any repeat returns the stored result instead of calling the carrier again." |
 | How did you prove new commissions matched old? | "Two full commission cycles in parallel with reconciliation per store, associate and day. We only switched the legacy batch off after two clean cycles." |
 | What would you do differently today? | "OpenTelemetry end to end, SLOs and error budgets per critical flow, Bicep modules and service templates with telemetry by default, ADRs and threat models per service, Durable Functions for port-ins, and offline-first behaviour so stores keep selling if the network drops." |
+
+---
+
+## 15. Strangler-Fig end to end — 15 questions answered from this project
+
+Each answer is anchored in this story. **Answer to say** first, then key points for follow-ups.
+
+### Phase 1 — Assessment, identification and planning
+
+#### Q1. What signs tell you it's time for Strangler-Fig instead of more patching?
+
+> **Answer to say:** "In our activation platform the signs were clear: a small change needed full regression and a night deployment, one slow carrier could slow the whole site, adding a carrier took months because its logic was spread across pages and stored procedures, and month-end reports blocked live activations. Patching didn't fix any of it because the problems were structural — one deployable, one shared database, synchronous coupling. But the system worked and earned money every day, so a big-bang rewrite was too risky. Strangler-Fig let us replace it piece by piece while stores kept selling."
+
+- Signs: **change is slow and risky**, **failures spread**, **cost per change keeps rising**, **dead-end technology** (WebForms), **can't scale parts independently**.
+- Strangler-Fig over rewrite when the system is **business-critical and can't stop**, domain knowledge lives **in the code**, and you need **value early**.
+
+#### Q2. How do you find "seams" in a tightly coupled monolith?
+
+> **Answer to say:** "We looked for seams in three places. In code: every carrier call ended up as an outbound request, so we could wrap them all behind one interface — that became our first seam. In data: we mapped which domain wrote each table and who read it, using code search and production tracing; single-writer tables were natural boundaries. In flows: reports and commissions only read activation data after the fact, so they could be separated by events instead of joins."
+
+- A **seam** = a place to change behaviour without editing the code around it: an interface, an HTTP boundary, a message, a single-writer table.
+- Good seams: **external-system calls**, **read-only features**, **after-the-fact processing**, **already-separate units** (class library, Windows Service).
+- No seam? **Create one** first (branch by abstraction), then move what's behind it.
+
+#### Q3. Why is DDD a prerequisite? How do bounded contexts decide what to extract first?
+
+> **Answer to say:** "Without domain thinking you cut along technical layers and get a distributed monolith. We ran workshops with the business to map capabilities — catalog and plans, inventory, customer and KYC, activation, carrier integration, payment hand-off, commissions — and agreed what each term meant in each area; 'activation' meant different things to the carrier side and to commissions. Each became a bounded context with its own data and one owner. Dependencies between contexts set the order: contexts others rely on but that depend on little — carrier integration — or that only consume events — commissions — came out early."
+
+- Bounded contexts give **service boundaries**, **data ownership** (one writer), **shared language**.
+- **Context mapping** shows dependencies; the carrier layer became an **anti-corruption layer** between our model and each carrier's.
+- Extract contexts with **few incoming dependencies** or **events-only coupling** first.
+
+#### Q4. When everything is tangled, what do you extract first — core or peripheral?
+
+> **Answer to say:** "We scored candidates on business value, risk and how easy they were to separate. Not the core activation flow first — too risky — and not something trivial that proves nothing. We started with reporting and commissions: read-heavy, separable through events, easy to verify because money totals must match, and they fixed real month-end pain. Then carrier integration for the biggest reliability gain. The core activation flow came last, once routing, data sync and rollback were proven on safer modules."
+
+- First slice = **low risk + real value + easy to verify** — it **proves pipeline, routing and data-sync patterns**.
+- **Core last**, with the **most safety** (store rings, reconciliation, reverse sync).
+- Avoid a first slice **so trivial it teaches nothing**.
+
+### Phase 2 — Architecture and design decisions
+
+#### Q5. How do you handle database decoupling and data sync during the transition?
+
+> **Answer to say:** "Our rule was one writer per table, with a pattern per domain by risk. Reporting: readable replica first, then its own event-fed store. Commissions: an outbox in the legacy stored procedure — activation update and event in one transaction — plus a two-cycle parallel run with reconciliation. Catalog: the new service became the only writer, with changes synced back into legacy tables for old screens. Activations, the riskiest: CDC into the new database, writes moved store by store with a feature flag, reverse sync to keep legacy correct, and tagged sync writes to prevent loops. Nightly reconciliation per store per day proved both sides matched. We never used dual writes from application code."
+
+- Patterns: **read replica, outbox, CDC, reverse sync, event-fed local copies, reconciliation, expand/contract**.
+- **No dual-write** — no shared transaction, a crash leaves the sides inconsistent.
+- **Legacy stays source of truth** until the write path flips. Details: [§6](#6-breaking-up-the-database).
+
+#### Q6. What is the "second system effect", and how did you avoid it?
+
+> **Answer to say:** "It's the urge to make the replacement perfect — every feature and abstraction the old system lacked — so it never ships. We used one rule per slice: feature parity plus a short agreed list of fixes, nothing else; new ideas went to a backlog for after cutover. We kept the design simple — App Service instead of Kubernetes, Azure SQL for most services, an adapter per carrier instead of a generic integration engine — and every slice had to reach production within weeks."
+
+- Causes: rewrite euphoria, **gold-plating**, building **frameworks** instead of features, slipping cutovers.
+- Prevention: **parity-first scope**, **short slices with production deadlines**, **ADRs** to justify complexity, **YAGNI**, success = **legacy retired**, not features added.
+
+#### Q7. How do you route traffic between old and new? What do gateways and proxies do?
+
+> **Answer to say:** "Two routers and one in-code switch. Application Gateway routed screens by path — new Angular screens under one path, everything else to legacy, on the same domain so sign-in and cookies worked across both. APIM routed APIs — each route pointed to legacy or the new service, and rollback was switching the backend back. Inside the monolith, carrier calls went through one interface with a flag per carrier. For the core activation flow the flag was per store — pilot stores, then a region, then all."
+
+- **Reverse proxy / App Gateway** = UI path routing; **APIM** = per-route backend + auth, limits, versions; **load balancer** spreads load within one side, it's not the old/new switch.
+- Splitting options: **by route, by store/tenant, by percentage (canary), shadow traffic**.
+- Every switch must be **a config change, not a deployment**. Diagram: [§4](#4-strangler-fig-in-practice--the-transition-state).
+
+#### Q8. How does Conway's Law affect the migration? Why can the old team structure break it?
+
+> **Answer to say:** "Conway's Law says systems mirror communication structures. Our teams were organised by layer — UI, backend, database. Keeping that would have meant every service change needed three teams, and we'd have rebuilt the monolith across services. We applied the inverse Conway manoeuvre: domain teams owning a bounded context end to end, from Angular screens to API and database. I was on the team owning carrier integration and commissions. A small platform group owned shared pieces — APIM, pipeline and monitoring templates."
+
+- Layer teams → **coupled services, hand-offs for every change**.
+- Domain teams → **independent services, clear ownership, one team per database**.
+- **Platform team** provides paved roads — consistent standards without central approval of every change.
+
+### Phase 3 — Development, testing and QA
+
+#### Q9. How does TDD — pinning legacy behaviour with tests — protect against regressions?
+
+> **Answer to say:** "Before moving any logic we wrote characterisation tests that captured what legacy actually did, including odd edge cases. For commissions we replayed real historical activations through the legacy calculation and saved the outputs as expected results; the new service had to match. For carriers we recorded real request/response pairs; each new adapter had to produce the same carrier request and map responses to the same outcomes. Any difference was a deliberate decision — fix a legacy bug, or match it."
+
+- **Characterisation / golden-master tests** lock current behaviour before change.
+- **TDD for new code** keeps the new design testable.
+- Differences are **business decisions**, not post-go-live surprises.
+- **Parallel run + reconciliation** = the final characterisation test at production scale.
+
+#### Q10. Integration/acceptance tests or unit tests?
+
+> **Answer to say:** "Both, at different moments. Before extraction, high-level tests matter more — legacy code isn't unit-testable and what we protect is behaviour: end-to-end activation flows, golden-master comparisons, contract tests at boundaries. Inside the new services we built a normal pyramid — many fast unit tests on domain logic like commission rules and error mapping, contract tests for each carrier adapter and our APIs, and a thin layer of end-to-end tests on critical journeys. Boundary tests are what let us swap the implementation safely."
+
+- **Legacy side:** outside-in acceptance and characterisation tests.
+- **New side:** test pyramid — unit → contract → few end-to-end.
+- **Contract tests** are the key layer — they prove old and new honour **the same interface**.
+
+#### Q11. What if the new service still depends on helpers or libraries in the monolith?
+
+> **Answer to say:** "Case by case. Pure, stable helpers — date and store-time-zone utilities, validation — we copied into the new service or put in a small versioned internal NuGet package. Helpers carrying business logic, like carrier code mappings, moved into their owning service, and the monolith called it. The shared data-access library we deliberately didn't reuse — it would have tied the new service to the old schema. A little duplication was better than a shared library that re-couples everything."
+
+- Options: **copy-and-own**, **versioned package**, **extract to a service**, **anti-corruption layer**.
+- **Never share** data access or domain models across services.
+- **Duplication is cheaper than the wrong coupling.**
+
+### Phase 4 — Integration, deployment and production
+
+#### Q12. Why are long-lived feature branches dangerous? How do trunk-based development and flags help?
+
+> **Answer to say:** "A long-lived branch for the new carrier service would have drifted from legacy, which kept changing with store fixes; the final merge would be huge and nothing would reach production for months. We used short-lived branches merged to main within a day or two, every merge through the pipeline. Unfinished work shipped to production switched off behind flags — per carrier for the new carrier path, per store for the new activation flow. Deploy and release became separate steps: deploy any day, release when ready, roll back with a flag."
+
+- Long-lived branches → **merge hell, hidden integration bugs, no production feedback, drift**.
+- **Trunk-based + CI** → one source of truth, small frequent merges.
+- Flags: **release flags** (carrier, store) and **kill switches**, removed after rollout.
+
+#### Q13. How do you deploy a skeleton service to production before it has business logic?
+
+> **Answer to say:** "Each new service's first production release was a walking skeleton — a .NET Core API on App Service with just a health endpoint and one trivial operation, deployed through the real pipeline with slots, using the real Key Vault, managed identity, App Insights and correlation ID, registered in APIM but with no traffic routed to it. That proved pipeline, networking, identity and monitoring end to end. Next came shadow traffic — carrier status checks went to both old and new, we compared results but still served legacy. Only then did we enable one real carrier."
+
+- **Walking skeleton** = thin slice through every layer, in production, **dark**.
+- Then **shadow → canary (one carrier / pilot stores) → ramp**.
+- Catches **infra, network and identity** problems early, when they're cheap.
+
+#### Q14. If the new service fails in production, how do you fall back to legacy?
+
+> **Answer to say:** "Every cutover had a minutes-long rollback, not a redeploy. APIs: switch the APIM backend back. Screens: switch the App Gateway path rule back. Carrier calls: turn off that carrier's flag and legacy calls the carrier directly. Activations: flip the store's flag back — legacy was still current because reverse sync kept it up to date. Each rollback had a defined trigger, like activation success rate below normal, and was rehearsed before go-live. Idempotent request IDs meant retries during rollback didn't create duplicate activations."
+
+- Fall back by **routing, flags, slot swap** — not only "fix forward".
+- **Keep legacy data current** (reverse sync) for the whole transition or rollback is impossible.
+- **Automatic fallback only for safe reads**; writes use a deliberate flag flip.
+- Rollback triggers written in the runbook and **rehearsed**.
+
+#### Q15. If the budget is cut halfway, what state is the system in vs a failed rewrite?
+
+> **Answer to say:** "Every wave we shipped was in production delivering value. If funding stopped after the carrier wave, we'd still have a working hybrid — reporting and commissions off the live database, every carrier call through the resilient service, the rest on legacy, all behind APIM. Nothing half-built, nothing wasted. A failed full rewrite leaves months of work with no business value and the old system still carrying all its problems. With Strangler-Fig, pausing just means the remaining legacy stays behind the gateway until funding returns."
+
+- Strangler-Fig = **value per slice, stable hybrid at every point, easy pause**; rewrite = **all or nothing**.
+- Safe pause requires each wave to end with **stable routing, sync complete or legacy still owner, runbooks done, no half-moved data**.
+- Pause cost: **running two systems** (gateway, sync jobs, two codebases) — the hybrid must be operable on its own.
