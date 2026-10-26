@@ -102,6 +102,8 @@ Live coding challenges for technical interviews:
 Answers include real examples from a personal RAG knowledge-base app built with Semantic Kernel, Azure OpenAI, and Gemini.
 
 ---
+Also in this folder: [production-ai-project-checklist.md](ai-llm/production-ai-project-checklist.md) — a reusable checklist for production AI and agent projects (18 areas, from LLM integration and security to evaluation and privacy), built from the IIT Hyderabad capstone evaluation criteria.
+
 
 ## SQL&Postgres
 
