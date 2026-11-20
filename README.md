@@ -8,6 +8,7 @@ My interview prep notes, organized by topic. Most answers are framed around the 
 
 | Folder | Description | Coverage |
 |--------|-------------|----------|
+| [project-stories](https://github.com/apoorv2009/interview-vault/tree/main/project-stories) | ⭐ **Start here before any interview** — 4 consolidated project docs (Capital Access, WARP/TJX, AI report ingestion, BDC → Capital Access migration) in STAR + 8-category Q&A format | 4 projects |
 | [dotnet-core](https://github.com/apoorv2009/interview-vault/tree/main/dotnet-core) | .NET 8 & C# 12 interview Q&A | 134 questions |
 | [angular](https://github.com/apoorv2009/interview-vault/tree/main/angular) | Angular 19 & TypeScript interview Q&A | 82 questions |
 | [react](https://github.com/apoorv2009/interview-vault/tree/main/react) | React hooks, state management interview Q&A | 4 questions |
@@ -101,9 +102,9 @@ Live coding challenges for technical interviews:
 
 Answers include real examples from a personal RAG knowledge-base app built with Semantic Kernel, Azure OpenAI, and Gemini.
 
----
 Also in this folder: [production-ai-project-checklist.md](ai-llm/production-ai-project-checklist.md) — a reusable checklist for production AI and agent projects (18 areas, from LLM integration and security to evaluation and privacy), built from the IIT Hyderabad capstone evaluation criteria.
 
+---
 
 ## SQL&Postgres
 
